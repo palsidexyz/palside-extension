@@ -1,0 +1,16 @@
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg" viewBox="-5 -5 58 58">
+    <defs>
+      <linearGradient id="r0b" x1="0" y1="4" x2="0" y2="45" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff7486"/><stop offset=".55" stop-color="#ee2846"/><stop offset="1" stop-color="#9c0f25"/></linearGradient>
+      <linearGradient id="r0g" x1="0" y1="3" x2="0" y2="26" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <filter id="r0f" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.8" stdDeviation="1.5" flood-color="#000" flood-opacity=".5"/></filter>
+    </defs>
+    <g filter="url(#r0f)">
+      <path d="M19.2,42 L4.6,42 L2.4,38.4 L21.6,4.5 L26.4,4.5 L45.6,38.4 L43.4,42 L28.8,42 L31.6,37 L37.2,37 L24,14 L10.8,37 L16.4,37Z M24,18.5 L26.8,22.5 L25.3,31 L22.7,31 L21.2,22.5Z M24,33 L27.5,36.5 L24,40 L20.5,36.5Z" fill-rule="evenodd" fill="#4c0a14" stroke="#4c0a14" stroke-width="3.4" stroke-linejoin="round" stroke-opacity=".92"/>
+      <clipPath id="r0c0"><path d="M19.2,42 L4.6,42 L2.4,38.4 L21.6,4.5 L26.4,4.5 L45.6,38.4 L43.4,42 L28.8,42 L31.6,37 L37.2,37 L24,14 L10.8,37 L16.4,37Z M24,18.5 L26.8,22.5 L25.3,31 L22.7,31 L21.2,22.5Z M24,33 L27.5,36.5 L24,40 L20.5,36.5Z" clip-rule="evenodd"/></clipPath>
+        <path d="M19.2,42 L4.6,42 L2.4,38.4 L21.6,4.5 L26.4,4.5 L45.6,38.4 L43.4,42 L28.8,42 L31.6,37 L37.2,37 L24,14 L10.8,37 L16.4,37Z M24,18.5 L26.8,22.5 L25.3,31 L22.7,31 L21.2,22.5Z M24,33 L27.5,36.5 L24,40 L20.5,36.5Z" fill-rule="evenodd" fill="url(#r0b)"/>
+        <g clip-path="url(#r0c0)">
+          <rect x="-5" y="-5" width="58" height="31" fill="url(#r0g)"/>
+          <path d="M19.2,42 L4.6,42 L2.4,38.4 L21.6,4.5 L26.4,4.5 L45.6,38.4 L43.4,42 L28.8,42 L31.6,37 L37.2,37 L24,14 L10.8,37 L16.4,37Z M24,18.5 L26.8,22.5 L25.3,31 L22.7,31 L21.2,22.5Z M24,33 L27.5,36.5 L24,40 L20.5,36.5Z" fill="none" stroke="#ff7486" stroke-opacity=".75" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M19.2,42 L4.6,42 L2.4,38.4 L21.6,4.5 L26.4,4.5 L45.6,38.4 L43.4,42 L28.8,42 L31.6,37 L37.2,37 L24,14 L10.8,37 L16.4,37Z M24,18.5 L26.8,22.5 L25.3,31 L22.7,31 L21.2,22.5Z M24,33 L27.5,36.5 L24,40 L20.5,36.5Z" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="1.4" transform="translate(0 -1.4)"/>
+        </g>
+    </g></svg>

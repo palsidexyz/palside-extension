@@ -1,0 +1,55 @@
+/* 信号 settings: the wheel drawn as it opens on the page (its own dark, gold-ruled look), the palette under it, then secondary rows. */
+.root { display:flex; flex-direction:column; }
+.editor { display:flex; flex-direction:column; gap:14px; padding:14px 0 16px; }
+.stage { display:grid; place-items:center; }
+
+/* The wheel: same colours as the page wheel, 8 slots from north clockwise. */
+.wheel { --r:224px; position:relative; width:var(--r); height:var(--r); border-radius:50%;
+  background:
+    repeating-conic-gradient(from -22.5deg, color-mix(in srgb, var(--signal-line) 50%, transparent) 0 .35deg, transparent .35deg 45deg),
+    radial-gradient(circle, var(--signal-deep) 0 calc(var(--r) * .225), color-mix(in srgb, var(--signal-deep) 80%, var(--signal-edge)) calc(var(--r) * .225), var(--signal-edge) 71%);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--signal-line) 35%, transparent); }
+.slot { position:absolute; left:50%; top:50%; display:grid; place-items:center; width:46px; height:46px; margin:-23px; padding:0; border:0; border-radius:50%; background:transparent; cursor:pointer;
+  transform:rotate(var(--a)) translateY(calc(var(--r) * -.36)) rotate(calc(var(--a) * -1)); transition:background-color .16s, box-shadow .16s; }
+.slot img { width:36px; height:36px; object-fit:contain; pointer-events:none; }
+.slot[data-emote] img { width:34px; height:34px; }
+.slot:hover { background:color-mix(in srgb, var(--signal-gold) 18%, transparent); }
+.slot[aria-checked="true"] { background:color-mix(in srgb, var(--signal-gold) 30%, transparent); box-shadow:0 0 0 1.5px var(--signal-gold); }
+.slot:focus-visible { outline:none; box-shadow:0 0 0 2px var(--signal-focus); }
+/* The hub shows the shortcut held while dragging on a page. */
+.hub { position:absolute; left:50%; top:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:var(--signal-ink); width:calc(var(--r) * .43); height:calc(var(--r) * .43); margin:calc(var(--r) * -.215); border-radius:50%;
+  background:radial-gradient(circle, var(--signal-deep) 0, var(--signal-mid) 100%); box-shadow:0 0 0 1.8px var(--signal-gold), 0 0 0 4.5px color-mix(in srgb, var(--signal-deep) 85%, transparent), 0 0 0 5.5px color-mix(in srgb, var(--signal-line) 90%, transparent); }
+
+.hub small { font-size:var(--ui-type-caption); line-height:12px; color:var(--signal-muted); }
+.hubKeys { display:flex; gap:3px; }
+.hubKeys kbd { min-width:20px; padding:1px 5px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:color-mix(in srgb, var(--signal-ink) 8%, transparent); color:var(--signal-ink); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--signal-gold) 55%, transparent); font:600 var(--ui-type-caption)/18px var(--font-geist-mono), monospace; text-align:center; }
+
+/* Two bars under the wheel: the shortcut (修改 opens ⌃ ⌥ ⇧ as chips), then 信号/表情 and 恢复默认. */
+.bar { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:30px; }
+.barLabel { display:flex; align-items:center; gap:8px; font-size:var(--ui-type-callout); color:var(--ui-text-secondary); }
+.keyChips, .tabs { display:flex; gap:4px; }
+.keyChips button { min-height:28px; padding:0 10px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; cursor:pointer; }
+.keyChips button[aria-pressed="true"] { background:var(--ui-solid); color:var(--ui-on-solid); }
+.tabs { padding:3px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.tabs button { min-height:24px; padding:0 12px; border:0; border-radius:calc(var(--ui-radius-m) - 3px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; cursor:pointer; }
+.tabs button[aria-selected="true"] { background:var(--ui-canvas); color:var(--ui-text-primary); }
+.keyChips button:focus-visible, .tabs button:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+
+.keys { display:inline-flex; flex-wrap:wrap; justify-content:center; gap:3px; max-width:100%; }
+.keys kbd { padding:1px 5px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-caption)/16px var(--font-geist-mono), monospace; white-space:nowrap; }
+
+/* The palette: what can go in the chosen slot. One on the wheel carries its slot number; the chosen slot's entry is ringed. */
+.palette { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:6px; }
+.pick { position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0; padding:8px 4px 6px; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; cursor:pointer; transition:background-color .16s, box-shadow .16s; }
+.pick img { width:34px; height:34px; object-fit:contain; pointer-events:none; }
+.pickName { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-footnote); line-height:15px; color:var(--ui-text-secondary); }
+.pick:hover { background:var(--ui-control-hover); }
+.slotNo { position:absolute; top:4px; right:4px; display:grid; place-items:center; min-width:16px; height:16px; padding:0 4px; border-radius:var(--ui-radius-pill); background:var(--ui-solid); color:var(--ui-on-solid); font:600 var(--ui-type-caption)/1 var(--font-geist-mono), monospace; }
+.pick[aria-pressed="true"] { box-shadow:inset 0 0 0 1.5px var(--ui-solid); background:var(--ui-canvas); }
+.pick:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+
+.rows { display:flex; flex-direction:column; }
+.rows > :first-child { box-shadow:none; }
+
+@container (max-width:350px) { .wheel { --r:200px; } }
+@media (prefers-reduced-motion:reduce) { .slot, .pick { transition:none; } }

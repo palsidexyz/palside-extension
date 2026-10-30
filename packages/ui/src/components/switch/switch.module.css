@@ -1,0 +1,27 @@
+.choice { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 44px; padding-block: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nativeChoice { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.choiceText { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--ui-text-primary); font-size:var(--ui-type-body); line-height: 20px; overflow-wrap: anywhere; }
+.choiceLabel { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.choice:has(.nativeChoice:disabled) { opacity: .45; cursor: not-allowed; }
+.nativeChoice:focus-visible ~ .switchTrack { outline: var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset: var(--ui-focus-offset); }
+.switchRow { justify-content: space-between; }
+.switchTrack { position: relative; flex: 0 0 40px; width: 40px; height: 24px; border-radius:var(--ui-radius-pill); background: var(--ui-control-recess); transition: background-color .24s cubic-bezier(.22,1,.36,1); }
+.switchThumb { position: absolute; inset-block-start: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius:50%; background: var(--ui-switch-thumb); transition: transform .28s cubic-bezier(.22,1,.36,1), width .2s cubic-bezier(.22,1,.36,1); }
+.nativeChoice:checked ~ .switchTrack { background: var(--ui-accent); }
+.nativeChoice:checked ~ .switchTrack .switchThumb { transform: translateX(16px); }
+.nativeChoice:checked ~ .switchTrack:dir(rtl) .switchThumb { transform: translateX(-16px); }
+.status { margin: 0; font-size:var(--ui-type-footnote); line-height: 18px; overflow-wrap: anywhere; color: var(--ui-ink-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .switchTrack, .switchThumb { transition: none; }
+}
+@media (forced-colors: active) {
+  .switchTrack { border: 1px solid ButtonText; }
+  .nativeChoice:checked ~ .switchTrack { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .switchThumb { forced-color-adjust: none; background: ButtonText; }
+}
+
+.switchRow:active .nativeChoice:not(:disabled) ~ .switchTrack .switchThumb { width:21px; }
+.switchRow:active .nativeChoice:checked:not(:disabled) ~ .switchTrack .switchThumb { transform:translateX(13px); }
+.switchRow:active .nativeChoice:checked:not(:disabled) ~ .switchTrack:dir(rtl) .switchThumb { transform:translateX(-13px); }
+@media(prefers-reduced-motion:reduce) { .switchThumb { transition:none; } .switchRow:active .nativeChoice:not(:disabled) ~ .switchTrack .switchThumb { width:18px; } .switchRow:active .nativeChoice:checked:not(:disabled) ~ .switchTrack .switchThumb { transform:translateX(16px); } .switchRow:active .nativeChoice:checked:not(:disabled) ~ .switchTrack:dir(rtl) .switchThumb { transform:translateX(-16px); } }
+.choice[data-label="hidden"] { gap: 0; min-height: 0; width: auto; padding-block: 0; }

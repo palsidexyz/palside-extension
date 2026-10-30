@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@import "@palside/design/tokens.css";
+@import "@palside/design/base.css";
+
+html, body, #root { width: 100%; height: 100%; margin: 0; min-width: 0; }
+body { overflow: hidden; -webkit-font-smoothing: antialiased; }
+/* The product's strongest weight is 600; emphasis never falls back to the browser's bold. */
+:where(b, strong) { font-weight: 600; }
+
+/* Text highlights registered by features/palside/chat/text-highlights.ts. A landing tint holds, then steps down. */
+::highlight(palside-focus) { background-color: color-mix(in srgb, var(--ui-accent) 62%, transparent); color: var(--ui-text-primary); }
+::highlight(palside-focus-fade-1) { background-color: color-mix(in srgb, var(--ui-accent) 42%, transparent); }
+::highlight(palside-focus-fade-2) { background-color: color-mix(in srgb, var(--ui-accent) 24%, transparent); }
+::highlight(palside-focus-fade-3) { background-color: color-mix(in srgb, var(--ui-accent) 10%, transparent); }
+::highlight(palside-search) { background-color: color-mix(in srgb, var(--ui-accent) 34%, transparent); }
+::highlight(palside-search-current) { background-color: var(--ui-accent); color: var(--ui-on-accent); }
+@media (forced-colors: active) {
+  ::highlight(palside-focus), ::highlight(palside-search-current) { background-color: Highlight; color: HighlightText; }
+  ::highlight(palside-search) { background-color: Mark; color: MarkText; }
+}

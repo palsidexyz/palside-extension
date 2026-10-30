@@ -1,0 +1,25 @@
+{
+  "name": "@palside/design",
+  "version": "0.1.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palsidexyz/palside-extension.git",
+    "directory": "packages/design"
+  },
+  "homepage": "https://palside.xyz",
+  "bugs": "https://github.com/palsidexyz/palside-extension/issues",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./tokens.css",
+    "./base.css": "./base.css",
+    "./fonts.css": "./fonts.css",
+    "./brand/palside.svg": "./assets/brand/palside.svg",
+    "./motion": "./motion.ts",
+    "./colors": "./colors.ts"
+  },
+  "dependencies": {
+    "motion": "14.6.0"
+  }
+}

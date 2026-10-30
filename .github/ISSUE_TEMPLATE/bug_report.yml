@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a reproducible problem with Palside.
+body:
+  - type: markdown
+    attributes:
+      value: "For security vulnerabilities, follow [SECURITY.md](https://github.com/palsidexyz/palside-extension/blob/HEAD/SECURITY.md) and report privately to palside@pm.me."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the steps needed to reproduce the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the Palside version or commit, affected component, OS, and Chrome or Node.js version as applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs and screenshots
+      description: Include relevant evidence with credentials, keys, and personal data removed.

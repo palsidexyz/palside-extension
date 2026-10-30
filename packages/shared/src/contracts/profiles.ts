@@ -1,0 +1,25 @@
+import Type, { type StaticDecode as Static } from 'typebox';
+import { denseArray, contractString, strictObject } from './validation.ts';
+import { id, matrixId, count, text } from './common.ts';
+import { walletBinding } from './chain.ts';
+import { normalizeTagText, presetTagIds } from './rules.ts';
+import { NICKNAME_LENGTH, BIO_LENGTH, TAG_COUNT, TAG_LENGTH } from './limits.ts';
+export const walletPerson = strictObject({ wallet: Type.Union([walletBinding, Type.Null()]) });
+export type WalletPerson = Static<typeof walletPerson>;
+export { presetTagIds };
+export const presetTagId = Type.Enum(presetTagIds);
+export type PresetTagId = Static<typeof presetTagId>;
+const customTag = contractString({ min: 1, max: TAG_LENGTH, unit: 'grapheme', normalize: normalizeTagText });
+export const profileTag = Type.Union([strictObject({ preset: presetTagId }), strictObject({ text: customTag })]);
+export type ProfileTag = Static<typeof profileTag>;
+export const profileTags = Type.Decode(denseArray(profileTag, { maxItems: TAG_COUNT }), tags => {
+  const seen = new Set<string>();
+  return tags.filter(tag => { const key = 'preset' in tag ? `preset:${tag.preset}` : `text:${tag.text.toLowerCase()}`; if (seen.has(key)) return false; seen.add(key); return true; });
+});
+export const personFields = { id, nickname: text(NICKNAME_LENGTH), avatarId: Type.Union([id, Type.Null()]) };
+export const person = strictObject(personFields);
+export const account = strictObject({ ...personFields, acceptTeamInvites: Type.Boolean(), bio: text(BIO_LENGTH), tags: profileTags, matrixId, revision: count });
+export type Account = Static<typeof account>;
+export const teamPerson = strictObject({ ...personFields, bio: text(BIO_LENGTH), tags: profileTags, matrixId, deleted: Type.Boolean() });
+export const profileUpdate = Type.Refine(strictObject({ nickname: Type.Optional(text(NICKNAME_LENGTH, 1)), bio: Type.Optional(text(BIO_LENGTH)), tags: Type.Optional(profileTags), acceptTeamInvites: Type.Optional(Type.Boolean()) }), value => Object.values(value).some(item => item !== undefined), () => 'expected a profile field');
+export type RoomPerson = Static<typeof person>;

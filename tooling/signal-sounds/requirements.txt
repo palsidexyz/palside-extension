@@ -1,0 +1,5 @@
+# CPython 3.9, macOS 14+ arm64. Generated with pip download --only-binary=:all: and SHA-256.
+--only-binary=:all:
+
+numpy==2.0.2 --hash=sha256:2b2955fa6f11907cf7a70dab0d0755159bca87755e831e47932367fc8f2f2d0b
+pedalboard==0.9.17 --hash=sha256:4e8cc9d61a8bd56ada4a5d894bc1960315457667108b7cdf04566d86e1c99f69

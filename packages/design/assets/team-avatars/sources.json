@@ -1,0 +1,146 @@
+[
+  {
+    "id": "frog-ghost",
+    "file": "team-avatar-frog-ghost.webp",
+    "bytes": 9532,
+    "sha256": "01c45df10cf35140a904a39136f1025089cd998a6776cda9e66448d3966d0c27"
+  },
+  {
+    "id": "robot-duo",
+    "file": "team-avatar-robot-duo.webp",
+    "bytes": 9496,
+    "sha256": "01ed00b7772b15414eec492b0d271dbb7732bdc6803708de660464cbeb24654d"
+  },
+  {
+    "id": "cat-duo",
+    "file": "team-avatar-cat-duo.webp",
+    "bytes": 11392,
+    "sha256": "19e5c71a8b93e01f4a33c533d3118efa518f2dfe85783664bdc8492f63c81cf1"
+  },
+  {
+    "id": "blob-trio",
+    "file": "team-avatar-blob-trio.webp",
+    "bytes": 8908,
+    "sha256": "6312f308d9bb39a4fe542af1e80b1b2422998d08c6fd2523c360a866f24e971f"
+  },
+  {
+    "id": "mushroom-pals",
+    "file": "team-avatar-mushroom-pals.webp",
+    "bytes": 13002,
+    "sha256": "a51b66f4fd1b9dfed4cbafe45c72c4aa05b6b4cec38d8fad75c93e748f030bf5"
+  },
+  {
+    "id": "cool-birds",
+    "file": "team-avatar-cool-birds.webp",
+    "bytes": 10310,
+    "sha256": "de4380679f415cd1d5cfa08f699f500b68f975c215b55a6fcd3cf00504c4843d"
+  },
+  {
+    "id": "ghost-high-five",
+    "file": "team-avatar-ghost-high-five.webp",
+    "bytes": 8378,
+    "sha256": "dfbcfd26d143885071f8739d4a7dffec2ec0046004d7fd56c98b0a994a112a7a"
+  },
+  {
+    "id": "monster-stack",
+    "file": "team-avatar-monster-stack.webp",
+    "bytes": 11688,
+    "sha256": "77452f589385cd2a66be1b32c4f75342d81ffe16cd9460e45fba44eec5be254f"
+  },
+  {
+    "id": "portrait-classics",
+    "file": "team-avatar-portrait-classics.webp",
+    "bytes": 10486,
+    "sha256": "7f5d4d893b6404d7bd8fa881064d9a3f026c8dc76f61f57c886d88d1f467ea86"
+  },
+  {
+    "id": "portrait-cosmic",
+    "file": "team-avatar-portrait-cosmic.webp",
+    "bytes": 11142,
+    "sha256": "d336c7aa9b2b91d20f89452fba7c561653886a608a63dc3ab1e7640bca16453b"
+  },
+  {
+    "id": "portrait-cozy",
+    "file": "team-avatar-portrait-cozy.webp",
+    "bytes": 12248,
+    "sha256": "da3dd969723751f06e00eba436ba58b9d438ea664a97647ec27d6ec9381ca87b"
+  },
+  {
+    "id": "portrait-nature",
+    "file": "team-avatar-portrait-nature.webp",
+    "bytes": 12152,
+    "sha256": "f4ea9b49953ac5b34b62a99845cc792f0789d8f957b84cc453611c3fff90aed9"
+  },
+  {
+    "id": "portrait-playful",
+    "file": "team-avatar-portrait-playful.webp",
+    "bytes": 10972,
+    "sha256": "db33f10c288b05a0dce41bab3911d22ee697242f66541d5ecdcd4e390a9d8908"
+  },
+  {
+    "id": "portrait-mischief",
+    "file": "team-avatar-portrait-mischief.webp",
+    "bytes": 12886,
+    "sha256": "1a47acbc236ce3a4bed72499433b8d3efd9fa1aafa4a6fed5b557e721142392b"
+  },
+  {
+    "id": "chat-classics",
+    "file": "team-avatar-chat-classics.webp",
+    "bytes": 12772,
+    "sha256": "c9a0bf755acffa2e8605f67b230ebaa4b0e8c7383eacceed4624fc791db18cc4"
+  },
+  {
+    "id": "chat-cosmic",
+    "file": "team-avatar-chat-cosmic.webp",
+    "bytes": 11988,
+    "sha256": "1d30121cffdd56a1e3d173983dfee022f7196991d383a7cc1afd16a9235e1157"
+  },
+  {
+    "id": "chat-cozy",
+    "file": "team-avatar-chat-cozy.webp",
+    "bytes": 12854,
+    "sha256": "953316fd846a92bc38f5f3e26c03fdbedb149a2bf298ee8fc7b971a95fbb6e76"
+  },
+  {
+    "id": "chat-night",
+    "file": "team-avatar-chat-night.webp",
+    "bytes": 11906,
+    "sha256": "3eb11c57c9b4b8f572bfa2a05190c15624685c2e7a4be330dacdc89310d9d7ef"
+  },
+  {
+    "id": "chat-odd",
+    "file": "team-avatar-chat-odd.webp",
+    "bytes": 9586,
+    "sha256": "4d9b6f3aeb6c93d6eb255b394f9e27f0801799ae767ad5560599fc83548c9978"
+  },
+  {
+    "id": "chat-garden",
+    "file": "team-avatar-chat-garden.webp",
+    "bytes": 10422,
+    "sha256": "ecaca1a4f0e10b092e44308c62aadf9b90daaa1754d793c92907e6dbf91cd620"
+  },
+  {
+    "id": "ride-boat",
+    "file": "team-avatar-ride-boat.webp",
+    "bytes": 11518,
+    "sha256": "32db56b8c18628b8ba7555116117546498f24b5b22cfe33886de308afb6dfc08"
+  },
+  {
+    "id": "ride-spaceship",
+    "file": "team-avatar-ride-spaceship.webp",
+    "bytes": 13816,
+    "sha256": "6d5c30dfd6f65f9eadb21a3c11f372b40e629f11f3dff5f19d0d55942225c1b9"
+  },
+  {
+    "id": "ride-camper",
+    "file": "team-avatar-ride-camper.webp",
+    "bytes": 13638,
+    "sha256": "e018b74469a1c631aabd3005801ec1f479d955059a86e281584fd1232b67e2b4"
+  },
+  {
+    "id": "ride-skateboard",
+    "file": "team-avatar-ride-skateboard.webp",
+    "bytes": 11250,
+    "sha256": "c41bf0046a5d07f94cce9d668aa89a4b942cf0505614b01ae23484f8dc5824fc"
+  }
+]

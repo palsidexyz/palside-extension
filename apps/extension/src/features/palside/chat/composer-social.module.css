@@ -1,0 +1,27 @@
+/* Source blocks shared by page references, quoted 弹幕 lines and replies: a source row (icon, name, host or time, kind tag), then the excerpt. */
+.fold { overflow:hidden; }
+.refBody { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.refHead { display:flex; align-items:center; gap:6px; min-width:0; height:18px; font-size:var(--ui-type-footnote); line-height:18px; color:var(--ui-text-secondary); }
+.refHead>span:first-child { flex-shrink:0; }
+.refSource { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ui-text-primary); font-weight:600; }
+.refSub { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.refTag { flex-shrink:0; height:18px; padding:0 6px; border:0; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); font-size:var(--ui-type-caption); line-height:16px; font-weight:600; }
+.refText { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; white-space:normal; font-size:var(--ui-type-callout); line-height:20px; font-weight:400; color:var(--ui-text-primary); }
+.refText>b { margin-right:5px; font-weight:600; }
+/* A 弹幕 line keeps the room's row: avatar, name, words. */
+.refLine { display:flex; align-items:flex-start; gap:7px; min-width:0; }
+.refLine>[data-person-avatar] { flex-shrink:0; margin-top:1px; }
+.refLine [data-presence] { display:none; }
+.replyText { -webkit-line-clamp:1; }
+.quoteText { -webkit-line-clamp:2; }
+/* The pending block above the input carries its own remove button. */
+.refDraft { display:flex; align-items:flex-start; gap:4px; margin:0 0 8px; min-width:0; padding:8px 4px 9px 10px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:color-mix(in srgb, var(--ui-text-primary) 6%, transparent); }
+.remove { margin:-5px 0; }
+.refDraft .refText { -webkit-line-clamp:2; }
+/* In a message the whole block is the button: it finds the page target, the 弹幕 line or the replied message. */
+.refChip { display:flex; width:100%; min-width:0; margin:0 0 8px; padding:8px 10px 9px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:color-mix(in srgb, var(--ui-text-primary) 6%, transparent); color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
+.refChip:only-child { margin:0; }
+.refChip:hover { background:color-mix(in srgb, var(--ui-text-primary) 10%, transparent); }
+.refChip:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.refChip[aria-busy=true] { opacity:.7; }
+@media (prefers-reduced-motion:reduce) { .refChip { transition:none; } }

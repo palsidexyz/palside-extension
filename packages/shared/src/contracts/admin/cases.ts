@@ -1,0 +1,21 @@
+import Type from 'typebox';
+import { strictObject, type Infer } from '../validation.ts';
+import { nullable, id, targetId, page, adminAccountRef, adminTeamRef } from './common.ts';
+import { accountFields, teamFields, duration } from './moderation.ts';
+
+export const reportReason = Type.Enum(['spam', 'harassment', 'sexual', 'illegal', 'other']);
+export const caseOutcome = Type.Enum(['confirmed', 'dismissed']);
+export const adminCaseSteps = strictObject({ ban: Type.Optional(strictObject({ accountId: targetId, duration, deleteMessages: Type.Boolean() })), clearAccount: Type.Optional(accountFields), clearTeam: Type.Optional(teamFields), hideRecruitment: Type.Optional(Type.Literal(true)), excludeRanking: Type.Optional(Type.Literal(true)), removeMessage: Type.Optional(Type.Literal(true)) });
+export type AdminCaseSteps = Infer<typeof adminCaseSteps>;
+export const adminCaseReview = strictObject({ caseId: targetId, expectedRevision: Type.Integer({ minimum: 1 }), reviewedReportIds: Type.Array(targetId, { minItems: 1, uniqueItems: true }) });
+export type AdminCaseReview = Infer<typeof adminCaseReview>;
+export const adminCaseStepResult = strictObject({ step: Type.Enum(['ban', 'clearAccount', 'clearTeam', 'hideRecruitment', 'excludeRanking', 'removeMessage']), targetId, status: Type.Enum(['applied', 'already-effective']), auditId: nullable(id), effectiveUntil: nullable(Type.Integer()) });
+export type AdminCaseStepResult = Infer<typeof adminCaseStepResult>;
+export const adminCaseRow = strictObject({ id, kind: Type.Enum(['account', 'team', 'message', 'room']), targetId, status: Type.Enum(['open', 'closed', 'expired']), revision: Type.Integer(), round: Type.Integer({ minimum: 1 }), outcome: nullable(caseOutcome), subject: nullable(adminAccountRef), team: nullable(adminTeamRef), reportCount: Type.Integer(), reporterCount: Type.Integer(), firstReportedAt: Type.Integer(), lastReportedAt: Type.Integer(), queuedAt: nullable(Type.Integer()), closedAt: nullable(Type.Integer()), preview: strictObject({ text: nullable(Type.String()), state: Type.Enum(['available', 'private', 'expired', 'unavailable']) }) });
+export type AdminCaseRow = Infer<typeof adminCaseRow>;
+export const adminCasePage = page(adminCaseRow);
+export const adminReportEvidence = strictObject({ id, reporterLabel: Type.String(), reason: nullable(reportReason), createdAt: Type.Integer(), provenance: Type.Enum(['user-submitted', 'server-public']), state: Type.Enum(['available', 'expired', 'unavailable']), snapshot: nullable(Type.String()), note: nullable(Type.String()), expiresAt: Type.Integer(), firstDisclosedAt: nullable(Type.Integer()), image: strictObject({ state: Type.Enum(['none', 'available', 'expired', 'unavailable']), expiresAt: nullable(Type.Integer()) }) });
+export type AdminReportEvidence = Infer<typeof adminReportEvidence>;
+export const adminCaseDisposition = strictObject({ outcome: caseOutcome, reason: Type.String(), closedAt: Type.Integer(), requestedSteps: adminCaseSteps, results: Type.Array(adminCaseStepResult), auditIds: Type.Array(id) });
+export const adminCaseDetail = strictObject({ ...adminCaseRow.properties, checkedAt: Type.Integer(), sourceCreatedAt: nullable(Type.Integer()), roomKey: nullable(Type.String()), currentOwner: nullable(adminAccountRef), currentBan: nullable(strictObject({ accountId: id, expiresAt: nullable(Type.Integer()) })), sourceState: Type.Enum(['available', 'removed', 'expired', 'unknown']), recruitmentActive: nullable(Type.Boolean()), ranking: nullable(strictObject({ manuallyExcluded: Type.Boolean(), excludedUntil: nullable(Type.Integer()) })), items: Type.Array(adminReportEvidence), matches: Type.Array(strictObject({ reportId: id, wordId: id, word: Type.String(), kind: Type.Enum(['reserved', 'sensitive']) })), history: Type.Array(adminCaseRow), disposition: nullable(adminCaseDisposition) });
+export type AdminCaseDetail = Infer<typeof adminCaseDetail>;

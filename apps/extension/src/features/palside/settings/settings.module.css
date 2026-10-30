@@ -1,0 +1,13 @@
+.page { display:flex; flex-direction:column; gap:14px; min-width:0; }
+/* The account card's first row: who you are, larger than a settings row; 零钱 sits under it in the same card. */
+.profile { display:flex; align-items:center; gap:14px; width:100%; padding:14px; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:background-color .18s; }
+.profile:hover { background:var(--ui-control-hover); }
+.profile:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:calc(-1 * var(--ui-focus-width)); }
+.identity { flex:1; min-width:0; }
+.identity strong { display:block; font-size:var(--ui-type-title); line-height:22px; font-weight:600; overflow-wrap:anywhere; }
+.identity small { display:block; margin-top:2px; font:500 var(--ui-type-footnote)/16px var(--font-geist-mono),monospace; color:var(--ui-text-secondary); overflow-wrap:anywhere; }
+.profile>svg { flex:none; color:var(--ui-text-secondary); }
+/* 网站 opens under 网页互动 when it is switched on. */
+.reveal { overflow:hidden; animation:reveal .22s var(--ui-ease-feedback); }
+@keyframes reveal { from { max-height:0; opacity:0; } to { max-height:56px; opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .reveal { animation:none; } .profile { transition:none; } }

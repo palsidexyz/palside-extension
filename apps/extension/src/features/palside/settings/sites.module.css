@@ -1,0 +1,11 @@
+.logo { --logo-size:28px; position:relative; display:inline-block; flex:0 0 var(--logo-size); width:var(--logo-size); height:var(--logo-size); min-width:var(--logo-size); max-width:var(--logo-size); min-height:var(--logo-size); max-height:var(--logo-size); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); overflow:hidden; vertical-align:middle; background:var(--ui-control-surface); color:var(--ui-text-secondary); }
+.logo img { position:absolute; inset:0; display:block; width:var(--logo-size); height:var(--logo-size); min-width:var(--logo-size); max-width:var(--logo-size); object-fit:contain; }
+.logo svg { position:absolute; width:65%; height:65%; inset:17.5%; }
+.logo[data-size="sm"] { --logo-size:20px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
+.logo[data-size="xs"] { --logo-size:16px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
+.logo[data-size="lg"] { --logo-size:40px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+/* A site already 开启 in 添加网站: the logo greys out. */
+.logo[data-off] img { filter:grayscale(1); opacity:.45; }
+.logo[data-off] svg { opacity:.5; }
+.logo[data-plate="light"] { background:var(--ui-logo-plate-light); }
+.logo[data-plate="dark"] { background:var(--ui-logo-plate-dark); }

@@ -1,0 +1,14 @@
+{
+  "name": {
+    "message": "Palside：和朋友一起看币"
+  },
+  "description": {
+    "message": "在 Chrome 侧栏和朋友一起看币：共享在看、端到端加密的小队聊天、网页信号与弹幕。"
+  },
+  "open": {
+    "message": "打开 Palside"
+  },
+  "captureCommand": {
+    "message": "截图当前网页"
+  }
+}

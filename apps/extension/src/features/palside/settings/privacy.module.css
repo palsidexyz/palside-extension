@@ -1,0 +1,27 @@
+/* 隐私与数据: a card per Chrome permission — Chrome's mark, the permission's name in the panel's own ink (nothing here is a link), its state
+   and 收回 on the right, then the features that run on it. */
+.cards { display:flex; flex-direction:column; gap:8px; }
+.card { display:flex; flex-direction:column; gap:12px; padding:14px 14px 14px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.head { display:flex; align-items:center; gap:8px; min-height:22px; }
+.name { flex:1; min-width:0; margin:0; color:var(--ui-text-primary); font-size:var(--ui-type-body); line-height:20px; font-weight:600; overflow-wrap:anywhere; }
+.state { display:inline-flex; flex:none; align-items:center; gap:5px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; white-space:nowrap; }
+.state::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.7; }
+.state[data-on] { color:var(--ui-ink-accent); font-weight:500; }
+.state[data-on]::before { opacity:1; }
+.state[data-fixed]::before { display:none; }
+/* On the control-surface card a surface button would vanish; it takes the canvas, like the chips. */
+.revoke.revoke.revoke { margin-left:2px; background:var(--ui-canvas); }
+.revoke.revoke.revoke:hover { background:var(--ui-control-hover); }
+.chip:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:0 12px 0 10px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-callout); font-weight:500; cursor:pointer; transition:background-color .18s; }
+.chip svg { flex:none; width:14px; height:14px; color:var(--ui-text-secondary); }
+.chip:hover { background:var(--ui-control-hover); }
+
+/* The drawer opens on the permission the feature runs on. */
+.permBox { display:flex; flex-direction:column; gap:2px; margin:0 0 14px; padding:10px 14px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.permBox > small { color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; margin-bottom:4px; }
+.permRow { display:flex; align-items:center; gap:10px; min-height:30px; }
+.permRow b { flex:1; min-width:0; color:var(--ui-text-primary); font-size:var(--ui-type-body); line-height:20px; font-weight:600; }
+@media (prefers-reduced-motion:reduce) { .chip { transition:none; } }
+.drawer dl { margin-top:14px; }

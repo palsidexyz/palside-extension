@@ -1,0 +1,5 @@
+/* 表情雨 inside the reaction stage: emoji only, no sender card. */
+.drop, .still { --emoji-shadow: rgb(0 0 0 / 14%); }
+.drop { position:absolute; top:0; height:100%; display:flex; align-items:flex-end; translate:-50% 0; line-height:1; pointer-events:none; will-change:transform, opacity; }
+.drop>span { display:block; padding-bottom:4px; filter:drop-shadow(0 3px 6px var(--emoji-shadow)); }
+.still { position:absolute; translate:-50% -50%; line-height:1; pointer-events:none; filter:drop-shadow(0 3px 6px var(--emoji-shadow)); }

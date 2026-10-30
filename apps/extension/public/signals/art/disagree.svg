@@ -1,0 +1,22 @@
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg" viewBox="-5 -5 58 58">
+    <defs>
+      <linearGradient id="r7b" x1="0" y1="4" x2="0" y2="45" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff7486"/><stop offset=".55" stop-color="#ee2846"/><stop offset="1" stop-color="#9c0f25"/></linearGradient>
+      <linearGradient id="r7g" x1="0" y1="3" x2="0" y2="26" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <filter id="r7f" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.8" stdDeviation="1.5" flood-color="#000" flood-opacity=".5"/></filter>
+    </defs>
+    <g filter="url(#r7f)">
+      <path d="M6.5,6.5 L13.69,8.31 L39.69,34.31 L41.5,41.5 L34.31,39.69 L8.31,13.69Z" fill-rule="evenodd" fill="#4c0a14" stroke="#4c0a14" stroke-width="3.4" stroke-linejoin="round" stroke-opacity=".92"/><path d="M41.5,6.5 L39.69,13.69 L30.65,22.73 L25.27,17.35 L34.31,8.31Z M6.5,41.5 L8.310000000000002,34.31 L17.35,25.27 L22.73,30.65 L13.689999999999998,39.69Z" fill-rule="evenodd" fill="#4c0a14" stroke="#4c0a14" stroke-width="3.4" stroke-linejoin="round" stroke-opacity=".92"/>
+      <clipPath id="r7c0"><path d="M6.5,6.5 L13.69,8.31 L39.69,34.31 L41.5,41.5 L34.31,39.69 L8.31,13.69Z" clip-rule="evenodd"/></clipPath>
+        <path d="M6.5,6.5 L13.69,8.31 L39.69,34.31 L41.5,41.5 L34.31,39.69 L8.31,13.69Z" fill-rule="evenodd" fill="url(#r7b)"/>
+        <g clip-path="url(#r7c0)">
+          <rect x="-5" y="-5" width="58" height="31" fill="url(#r7g)"/>
+          <path d="M6.5,6.5 L13.69,8.31 L39.69,34.31 L41.5,41.5 L34.31,39.69 L8.31,13.69Z" fill="none" stroke="#ff7486" stroke-opacity=".75" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M6.5,6.5 L13.69,8.31 L39.69,34.31 L41.5,41.5 L34.31,39.69 L8.31,13.69Z" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="1.4" transform="translate(0 -1.4)"/>
+        </g><clipPath id="r7c1"><path d="M41.5,6.5 L39.69,13.69 L30.65,22.73 L25.27,17.35 L34.31,8.31Z M6.5,41.5 L8.310000000000002,34.31 L17.35,25.27 L22.73,30.65 L13.689999999999998,39.69Z" clip-rule="evenodd"/></clipPath>
+        <path d="M41.5,6.5 L39.69,13.69 L30.65,22.73 L25.27,17.35 L34.31,8.31Z M6.5,41.5 L8.310000000000002,34.31 L17.35,25.27 L22.73,30.65 L13.689999999999998,39.69Z" fill-rule="evenodd" fill="url(#r7b)"/>
+        <g clip-path="url(#r7c1)">
+          <rect x="-5" y="-5" width="58" height="31" fill="url(#r7g)"/>
+          <path d="M41.5,6.5 L39.69,13.69 L30.65,22.73 L25.27,17.35 L34.31,8.31Z M6.5,41.5 L8.310000000000002,34.31 L17.35,25.27 L22.73,30.65 L13.689999999999998,39.69Z" fill="none" stroke="#ff7486" stroke-opacity=".75" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M41.5,6.5 L39.69,13.69 L30.65,22.73 L25.27,17.35 L34.31,8.31Z M6.5,41.5 L8.310000000000002,34.31 L17.35,25.27 L22.73,30.65 L13.689999999999998,39.69Z" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="1.4" transform="translate(0 -1.4)"/>
+        </g>
+    </g></svg>

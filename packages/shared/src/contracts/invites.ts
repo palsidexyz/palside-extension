@@ -1,0 +1,20 @@
+import { denseArray, contractString, strictObject } from './validation.ts';
+import Type, { type StaticDecode as Static } from 'typebox';
+import { id, timestamp, count, password, text } from './common.ts';
+import { publicTeam } from './team-model.ts';
+import { person } from './profiles.ts';
+import { chainAmount } from './chain.ts';
+import { TEAM_NAME_LENGTH, TEAM_JOINED_LIMIT } from './limits.ts';
+export const inviteState = strictObject({ active: Type.Boolean(), expiresAt: Type.Union([timestamp, Type.Null()]), url: Type.Union([contractString({ min: 1 }), Type.Null()]), password: Type.Union([password, Type.Null()]), suspended: Type.Boolean() });
+export const invitationReward = strictObject({ amount: chainAmount, remaining: count, expiresAt: timestamp });
+export type InvitationReward = Static<typeof invitationReward>;
+const nullableReward = Type.Union([invitationReward, Type.Null()]);
+export const invitePreview = strictObject({ team: publicTeam, expiresAt: timestamp, passwordRequired: Type.Boolean(), alreadyMember: Type.Boolean(), lockedUntil: Type.Union([timestamp, Type.Null()]), invitationReward: nullableReward });
+export const teamInvite = strictObject({ id, team: strictObject({ id, name: text(TEAM_NAME_LENGTH), avatarId: Type.Union([id, Type.Null()]), memberCount: count }), from: person, createdAt: timestamp, expiresAt: timestamp, invitationReward: nullableReward });
+export const sentInvite = strictObject({ invite: strictObject({ id, expiresAt: timestamp }) });
+export const inviteOptions = strictObject({ accepts: Type.Boolean(), teams: denseArray(strictObject({ teamId: id, state: Type.Enum(['can', 'invited', 'member', 'full', 'no-permission', 'unavailable']) }), { maxItems: TEAM_JOINED_LIMIT }) });
+export type TeamInvite = Static<typeof teamInvite>;
+export type InvitePreview = Static<typeof invitePreview>;
+export type InviteOptions = Static<typeof inviteOptions>;
+
+export { normalizeInvitePassword, isInvitePassword } from './rules.ts';

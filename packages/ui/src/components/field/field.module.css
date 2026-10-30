@@ -1,0 +1,68 @@
+.field { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; }
+.fieldLabel { color: var(--ui-text-primary); font-size:var(--ui-type-body); font-weight: 500; line-height: 20px; overflow-wrap: anywhere; }
+.optional { margin-inline-start: 6px; color: var(--ui-ink-muted); font-weight: 400; }
+.inputSurface { position:relative; display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; border-radius:var(--ui-radius-control); corner-shape: var(--ui-corner-shape); background: var(--ui-field-surface, var(--ui-control-surface)); transition: background-color .2s var(--ui-ease-feedback); }
+.input { width: 100%; min-width: 0; min-height: 40px; padding: 10px 12px; border: 0; border-radius:inherit; background: transparent; color: var(--ui-text-primary); font:inherit; font-size:var(--ui-type-body); line-height: 20px; outline: none; }
+.leadingIcon { display: inline-flex; flex-shrink: 0; margin-inline-start: 12px; color: var(--ui-text-secondary); }
+.leadingIcon svg { width: 16px; height: 16px; }
+.leadingIcon + .input { padding-inline-start: 0; }
+.textarea { display: block; width: 100%; min-width: 0; min-height: 80px; max-height: 320px; padding: 12px; border: 0; border-radius:var(--ui-radius-control); corner-shape: var(--ui-corner-shape); background: var(--ui-field-surface, var(--ui-control-surface)); color: var(--ui-text-primary); font:inherit; font-size:var(--ui-type-body); line-height: 20px; resize: none; field-sizing: content; outline: none; transition: background-color .2s var(--ui-ease-feedback); }
+.input::placeholder, .textarea::placeholder { color: var(--ui-ink-muted); opacity: 1; }
+.input:focus-visible { outline:none; }
+.inputSurface::after { content:""; position:absolute; inset:0; border:var(--ui-focus-width) solid var(--ui-text-secondary); border-radius:inherit; corner-shape:inherit; pointer-events:none; opacity:0; transition:opacity .18s var(--ui-ease-feedback); }
+.inputSurface:has(.input:focus-visible)::after { opacity:1; }
+.inputSurface:has(.input[aria-invalid="true"])::after { opacity:1; border-color:var(--ui-ink-error); }
+.textarea:focus-visible { outline:none; box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }
+.textarea[aria-invalid="true"]:focus-visible { box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-ink-error); }
+.inputSurface:has(.input:disabled), .textarea:disabled { opacity: .45; cursor: not-allowed; }
+.input:disabled { cursor: not-allowed; }
+.input:read-only, .textarea:read-only { color: var(--ui-ink-muted); }
+.fieldFooter { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 12px; min-width: 0; }
+.fieldNotes { flex: 1 1 120px; min-width: 0; }
+.hint, .error { margin: 0; font-size:var(--ui-type-footnote); line-height: 18px; overflow-wrap: anywhere; }
+.hint { color: var(--ui-ink-muted); }
+.error { color: var(--ui-ink-error); }
+.error:empty { height: 0; }
+.fieldCounter { margin-inline-start: auto; }
+.count { color: var(--ui-ink-muted); font-size:var(--ui-type-footnote); line-height: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.count[data-exceeded] { color: var(--ui-ink-error); }
+@media (hover: hover) {
+  .inputSurface:has(.input:not(:disabled):not(:read-only)):hover, .textarea:not(:disabled):not(:read-only):hover { background: var(--ui-control-hover); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inputSurface, .textarea { transition: none; }
+}
+@media (forced-colors: active) {
+  .inputSurface, .textarea { border: 1px solid ButtonText; }
+}
+
+/* Control geometry stays stationary during state changes. */
+.inputSurface:has(.input[aria-invalid="true"]), .textarea[aria-invalid="true"]:not(:focus-visible) { box-shadow: inset 0 0 0 1px var(--ui-ink-error); }
+.inputSurface:has(.input:focus),.textarea:focus { background:var(--ui-control-hover); }
+
+@media(prefers-reduced-motion:reduce) { .inputSurface::after { transition:none; } }
+@media(forced-colors:active) { .inputSurface:has(.input:focus-visible)::after { border-color:Highlight; } .textarea:focus-visible { outline:2px solid Highlight; outline-offset:-2px; } }
+
+/* PIN: one transparent input over masked digit cells. */
+.pin { position:relative; display:grid; grid-template-columns:repeat(var(--pin-length),minmax(0,1fr)); gap:8px; width:100%; }
+.pinCell { position:relative; display:grid; place-items:center; height:52px; border-radius:var(--ui-radius-control); corner-shape:var(--ui-corner-shape); background:var(--ui-field-surface, var(--ui-control-surface)); transition:box-shadow .18s var(--ui-ease-feedback), background-color .18s var(--ui-ease-feedback); }
+.pinCell::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--ui-text-primary); transform:scale(0); transition:transform .18s var(--ui-ease-feedback); }
+.pinCell[data-filled]::after { transform:scale(1); }
+.pinCell[data-reveal] { font:600 var(--ui-type-title-l)/1 var(--font-geist-mono),monospace; color:var(--ui-text-primary); font-variant-numeric:tabular-nums; }
+.pinCell[data-reveal]::after { display:none; }
+.pinCell[data-reveal][data-filled] { animation:pinDigit .22s var(--ui-ease-feedback); }
+.pin:has(.pinInput:focus) .pinCell[data-active] { background:var(--ui-control-hover); box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }
+.pin:has(.pinInput[aria-invalid="true"]) .pinCell { box-shadow:inset 0 0 0 1px var(--ui-ink-error); animation:pinShake .36s; }
+.pin:has(.pinInput:disabled) { opacity:.45; }
+/* Outlined: separate canvas cells with a hairline border; the active cell darkens its border and shows a caret while empty. */
+.pin[data-outlined] .pinCell { background:var(--ui-canvas); box-shadow:inset 0 0 0 1px var(--ui-border-control); }
+.pin[data-outlined] .pinCell::before { content:""; position:absolute; left:50%; top:50%; width:1.5px; height:22px; margin:-11px 0 0 -.75px; border-radius:1px; background:var(--ui-text-primary); opacity:0; }
+.pin[data-outlined]:has(.pinInput:focus) .pinCell[data-active] { background:var(--ui-canvas); box-shadow:inset 0 0 0 1.5px var(--ui-text-primary); }
+.pin[data-outlined]:has(.pinInput:focus) .pinCell[data-active]:not([data-filled])::before { animation:pinCaret 1.1s steps(1) infinite; }
+.pin[data-outlined]:has(.pinInput[aria-invalid="true"]) .pinCell, .pin[data-outlined]:has(.pinInput[aria-invalid="true"]) .pinCell[data-active] { box-shadow:inset 0 0 0 1px var(--ui-ink-error); }
+.pinInput { position:absolute; inset:0; width:100%; height:100%; padding:0; border:0; background:transparent; color:transparent; caret-color:transparent; font-size:var(--ui-type-title); letter-spacing:0; opacity:0; cursor:text; }
+.pinInput:disabled { cursor:not-allowed; }
+@keyframes pinDigit { from { transform:translateY(3px); opacity:.4; } }
+@keyframes pinCaret { 0% { opacity:1; } 50% { opacity:0; } }
+@keyframes pinShake { 25% { transform:translateX(-4px); } 75% { transform:translateX(4px); } }
+@media(prefers-reduced-motion:reduce) { .pinCell,.pinCell::after { transition:none; } .pinCell[data-reveal][data-filled] { animation:none; } .pin:has(.pinInput[aria-invalid="true"]) .pinCell { animation:none; } .pin[data-outlined]:has(.pinInput:focus) .pinCell[data-active]:not([data-filled])::before { animation:none; opacity:1; } }

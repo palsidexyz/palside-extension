@@ -1,0 +1,13 @@
+.chip { --hue:var(--ui-text-secondary); --chip-on-solid:#fff; display:inline-flex; flex:none; align-items:center; gap:3px; min-width:0; max-width:100%; height:18px; padding:0 6px; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--hue) 14%, var(--ui-canvas)); color:color-mix(in srgb, var(--hue) 78%, var(--ui-text-primary)); font-size:var(--ui-type-caption); font-weight:600; line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums; vertical-align:middle; }
+.chip svg { flex:none; width:11px; height:11px; }
+.chip[data-size=md] { gap:4px; height:22px; padding:0 8px; font-size:var(--ui-type-footnote); line-height:22px; }
+.chip[data-size=md] svg { width:12px; height:12px; }
+.chip[data-tone=neutral] { background:var(--ui-control-surface); color:var(--ui-text-secondary); }
+.chip[data-tone=accent] { background:var(--ui-accent-soft); color:var(--ui-ink-accent); }
+.chip[data-tone=blue] { --hue:#2F7FE0; }
+.chip[data-tone=green] { --hue:#1FA971; }
+.chip[data-tone=amber] { --hue:#D98A0B; }
+.chip[data-tone=red] { --hue:#E2543F; }
+.chip[data-tone=purple] { --hue:#8A5CF6; }
+.chip[data-tone=gray] { --hue:#6B7280; }
+.chip[data-solid] { background:var(--hue); color:var(--chip-on-solid); }

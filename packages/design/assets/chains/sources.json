@@ -1,0 +1,53 @@
+[
+  {
+    "id": "robinhood",
+    "page": "https://docs.robinhood.com/chain/brand-guidelines/",
+    "url": "https://cdn.robinhood.com/robinhood_chain/brand_assets/robinhood-chain-brand-assets-v1.zip",
+    "archiveEntry": "Robinhood Chain Brand Assets - V1/Robinhood Feather Symbol/Robinhood_Avatar.jpg",
+    "file": "robinhood.webp",
+    "sha256": "0bb451b271293302844ff845515a88eaa4c12f3a49cd33294ea4c4c82d039783",
+    "sourceFile": "robinhood.jpg",
+    "sourceSha256": "d480c7cbcfa79f017a6bff8d6482cd1e85c98e5fe70dc5491588e3153274a4c5",
+    "width": 96,
+    "height": 96,
+    "bytes": 1810,
+    "optimization": "Proportional 96px resize, lossless WebP"
+  },
+  {
+    "id": "solana",
+    "page": "https://solana.com/branding",
+    "url": "https://solana.com/src/img/branding/solanaLogoMark.svg",
+    "file": "solana.svg",
+    "sha256": "3d3401109aa061dec40a8659f1847817a8e647f98de1e65e76e86a95bbe1f08a",
+    "bytes": 2519
+  },
+  {
+    "id": "bnb",
+    "page": "https://www.bnbchain.org/en/brand-guidelines",
+    "url": "https://www.bnbchain.org/images/brand-guidelines/svg/BNB%20Chain_Symbol_Yellow.svg",
+    "file": "bnb.svg",
+    "sha256": "b8ff1ce0b5af2e2d9bcf5ec89fedd5224079f4f7267e306e23e8d691024f5eff",
+    "bytes": 1070
+  },
+  {
+    "id": "ethereum",
+    "page": "https://ethereum.org/assets/",
+    "url": "https://ethereum.org/images/assets/svgs/eth-diamond-purple.svg",
+    "file": "ethereum.svg",
+    "sha256": "7320e64e211db747308cc3e546e5360d42f3790b7a14fba0504573790e17f124",
+    "bytes": 476
+  },
+  {
+    "id": "base",
+    "page": "https://brand.base.org/",
+    "url": "https://brand.base.org/document/apple-touch-icon.png",
+    "file": "base.webp",
+    "sha256": "3a42df825755b43e16cce9d8916d72fc487fd28314b1ebc9abf99fe869a97c70",
+    "sourceFile": "base.png",
+    "sourceSha256": "3c086b400805728a106632514c2ca5217e900cccdb18b594e19799536f63320d",
+    "width": 96,
+    "height": 96,
+    "bytes": 138,
+    "optimization": "Proportional 96px resize, lossless WebP"
+  }
+]

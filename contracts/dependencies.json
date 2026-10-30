@@ -1,0 +1,17 @@
+{
+  "openzeppelin": {
+    "version": "5.4.0",
+    "url": "https://registry.npmjs.org/@openzeppelin/contracts/-/contracts-5.4.0.tgz",
+    "integrity": "sha512-eCYgWnLg6WO+X52I16TZt8uEjbtdkgLC0SUX/xnAksjjrQI4Xfn4iBRoI5j55dmlOhDv1Y7BoR3cU7e3WWhC6A==",
+    "license": "MIT",
+    "licenseFile": "licenses/OpenZeppelin-MIT.txt",
+    "licenseUrl": "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts/v5.4.0/LICENSE"
+  },
+  "forge-std": {
+    "version": "1.9.7",
+    "url": "https://codeload.github.com/foundry-rs/forge-std/tar.gz/refs/tags/v1.9.7",
+    "integrity": "sha256-RRVzU6tJ6rAdKUVlhmcx5ZmzJAF1cilonuRZqia37pQ=",
+    "license": "MIT OR Apache-2.0",
+    "licenseFile": "vendor/forge-std/LICENSE-MIT"
+  }
+}

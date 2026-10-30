@@ -1,0 +1,63 @@
+.button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius:var(--ui-radius-control);
+  corner-shape: var(--ui-corner-shape);
+  background: var(--ui-control-surface);
+  color: var(--ui-text-primary);
+  font:inherit;
+  font-size:var(--ui-type-body);
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color .2s, color .2s;
+}
+.button[data-size="xs"] { min-height: 24px; padding: 2px 8px; font-size:var(--ui-type-footnote); }
+.button[data-size="sm"] { min-height: 32px; padding: 6px 12px; }
+.button[data-size="lg"] { min-height: 44px; padding: 12px 20px; }
+.button[data-variant="primary"] { background: var(--ui-accent); color: var(--ui-on-accent); }
+.button[data-variant="danger"] { background: var(--ui-danger); color: var(--ui-on-danger); }
+.button[data-variant="quiet"] { background: transparent; color: var(--ui-ink-muted); }
+.button[aria-expanded="true"] { background: var(--ui-control-recess); color: var(--ui-text-primary); }
+.button[data-loading] { cursor: progress; }
+.button:disabled, .button[aria-disabled="true"]:not([data-loading]) { opacity: .45; cursor: default; }
+/* A primary action that is not ready yet reads as neutral, never as a faded accent. */
+.button[data-variant="primary"]:disabled:not([data-loading]), .button[data-variant="primary"][aria-disabled="true"]:not([data-loading]) { opacity: 1; background: var(--ui-disabled-surface); color: var(--ui-text-secondary); }
+.button:focus-visible { outline: var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset: var(--ui-focus-offset); }
+.button[aria-pressed="true"] { background: var(--ui-accent-soft); color: var(--ui-ink-accent); }
+/* Fixed outer geometry. Feedback stays inside the existing control surface. */
+.button::after { content: ""; position: absolute; inset: 0; border-radius:inherit; corner-shape: inherit; pointer-events: none; background: color-mix(in srgb, currentColor 8%, transparent); opacity: 0; transition: opacity .16s; }
+.button:not(:disabled):not([aria-disabled="true"]):active::after { opacity: 1; }
+.buttonContent { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; transition: transform .16s cubic-bezier(.22, 1, .36, 1); }
+.button:not(:disabled):not([aria-disabled="true"]):active .buttonContent { transform: translateY(.5px); }
+.button[data-loading] .buttonContent { opacity: 0; }
+.icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.icon svg { width: 18px; height: 18px; }
+.busy { position: absolute; inset: 0; display: grid; place-items: center; }
+.button.iconButton { width: 40px; height: 40px; padding: 0; }
+.button.iconButton[data-size="xs"] { width: 24px; height: 24px; }
+.button.iconButton[data-size="xs"] .icon svg { width: 14px; height: 14px; }
+.button.iconButton[data-size="sm"] { width: 32px; height: 32px; }
+.button.iconButton[data-size="lg"] { width: 44px; height: 44px; }
+@media (hover: hover) {
+  .button:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-control-hover); }
+  .button[data-variant="quiet"]:not(:disabled):not([aria-disabled="true"]):hover { color: var(--ui-text-primary); }
+  .button[data-variant="primary"]:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-accent-hover); }
+  .button[data-variant="danger"]:not(:disabled):not([aria-disabled="true"]):hover { background: color-mix(in srgb, var(--ui-danger) 90%, black); }
+  .button[aria-pressed="true"]:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-accent-soft); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button, .button::after, .buttonContent { transition: none; }
+  .button:not(:disabled):not([aria-disabled="true"]):active .buttonContent { transform: none; }
+}
+@media (forced-colors: active) {
+  .button { border: 1px solid ButtonText; }
+}

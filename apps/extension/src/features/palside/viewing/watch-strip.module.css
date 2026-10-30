@@ -1,0 +1,70 @@
+/* Top slot: one 52px row of equal columns — 在看 chips (two at most), or one card — and a +N square. Never scrolls, never cut off.
+   Chip insets are kept tight so a token name of eight characters still fits beside two faces at the default panel width. */
+.region { --watch-more:44px; overflow:hidden; flex-shrink:0; }
+.strip { display:grid; gap:6px; height:60px; padding:0 16px 8px; }
+.card { min-width:0; }
+.chip { position:relative; display:flex; align-items:stretch; min-width:0; height:52px; padding:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.chip > [data-token-lock] { align-self:center; margin-inline:-6px 2px; }
+.target { display:flex; flex:1; align-items:center; gap:5px; min-width:0; padding:0 2px 0 3px; border-radius:calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs) var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px); corner-shape:var(--ui-corner-shape); text-align:left; background:transparent; border:0; color:var(--ui-text-primary); }
+.target > [data-token-size][data-token-size] { --token-size:24px; }
+.text { flex:1; min-width:0; }
+.text strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-callout); line-height:18px; font-weight:600; letter-spacing:-.01em; }
+.text small { display:flex; align-items:center; gap:3px; overflow:hidden; font-size:var(--ui-type-caption); line-height:14px; color:var(--ui-text-secondary); white-space:nowrap; }
+.text small svg { flex:none; }
+/* Who: two overlapping faces and a +N disc of the same size. The user's own face is the only accent in the chip. */
+.count { display:flex; flex:none; align-items:center; padding:0 4px 0 2px; border:0; border-radius:var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px) calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); --stack-edge:var(--ui-control-surface); }
+.count:hover { --stack-edge:var(--ui-control-hover); }
+.count:active { --stack-edge:var(--ui-control-recess); }
+.stack { display:flex; align-items:center; height:24px; }
+.stack > * + * { margin-left:-10px; }
+.face > :global([data-person-avatar][data-avatar-size]) { --person-size:20px; --person-font:8px; }
+.face { position:relative; display:grid; flex:none; border-radius:50%; box-shadow:0 0 0 1.5px var(--stack-edge); }
+.face [data-presence] { display:none; }
+.face[data-self] { box-shadow:0 0 0 1.5px var(--stack-edge), 0 0 0 3px var(--ui-accent); }
+.rest { position:relative; display:flex; align-items:center; justify-content:center; flex:none; white-space:nowrap; min-width:20px; height:20px; padding:0 3px; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-text-primary) 9%, var(--stack-edge)); box-shadow:0 0 0 1.5px var(--stack-edge); color:var(--ui-text-primary); font-size:var(--ui-type-caption); line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
+.more { display:grid; place-items:center; width:var(--watch-more); height:52px; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-callout)/1 var(--font-geist-mono), ui-monospace, monospace; cursor:pointer; }
+.more:hover, .more[aria-expanded="true"] { background:var(--ui-control-hover); }
+.more:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+/* +N: the chips and waiting 喊你来看 the row has no room for, as full-width rows. */
+.moreList { display:flex; flex-direction:column; gap:4px; }
+/* The popup's generic button rows must not reshape the chips inside it. */
+.moreList .target { width:auto; min-height:0; padding:0 6px; gap:8px; border-radius:calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs) var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px); corner-shape:var(--ui-corner-shape); font:inherit; }
+.moreList .count { width:auto; min-height:0; padding:0 7px 0 4px; gap:0; border-radius:var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px) calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
+.moreList .pokeOpen { width:auto; min-height:0; padding:0 12px; justify-content:center; font-size:var(--ui-type-footnote); line-height:16px; font-weight:600; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+.moreList .pokeOpen:hover { background:color-mix(in srgb, var(--ui-text-primary) 86%, var(--ui-canvas)); }
+.moreList .chip { height:48px; }
+.pokeRow { display:flex; align-items:center; gap:8px; min-height:48px; padding:0 6px 0 10px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.pokeRow [data-presence] { display:none; }
+.pokeText { display:flex; flex:1; flex-direction:column; min-width:0; }
+.pokeText strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-callout); line-height:18px; font-weight:600; }
+.pokeText small { display:flex; align-items:center; gap:4px; min-width:0; overflow:hidden; font-size:var(--ui-type-caption); line-height:14px; color:var(--ui-text-secondary); white-space:nowrap; }
+.pokeText small > [data-token-size][data-token-size] { --token-size:14px; }
+.pokeText small > [data-token-size] > :not(:first-child) { display:none; }
+.pokeOpen { flex:none; height:28px; padding:0 12px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-text-primary); color:var(--ui-canvas); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; }
+/* 合流时刻: the chip briefly takes the accent tint, then settles. */
+.merge { position:absolute; inset:0; border-radius:inherit; corner-shape:inherit; pointer-events:none; background:color-mix(in srgb, var(--ui-accent) 22%, transparent); }
+.target:hover,.count:hover,.sourceTarget:hover,.copy:hover { background:var(--ui-control-hover); }
+.target:active,.count:active,.sourceTarget:active,.copy:active { background:var(--ui-control-recess); }
+.chip button:focus-visible,.menu button:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.menu { --popover-width:max-content; min-width:0; padding:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); box-shadow:var(--ui-shadow-floating); overflow:auto; }
+.contractRow { padding-bottom:3px; margin-bottom:3px; }
+.contract { display:flex; align-items:center; gap:7px; width:100%; min-height:30px; padding:4px 6px; border:0; border-radius:calc(var(--ui-radius-l) - 4px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); text-align:left; }
+.contract span { font-size:var(--ui-type-caption); }
+.contract code { flex:1; font-size:var(--ui-type-caption); white-space:nowrap; }
+.contract:hover { background:var(--ui-control-hover); }
+.contract:active { background:var(--ui-control-recess); }
+.source { display:flex; min-width:0; align-items:stretch; }
+.sourceTarget { display:flex; align-items:center; gap:7px; flex:1; min-width:0; min-height:36px; padding:7px 6px; background:transparent; border:0; border-radius:calc(var(--ui-radius-l) - 4px); corner-shape:var(--ui-corner-shape); color:inherit; text-align:left; }
+.sourceText { flex:1; min-width:0; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-footnote); direction:ltr; }
+.sourceText small { display:block; }
+.sourceTarget>small { flex-shrink:0; font-size:var(--ui-type-caption); color:var(--ui-text-secondary); }
+.copy { width:26px; padding:0; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); display:grid; place-items:center; }
+.menu button:disabled { opacity:.45; cursor:default; }
+@container (max-width:350px) { .strip { padding-inline:12px; } }
+
+.loadingIcon[data-slot="spinner"] { animation-duration:1s; }
+@media (prefers-reduced-motion:reduce) { .chip { transition:none; } }
+
+.morePopover { --popover-width:320px; padding:12px; }
+
+.menu:popover-open { animation:none; }

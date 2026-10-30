@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  # A local reusable workflow runs against this tag's commit, with no reliance
+  # on a previous branch CI result or on asynchronous check-status queries.
+  checks:
+    uses: ./.github/workflows/ci.yml
+  release:
+    needs: checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: Build, verify and package release
+        run: |
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          npm run package:release
+          node --input-type=module -e 'import fs from "node:fs"; const manifest = JSON.parse(fs.readFileSync("apps/extension/.output/release/manifest.json", "utf8")); if (process.env.GITHUB_REF_NAME !== `v${manifest.version}`) throw new Error("Tag must match manifest version");'
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            apps/extension/.output/release/palside-*-chrome.zip
+            apps/extension/.output/release/SHA256SUMS.txt
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            apps/extension/.output/release/palside-*-chrome.zip \
+            apps/extension/.output/release/SHA256SUMS.txt \
+            apps/extension/.output/release/manifest.json \
+            --verify-tag

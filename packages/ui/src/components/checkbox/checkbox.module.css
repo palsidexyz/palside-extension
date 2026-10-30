@@ -1,0 +1,17 @@
+.choice { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 44px; padding-block: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nativeChoice { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.choiceText { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: var(--ui-text-primary); font-size:var(--ui-type-body); line-height: 20px; overflow-wrap: anywhere; }
+.choice:has(.nativeChoice:disabled) { opacity: .45; cursor: not-allowed; }
+.checkboxBox { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; border-radius:var(--ui-radius-s); corner-shape: var(--ui-corner-shape); background: var(--ui-control-recess); color: var(--ui-on-accent); transition: background-color .24s cubic-bezier(.22,1,.36,1); }
+.checkboxBox svg { width: 20px; height: 20px; }
+.checkPath { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; transition: stroke-dashoffset .22s cubic-bezier(.22,1,.36,1), opacity .22s; }
+.nativeChoice:checked ~ .checkboxBox { background: var(--ui-accent); }
+.nativeChoice:checked ~ .checkboxBox .checkPath { stroke-dashoffset: 0; opacity: 1; }
+.nativeChoice:focus-visible ~ .checkboxBox { outline: var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset: var(--ui-focus-offset); }
+@media (prefers-reduced-motion: reduce) {
+  .checkboxBox, .checkPath { transition: none; }
+}
+@media (forced-colors: active) {
+  .checkboxBox { border: 1px solid ButtonText; }
+  .nativeChoice:checked ~ .checkboxBox { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+}

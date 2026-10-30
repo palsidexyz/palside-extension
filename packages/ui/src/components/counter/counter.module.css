@@ -1,0 +1,1 @@
+.counter { position:relative; display:inline-flex; align-items:center; font-variant-numeric:tabular-nums; --number-flow-char-height:1.5em; --number-flow-mask-height:.33em; }

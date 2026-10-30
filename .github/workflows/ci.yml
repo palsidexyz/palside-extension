@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1
+        with:
+          version: v1.5.0
+      - name: Verify contracts and generated ABI
+        run: |
+          forge --version
+          npm run chain:prepare
+          forge test --root contracts
+          node scripts/chain/generate.mjs --check
+      - run: node scripts/sync-site-assets.mjs
+      - run: npm run check:licenses
+      - run: npm audit --omit=dev --audit-level=low
+      - run: npm audit --audit-level=critical
+      - run: npm run check
+      - run: node scripts/third-party-licenses.mjs --check
+      - run: node scripts/verify-reproducible.mjs
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan full Git history
+        run: |
+          scan_dir=$(mktemp -d)
+          trap 'rm -rf "$scan_dir"' EXIT
+          curl --fail --silent --show-error --location \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$scan_dir/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $scan_dir/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$scan_dir/gitleaks.tar.gz" -C "$scan_dir" gitleaks
+          "$scan_dir/gitleaks" git --redact --exit-code 1 .

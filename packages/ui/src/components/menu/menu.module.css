@@ -1,0 +1,13 @@
+/* Items sit concentric with the popover: its radius minus its 6px inset. */
+.item { display:flex; align-items:center; gap:10px; width:100%; min-height:38px; padding:9px 10px; border:0; border-radius:calc(var(--ui-radius-popover) - 6px); corner-shape:var(--ui-corner-shape); background:none; color:inherit; font:inherit; font-size:var(--ui-type-callout); line-height:20px; text-align:start; cursor:pointer; transition:background-color .18s, color .18s; }
+.item:focus { outline:none; }
+.item:focus-visible { background:var(--ui-control-surface); }
+.item:disabled { opacity:.45; cursor:default; }
+.item[data-tone="danger"] { color:var(--ui-ink-error); }
+.itemIcon { display:inline-flex; flex:0 0 auto; color:var(--ui-ink-muted); }
+.itemIcon svg { width:16px; height:16px; }
+.item[data-tone="danger"] .itemIcon { color:inherit; }
+.itemLabel { min-width:0; overflow-wrap:anywhere; }
+@media (hover: hover) { .item:not(:disabled):hover { background:var(--ui-control-surface); } }
+@media (prefers-reduced-motion: reduce) { .item { transition:none; } }
+@media (forced-colors: active) { .item:focus-visible { outline:1px solid Highlight; } }

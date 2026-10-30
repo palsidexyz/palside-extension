@@ -1,0 +1,100 @@
+/* Settings pages (网站与权限, 网站详情, 信号设置, 通知, 隐私与数据) and 收藏: cards with primary rows; a feature's parts sit under it as secondary rows — indented, no icon block, 13px, state word or control at the end. */
+.page { display:flex; flex-direction:column; gap:14px; min-width:0; }
+.page[data-fill] { flex:1 1 auto; }
+.card { composes: card from '../settings/setting-rows.module.css'; }
+.row { composes: row from '../settings/setting-rows.module.css'; }
+.icon { composes: icon from '../settings/setting-rows.module.css'; }
+.text { composes: text from '../settings/setting-rows.module.css'; }
+.switch { composes: switch from '../settings/setting-rows.module.css'; }
+
+.subRow { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:40px; padding:4px 0; border:0; background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-callout); line-height:18px; text-align:left; }
+.subRow + .subRow { box-shadow:none; }
+.subRow > span:first-child { min-width:0; color:var(--ui-text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+button.subRow { cursor:pointer; }
+button.subRow:hover > span:first-child { color:var(--ui-text-primary); }
+button.subRow:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
+.lead { display:flex; align-items:center; gap:10px; min-width:0; }
+.lead > :first-child { display:grid; place-items:center; flex:0 0 22px; width:22px; height:22px; color:var(--ui-text-secondary); }
+.lead > :first-child svg { width:16px; height:16px; }
+.lead > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.options { padding:2px 14px 6px; }
+.options .subRow:first-child { box-shadow:none; }
+
+.seg { display:inline-flex; flex:none; padding:2px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); box-shadow:none; }
+.seg button { min-height:24px; padding:0 9px; border:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); cursor:pointer; white-space:nowrap; }
+.seg button[aria-checked="true"] { background:var(--ui-control-surface); color:var(--ui-text-primary); font-weight:500; }
+.seg button:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.range { display:inline-flex; align-items:center; gap:8px; }
+.range input { width:96px; accent-color:var(--ui-solid); }
+.range output { min-width:34px; font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); font-variant-numeric:tabular-nums; text-align:right; }
+/* In an option card every control has the same width, so the right edge and the choices line up row to row. */
+.options .seg { display:inline-grid; grid-auto-flow:column; grid-auto-columns:minmax(max-content, 1fr); min-width:156px; }
+/* Choices never clip: when they do not fit beside their name they move, whole, to the line below. */
+.subRow:has(> .seg) { flex-wrap:wrap; row-gap:6px; }
+.subRow > .seg { margin-inline-start:auto; }
+.options .seg button { padding:0 6px; }
+.options .range input { width:114px; }
+
+/* 已授权网站: one row per site, the whole row opens it. */
+.siteButton { display:block; width:100%; min-width:0; padding:0 12px 0 14px; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:background-color .18s; }
+.siteButton:hover { background:var(--ui-control-hover); }
+.siteButton:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.chevron { flex:none; color:var(--ui-text-secondary); }
+.allMark { display:grid; place-items:center; flex:none; width:40px; height:40px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-secondary); }
+/* 网站详情's head: the site as one block, its domain a link. */
+.hero { flex-direction:row; align-items:center; gap:14px; padding:14px; }
+.hero > * + * { box-shadow:none; }
+.heroText { display:flex; flex:1; flex-direction:column; gap:1px; min-width:0; }
+.heroText strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-title); line-height:22px; font-weight:600; }
+.row[data-clickable] { cursor:pointer; transition:background-color .18s; }
+.row[data-clickable]:hover { background:var(--ui-control-hover); }
+
+/* One site row everywhere: logo, name with capability tags over the domain or its uses, one control at the end. */
+.siteRow { display:flex; align-items:center; gap:10px; min-width:0; min-height:56px; }
+.siteText { display:flex; flex:1; flex-direction:column; min-width:0; container-type:inline-size; }
+.siteLine { display:flex; align-items:center; gap:5px; min-width:0; }
+.siteName { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-body); line-height:18px; font-weight:500; }
+.tag { flex:none; padding:0 5px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); box-shadow:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height:16px; font-weight:500; }
+/* A narrow row keeps the whole name and drops the tags. */
+@container (max-width: 150px) { .tag { display:none; } }
+.siteUrl { align-self:flex-start; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-footnote); line-height:18px; color:var(--ui-text-secondary); text-decoration:none; font-variant-numeric:tabular-nums; }
+a.siteUrl { border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
+a.siteUrl:hover { color:var(--ui-text-primary); text-decoration:underline; text-underline-offset:2px; }
+a.siteUrl:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+
+.addRow { display:flex; align-items:center; gap:10px; width:100%; min-height:46px; padding:0 14px; border:0; background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-body); text-align:left; cursor:pointer; }
+.addRow:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.addRow:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.addMark { background:var(--ui-canvas); display:grid; place-items:center; width:20px; height:20px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); box-shadow:none; }
+
+.grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; }
+@container (min-width:430px) { .grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+.error { width:100%; margin:0 2px; font-size:var(--ui-type-footnote); color:var(--ui-ink-error); }
+
+/* 通知: one choice as radio rows — the name, then the mark at the end. */
+.radioRow { composes: row from '../settings/setting-rows.module.css'; min-height:52px; cursor:pointer; }
+.radioRow:hover { background:var(--ui-control-hover); }
+.radioRow:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.radio { background:var(--ui-canvas); flex:none; width:20px; height:20px; border-radius:50%; box-shadow:none; transition:box-shadow .16s var(--ui-ease-feedback); }
+.radioRow[aria-checked="true"] .radio { box-shadow:inset 0 0 0 6px var(--ui-solid); }
+
+/* 收藏 */
+.favorite { display:flex; align-items:center; gap:8px; min-width:0; height:44px; padding:0 4px 0 10px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.favorite .siteName { flex:1; font-size:var(--ui-type-callout); font-weight:500; color:var(--ui-text-primary); text-decoration:none; }
+.favorite a.siteName:hover { text-decoration:underline; text-underline-offset:3px; }
+.rowLink { flex:1; min-width:0; display:flex; flex-direction:column; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.rowLink strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-body); line-height:20px; font-weight:500; }
+.rowLink small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-footnote); line-height:18px; color:var(--ui-text-secondary); }
+.rowLink:hover strong { text-decoration:underline; text-underline-offset:3px; }
+.rowLink:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
+.star { flex:none; color:var(--ui-ink-muted); }
+.starOn { flex:none; color:var(--ui-ink-warning); fill:currentColor; }
+
+@container (max-width:350px) {
+  .subRow:has(.seg), .subRow:has(.range) { flex-wrap:wrap; padding-block:8px; }
+  .subRow:has(.seg) > .seg, .subRow:has(.range) > .range { flex:1 1 100%; }
+  .seg button { flex:1; }
+  .range input { flex:1; }
+}
+@media (prefers-reduced-motion:reduce) { .row[data-clickable] { transition:none; } }
+.empty { padding:16px 14px; color:var(--ui-text-secondary); font-size:var(--ui-type-callout); }

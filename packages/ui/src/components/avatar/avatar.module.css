@@ -1,0 +1,25 @@
+.avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--avatar-size, 36px);
+  height: var(--avatar-size, 36px);
+  overflow: hidden;
+  border-radius:50%;
+  background: var(--avatar-surface, var(--ui-control-surface));
+  color: var(--avatar-ink, var(--ui-ink-muted));
+  font-size:var(--avatar-font, var(--ui-type-footnote));
+  font-weight: 500;
+  line-height: 1;
+  user-select: none;
+}
+.avatar[data-size="sm"] { width: var(--avatar-size, 28px); height: var(--avatar-size, 28px); font-size:var(--avatar-font, var(--ui-type-caption)); }
+.avatar[data-size="lg"] { width: var(--avatar-size, 44px); height: var(--avatar-size, 44px); font-size:var(--avatar-font, var(--ui-type-body)); }
+.avatar[data-shape="rounded"] { border-radius: 24%; }
+.avatarImage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--avatar-surface, var(--ui-control-surface)); }
+.avatar[data-fit="contain"] .avatarImage { object-fit: contain; background: transparent; }
+.avatar[data-fit="contain"]:has(.avatarImage) > span { visibility: hidden; }
+@media (forced-colors: active) {
+  .avatar { border: 1px solid ButtonText; }
+}

@@ -1,0 +1,17 @@
+.menu { --popover-width:216px; padding:8px; max-width:calc(100vw - 24px); }
+.teamPopup { --popover-width:256px; padding:8px; max-width:calc(100vw - 24px); }
+.separator { height:1px; border:0; background:none; margin:5px; }
+.teamOption { display:flex; align-items:center; gap:10px; padding:10px 11px; min-height:48px; width:100%; border:0; background:none; color:inherit; text-align:left; font:400 var(--ui-type-callout)/20px var(--font-geist-sans),sans-serif; border-radius:calc(var(--ui-radius-popover) - 8px); corner-shape:var(--ui-corner-shape); cursor:pointer; transition:background .18s,color .18s; }
+.teamOption:hover { background:var(--ui-control-surface); }
+.teamOption:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.teamOption[aria-current="true"] { background:var(--ui-accent-soft); }
+.teamOptionLabel { flex:1; min-width:0; overflow-wrap:anywhere; }
+.teamOption[aria-current="true"] .teamOptionLabel { font-weight:500; }
+.teamOption > span:last-child:not(.teamOptionLabel) { position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; flex:0 0 auto; padding:0 6px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); }
+.teamOption > .mentionBadge:last-child { background:var(--ui-accent); color:var(--ui-on-accent); font-weight:600; }
+.groupLabel { margin:10px 11px 4px; font-size:var(--ui-type-footnote); line-height:16px; font-weight:500; color:var(--ui-text-secondary); }
+.teamOption[data-former] [data-team-avatar] { filter:grayscale(1); opacity:.6; }
+.teamOption[data-former] .teamOptionLabel { display:flex; flex-direction:column; color:var(--ui-text-secondary); }
+.teamOption[data-former] .teamOptionLabel small { font-size:var(--ui-type-caption); line-height:16px; color:var(--ui-ink-muted); }
+.lobby { width:100%; justify-items:start; text-align:left; }
+@media (prefers-reduced-motion:reduce) { .teamOption { transition:none; } }

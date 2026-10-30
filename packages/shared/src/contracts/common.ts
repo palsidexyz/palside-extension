@@ -1,0 +1,23 @@
+import { Value } from 'typebox/value';
+import Type, { type StaticDecode as Static } from 'typebox';
+import { contractString, safeInteger, strictObject } from './validation.ts';
+import { EVENT_ID_LENGTH, IDENTIFIER_LENGTH } from './limits.ts';
+import { INVITE_PASSWORD_PATTERN } from './rules.ts';
+export const id = contractString({ min: 1, max: IDENTIFIER_LENGTH, pattern: /^[^\s\x00-\x1f\x7f]+$/u });
+export const eventId = contractString({ min: 1, max: EVENT_ID_LENGTH, pattern: /^[^\s\x00-\x1f\x7f]+$/u });
+export const matrixId = contractString({ min: 1 });
+export const count = safeInteger({ minimum: 0 });
+/** Unix milliseconds. Durations are named with an Ms suffix. */
+export const timestamp = safeInteger({ minimum: 0 });
+export const text = (max: number, min = 0) => contractString({ min, max, unit: 'grapheme', trim: true });
+export const empty = strictObject({});
+export const idParams = strictObject({ id });
+export const saved = strictObject({ saved: Type.Literal(true) });
+export const teamResult = strictObject({ teamId: id, alreadyMember: Type.Optional(Type.Literal(true)) });
+export const password = contractString({ pattern: INVITE_PASSWORD_PATTERN });
+export const joinPassword = Type.Decode(Type.Refine(Type.String(), value => Value.Check(password, value.toUpperCase()), () => 'invalid invite password'), value => value.toUpperCase());
+export const operationKey = contractString({ min: 16, max: 100, pattern: /^[a-zA-Z0-9_-]+$/ });
+export const deviceStates = ['active', 'away'] as const;
+export const presenceState = Type.Enum([...deviceStates, 'offline']);
+export type TeamResult = Static<typeof teamResult>;
+export type PresenceState = Static<typeof presenceState>;

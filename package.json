@@ -1,0 +1,63 @@
+{
+  "name": "palside",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "homepage": "https://palside.xyz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palsidexyz/palside-extension.git"
+  },
+  "bugs": "https://github.com/palsidexyz/palside-extension/issues",
+  "packageManager": "npm@11.8.0",
+  "scripts": {
+    "dev:extension": "npm run dev --workspace @palside/extension",
+    "build:extension": "npm run build --workspace @palside/extension",
+    "chain:prepare": "node scripts/chain/prepare.mjs",
+    "chain:generate": "node scripts/chain/generate.mjs",
+    "lint": "eslint .",
+    "check:extension": "npm run typecheck --workspace @palside/extension && npm run build:extension && npm run verify:extension",
+    "check:shared": "npm run typecheck --workspace @palside/shared",
+    "verify:extension": "node scripts/verify-extension.mjs",
+    "check:review-pages": "node scripts/check-review-pages.mjs",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "postinstall": "npm run prepare --workspace @palside/extension",
+    "package:release": "node scripts/release-extension.mjs",
+    "verify:installed": "node scripts/verify-installed.mjs",
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "typecheck": "npm run typecheck --workspace @palside/extension && npm run typecheck --workspace @palside/shared && node scripts/check-typecheck-coverage.mjs",
+    "package:extension": "npm run zip --workspace @palside/extension",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build:extension && node scripts/check-generated-assets.mjs && npm run check:review-pages && npm run verify:extension"
+  },
+  "devDependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.20",
+    "@types/node": "24.19.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "axe-core": "4.13.0",
+    "esbuild": "0.28.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.1",
+    "linkedom": "0.18.13",
+    "next": "16.4.1",
+    "rolldown": "1.2.15",
+    "sharp": "^0.35.5",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "react-remove-scroll@2.7.2": {
+      "react-remove-scroll-bar": "2.3.7"
+    },
+    "zod": "4.6.7"
+  },
+  "workspaces": [
+    "apps/extension",
+    "packages/design",
+    "packages/i18n",
+    "packages/shared",
+    "packages/ui"
+  ],
+  "engines": {
+    "node": "^24.13.1"
+  }
+}

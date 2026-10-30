@@ -1,0 +1,77 @@
+/* 首页 and 添加小队: the new team is the page — its face, its name, its intro, 创建 — then 或 and the two other ways in, all on one centred column. */
+.start { display:flex; flex-direction:column; flex:1; min-height:0; }
+.start>header { justify-content:space-between; }
+.start>.body { flex:1; min-height:0; overflow:auto; padding:8px 20px 24px; justify-content:center; }
+.body { display:flex; flex-direction:column; gap:16px; width:100%; max-width:360px; margin:auto; animation:startEnter .28s var(--ui-ease-feedback); }
+.form { --ui-field-surface:var(--ui-control-surface); display:flex; flex-direction:column; gap:12px; }
+.identity { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.face { position:relative; padding:0; border:0; background:none; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); cursor:pointer; transition:transform .18s var(--ui-ease-feedback); }
+.face:hover [data-team-avatar] { filter:brightness(.94); }
+.face:active { transform:scale(.97); }
+.face:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.face [data-team-avatar] img { animation:faceSwap .24s var(--ui-ease-feedback); }
+.camera { position:absolute; right:-4px; bottom:-4px; display:grid; place-items:center; width:28px; height:28px; border:2px solid var(--ui-canvas); border-radius:var(--ui-radius-pill); background:var(--ui-text-primary); color:var(--ui-canvas); }
+.picks { display:flex; align-items:center; justify-content:center; gap:6px; }
+.pick { flex:none; width:36px; height:36px; padding:0; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; cursor:pointer; opacity:.62; transition:opacity .18s, transform .18s var(--ui-ease-feedback), box-shadow .18s; }
+.pick img { display:block; width:100%; height:100%; object-fit:cover; }
+.pick:hover { opacity:1; }
+.pick[aria-pressed="true"] { opacity:1; box-shadow:0 0 0 2px var(--ui-canvas), 0 0 0 4px var(--ui-text-primary); }
+.pick:active { transform:scale(.94); }
+.pick:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.shuffle { flex:none; margin-left:2px; }
+.name { width:100%; }
+.name input { text-align:center; font-size:var(--ui-type-headline); font-weight:500; }
+.error, .fieldError { margin:-4px 0 0; font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-ink-error); text-align:center; animation:startEnter .2s var(--ui-ease-feedback); }
+.bare>label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.intro { min-height:72px; resize:none; }
+.or { display:flex; align-items:center; gap:12px; color:var(--ui-ink-muted); font-size:var(--ui-type-footnote); }
+.or::before, .or::after { content:""; flex:1; height:1px; background:var(--ui-border-control); }
+.ways { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ways>button { width:100%; min-width:0; }
+.badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; margin-left:6px; padding:0 5px; border-radius:var(--ui-radius-pill); background:var(--ui-accent); color:var(--ui-on-accent); font-size:var(--ui-type-caption); font-weight:600; }
+.former { display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:10px 12px; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); text-align:left; cursor:pointer; transition:background-color .18s; }
+.former>span { flex:1; min-width:0; }
+.former small { font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; }
+.former:hover { background:var(--ui-control-surface); }
+.former:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+
+/* 通过邀请加入: three faces over one paste field, centred in the panel. */
+.joinBody { display:flex; flex-direction:column; justify-content:center; gap:16px; flex:1; min-height:100%; width:100%; max-width:360px; margin:0 auto; padding-bottom:48px; animation:startEnter .28s var(--ui-ease-feedback); }
+.trio { display:flex; justify-content:center; }
+.trio img { width:56px; height:56px; border:3px solid var(--ui-canvas); border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); object-fit:cover; }
+.trio img:nth-child(1) { transform:rotate(-8deg) translateX(10px); }
+.trio img:nth-child(2) { position:relative; z-index:1; transform:translateY(-6px); }
+.trio img:nth-child(3) { transform:rotate(8deg) translateX(-10px); }
+.paste { display:flex; align-items:center; gap:8px; }
+.link { flex:1; min-width:0; }
+
+/* The join sheet: the team as it will look in the switcher, then the password when it needs one, then 加入小队. */
+.sheet { display:flex; flex-direction:column; padding:12px 16px 16px; }
+.sheet form { display:flex; flex-direction:column; gap:14px; }
+.sheetHead { display:flex; align-items:center; justify-content:flex-end; min-height:32px; margin-right:-6px; }
+.sheetTitle { flex:1; }
+.preview { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; animation:startEnter .24s var(--ui-ease-feedback); }
+.nameLine { display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap; gap:4px 8px; margin:4px 0 0; font-size:var(--ui-type-title); line-height:24px; font-weight:600; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.count { display:inline-flex; align-items:center; gap:3px; font-size:var(--ui-type-footnote); font-weight:400; letter-spacing:0; color:var(--ui-text-secondary); font-variant-numeric:tabular-nums; }
+.description { max-width:300px; font-size:var(--ui-type-callout); line-height:20px; color:var(--ui-text-secondary); overflow-wrap:anywhere; }
+.status, .statusError { font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); }
+.statusError { color:var(--ui-ink-error); }
+.pin { justify-content:center; }
+.join { width:100%; }
+.state { display:flex; flex-direction:column; align-items:center; gap:12px; padding:8px 0 20px; font-size:var(--ui-type-headline); }
+.stateMark { display:grid; place-items:center; width:48px; height:48px; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-ink-error); }
+
+/* 已离开的小队: one card of rows, each reopening the read-only history; ··· holds 删除本机记录. */
+.formerList { display:flex; flex-direction:column; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; }
+.formerRow { display:flex; align-items:center; gap:4px; padding-right:8px; }
+.formerOpen { flex:1; min-width:0; display:flex; align-items:center; gap:12px; min-height:60px; padding:10px 8px 10px 14px; border:0; background:none; color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; transition:background-color .18s; }
+.formerOpen:hover { background:var(--ui-control-hover); }
+.formerOpen:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:calc(-1 * var(--ui-focus-width)); }
+.formerFace { filter:grayscale(1); opacity:.6; }
+.formerText { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.formerText strong { font-size:var(--ui-type-body); line-height:20px; font-weight:500; overflow-wrap:anywhere; }
+.formerText small { font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); }
+
+@keyframes startEnter { from { opacity:0; transform:translateY(6px); } }
+@keyframes faceSwap { from { opacity:.4; transform:scale(.92); } }
+@media (prefers-reduced-motion:reduce) { .body, .joinBody, .preview, .error, .fieldError, .face [data-team-avatar] img { animation:none; } .face, .pick, .former, .formerOpen { transition:none; } }

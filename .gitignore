@@ -1,0 +1,28 @@
+node_modules/
+.DS_Store
+*.pem
+*.tsbuildinfo
+.env*
+__pycache__/
+*.pyc
+npm-debug.log*
+
+# Build output
+.wxt/
+.output/
+/output/
+
+# Generated from packages/design/assets and the license snapshot
+/apps/extension/public/site-logos/
+/apps/extension/public/chain-logos/
+/apps/extension/public/avatars/
+/apps/extension/public/brand/
+/apps/extension/public/team-avatars/
+/apps/extension/public/art/
+/apps/extension/public/tokens/
+/apps/extension/public/icon-*.png
+/apps/extension/public/licenses/THIRD-PARTY.json
+/apps/extension/public/licenses/THIRD-PARTY.txt
+/apps/extension/public/licenses/Palside-MIT.txt
+/apps/extension/public/licenses/Geist-OFL.txt
+/apps/extension/public/licenses/GeistMono-OFL.txt

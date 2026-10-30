@@ -1,0 +1,11 @@
+import type { StaticDecode as Static } from 'typebox';
+import { denseArray, contractString, strictObject, plainRecord } from './validation.ts';
+import { text, matrixId, presenceState, timestamp } from './common.ts';
+import { account } from './profiles.ts';
+import { teamSnapshot } from './team-model.ts';
+import { DEVICE_LABEL_LENGTH } from './limits.ts';
+export const registration = strictObject({ token: contractString({ min: 1 }), account, matrix: strictObject({ userId: matrixId, deviceId: contractString({ min: 1 }) }) });
+export const deviceRegistration = strictObject({ label: text(DEVICE_LABEL_LENGTH, 1) });
+export const snapshot = strictObject({ account, teams: denseArray(teamSnapshot), presence: plainRecord(presenceState), serverTime: timestamp });
+export type Registration = Static<typeof registration>;
+export type Snapshot = Static<typeof snapshot>;

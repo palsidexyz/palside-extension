@@ -1,0 +1,24 @@
+/* The report reads top to bottom: what is sent, why, then the decision. */
+.report { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.section { display:flex; flex-direction:column; gap:8px; min-width:0; margin:0; padding:0; border:0; }
+.title { margin:0 14px; padding:0; font-size:var(--ui-type-footnote); line-height:16px; font-weight:500; color:var(--ui-text-secondary); }
+legend.title { margin-bottom:8px; }
+.target { display:flex; flex-direction:column; gap:10px; min-width:0; padding:14px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.subject { display:flex; align-items:center; gap:10px; min-width:0; }
+.subject strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-body); line-height:20px; font-weight:600; }
+.subject small { flex:none; font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); }
+.body { margin:0; max-height:160px; overflow:auto; font-size:var(--ui-type-body); line-height:21px; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--ui-text-primary); }
+.image { display:block; max-width:100%; max-height:200px; align-self:flex-start; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); object-fit:contain; background:var(--ui-canvas); }
+.attach { padding-top:10px; }
+.privacy { display:flex; align-items:flex-start; gap:6px; margin:0 14px; font-size:var(--ui-type-footnote); line-height:17px; color:var(--ui-text-secondary); }
+.privacy svg { flex:none; margin-top:1.5px; }
+.reasons { display:flex; flex-wrap:wrap; gap:8px; }
+.reason { position:relative; display:inline-flex; align-items:center; min-height:34px; padding:6px 14px; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); font-size:var(--ui-type-callout); line-height:20px; color:var(--ui-text-primary); cursor:pointer; transition:background-color .18s,box-shadow .18s; }
+.reason:hover { background:var(--ui-control-hover); }
+.reason[data-checked] { background:color-mix(in srgb, var(--ui-accent) 24%, var(--ui-canvas)); box-shadow:inset 0 0 0 1.5px var(--ui-text-primary); font-weight:500; }
+.reason input { position:absolute; inset:0; margin:0; opacity:0; cursor:inherit; }
+.reason:has(input:focus-visible) { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+fieldset:disabled .reason { opacity:.55; cursor:default; }
+.actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.actions > :only-child { grid-column:1 / -1; }
+@media (prefers-reduced-motion:reduce) { .reason { transition:none; } }

@@ -1,0 +1,10 @@
+/* 你不在时: a centered rule in the timeline, like the date labels, with the tokens as small buttons. */
+.divider { display:flex; align-items:center; gap:8px; margin:16px 0 6px; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height:16px; font-weight:500; white-space:nowrap; }
+.divider::before, .divider::after { content:""; flex:1; min-width:16px; height:1px; background:none; }
+.tokens { display:inline-flex; align-items:center; gap:1px; }
+.tokens small { margin-left:2px; font-size:var(--ui-type-caption); }
+.token { display:grid; place-items:center; width:22px; height:22px; padding:0; border:0; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:transparent; cursor:pointer; }
+.token:hover { background:var(--ui-control-hover); }
+.token > [data-token-size][data-token-size] { --token-size:16px; }
+.token > [data-token-size] > :not(:first-child) { display:none; }
+.token:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }

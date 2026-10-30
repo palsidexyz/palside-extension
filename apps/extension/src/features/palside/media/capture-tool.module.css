@@ -1,0 +1,4 @@
+/* The shortcut guide: one line — what to press, the keys, and the button that changes them. */
+.guide { --popover-width:max-content; padding:8px 8px 8px 12px; max-width:calc(100vw - 24px); }
+.line { display:flex; align-items:center; gap:10px; font-size:var(--ui-type-callout); line-height:20px; white-space:nowrap; }
+.line > span:first-child { flex:1; color:var(--ui-text-secondary); }

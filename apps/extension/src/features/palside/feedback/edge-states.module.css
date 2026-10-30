@@ -1,0 +1,18 @@
+.brand { display:inline-flex; align-items:center; gap:9px; flex-shrink:0; color:var(--ui-text-primary); font-size:var(--ui-type-display); font-weight:600; letter-spacing:-1px; line-height:1; }
+.brand img { display:block; flex-shrink:0; }
+.error { margin:0; font-size:var(--ui-type-footnote); color:var(--ui-ink-error); line-height:1.5; overflow-wrap:anywhere; }
+.quietState { padding:28px 0; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); text-align:center; line-height:1.6; }
+.image { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; min-width:0; max-width:100%; overflow:hidden; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-secondary); padding:0; cursor:pointer; }
+.image:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.image[data-state="failed"],.image[data-state="loading"] { min-width:min(160px,100%); min-height:100px; padding:16px; }
+.image img { max-width:100%; max-height:220px; display:block; object-fit:contain; }
+.image[data-state="loading"] img { width:1px; height:1px; opacity:0; position:absolute; }
+.image span { font-size:var(--ui-type-footnote); overflow-wrap:anywhere; }
+.image[data-compact="true"] { flex-direction:row; justify-content:flex-start; padding:8px 10px; min-height:48px; }
+.image[data-compact="true"] img { width:36px; height:36px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); object-fit:cover; }
+.image[data-compact="true"] span { text-align:left; }
+.memberChoice { display:flex; align-items:center; gap:12px; border:0; background:none; color:inherit; text-align:left; min-height:56px; padding:8px 14px; width:100%; cursor:pointer; transition:background-color .18s; }
+.memberChoice:hover { background-color:var(--ui-control-hover); }
+.memberChoice>span:nth-child(2) { flex:1; min-width:0; overflow-wrap:anywhere; }
+.memberChoice>svg { color:var(--ui-text-secondary); }
+.memberChoice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }

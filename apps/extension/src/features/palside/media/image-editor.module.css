@@ -1,0 +1,24 @@
+.workspace { position:fixed; inset:0; margin:0; padding:0; width:100%; height:100%; max-width:none; max-height:none; border:0; border-radius:0; background:var(--ui-canvas); color:var(--ui-text-primary); font:inherit; overflow:hidden; }
+.workspace[open], section.workspace { display:flex; flex-direction:column; }
+.workspace::backdrop { background:transparent; }
+.header { display:flex; align-items:center; gap:8px; padding:12px; flex-shrink:0; }
+.header h2 { font-size:var(--ui-type-body); font-weight:600; line-height:20px; flex:1; margin:0; min-width:0; }
+.canvasArea { flex:1; min-height:0; position:relative; background:var(--ui-control-surface); }
+.stage { position:absolute; inset:0; overflow:hidden; }
+.stage:focus-within { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.status, .handoff { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; gap:16px; padding:16px; text-align:center; font-size:var(--ui-type-callout); color:var(--ui-text-secondary); }
+.status { pointer-events:none; }
+.handoff { flex-direction:column; background:var(--ui-canvas); }
+.footer { flex-shrink:0; padding:8px 12px 12px; }
+.zoom { display:flex; align-items:center; justify-content:center; gap:4px; }
+.zoomValue { min-width:48px; text-align:center; font:var(--ui-type-footnote) var(--font-geist-mono),monospace; color:var(--ui-text-secondary); }
+.tools :global(.image-workspace-tools) { display:flex; flex-wrap:wrap; justify-content:center; gap:4px; padding-top:8px; max-width:560px; margin:auto; }
+.tools button { display:grid; place-items:center; width:32px; height:32px; padding:6px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); color:var(--ui-text-secondary); background:transparent; cursor:pointer; }
+.tools button:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.tools button[aria-pressed=true] { background:var(--ui-accent-soft); color:var(--ui-text-primary); }
+.tools button:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.tools button:disabled { opacity:.4; cursor:default; }
+.tools svg { width:18px; height:18px; }
+.tools :global(.image-workspace-color)::before { content:''; width:16px; height:16px; border-radius:50%; background:var(--swatch); border:0; }
+.error { flex-shrink:0; margin:0; padding:8px 16px; color:var(--ui-danger); font-size:var(--ui-type-footnote); line-height:18px; }
+@media (max-height:480px) { .header { padding:8px 12px; } .footer { padding-top:4px; padding-bottom:4px; } .tools :global(.image-workspace-tools) { padding-top:4px; } }

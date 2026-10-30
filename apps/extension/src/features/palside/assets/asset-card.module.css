@@ -1,0 +1,38 @@
+/* Page card: 36px site icon, a two-line page name, then the domain. Token pages show name + chain, the short contract, and a 详情 button. */
+.layout { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; container: asset-card / inline-size; }
+.heading { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.chain { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; height: 16px; padding: 0 5px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background: var(--ui-control-surface); color: var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height: 16px; font-weight: 600; white-space: nowrap; }
+.address { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-geist-mono, ui-monospace), ui-monospace, monospace; font-size:var(--ui-type-caption); }
+.identity { display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: 1; min-width: 0; }
+.title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font:inherit;
+  font-size:var(--ui-type-callout);
+  line-height: 18px;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+/* A token's name is one word: it ellipsizes instead of breaking, and keeps at least four characters while the chain
+   tag gives way first. Narrow cards drop the tag; the title tooltip still names the chain. Page titles keep two lines. */
+[data-kind="asset"] .title { display:block; flex: 0 1 auto; min-width: min(4.5em, 100%); white-space:nowrap; text-overflow:ellipsis; }
+/* The name keeps its room: the chain chip shrinks first and leaves narrow cards (its badge stays on the avatar). */
+@container asset-card (max-width: 260px) { .chain { display: none; } }
+/* The panel resets every link to inherit its colour; the card's name stays primary. */
+.layout .title { color: var(--ui-text-primary); }
+.title:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--ui-border-control); }
+.meta { display: flex; align-items: center; gap: 5px; min-width: 0; height: 18px; color: var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height: 16px; white-space: nowrap; }
+.host { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.title:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
+.remove.remove { position: absolute; top: -9px; right: -7px; width: 24px; min-width: 24px; height: 24px; min-height: 24px; padding: 0; border-radius:50%; background: var(--ui-canvas); }
+
+.details.details { min-height:28px; height:28px; padding:0 10px; font-size:var(--ui-type-footnote); font-weight:600; white-space:nowrap; }

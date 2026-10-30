@@ -1,0 +1,42 @@
+{
+  "name": "@palside/shared",
+  "version": "0.1.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palsidexyz/palside-extension.git",
+    "directory": "packages/shared"
+  },
+  "homepage": "https://palside.xyz",
+  "bugs": "https://github.com/palsidexyz/palside-extension/issues",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./contracts/*": "./src/contracts/*.ts",
+    "./chain/*": "./src/chain/*.ts",
+    "./team-activity": "./src/team-activity.ts",
+    "./team-activity-rules": "./src/team-activity-rules.ts",
+    "./navigation": "./src/navigation.ts",
+    "./sites": "./src/sites/index.ts",
+    "./identity": "./src/identity.ts",
+    "./extension": "./src/extension.ts",
+    "./public-links": "./src/public-links.ts",
+    "./team-avatars": "./src/team-avatars.ts",
+    "./person-avatars": "./src/person-avatars.ts",
+    "./signals": "./src/signals.ts",
+    "./signal-art": "./src/signal-art/index.ts",
+    "./models/*": "./src/models/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "@scure/base": "2.4.0",
+    "@scure/bip32": "2.4.0",
+    "@scure/bip39": "2.4.0",
+    "typebox": "1.4.3",
+    "viem": "2.57.10"
+  }
+}

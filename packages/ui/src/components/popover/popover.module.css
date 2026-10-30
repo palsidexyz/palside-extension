@@ -1,0 +1,10 @@
+.content { position:fixed; inset:auto; box-sizing:border-box; margin:0; padding:6px; width:var(--popover-width, max-content); min-width:min(200px, var(--anchored-layer-width, calc(100vw - 16px))); max-width:calc(100vw - 16px); max-height:min(420px, 70dvh); overflow:auto; overscroll-behavior:contain; border:0; border-radius:var(--ui-radius-popover); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-primary); box-shadow:var(--ui-shadow-floating); }
+.content:focus { outline:none; }
+/* A class that sets display on the content must not reveal a closed layer. */
+.content[popover]:not(:popover-open) { display:none; }
+.content:popover-open { animation:enterBelow .24s var(--ui-ease-feedback); }
+.content[data-side="top"]:popover-open { animation-name:enterAbove; }
+@keyframes enterBelow { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+@keyframes enterAbove { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .content:popover-open { animation:none; } }
+@media (forced-colors: active) { .content { border:1px solid CanvasText; } }

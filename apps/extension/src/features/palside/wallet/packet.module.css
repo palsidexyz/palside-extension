@@ -1,0 +1,112 @@
+/* 红包: the packet's own colours are an illustration, the same in both themes; everything around it uses product tokens. */
+.envelope, .card, .envDialog, .env, .banner, .stack { --packet:#E2543F; --packet-hover:#D94D39; --packet-dim:light-dark(#EFA597, #8E4236); --packet-deep:#C8432F; --packet-flap:#EC6A53; --seal:#F5C55B; --seal-ink:#7A4A06; --packet-ink:#FFF6EA; --packet-scrim:rgb(15 16 20 / 32%); --packet-hover-veil:rgb(255 255 255 / 14%); }
+
+/* The envelope drawing: body, curved flap, seal. */
+.envelope { position:relative; flex:none; display:inline-block; width:28px; height:36px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--packet); overflow:hidden; }
+.envelope::before { content:""; position:absolute; left:-25%; right:-25%; top:-38%; height:72%; border-radius:0 0 50% 50%; background:var(--packet-flap); }
+.envelope::after { content:""; position:absolute; left:50%; top:34%; width:32%; aspect-ratio:1; border-radius:50%; background:var(--seal); translate:-50% 0; }
+.envelope[data-size=xs] { width:12px; height:15px; border-radius:3px; }
+.envelope[data-size=sm] { width:22px; height:28px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
+.envelope[data-size=lg] { width:44px; height:56px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
+
+/* 红包卡片 in chat: red top, quiet foot; spent packets fade toward the canvas. */
+.card { display:block; width:240px; max-width:100%; margin:0; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--packet); color:var(--packet-ink); font:inherit; text-align:left; overflow:hidden; cursor:pointer; transition:background-color .3s; }
+.card:hover { background:var(--packet-hover); }
+.card[data-dim] { background:var(--packet-dim); }
+.card[data-dim] .envelope { opacity:.7; }
+.card:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.cardTop { display:flex; align-items:center; gap:10px; padding:12px 12px 11px; }
+.cardTop .envelope { background:var(--packet-deep); }
+.cardTop > span:last-child { display:flex; flex-direction:column; min-width:0; }
+.cardTop strong { font-size:var(--ui-type-body); line-height:20px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cardTop small { font-size:var(--ui-type-footnote); line-height:17px; opacity:.86; font-variant-numeric:tabular-nums; }
+.cardFoot { display:flex; justify-content:space-between; align-items:center; height:26px; padding:0 12px; background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-caption); }
+
+/* 拆红包: the envelope dialog, centred over a light scrim. */
+.envDialog { width:fit-content; max-width:none; height:fit-content; max-height:none; margin:auto; padding:0; border:0; background:transparent; overflow:visible; }
+.envDialog::backdrop { background:var(--packet-scrim); }
+.envDialog:focus { outline:none; }
+.env { position:relative; display:flex; flex-direction:column; align-items:center; width:272px; height:396px; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--packet); color:var(--packet-ink); overflow:hidden; perspective:600px; }
+.envFlap { position:absolute; inset:0 0 auto; z-index:1; display:flex; flex-direction:column; align-items:center; gap:14px; height:66%; padding:44px 24px 0; background:var(--packet-flap); border-radius:0 0 50% 50% / 0 0 22% 22%; text-align:center; }
+.envClose { position:absolute; top:10px; left:10px; display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--packet-ink); cursor:pointer; }
+.envClose:hover:not(:disabled) { background:var(--packet-hover-veil); }
+.envClose:disabled { opacity:.5; cursor:default; }
+.envClose svg { width:18px; height:18px; }
+.envFrom { display:inline-flex; align-items:center; gap:8px; font-size:var(--ui-type-callout); font-weight:600; }
+.envWish { font-size:var(--ui-type-title-l); line-height:30px; font-weight:600; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.envSeal { position:absolute; top:calc(66% - 46px); left:calc(50% - 46px); z-index:2; display:grid; place-items:center; width:92px; height:92px; padding:0; border:0; border-radius:50%; background:var(--seal); color:var(--seal-ink); font:600 var(--ui-type-page-s)/1 var(--font-geist-sans), sans-serif; cursor:pointer; }
+.envSeal:disabled { cursor:default; }
+.envSeal:focus-visible { outline:var(--ui-focus-width) solid var(--packet-ink); outline-offset:var(--ui-focus-offset); }
+.envSealOff { position:absolute; top:calc(66% - 24px); left:calc(50% - 24px); z-index:2; width:48px; height:48px; border-radius:50%; background:var(--seal); opacity:.55; }
+.envLink { position:absolute; bottom:22px; left:50%; translate:-50% 0; padding:4px 8px; border:0; background:none; color:var(--packet-ink); font:inherit; font-size:var(--ui-type-footnote); opacity:.9; white-space:nowrap; cursor:pointer; }
+.envLink:hover:not(:disabled) { text-decoration:underline; text-underline-offset:3px; }
+.envLink:disabled { cursor:default; }
+
+/* Result: who sent it, the wish, what I got rolling up, then the claims. */
+.result { position:relative; gap:20px; }
+.close { position:absolute; top:12px; right:12px; }
+.hero { display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0; text-align:center; }
+.hero > small { font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); }
+.from { display:inline-flex; align-items:center; gap:6px; font-size:var(--ui-type-callout); font-weight:600; }
+.amount { display:inline-flex; align-items:baseline; gap:6px; margin-top:10px; font-size:var(--ui-type-page-m); line-height:44px; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.amount small { font-size:var(--ui-type-headline); font-weight:600; color:var(--ui-text-secondary); letter-spacing:0; }
+.saved { display:inline-flex; align-items:center; gap:6px; margin-top:6px; color:var(--ui-ink-success); font-size:var(--ui-type-footnote); font-weight:500; transition:color .2s; }
+.saved[data-state=issued] { color:var(--ui-text-secondary); }
+.saved[data-state=failed] { color:var(--ui-ink-error); }
+.centered { text-align:center; }
+.claims { display:flex; flex-direction:column; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; }
+.claims > header { display:flex; justify-content:space-between; gap:12px; padding:12px 14px 6px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; }
+.claims > header:only-child { padding-bottom:12px; }
+.claim { display:flex; align-items:center; gap:12px; min-height:52px; padding:6px 14px; }
+.claimWho { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.claimWho strong { font-size:var(--ui-type-body); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.claimWho small { font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); font-variant-numeric:tabular-nums; }
+.claim > span:last-child { display:flex; flex-direction:column; align-items:flex-end; gap:1px; font-variant-numeric:tabular-nums; }
+.claim b { font-size:var(--ui-type-body); font-weight:600; }
+.best { display:inline-flex; align-items:center; gap:3px; color:var(--ui-ink-warning); font-size:var(--ui-type-footnote); font-weight:600; }
+.best svg { width:12px; height:12px; }
+
+/* 发红包: one grouped list of inputs, then the total set large in the middle of the remaining space. */
+.form { flex:1; }
+.rows { display:flex; flex-direction:column; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.row { display:flex; align-items:center; gap:10px; min-height:52px; padding:0 14px; cursor:text; }
+.row > span:first-child { flex:none; width:64px; font-size:var(--ui-type-callout); color:var(--ui-text-secondary); }
+.row > :nth-child(2) { margin-left:auto; }
+.row[data-error] .rowAmount { color:var(--ui-ink-error); }
+.row:focus-within { box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+.rowAmount, .rowText { flex:1; min-width:0; padding:0; border:0; outline:none; background:none; color:var(--ui-text-primary); font:inherit; text-align:right; }
+.rowAmount { font-size:var(--ui-type-title-l); line-height:28px; font-weight:600; font-variant-numeric:tabular-nums; }
+.rowAmount::placeholder, .rowText::placeholder { color:var(--ui-ink-muted); }
+.rowText { font-size:var(--ui-type-callout); }
+.pill { flex:none; display:inline-flex; align-items:center; height:30px; padding:0 10px; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); font-size:var(--ui-type-callout); font-weight:600; }
+.stepper { display:inline-flex; align-items:center; gap:4px; }
+.stepper button { display:grid; place-items:center; width:28px; height:28px; padding:0; border:0; border-radius:50%; background:var(--ui-canvas); color:var(--ui-text-primary); cursor:pointer; }
+.stepper button:disabled { opacity:.4; cursor:default; }
+.stepper button svg { width:14px; height:14px; }
+.stepper b { min-width:32px; text-align:center; font-size:var(--ui-type-body); font-weight:600; font-variant-numeric:tabular-nums; }
+/* The total reads straight under the inputs and the button follows it, one block like a checkout, so no gap opens between them. */
+.totalArea { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:20px 0 4px; }
+.submit.submit { position:static; margin-top:0; padding-top:0; }
+.totalBig { display:inline-flex; align-items:baseline; gap:8px; font-size:var(--ui-type-page-m); line-height:48px; font-weight:600; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+.totalBig small { font-size:var(--ui-type-title); font-weight:600; letter-spacing:0; color:var(--ui-text-secondary); }
+.totalSub { font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); font-variant-numeric:tabular-nums; }
+.totalSub [data-error] { color:var(--ui-ink-error); }
+.dot { margin:0 4px; color:var(--ui-ink-muted); }
+
+/* 弹幕: the packet banner under 看法. */
+.banner { flex:none; overflow:hidden; }
+.bannerIn { display:flex; align-items:center; gap:10px; margin:0 0 6px; padding:8px 8px 8px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:color-mix(in srgb, var(--packet) 10%, var(--ui-canvas)); }
+.bannerIn[data-state=gone] { background:var(--ui-control-surface); }
+.bannerText { display:flex; flex:1; flex-direction:column; min-width:0; }
+.bannerText strong { font-size:var(--ui-type-callout); line-height:20px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bannerText small { font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stack { position:relative; display:inline-grid; place-items:center; flex:none; }
+.stack[data-many]::before, .stack[data-many]::after { content:""; position:absolute; width:22px; height:28px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--packet); opacity:.35; transform:translate(4px, -3px) rotate(8deg); }
+.stack[data-many]::after { opacity:.2; transform:translate(7px, -5px) rotate(14deg); }
+.stack > * { position:relative; z-index:1; }
+.grab { flex:none; display:grid; place-items:center; width:40px; height:40px; padding:0; border:0; border-radius:50%; background:var(--seal); color:var(--seal-ink); font:600 var(--ui-type-headline)/1 var(--font-geist-sans), sans-serif; cursor:pointer; }
+.luck, .pager { flex:none; height:30px; padding:0 12px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; cursor:pointer; }
+.pager { height:24px; padding:0 8px; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); }
+.luck:hover, .pager:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.grab:focus-visible, .luck:focus-visible, .pager:focus-visible, .stepper button:focus-visible, .envClose:focus-visible, .envLink:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+@media (prefers-reduced-motion:reduce) { .card { transition:none; } }

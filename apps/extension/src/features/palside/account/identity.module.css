@@ -1,0 +1,22 @@
+.phrase { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; transition:filter .2s ease; }
+.phrase li { display:flex; align-items:baseline; gap:8px; min-width:0; padding:8px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-field-surface, var(--ui-control-surface)); font:var(--ui-type-callout)/20px var(--font-geist-mono),monospace; overflow-wrap:anywhere; }
+.phrase span { min-width:16px; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); text-align:right; }
+.phrase[data-hidden] { filter:blur(6px); user-select:none; }
+.page { display:flex; flex-direction:column; gap:14px; min-width:0; }
+.accountId { flex:1; min-width:0; display:flex; font:var(--ui-type-callout)/20px var(--font-geist-mono),monospace; color:var(--ui-text-primary); white-space:nowrap; }
+.accountId>span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.accountId>span:last-child { flex:none; }
+.panel { display:flex; flex-direction:column; gap:12px; padding:14px; }
+.actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+/* A page's only action (注销账号) spans the page right under the PIN, so it is never missed; paired with 取消 they stay at the end. */
+.actions > :only-child { flex:1; }
+.device { flex-wrap:wrap; }
+.current { flex:none; padding:3px 9px; border-radius:var(--ui-radius-pill); background:var(--ui-accent); color:var(--ui-on-accent); font-size:var(--ui-type-footnote); font-weight:600; }
+.removal { --ui-field-surface:var(--ui-canvas); flex-basis:100%; display:flex; flex-direction:column; gap:8px; padding-bottom:4px; }
+/* Device rows hold their shape while the list loads. */
+.lines { flex:1; display:flex; flex-direction:column; gap:8px; }
+.lines i { display:block; height:10px; width:46%; border-radius:var(--ui-radius-pill); background:var(--ui-control-recess); animation:pulse 1.4s ease-in-out infinite; }
+.lines i+i { width:28%; }
+@keyframes pulse { 50% { opacity:.45; } }
+@media (prefers-reduced-motion:reduce) { .phrase { transition:none; } .lines i { animation:none; } }
+@container palside (max-width:300px) { .phrase { grid-template-columns:minmax(0,1fr); } }

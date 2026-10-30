@@ -1,0 +1,4 @@
+.menu { --popover-width:148px; min-width:0; padding:5px; max-width:calc(100vw - 24px); }
+.item { min-height:34px; padding:7px 9px; gap:9px; border-radius:calc(var(--ui-radius-popover) - 5px); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-footnote); }
+.aside:has(.menu:popover-open) { opacity:1; }
+.menuTrigger:has(.menu:popover-open) { pointer-events:auto; }

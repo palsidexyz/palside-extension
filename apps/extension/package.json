@@ -1,0 +1,49 @@
+{
+  "name": "@palside/extension",
+  "version": "0.1.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palsidexyz/palside-extension.git",
+    "directory": "apps/extension"
+  },
+  "homepage": "https://palside.xyz",
+  "bugs": "https://github.com/palsidexyz/palside-extension/issues",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build -b chrome",
+    "zip": "wxt zip -b chrome",
+    "prepare": "wxt prepare",
+    "pretypecheck": "node ../../scripts/sync-site-assets.mjs",
+    "typecheck": "wxt prepare && tsc --noEmit",
+    "predev": "node ../../scripts/sync-site-assets.mjs",
+    "prebuild": "node ../../scripts/sync-site-assets.mjs",
+    "prezip": "node ../../scripts/sync-site-assets.mjs"
+  },
+  "dependencies": {
+    "@palside/design": "*",
+    "@palside/i18n": "*",
+    "@palside/shared": "*",
+    "@palside/ui": "*",
+    "danmaku": "2.0.10",
+    "lucide-react": "1.50.0",
+    "matrix-encrypt-attachment": "1.0.3",
+    "matrix-js-sdk": "42.4.0",
+    "motion": "14.6.0",
+    "qrcode.react": "4.2.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-use-measure": "^2.1.7",
+    "use-intl": "4.14.7",
+    "viem": "2.57.10"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@wxt-dev/module-react": "1.2.2",
+    "tailwindcss": "^4",
+    "vite": "8.3.3",
+    "wxt": "0.21.4"
+  }
+}

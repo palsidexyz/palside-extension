@@ -1,0 +1,10 @@
+.feedback[data-tone="success"] .feedbackIcon { color: var(--ui-ink-success); }
+.feedback[data-tone="warning"] .feedbackIcon { color: var(--ui-ink-warning); }
+.feedback[data-tone="error"] .feedbackIcon { color: var(--ui-ink-error); }
+.feedback { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; width: 100%; min-width: 0; padding: 12px; border-radius:var(--ui-radius-control); corner-shape: var(--ui-corner-shape); background: var(--ui-control-surface); color: var(--ui-text-primary); }
+.feedbackIcon { flex-shrink: 0; margin-top: 1px; color: var(--ui-ink-muted); }
+.feedbackMessage { flex: 1 1 120px; min-width: 0; font-size:var(--ui-type-body); line-height: 20px; overflow-wrap: anywhere; }
+.feedbackAction { margin-inline-start: auto; }
+@media (forced-colors: active) {
+  .feedback { border: 1px solid ButtonText; }
+}

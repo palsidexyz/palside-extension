@@ -1,0 +1,189 @@
+/* Global document defaults; product surfaces override these below. */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(.3211 0 0);
+  --border: oklch(.9276 .0058 264.5313);
+  --ring: oklch(.6231 .1880 259.8145);
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+}
+
+/* Shared product design values. */
+:root {
+  --ui-canvas: var(--background);
+  --ui-border: var(--border);
+  --ui-control-surface: #F4F4F9;
+  /* Plates behind site logos drawn for the other theme: a near-black mark in dark mode, a near-white one in light mode. */
+  --ui-logo-plate-light: var(--ui-control-surface);
+  --ui-logo-plate-dark: #2A2C31;
+  --ui-text-primary: var(--foreground);
+  --ui-text-secondary: #686773;
+  /* Robin Neon: https://docs.robinhood.com/chain/brand-guidelines/ */
+  --ui-accent: #CCFF00;
+  --ui-on-accent: #202400;
+  --ui-accent-hover: color-mix(in srgb, var(--ui-accent) 94%, black);
+  --ui-accent-soft: color-mix(in srgb, var(--ui-accent) 18%, var(--ui-canvas));
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 24px;
+  --ui-space-6: 32px;
+  --ui-space-7: 48px;
+  /* Type scale for product surfaces. CSS modules use these names, never raw pixel sizes. */
+  --ui-type-caption: 11px;
+  --ui-type-footnote: 12px;
+  --ui-type-callout: 13px;
+  --ui-type-body: 14px;
+  --ui-type-headline: 15px;
+  --ui-type-title: 17px;
+  --ui-type-title-l: 20px;
+  --ui-type-display: 24px;
+  /* Website reading and page-title steps. */
+  --ui-type-lead: 16px;
+  --ui-type-lead-l: 18px;
+  --ui-type-page-s: 32px;
+  --ui-type-page-m: 40px;
+  --ui-type-page-l: 48px;
+  /* Radius scale: chips, small controls, rows and buttons, cards and groups, sheets, pills.
+     Only hairline marks (3px or less) keep literal radii. Every token radius below pill
+     pairs with --ui-corner-shape, the continuous-curvature corner. */
+  --ui-radius-xs: 6px;
+  --ui-radius-s: 8px;
+  --ui-radius-m: 12px;
+  --ui-radius-l: 16px;
+  --ui-radius-xl: 20px;
+  --ui-radius-pill: 999px;
+  --ui-radius-control: var(--ui-radius-m);
+  --ui-radius-popover: var(--ui-radius-l);
+  --ui-radius-panel: var(--ui-radius-xl);
+  --ui-corner-shape: superellipse(1.4);
+  /* Keyboard focus: a 1px secondary-ink outline 2px outside the control. */
+  --ui-focus-width: 1px;
+  --ui-focus-offset: 2px;
+  --ui-focus-ring: 0 0 0 2px var(--background), 0 0 0 3px #868593;
+}
+
+/* Control surfaces, elevation and semantic text colors. */
+:root {
+  --ui-control-hover: #FAFAFD;
+  --ui-control-recess: #E7E7EF;
+  --ui-disabled-surface: #ECEDF1;
+  --ui-shadow-floating: 0 4px 12px rgb(0 0 0 / 6%);
+  --ui-border-soft: rgb(70 70 90 / 8%);
+  /* Every text field and bordered button shares one visible edge. Containers that
+     already use the control surface set --ui-field-surface for their fields. */
+  --ui-border-control: rgb(70 70 90 / 13%);
+  --ui-ease-feedback: cubic-bezier(.22, 1, .36, 1);
+  --ui-ink-muted: var(--ui-text-secondary);
+  --ui-ink-accent: #4B5900;
+  --ui-ink-success: #287447;
+  --ui-ink-warning: #946000;
+  --ui-ink-error: #B83B3B;
+  --ui-danger: #D63B3B;
+  --ui-on-danger: #FFFFFF;
+  --ui-switch-thumb: #FFFFFF;
+  /* Initials on a pastel member colour, the same in both themes. */
+  --ui-avatar-ink: #42434B;
+  /* A hairline that keeps light images from melting into the surface. */
+  --ui-image-edge: rgb(0 0 0 / 6%);
+  /* Behind sheets and cards that take the panel; dialogs dim less. */
+  --ui-scrim: rgb(12 13 16 / 34%);
+  --ui-scrim-soft: rgb(32 32 40 / 14%);
+}
+
+/* Signal wheel art: its own dark teal and gold in both themes (the in-page wheel draws the same). */
+:root {
+  --signal-gold: #C8AA6E;
+  --signal-line: #B79A5C;
+  --signal-deep: #0D1A19;
+  --signal-mid: #102E30;
+  --signal-edge: #1A2826;
+  --signal-ink: #E8E2CF;
+  --signal-muted: #8F9A98;
+  --signal-focus: #16B8DF;
+}
+
+/* Product themes are scoped to each application surface. */
+[data-palside-app] {
+  color-scheme: light;
+  --background: #FFFFFF;
+  --foreground: #303138;
+  --border: #E5E5EB;
+  --ui-canvas: var(--background);
+  --ui-text-primary: var(--foreground);
+  --ui-border: var(--border);
+  --ui-control-surface: #F4F4F7;
+  --ui-logo-plate-light: var(--ui-control-surface);
+  --ui-logo-plate-dark: #2A2C31;
+  --ui-control-hover: #EBECF0;
+  --ui-control-recess: #E7E8ED;
+  --ui-disabled-surface: #ECEDF1;
+  --ui-text-secondary: #686773;
+  --ui-ink-muted: var(--ui-text-secondary);
+  --ui-accent-soft: color-mix(in srgb, var(--ui-accent) 14%, var(--ui-canvas));
+  --ui-ink-accent: #4B5900;
+  --ui-border-soft: rgb(70 70 90 / 8%);
+  --ui-border-control: rgb(70 70 90 / 13%);
+  /* Ink pill (solid secondary action): hover deepens the ink, never fades it. */
+  --ui-solid: var(--ui-text-primary);
+  --ui-on-solid: var(--ui-canvas);
+  --ui-solid-hover: #1D1E23;
+  --ui-focus-ring: 0 0 0 2px var(--background), 0 0 0 3px var(--ui-ink-muted);
+  /* Toast: a dark surface with white text in both themes. */
+  --ui-toast-surface: #303138;
+  --ui-toast-text: #FFFFFF;
+  --ui-toast-action: rgb(255 255 255 / 12%);
+}
+[data-palside-app][data-appearance="dark"] {
+  color-scheme: dark;
+  --background: #17191C;
+  --foreground: #ECEEF0;
+  --border: #34373D;
+  --ui-control-surface: #23262B;
+  --ui-logo-plate-light: #F4F4F7;
+  --ui-logo-plate-dark: var(--ui-control-surface);
+  --ui-control-hover: #2C3036;
+  --ui-control-recess: #1C1F23;
+  --ui-disabled-surface: #262A30;
+  --ui-text-secondary: #9A9EA7;
+  --ui-ink-muted: #AAAFB8;
+  --ui-ink-accent: #D0ED78;
+  --ui-ink-success: #83D1A0;
+  --ui-ink-warning: #E6BA76;
+  --ui-ink-error: #F39494;
+  --ui-border-soft: rgb(255 255 255 / 9%);
+  --ui-border-control: rgb(255 255 255 / 12%);
+  --ui-solid-hover: #FFFFFF;
+  --ui-shadow-floating: 0 4px 16px rgb(0 0 0 / 28%);
+  --ui-toast-surface: #34373E;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palside-app][data-appearance="system"] {
+  color-scheme: dark;
+  --background: #17191C;
+  --foreground: #ECEEF0;
+  --border: #34373D;
+  --ui-control-surface: #23262B;
+  --ui-logo-plate-light: #F4F4F7;
+  --ui-logo-plate-dark: var(--ui-control-surface);
+  --ui-control-hover: #2C3036;
+  --ui-control-recess: #1C1F23;
+  --ui-disabled-surface: #262A30;
+  --ui-text-secondary: #9A9EA7;
+  --ui-ink-muted: #AAAFB8;
+  --ui-ink-accent: #D0ED78;
+  --ui-ink-success: #83D1A0;
+  --ui-ink-warning: #E6BA76;
+  --ui-ink-error: #F39494;
+  --ui-border-soft: rgb(255 255 255 / 9%);
+  --ui-border-control: rgb(255 255 255 / 12%);
+  --ui-solid-hover: #FFFFFF;
+  --ui-shadow-floating: 0 4px 16px rgb(0 0 0 / 28%);
+  --ui-toast-surface: #34373E;
+  }
+}

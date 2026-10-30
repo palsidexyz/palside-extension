@@ -1,0 +1,20 @@
+/* Team reactions: composer trigger, floating picker and the flight layer over the chat. */
+
+.layer { position:fixed; inset:auto; margin:0; padding:0; border:0; background:none; overflow:visible; color:var(--ui-text-primary); }
+.bar { position:relative; z-index:1; display:flex; align-items:center; gap:2px; padding:4px; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); border:0; box-shadow:var(--ui-shadow-floating); }
+.item { display:grid; place-items:center; width:36px; height:36px; padding:0; border:0; border-radius:50%; background:none; cursor:pointer; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; transition:background-color .18s; }
+.item:hover { background:var(--ui-control-surface); }
+.item:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.glyph { display:block; font-size:var(--ui-type-display); line-height:1; pointer-events:none; }
+.tail, .tailDot { position:absolute; border-radius:50%; background:var(--ui-canvas); border:0; box-shadow:var(--ui-shadow-floating); translate:-50% 0; }
+.tail { width:12px; height:12px; }
+.tailDot { width:6px; height:6px; }
+.tail[data-side="top"] { bottom:-5px; }
+.tailDot[data-side="top"] { bottom:-13px; }
+.tail[data-side="bottom"] { top:-5px; }
+.tailDot[data-side="bottom"] { top:-13px; }
+
+.stage { position:absolute; inset:0; z-index:20; overflow:hidden; pointer-events:none; contain:strict; }
+.particle { position:absolute; width:26px; height:26px; margin:-13px 0 0 -13px; font-size:var(--ui-type-display); line-height:26px; text-align:center; will-change:transform, opacity, filter; -webkit-user-select:none; user-select:none; }
+
+

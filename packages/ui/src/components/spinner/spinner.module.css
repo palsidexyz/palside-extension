@@ -1,0 +1,4 @@
+.status { display: inline-flex; }
+.spinner { flex: none; animation: spin .85s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

@@ -1,0 +1,4 @@
+- [ ] Explain what changed and why.
+- [ ] `npm run check` passes.
+- [ ] UI changes include screenshots, if applicable.
+- [ ] User-facing text updates include both `en` and `zh-CN` in `packages/i18n`, if applicable.

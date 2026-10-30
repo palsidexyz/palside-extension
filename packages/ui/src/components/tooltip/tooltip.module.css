@@ -1,0 +1,8 @@
+.tooltip { position: fixed; inset: auto; margin: 0; box-sizing: border-box; min-width: 0; max-width: calc(100vw - 16px); border: 0; background: var(--ui-canvas); color: var(--ui-text-primary); box-shadow: var(--ui-shadow-floating); overflow: auto; overscroll-behavior: contain; width: max-content; border-radius:var(--ui-radius-control); corner-shape: var(--ui-corner-shape); padding: 8px 12px; font-size:var(--ui-type-footnote); line-height: 18px; white-space: pre-line; overflow-wrap: anywhere; }
+.tooltip:popover-open { animation: appear .16s cubic-bezier(.22,1,.36,1); }
+@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .tooltip:popover-open { animation: none; }
+}
+/* HelpTip: a 24px quiet IconButton. Matches the button's own attributes so it outranks the IconButton size rules. */
+.helpTip[data-slot="icon-button"][data-size][data-variant] { width: 24px; height: 24px; min-height: 24px; flex: 0 0 24px; color: var(--ui-ink-muted); }

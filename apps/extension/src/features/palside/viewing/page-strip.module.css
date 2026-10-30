@@ -1,0 +1,51 @@
+/* 本页条: one quiet 32px row resting on the message box where 互动 runs — page and faces on the left, page features on the right. No frame
+   of its own; its 8px inset matches the message box's, so the token lines up with the first tool and the last feature with send. */
+.strip { display:flex; align-items:center; gap:6px; min-width:0; height:32px; margin:0 0 8px; padding:0 8px; animation:stripIn .22s var(--ui-ease-feedback) both; }
+@keyframes stripIn { from { opacity:0; transform:translateY(4px); } }
+.identity { display:flex; flex:1; align-items:center; gap:7px; min-width:0; height:32px; margin-inline-start:-4px; padding:0 8px 0 4px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
+.identity :global([data-token-size]) { --token-size:22px; }
+.identity:hover { background:var(--ui-control-hover); }
+.name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-callout); line-height:18px; font-weight:600; }
+.faces { display:flex; flex-shrink:0; border-radius:var(--ui-radius-pill); }
+.faces>*+* { margin-left:-5px; }
+.faces>* { border-radius:50%; box-shadow:0 0 0 1.5px var(--ui-canvas); }
+.faces [data-presence] { display:none; }
+.identity:focus-visible, .faces:focus-visible, .returnChip:focus-visible, .roomChip:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+
+.returnChip { display:inline-flex; flex:none; align-items:center; gap:3px; height:32px; padding:0 8px 0 6px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-secondary); cursor:pointer; }
+.returnChip :global([data-token-size]) { --token-size:18px; }
+.returnChip:hover { color:var(--ui-text-primary); background:var(--ui-control-hover); }
+
+/* The page features: icon-only, 32px like the composer tools, 4px apart. Popup triggers inside take the same size. */
+.tools { display:inline-flex; flex:none; align-items:center; gap:4px; margin-inline-start:auto; }
+.tools > * { animation:toolIn .2s var(--ui-ease-feedback) both; }
+@keyframes toolIn { from { opacity:0; transform:scale(.86); } }
+.badged { position:relative; display:inline-flex; }
+/* 弹幕 with its count, first among the page features. */
+.roomChip { display:inline-flex; flex:none; align-items:center; gap:4px; height:32px; padding:0 10px 0 8px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; cursor:pointer; }
+.roomChip svg { width:15px; height:15px; color:var(--ui-text-secondary); }
+.roomChip:hover { background:var(--ui-control-hover); }
+.badge { position:absolute; top:1px; right:0; min-width:14px; height:14px; padding:0 3px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-solid); color:var(--ui-on-solid); font-size:var(--ui-type-caption); line-height:14px; font-weight:600; font-variant-numeric:tabular-nums; text-align:center; pointer-events:none; }
+
+/* How a page feature is used: three steps with a small picture each, and the one thing to change. */
+.guide { display:flex; flex-direction:column; gap:10px; }
+.guideHead { display:flex; align-items:center; gap:8px; min-height:28px; }
+.guideHead strong { flex:1; font-size:var(--ui-type-body); font-weight:600; }
+.guideIcon { display:grid; place-items:center; width:26px; height:26px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); }
+.steps { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; margin:0; padding:0; list-style:none; counter-reset:step; }
+.steps li { position:relative; display:flex; flex-direction:column; align-items:center; gap:7px; padding:12px 6px 9px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:15px; text-align:center; counter-increment:step; }
+.steps li::before { content:counter(step); position:absolute; top:5px; left:7px; font:600 var(--ui-type-caption) var(--font-geist-mono), monospace; color:var(--ui-ink-muted); }
+.art { display:inline-flex; align-items:center; justify-content:center; gap:3px; height:30px; color:var(--ui-text-primary); }
+.wheel { position:relative; width:34px; height:34px; border-radius:50%; background:radial-gradient(circle, var(--signal-mid) 0 5px, color-mix(in srgb, var(--signal-deep) 82%, transparent) 5.5px); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--signal-line) 60%, transparent); }
+.wheel img { position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px; object-fit:contain; transform:rotate(var(--a)) translateY(-11px) rotate(calc(var(--a) * -1)); }
+.bubble { padding:2px 7px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); font-size:var(--ui-type-caption); font-weight:600; white-space:nowrap; }
+.mark { padding:0 4px; border-radius:3px; background:color-mix(in srgb, var(--ui-accent) 50%, transparent); color:var(--ui-text-primary); font-weight:600; font-size:var(--ui-type-callout); }
+
+@container (max-width:350px) { .faces { display:none; } .strip { gap:4px; } }
+@media (prefers-reduced-motion:reduce) { .identity { transition:none; } .strip, .identity, .faces, .returnChip, .tools > * { animation:none; } }
+
+.guideAction.guideAction { min-height:28px; padding:0 10px; border-radius:var(--ui-radius-pill); font-size:var(--ui-type-footnote); font-weight:600; white-space:nowrap; }
+.guidePopover { --popover-width:320px; padding:12px; }
+
+.guideTrigger.guideTrigger.guideTrigger { width:32px; height:32px; min-height:32px; }
+.guideTrigger[aria-expanded="true"] { background:var(--ui-control-hover); color:var(--ui-text-primary); }

@@ -1,0 +1,8 @@
+.menu { --popover-width:216px; }
+/* Member list row: name + role badge on one line, tags then 一句话介绍 on the next. */
+.memberTitle { display:flex; align-items:center; gap:6px; min-width:0; font-size:var(--ui-type-body); line-height:20px; font-weight:600; color:var(--ui-text-primary); }
+.memberTitle > strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:inherit; }
+.memberRole { flex:none; height:18px; padding:0 6px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); line-height:18px; font-weight:600; }
+.memberBio { display:flex; align-items:center; gap:4px; min-width:0; margin-top:4px; overflow:hidden; white-space:nowrap; font-size:var(--ui-type-footnote); line-height:18px; color:var(--ui-text-secondary); }
+.memberBio > span { min-width:0; margin-left:2px; overflow:hidden; text-overflow:ellipsis; }
+.memberTag { background:var(--ui-canvas); flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; height:18px; padding:0 6px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); color:var(--ui-text-primary); font-size:var(--ui-type-caption); line-height:18px; font-weight:500; }

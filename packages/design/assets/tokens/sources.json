@@ -1,0 +1,58 @@
+[
+  {
+    "id": "cashcat",
+    "file": "cashcat.webp",
+    "source": "https://gmgn.ai/external-res/629e7bf29d935b8901225741bb0754bd_v2.webp",
+    "page": "https://gmgn.ai/robinhood/token/0x020bfc650a365f8bb26819deaabf3e21291018b4",
+    "verification": "Current page image, 2026-09-27",
+    "bytes": 1826,
+    "width": 128,
+    "height": 128,
+    "sha256": "5b6ece238c1a9b0a555dd529ced6328544a07ce7f1eaabccf82de1ab5b4b21e9"
+  },
+  {
+    "id": "pons",
+    "file": "pons.webp",
+    "source": "https://metadata.mobula.io/assets/logos/f03b6095dc83bde168cab16013205334941f599c7405682cced179242df940f8.png",
+    "page": "https://fomo.family/tokens/robinhood/0x39dbed3a2bd333467115de45665cc57f813c4571",
+    "verification": "Source recorded by original page inspection; unsigned page currently redirects to home; source image downloaded in browser 2026-09-27",
+    "bytes": 728,
+    "width": 128,
+    "height": 128,
+    "sha256": "bbef43f3cd05a5b1169d99bc0c70d843cfd41e8b408b13c665f43a66c84dce90"
+  },
+  {
+    "id": "chump",
+    "file": "chump.webp",
+    "source": "https://cdn.dexscreener.com/cms/images/4cJVmRdL_zSKVHcY",
+    "page": "https://dexscreener.com/robinhood/0x0e0d2c89a5a019fe1cf762e5e33187631dacc21b",
+    "address": "0x0E0d2C89a5a019FE1cF762e5e33187631DACC21B",
+    "chain": "robinhood",
+    "verification": "DexScreener pair profile image, 2026-10-20",
+    "bytes": 4302,
+    "width": 128,
+    "height": 128,
+    "sha256": "8aa6bd6a241096a8b586df575b4c3c6894c3e7b466024f7754493b3c215979f8"
+  },
+  {
+    "id": "frong",
+    "file": "frong.webp",
+    "source": "https://cdn.dexscreener.com/cms/images/sb8NxFYZy_lfgbXO",
+    "page": "https://dexscreener.com/robinhood/0x6245e67affa44a23077f0ea7f981a8dc743a0c47",
+    "address": "0x6245e67affA44a23077f0Ea7f981a8DC743a0c47",
+    "chain": "robinhood",
+    "verification": "DexScreener pair profile image, 2026-10-20",
+    "bytes": 3252,
+    "width": 128,
+    "height": 128,
+    "sha256": "7af314ae3c770fba0478ef91c014dfc7fde5bfb3d8be06fabcd5eb479a191ac5"
+  },
+  {
+    "id": "x",
+    "file": "x.svg",
+    "source": "https://about.x.com/content/dam/about-twitter/x/brand-toolkit/x-logo.zip",
+    "page": "https://about.x.com/en/who-we-are/brand-toolkit",
+    "archiveEntry": "logo.svg",
+    "bytes": 430
+  }
+]

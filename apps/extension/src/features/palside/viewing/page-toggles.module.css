@@ -1,0 +1,24 @@
+/* 共享在看 and 网页互动, left of send: a pair of 32px circles, the composer tools' size. On = accent-soft fill; off = muted with a slash; on where it cannot
+   run = dimmed; on for a site Chrome has not allowed = an amber 授权 pill. The state is in the tooltip. */
+.toggle { position:relative; display:inline-grid; place-items:center; flex:none; width:32px; height:32px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--ui-ink-muted); cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
+.toggle > svg { width:18px; height:18px; stroke-width:1.8; }
+.toggle:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.toggle[data-on] { background:var(--ui-accent-soft); color:var(--ui-ink-accent); }
+.toggle:not([data-on])::after { content:""; position:absolute; left:50%; top:50%; width:20px; height:1.6px; border-radius:1px; background:currentColor; box-shadow:0 0 0 1.5px var(--ui-control-surface); transform:translate(-50%, -50%) rotate(-40deg); pointer-events:none; }
+.grant { display:inline-flex; align-items:center; gap:4px; flex:none; height:32px; padding:0 12px 0 10px; border:0; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-ink-warning) 16%, var(--ui-canvas)); color:var(--ui-ink-warning); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; }
+.grant svg { width:13px; height:13px; }
+.grant:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.toggle[data-dim] > svg { opacity:.45; }
+.toggle[data-dim]:hover > svg { opacity:.8; }
+.toggle:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+
+.toggle[data-on] .center { fill:currentColor; }
+.toggle[data-live] :is(.waveInner,.waveOuter) { animation:wave 3s ease-in-out infinite both; }
+.toggle[data-live] .waveOuter { animation-delay:.3s; }
+@keyframes wave { 0%,60%,100% { opacity:.45; } 20%,30% { opacity:1; } }
+
+@media (prefers-reduced-motion:reduce) {
+  .toggle { transition:none; }
+  .toggle[data-live] :is(.waveInner,.waveOuter) { animation:none; opacity:1; }
+}
+@media (forced-colors:active) { .toggle[data-on], .grant { outline:1px solid Highlight; } }

@@ -1,0 +1,56 @@
+title = "Palside public test vectors"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "NIP-06 published mnemonic and derived key vectors"
+condition = "AND"
+paths = ['''^tests/identity\.test\.mjs$''']
+regexes = [
+  '''^leader monkey parrot ring guide accident before fence cannon height naive bean$''',
+  '''^what bleak badge arrange retreat wolf trade produce cricket blur garlic valid proud rude strong choose busy staff weather area salt hollow arm fade$''',
+  '''^(7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a|c15d739894c81a2fcfd3a2df85a0d2c0dbc47a280d092799f144d73d7ae78add)$''',
+]
+
+[[allowlists]]
+description = "BIP39 public vectors used for account and NIP-98 tests"
+condition = "AND"
+paths = ['''^tests/(avatar-access|server-auth)\.test\.mjs$''']
+regexes = [
+  '''^abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about$''',
+  '''^legal winner thank year wave sausage worth useful legal winner thank yellow$''',
+  '''^letter advice cage absurd amount doctor acoustic avoid letter advice cage above$''',
+]
+
+[[allowlists]]
+description = "BIP39 public all-ones entropy vector"
+condition = "AND"
+paths = ['''^tests/server-auth\.test\.mjs$''']
+regexes = ['''^zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong$''']
+
+[[allowlists]]
+description = "Invite password alphabet"
+condition = "AND"
+paths = ['''^packages/shared/src/(protocol|contracts/limits)\.ts$''']
+regexes = ['''^ABCDEFGHJKMNPQRSTUVWXYZ23456789$''']
+
+[[allowlists]]
+description = "Readable idempotency keys used as test fixtures"
+condition = "AND"
+paths = ['''^tests/(connection|contracts|rooms-runtime|server-gateway-limits)\.test\.mjs$''']
+regexes = ['''^(same-operation-0001|operation-123456789|operation-key-0001|cancel-operation-0001|durable-operation-0001)$''']
+
+[[allowlists]]
+description = "EVM addresses are public identifiers, not credentials"
+regexes = ['''^0x[0-9a-fA-F]{40}$''']
+
+[[allowlists]]
+description = "Vendored API reference examples"
+paths = ['''^\.agents/skills/[^/]+/references/''']
+
+[[allowlists]]
+description = "Fixed idempotency keys in the chain integration test"
+condition = "AND"
+paths = ['''^tests/chain-integration\.test\.mjs$''']
+regexes = ['''^integration-key-\d+$''']

@@ -1,0 +1,54 @@
+.selectSurface { position: relative; display: block; width: 100%; min-width: 0; }
+.select { appearance: none; width: 100%; min-width: 0; min-height: 40px; border: 0; border-radius:var(--ui-radius-control); corner-shape: var(--ui-corner-shape); padding: 10px 36px 10px 12px; background: var(--ui-field-surface, var(--ui-control-surface)); color: var(--ui-text-primary); font:inherit; font-size:var(--ui-type-body); line-height: 20px; text-overflow: ellipsis; cursor: pointer; }
+.selectChevron { position: absolute; inset-inline-end: 12px; inset-block-start: 12px; pointer-events: none; color: var(--ui-ink-muted); }
+.select:focus-visible { outline: var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset: var(--ui-focus-offset); }
+.select[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--ui-ink-error); }
+.select:disabled { opacity: .45; cursor: not-allowed; }
+.select:disabled + .selectChevron { opacity: .45; }
+.select[data-leading="true"] { padding-inline-start:40px; }
+.selectLeading { position:absolute; inset-inline-start:12px; inset-block-start:12px; width:16px; height:16px; display:grid; place-items:center; pointer-events:none; }
+.select:disabled ~ .selectLeading { opacity:.45; }
+.selectSurface[data-compact="true"] .select { height:40px; padding-inline:8px 24px; font-size:var(--ui-type-footnote); white-space:nowrap; overflow:hidden; }
+.selectSurface[data-compact="true"] .selectChevron { inset-inline-end:7px; width:12px; }
+.selectSurface[data-compact="true"] .selectLeading { inset-inline-start:10px; inset-block-start:10px; width:20px; height:20px; }
+.select[data-icon-only="true"] { color:transparent; }
+.select[data-icon-only="true"] option { color:var(--ui-text-primary); }
+/* Icon-only selects read as a glyph button: centered icon, no chevron. */
+.selectSurface .select[data-icon-only="true"] { padding-inline:0; }
+.select[data-icon-only="true"] + .selectChevron { display:none; }
+.select[data-icon-only="true"] ~ .selectLeading { inset-inline-start:50%; translate:-50% 0; }
+@supports (appearance: base-select) {
+  .select, .select::picker(select) { appearance: base-select; }
+  .select::picker-icon { display: none; }
+  .select::picker(select) { border: 0; border-radius:var(--ui-radius-popover); corner-shape: var(--ui-corner-shape); margin-block: 6px; padding: 6px; background: var(--ui-canvas); color: var(--ui-text-primary); box-shadow: var(--ui-shadow-floating); max-width: calc(100vw - 16px); max-height: min(280px, 60dvh); overflow: auto; }
+  .select option { min-width: 0; min-height: 36px; padding: 8px 10px; border-radius:calc(var(--ui-radius-popover) - 6px); corner-shape: var(--ui-corner-shape); font-size:var(--ui-type-body); text-align: start; white-space: normal; overflow-wrap: anywhere; }
+  .select option::checkmark { display: none; }
+  .select option:checked { background: var(--ui-accent-soft); color: var(--ui-ink-accent); }
+  /* The checked fill already marks the value; focus only lightens the row, like hover. */
+  .select option:focus-visible { outline: none; background: var(--ui-control-surface); }
+  .select option:checked:focus-visible { background: var(--ui-accent-soft); }
+  .select option:hover:not(:checked) { background: var(--ui-control-surface); }
+  .select option:disabled { opacity: .45; }
+  .select option[data-icon="true"] { display:flex; align-items:center; gap:8px; }
+  .select option[data-icon="true"]::before { content:""; display:block; width:16px; height:16px; flex:0 0 16px; background:var(--select-option-icon) center / contain no-repeat; }
+  .selectSurface[data-compact="true"] .select::picker(select) { min-width:180px; }
+  /* A ghost value sits at the row's end: the panel opens under it, right-aligned, sized to its options. */
+  .selectSurface[data-variant="ghost"]:not([data-compact="true"]) .select::picker(select) { width: max-content; min-width: 160px; position-area: block-end span-inline-start; position-try-fallbacks: flip-block; }
+  .selectSurface[data-variant="ghost"] .select option { white-space: nowrap; }
+}
+@media (hover: hover) { .select:not(:disabled):hover { background: var(--ui-control-hover); } }
+/* Ghost: no surface. Compact icon-only reads as a bare glyph with a hover surface; text reads as a settings value. */
+.selectSurface[data-variant="ghost"] .select { background: transparent; }
+.selectSurface[data-variant="ghost"] .selectLeading { color: var(--ui-text-secondary); transition: color .15s; }
+.selectSurface[data-variant="ghost"]:not([data-compact="true"]) { display: inline-block; width: auto; max-width: 100%; color: var(--ui-text-secondary); }
+.selectSurface[data-variant="ghost"]:not([data-compact="true"]) .select { min-height: 0; padding: 4px 18px 4px 0; color: inherit; font-size:var(--ui-type-callout); text-align: end; }
+.selectSurface[data-variant="ghost"]:not([data-compact="true"]) .selectChevron { inset-inline-end: 0; inset-block-start: 50%; translate: 0 -50%; color: inherit; }
+.selectSurface[data-variant="ghost"]:has(.select:disabled) { opacity: .45; }
+.selectSurface[data-variant="ghost"] .select:disabled, .selectSurface[data-variant="ghost"] .select:disabled ~ * { opacity: 1; }
+@media (hover: hover) {
+  .selectSurface[data-variant="ghost"][data-compact="true"] .select:not(:disabled):hover { background: var(--ui-control-surface); }
+  .selectSurface[data-variant="ghost"]:not([data-compact="true"]) .select:not(:disabled):hover { background: transparent; }
+  .selectSurface[data-variant="ghost"]:has(.select:not(:disabled):hover) { color: var(--ui-text-primary); }
+  .selectSurface[data-variant="ghost"]:has(.select:not(:disabled):hover) .selectLeading { color: var(--ui-text-primary); }
+}
+@media (forced-colors: active) { .select { border: 1px solid ButtonText; } }

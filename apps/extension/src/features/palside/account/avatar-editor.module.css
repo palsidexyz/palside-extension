@@ -1,0 +1,23 @@
+.picker { display:flex; flex-direction:column; gap:var(--ui-space-4); }
+.preview { display:flex; align-items:center; gap:var(--ui-space-4); }
+.preview strong { font-size:var(--ui-type-body); font-weight:500; }
+.preview p { margin:4px 0 0; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
+.face { --avatar-size:64px; flex:none; }
+.tools { display:flex; flex-wrap:wrap; gap:var(--ui-space-2); }
+.fileInput { display:none; }
+.grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--ui-space-3); }
+.option { position:relative; display:grid; place-items:center; min-width:0; aspect-ratio:1; padding:4px; border:2px solid transparent; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:transparent; cursor:pointer; }
+.option:hover { background:var(--ui-control-hover); }
+.option[aria-pressed="true"] { border-color:var(--ui-accent); background:var(--ui-accent-soft); }
+.option:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.option:disabled { cursor:wait; opacity:.65; }
+.thumbnail { --avatar-size:100%; aspect-ratio:1; }
+.check { position:absolute; bottom:1px; right:1px; width:18px; height:18px; display:grid; place-items:center; background:var(--ui-accent); color:var(--ui-on-accent); border:2px solid var(--ui-canvas); border-radius:50%; }
+.trigger { position:relative; display:block; flex:none; padding:0; border:0; border-radius:50%; background:none; cursor:pointer; }
+.trigger:hover [data-person-avatar],.trigger:hover [data-team-avatar] { filter:brightness(.94); }
+.trigger:has([data-team-avatar]) { border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+.trigger:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+/* The camera badge, as on 创建小队: dark, 28px, over the avatar's corner. */
+.badge { position:absolute; right:-4px; bottom:-4px; display:grid; place-items:center; width:28px; height:28px; border:2px solid var(--ui-canvas); border-radius:50%; background:var(--ui-text-primary); color:var(--ui-canvas); }
+.trigger:hover .badge { background:color-mix(in srgb, var(--ui-text-primary) 86%, var(--ui-canvas)); }
+.error { margin:0; font-size:var(--ui-type-callout); color:var(--ui-ink-error); }

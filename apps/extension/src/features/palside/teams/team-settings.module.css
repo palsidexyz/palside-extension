@@ -1,0 +1,42 @@
+.page { display:flex; flex-direction:column; gap:14px; min-width:0; }
+.identity { display:flex; align-items:center; gap:0; padding:14px; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.identity>.identityText { margin-left:14px; }
+.identityText { flex:1; min-width:0; display:flex; flex-direction:column; }
+.identityText strong { font-size:var(--ui-type-title); line-height:24px; font-weight:600; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.identityText span { margin-top:2px; font-size:var(--ui-type-callout); line-height:19px; color:var(--ui-text-secondary); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+/* Name, intro and chevron are one button into 编辑资料; it fills the card beside the avatar. */
+.identityLink { flex:1; min-width:0; display:flex; align-items:center; gap:8px; align-self:stretch; margin:-14px -14px -14px 0; padding:14px; border:0; border-radius:0 var(--ui-radius-xl) var(--ui-radius-xl) 0; corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; transition:background-color .18s; }
+.identityLink>svg { flex:none; color:var(--ui-text-secondary); }
+.identityLink:hover { background:var(--ui-control-hover); }
+.identityLink:active { background:var(--ui-control-recess); }
+.identityLink:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.transfer { padding:14px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); }
+.transfer p { font-size:var(--ui-type-callout); line-height:20px; }
+.transfer>div { display:flex; justify-content:flex-end; gap:8px; margin-top:10px; }
+.operation { display:flex; align-items:center; gap:12px; min-height:56px; padding:8px 12px 8px 14px; }
+/* The row's bare icon in the shared 20px icon slot. */
+.operation>svg { flex:none; box-sizing:content-box; width:16px; height:16px; padding:2px; color:var(--ui-text-secondary); }
+.operationText { flex:1; min-width:0; }
+.operationText h2 { font-size:var(--ui-type-body); line-height:20px; font-weight:500; }
+.operationText p { font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); }
+.operationActions { display:flex; align-items:center; gap:2px; flex:none; }
+/* Row actions are the quiet pill used across settings rows. */
+.operationAction { min-height:30px; padding:4px 14px; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); font-size:var(--ui-type-footnote); font-weight:500; }
+.operationAction:hover:not(:disabled) { background:var(--ui-control-hover); }
+.operationText p.warning { color:var(--ui-ink-error); }
+/* The join password reads as a code: monospace, spaced, so it can be dictated character by character. */
+.operationText p.passwordValue { margin-top:1px; font:600 var(--ui-type-callout)/16px var(--font-geist-mono),monospace; letter-spacing:.2em; color:var(--ui-text-primary); }
+.manualCopy { padding:0 14px 12px 46px; }
+.passwordInput { display:flex; align-items:center; gap:8px; }
+/* Four near-square cells instead of the default stretch. */
+.passwordCells { max-width:232px; }
+.passwordForm { display:flex; flex-direction:column; gap:12px; margin-top:14px; }
+.error { padding:0 14px 10px 46px; color:var(--ui-ink-error); font-size:var(--ui-type-footnote); line-height:18px; }
+
+/* A value still being read: a quiet placeholder bar the width of a short value. */
+@keyframes skeleton { 50% { opacity:.5; } }
+.skeleton { display:inline-block; width:48px; height:10px; border-radius:var(--ui-radius-pill); background:var(--ui-control-recess); vertical-align:middle; animation:skeleton 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion:reduce) { .skeleton { animation:none; } }
+.skeleton[data-wide] { width:120px; }
+
+.actionMenu { --popover-width:148px; min-width:148px; }

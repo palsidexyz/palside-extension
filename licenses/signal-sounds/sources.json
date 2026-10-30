@@ -1,0 +1,758 @@
+{
+  "packs": [
+    {
+      "id": "freesound",
+      "name": "Freesound HQ MP3 previews",
+      "author": "Per-recording authors",
+      "version": "Unversioned previews identified by sound ID, preview path and SHA-256",
+      "url": "https://freesound.org/",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "licenseFile": "licenses/signal-sounds/freesound-cc0.txt",
+      "licenseSha256": "36ffd9dc085d529a7e60e1276d73ae5a030b020313e6c5408593a6ae2af39673"
+    },
+    {
+      "id": "kenney-impact-sounds",
+      "name": "Impact Sounds",
+      "author": "Kenney",
+      "version": "1.0",
+      "url": "https://kenney.nl/assets/impact-sounds",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip",
+      "archiveSha256": "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8",
+      "license": "CC0-1.0",
+      "licenseFile": "licenses/signal-sounds/kenney-impact-sounds.txt",
+      "licenseArchivePath": "License.txt",
+      "licenseSha256": "b49aa9c56b04528b95913de13e506a0f7c5e807b9925db9bfef86af1f91120db"
+    },
+    {
+      "id": "kenney-interface-sounds",
+      "name": "Interface Sounds",
+      "author": "Kenney",
+      "version": "1.0",
+      "url": "https://kenney.nl/assets/interface-sounds",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip",
+      "archiveSha256": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+      "license": "CC0-1.0",
+      "licenseFile": "licenses/signal-sounds/kenney-interface-sounds.txt",
+      "licenseArchivePath": "License.txt",
+      "licenseSha256": "f7966c773bbed0eca6a9c75081c44a178b38eae112724dbb5fdfbd4192d118a9"
+    },
+    {
+      "id": "kenney-rpg-audio",
+      "name": "RPG Audio",
+      "author": "Kenney",
+      "version": "1.0",
+      "url": "https://kenney.nl/assets/rpg-audio",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip",
+      "archiveSha256": "6dbeaf8544da958d8f2adcb4a4a4b76c1ade34a05f8ab9edccd327da7375f38b",
+      "license": "CC0-1.0",
+      "licenseFile": "licenses/signal-sounds/kenney-rpg-audio.txt",
+      "licenseArchivePath": "License.txt",
+      "licenseSha256": "5735dfd72cb64cbbceda4ebc00c380c41ca680edb82ff153aa7c9ab97614c539"
+    },
+    {
+      "id": "vsco-2-ce",
+      "name": "VS Chamber Orchestra 2 Community Edition",
+      "author": "Sam Gossner and Simon Dalzell; sample cutting by Elan Hickler / Soundemote",
+      "version": "commit 440300901dfe9275fd84e0b7763af1f8443ae62e",
+      "url": "https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e",
+      "downloadUrl": "https://codeload.github.com/sgossner/VSCO-2-CE/zip/440300901dfe9275fd84e0b7763af1f8443ae62e",
+      "archiveSha256": "9c92356b50e417e392b764e8ed760a653a1e0275117e83e026c0ddce6f89568f",
+      "license": "CC0-1.0",
+      "licenseFile": "licenses/signal-sounds/vsco-2-ce.txt",
+      "licenseArchivePath": "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/LICENSE",
+      "licenseSha256": "36ffd9dc085d529a7e60e1276d73ae5a030b020313e6c5408593a6ae2af39673"
+    }
+  ],
+  "recordings": [
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-106127.mp3",
+      "sha256": "f0ba977eeda2f2db63c4e97a843bc6a3964c3316a6163043769988b4b91d71f5",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 106127,
+      "title": "crumple.wav",
+      "author": "j1987",
+      "url": "https://freesound.org/people/j1987/sounds/106127/",
+      "version": "Sound 106127, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/106/106127_367313-hq.mp3",
+      "upstreamPath": "previews/106/106127_367313-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-151218.mp3",
+      "sha256": "daa05b12f21b72374f2c5b94a0fb85484f14ac4be702396102a02054e0fbddc1",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 151218,
+      "title": "Sniff",
+      "author": "OwlStorm",
+      "url": "https://freesound.org/people/OwlStorm/sounds/151218/",
+      "version": "Sound 151218, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/151/151218_140737-hq.mp3",
+      "upstreamPath": "previews/151/151218_140737-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-178615.mp3",
+      "sha256": "dd2bdde18543e3a687931b2d623bc6af4c6cbeb67f9af1a8ed7d3e815c94f037",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 178615,
+      "title": "The Rustle of a Bush",
+      "author": "Montacue",
+      "url": "https://freesound.org/people/Montacue/sounds/178615/",
+      "version": "Sound 178615, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/178/178615_3280198-hq.mp3",
+      "upstreamPath": "previews/178/178615_3280198-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-187343.mp3",
+      "sha256": "7bedc86f6bd6b4a59434b6123468a7b065e7daad1d3a8e4da073b18c2bbd1cfc",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 187343,
+      "title": "Rubber Shoe Squeak.wav",
+      "author": "baidonovan",
+      "url": "https://freesound.org/people/baidonovan/sounds/187343/",
+      "version": "Sound 187343, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/187/187343_3297044-hq.mp3",
+      "upstreamPath": "previews/187/187343_3297044-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-19312.mp3",
+      "sha256": "f22490566ff3cc26eae60e81b1457e4eaace38a1bdc3ce08830641f01954d064",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 19312,
+      "title": "classic double swwosh .wav",
+      "author": "martian",
+      "url": "https://freesound.org/people/martian/sounds/19312/",
+      "version": "Sound 19312, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/19/19312_84709-hq.mp3",
+      "upstreamPath": "previews/19/19312_84709-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-234782.mp3",
+      "sha256": "3931e43d3e7738abb9a1507bf9c55da170d92940c43ad7151b01b4380bb9d931",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 234782,
+      "title": "Steam/hiss",
+      "author": "wubitog",
+      "url": "https://freesound.org/people/wubitog/sounds/234782/",
+      "version": "Sound 234782, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/234/234782_3501487-hq.mp3",
+      "upstreamPath": "previews/234/234782_3501487-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-240469.mp3",
+      "sha256": "24a16f60de1a9e2c23915bf569424f3c37299501304ab0d57524dde3124ee037",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 240469,
+      "title": "wings2.wav",
+      "author": "Godowan",
+      "url": "https://freesound.org/people/Godowan/sounds/240469/",
+      "version": "Sound 240469, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/240/240469_1662097-hq.mp3",
+      "upstreamPath": "previews/240/240469_1662097-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-242909.mp3",
+      "sha256": "f7abac728636187e7d9bfcd6ed71895875189c7b2c382be3c5b7d7542ebc2881",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 242909,
+      "title": "relieved sigh.wav",
+      "author": "Reitanna",
+      "url": "https://freesound.org/people/Reitanna/sounds/242909/",
+      "version": "Sound 242909, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/242/242909_950925-hq.mp3",
+      "upstreamPath": "previews/242/242909_950925-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-245646.mp3",
+      "sha256": "5c766933e63fa3e7dda8531899fd69544e5a5e4c19c34af50418335962423e5c",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 245646,
+      "title": "Cartoon Pop (Distorted)",
+      "author": "unfa",
+      "url": "https://freesound.org/people/unfa/sounds/245646/",
+      "version": "Sound 245646, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/245/245646_1038806-hq.mp3",
+      "upstreamPath": "previews/245/245646_1038806-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-275015.mp3",
+      "sha256": "8f44daa3caa69d4672271db2f3ae414a003a3e957047c7506ea244b0d88e6e8a",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 275015,
+      "title": "Bite (Apple)",
+      "author": "wadaltmon",
+      "url": "https://freesound.org/people/wadaltmon/sounds/275015/",
+      "version": "Sound 275015, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/275/275015_4675419-hq.mp3",
+      "upstreamPath": "previews/275/275015_4675419-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-321490.mp3",
+      "sha256": "1198c7ca15b77b9c4b3f4e25c5f1c183e08e45a9934edaa94bc295f28828dab6",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 321490,
+      "title": "Tiny Splash",
+      "author": "dslrguide",
+      "url": "https://freesound.org/people/dslrguide/sounds/321490/",
+      "version": "Sound 321490, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/321/321490_5485024-hq.mp3",
+      "upstreamPath": "previews/321/321490_5485024-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-348112.mp3",
+      "sha256": "1f6bc4cabdf1fcbb5964b60c52b8a791433f70191d565b2ab395a6e0e01cf519",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 348112,
+      "title": "Crunch",
+      "author": "LilMati",
+      "url": "https://freesound.org/people/LilMati/sounds/348112/",
+      "version": "Sound 348112, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/348/348112_6142149-hq.mp3",
+      "upstreamPath": "previews/348/348112_6142149-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-393056.mp3",
+      "sha256": "6e7535fb8447b043a8e35bd46e5eb1ee44201b76cde692c53912c1a9618e629c",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 393056,
+      "title": "Paracaídas.wav",
+      "author": "sbaneat",
+      "url": "https://freesound.org/people/sbaneat/sounds/393056/",
+      "version": "Sound 393056, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/393/393056_6231982-hq.mp3",
+      "upstreamPath": "previews/393/393056_6231982-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-401542.mp3",
+      "sha256": "5b4a3031388c6c74b3699f072dbb2fe8c89e86b51a1dc35b561d3585d5116a73",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 401542,
+      "title": "Pop Sound",
+      "author": "ConarB13",
+      "url": "https://freesound.org/people/ConarB13/sounds/401542/",
+      "version": "Sound 401542, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/401/401542_2331641-hq.mp3",
+      "upstreamPath": "previews/401/401542_2331641-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-47498.mp3",
+      "sha256": "c8916f46359e5cbc34a93a9a1001d1a2f891572dc480641af4366f2c96a6ea8c",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 47498,
+      "title": "mouthPop_02.wav",
+      "author": "carlSablowEdwards",
+      "url": "https://freesound.org/people/carlSablowEdwards/sounds/47498/",
+      "version": "Sound 47498, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/47/47498_210407-hq.mp3",
+      "upstreamPath": "previews/47/47498_210407-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-497092.mp3",
+      "sha256": "6c1302d40d370569ffb3c8d7bfc3d10ab8408e5b2d12e0f2763f33931f2c422b",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 497092,
+      "title": "FX swanee whistle up.wav",
+      "author": "v0idation",
+      "url": "https://freesound.org/people/v0idation/sounds/497092/",
+      "version": "Sound 497092, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/497/497092_942821-hq.mp3",
+      "upstreamPath": "previews/497/497092_942821-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-497093.mp3",
+      "sha256": "5cb111e0f006336d86030173ffc670b171352fe376255b4d90004a4cee2ede2f",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 497093,
+      "title": "FX swanee whistle down.wav",
+      "author": "v0idation",
+      "url": "https://freesound.org/people/v0idation/sounds/497093/",
+      "version": "Sound 497093, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/497/497093_942821-hq.mp3",
+      "upstreamPath": "previews/497/497093_942821-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-54848.mp3",
+      "sha256": "5ca75667f2fb4f7322ae4134a83b0b6461baa4e6f26ed54da876999103d2814c",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 54848,
+      "title": "Ticking Clock.wav",
+      "author": "Izkhanilov",
+      "url": "https://freesound.org/people/Izkhanilov/sounds/54848/",
+      "version": "Sound 54848, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/54/54848_673516-hq.mp3",
+      "upstreamPath": "previews/54/54848_673516-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-60013.mp3",
+      "sha256": "ebdb219e7f36f7e1aecdb045d6d8bdad059119af319863777c7302a69fa41a92",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 60013,
+      "title": "Whoosh",
+      "author": "qubodup",
+      "url": "https://freesound.org/people/qubodup/sounds/60013/",
+      "version": "Sound 60013, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/60/60013_71257-hq.mp3",
+      "upstreamPath": "previews/60/60013_71257-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-611642.mp3",
+      "sha256": "873b0594e52041ee0812a7576b351ebc827cdd4dbe336cb75df538c3a99d1e74",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 611642,
+      "title": "waterbloop.mp3",
+      "author": "kstargio",
+      "url": "https://freesound.org/people/kstargio/sounds/611642/",
+      "version": "Sound 611642, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/611/611642_13431005-hq.mp3",
+      "upstreamPath": "previews/611/611642_13431005-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-65620.mp3",
+      "sha256": "50b59ff5f33ff75984e40390fad51c219a2919ab6fe0347a25a67b23ec63bc01",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 65620,
+      "title": "Inhale_10115a.wav",
+      "author": "otherthings",
+      "url": "https://freesound.org/people/otherthings/sounds/65620/",
+      "version": "Sound 65620, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/65/65620_271450-hq.mp3",
+      "upstreamPath": "previews/65/65620_271450-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-714257.mp3",
+      "sha256": "e73c30c76507aa349f6b63e158918043bcc24fbe0ee76840958a6ddb7ea166a3",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 714257,
+      "title": "Puff of Smoke",
+      "author": "qubodup",
+      "url": "https://freesound.org/people/qubodup/sounds/714257/",
+      "version": "Sound 714257, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/714/714257_71257-hq.mp3",
+      "upstreamPath": "previews/714/714257_71257-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/freesound/fs-90143.mp3",
+      "sha256": "8245fa42b2a9d1caaca16be89a01f74e3681bcb912cb2774c364672209a6affd",
+      "pack": "freesound",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "id": 90143,
+      "title": "steam_burst.wav",
+      "author": "pengo_au",
+      "url": "https://freesound.org/people/pengo_au/sounds/90143/",
+      "version": "Sound 90143, unversioned HQ MP3 preview pinned by SHA-256",
+      "downloadUrl": "https://cdn.freesound.org/previews/90/90143_793892-hq.mp3",
+      "upstreamPath": "previews/90/90143_793892-hq.mp3",
+      "verification": "byte-match"
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/bookFlip1.ogg",
+      "sha256": "fa81ac2fedc8c641661b87e349630a36c9800e795e0c800e029214efdbe26a7d",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/bookFlip1.ogg",
+      "matchingArchivePaths": [
+        "Audio/bookFlip1.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/cloth1.ogg",
+      "sha256": "ddb93a3671233f95da0e0b10367f082f7eb42fa6caaddcf776410aa8833c747d",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/cloth1.ogg",
+      "matchingArchivePaths": [
+        "Audio/cloth1.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/cloth2.ogg",
+      "sha256": "8a7451193c38bc05483aec25dd193e163a15d44cf7fff04ac7912573231b0201",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/cloth2.ogg",
+      "matchingArchivePaths": [
+        "Audio/cloth2.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/cloth3.ogg",
+      "sha256": "a48632d17a4f1416541d261a32a31612e01267144c407fa3ecab3ff410f0085b",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/cloth3.ogg",
+      "matchingArchivePaths": [
+        "Audio/cloth3.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/cloth4.ogg",
+      "sha256": "e7ab9a6c4466dea874196c61f59bf1da05cfe58748f42fadd695d441a154a99b",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/cloth4.ogg",
+      "matchingArchivePaths": [
+        "Audio/cloth4.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/dropLeather.ogg",
+      "sha256": "097e1d3b74949b0145fda0519d40b7e0773ab82ec4858727f95be830927e1a45",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/dropLeather.ogg",
+      "matchingArchivePaths": [
+        "Audio/dropLeather.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/drop_002.ogg",
+      "sha256": "4ac4d1cef7e936965cbf795852ca2020300b9e2ba7daa59f2bf4f1f7bf416218",
+      "pack": "kenney-interface-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/drop_002.ogg",
+      "matchingArchivePaths": [
+        "Audio/drop_002.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/footstep_carpet_000.ogg",
+      "sha256": "b9524658b52a99a20590f8feefc103088637fd13ea8ec35811aee785e1f2f330",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/footstep_carpet_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/footstep_carpet_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/footstep_carpet_001.ogg",
+      "sha256": "9af3c3f76705107339e72036e4053bdca3eaa50ad31c8c929f42ce8d40e5d781",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/footstep_carpet_001.ogg",
+      "matchingArchivePaths": [
+        "Audio/footstep_carpet_001.ogg",
+        "Audio/footstep_carpet_002.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/footstep_carpet_002.ogg",
+      "sha256": "9af3c3f76705107339e72036e4053bdca3eaa50ad31c8c929f42ce8d40e5d781",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/footstep_carpet_002.ogg",
+      "matchingArchivePaths": [
+        "Audio/footstep_carpet_001.ogg",
+        "Audio/footstep_carpet_002.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/footstep_carpet_003.ogg",
+      "sha256": "4ae7454338d57c7d102145919ae653c7d010eb542797c4f25a1c7470be3a7e4c",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/footstep_carpet_003.ogg",
+      "matchingArchivePaths": [
+        "Audio/footstep_carpet_003.ogg",
+        "Audio/footstep_carpet_004.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/handleCoins.ogg",
+      "sha256": "8a91f969e932df709df80ee124d86a51389eed9b67f22e5e716bc2bbf60d8dab",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/handleCoins.ogg",
+      "matchingArchivePaths": [
+        "Audio/handleCoins.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/handleCoins2.ogg",
+      "sha256": "4b857968d64f9ac9336a10ffac6694d7547e1f01566ad6857b30bc8db3ee6c32",
+      "pack": "kenney-rpg-audio",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/handleCoins2.ogg",
+      "matchingArchivePaths": [
+        "Audio/handleCoins2.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactGlass_heavy_000.ogg",
+      "sha256": "b44b39a940e8948e74b9bd3776bff980df43cf220abdaf0d467dc4c43c0244a5",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactGlass_heavy_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactGlass_heavy_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactPlate_light_000.ogg",
+      "sha256": "6e797cf8a5bfc52d7ed5eb47c227974c1cf2a674954fec5b539cea7d62c7282c",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactPlate_light_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactPlate_light_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactPlate_medium_001.ogg",
+      "sha256": "68ba7701b71ef620f498f3038e832157d71ac8db7ad59424545890b250ceb24e",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactPlate_medium_001.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactPlate_medium_001.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactPunch_heavy_000.ogg",
+      "sha256": "b33a8f14068aec24ec69ba85e5e87fdc41228975f6a1a3e44a6e7d6fc3d9f8d8",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactPunch_heavy_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactPunch_heavy_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactPunch_heavy_001.ogg",
+      "sha256": "f92f5cb6ba4ff2766497292ffd90865654317eeca976f5652e0708dbdcdc0dd9",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactPunch_heavy_001.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactPunch_heavy_001.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactPunch_medium_000.ogg",
+      "sha256": "486988aa2d6440ffc4c62a0e8ccf3c23673ba84424bd4723378d451b7255eb5c",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactPunch_medium_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactPunch_medium_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactSoft_heavy_000.ogg",
+      "sha256": "49e7ca88743fca974bb8676ea138b751cfd8f9033b5e7af8736c2a215d6edbc1",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactSoft_heavy_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactSoft_heavy_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactSoft_medium_000.ogg",
+      "sha256": "7d3ba0bb5e60a11b5d3e558c141303dcf494256675fbf753c0d252d2cf0481e3",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactSoft_medium_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactSoft_medium_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactWood_heavy_000.ogg",
+      "sha256": "15ff82332f342c30e469215539e1cc57e11b221aa2cf7e11e811d313a9927f3d",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactWood_heavy_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactWood_heavy_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactWood_light_000.ogg",
+      "sha256": "eb45e35b4bed784d3f120de4afec4b0d6ac09d9e143cce8cfcb7d739e1b1f3c3",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactWood_light_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactWood_light_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/impactWood_medium_000.ogg",
+      "sha256": "1723a9fd25103ed41af06054814e84e65f4a772bac86ab2dc927da93d9592ff5",
+      "pack": "kenney-impact-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/impactWood_medium_000.ogg",
+      "matchingArchivePaths": [
+        "Audio/impactWood_medium_000.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/switch_002.ogg",
+      "sha256": "6fc395be2ad1f99ce318a5d28f98fb76dbeb676d83a0b28239d8c1fb90736180",
+      "pack": "kenney-interface-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/switch_002.ogg",
+      "matchingArchivePaths": [
+        "Audio/switch_002.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/kenney/tick_001.ogg",
+      "sha256": "9d057b918024c787bbe6c00beed13a7ef72a3fa0c259add3cef36582792f4230",
+      "pack": "kenney-interface-sounds",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "Audio/tick_001.ogg",
+      "matchingArchivePaths": [
+        "Audio/tick_001.ogg"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/vsco/BrakeDrum1_Hammer_v2_Sum.wav",
+      "sha256": "ceb398df6b2b0e021836d5857fd4ec620c26aa19ecb7dd74266172748e976043",
+      "pack": "vsco-2-ce",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/BrakeDrum1_Hammer_v2_Sum.wav",
+      "matchingArchivePaths": [
+        "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/BrakeDrum1_Hammer_v2_Sum.wav"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/vsco/Claves1_Hit_v2_rr1_Sum.wav",
+      "sha256": "ae0493fa57d0d1dd57693e8639dfe5fd9675b520a1c0c0eb45cf992f2a23ca9c",
+      "pack": "vsco-2-ce",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/Claves1_Hit_v2_rr1_Sum.wav",
+      "matchingArchivePaths": [
+        "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/Claves1_Hit_v2_rr1_Sum.wav"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/vsco/LogDrumHi_MedM_v2_rr1_Sum.wav",
+      "sha256": "8c4f61b36a13a8559f1777845ee9795bec52e07d2e86f05d50097bee6abd08b0",
+      "pack": "vsco-2-ce",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/LogDrumHi_MedM_v2_rr1_Sum.wav",
+      "matchingArchivePaths": [
+        "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/LogDrumHi_MedM_v2_rr1_Sum.wav"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/vsco/Sum_SHTrumpet_stac_D4_v3_rr1.wav",
+      "sha256": "7dcf2aec74e544c9cd139e2713c8a8bf358c26633b2fb3be254e998a0b010df9",
+      "pack": "vsco-2-ce",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Trumpet/stac/Sum_SHTrumpet_stac_D4_v3_rr1.wav",
+      "matchingArchivePaths": [
+        "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Trumpet/stac/Sum_SHTrumpet_stac_D4_v3_rr1.wav"
+      ]
+    },
+    {
+      "file": "tooling/signal-sounds/sources/vsco/cymbal-crashshort_v1.wav",
+      "sha256": "af0d5f0eb7f2226a1c592e5cda8e2dc0588cadbc851999ed39e3f36276acc7c9",
+      "pack": "vsco-2-ce",
+      "license": "CC0-1.0",
+      "verification": "byte-match",
+      "archivePath": "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/cymbal-crashshort_v1.wav",
+      "matchingArchivePaths": [
+        "VSCO-2-CE-440300901dfe9275fd84e0b7763af1f8443ae62e/Percussion/cymbal-crashshort_v1.wav"
+      ]
+    }
+  ]
+}

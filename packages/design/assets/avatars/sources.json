@@ -1,0 +1,146 @@
+[
+  {
+    "id": "frog",
+    "file": "avatar-frog.webp",
+    "bytes": 8336,
+    "sha256": "a1537d3135c804f83fbbc3058b1109c75740c7fc8a2039086f37880abb6387c0"
+  },
+  {
+    "id": "ghost",
+    "file": "avatar-ghost.webp",
+    "bytes": 6396,
+    "sha256": "bb163dfb87cd8738766f8ad448539b11dd957d44f77b7ec17ad5f6c7b7a8fa0a"
+  },
+  {
+    "id": "cat",
+    "file": "avatar-cat.webp",
+    "bytes": 7948,
+    "sha256": "7f2361be225ced5e8729bcc135771551c8946ee18dc4d35dac40b3fb58af0cc0"
+  },
+  {
+    "id": "alien",
+    "file": "avatar-alien.webp",
+    "bytes": 6336,
+    "sha256": "8c0e2dfd2e36c71de634169dec892211acd8ca100ab2912951317be4436f6718"
+  },
+  {
+    "id": "robot",
+    "file": "avatar-robot.webp",
+    "bytes": 5602,
+    "sha256": "6d5e5d8dd1352fc5b0ee9d708a25f5b4765da4705280d78f04e005a26f571414"
+  },
+  {
+    "id": "duck",
+    "file": "avatar-duck.webp",
+    "bytes": 7980,
+    "sha256": "cf30a109200170c9ad926afcfb934221ee92163bed2a3bcc328506c118050305"
+  },
+  {
+    "id": "hoodie",
+    "file": "avatar-hoodie.webp",
+    "bytes": 8822,
+    "sha256": "b8d97d1817b8f2e14166699c322128dc0bdbda25dfe496a67bcc88747de6605f"
+  },
+  {
+    "id": "dog",
+    "file": "avatar-dog.webp",
+    "bytes": 8804,
+    "sha256": "1c4acb4fe5217674dfea351b0e1a56f4a9e2eb477f45fd16a341567f0fd9b38f"
+  },
+  {
+    "id": "mushroom",
+    "file": "avatar-mushroom.webp",
+    "bytes": 8238,
+    "sha256": "463d10debf0e4fe363fd49fbc9504348fc8354da2be8cd8ca44880f56e17c027"
+  },
+  {
+    "id": "crab",
+    "file": "avatar-crab.webp",
+    "bytes": 11580,
+    "sha256": "dd42286f59255844935528789d4f55cf3ac5cf79f3a25c30be2ffe3c274c7962"
+  },
+  {
+    "id": "bat",
+    "file": "avatar-bat.webp",
+    "bytes": 7764,
+    "sha256": "e01e38d98014adc4c528ffa35a52049cd99ec4fa585088bf3614ba479bc026d2"
+  },
+  {
+    "id": "skull",
+    "file": "avatar-skull.webp",
+    "bytes": 8370,
+    "sha256": "3b3537bcdccbfd8e41299dace76543dd46819974575465cba4de379b7cb64117"
+  },
+  {
+    "id": "cactus",
+    "file": "avatar-cactus.webp",
+    "bytes": 8208,
+    "sha256": "837cfc6148ee57a749e7452be429f212913099fb36535278c557190e2a93e029"
+  },
+  {
+    "id": "fish",
+    "file": "avatar-fish.webp",
+    "bytes": 8896,
+    "sha256": "00957925f8868783229cddb14c8e90a1dec001929e3d4599e4aa741e6dcc4380"
+  },
+  {
+    "id": "star",
+    "file": "avatar-star.webp",
+    "bytes": 8828,
+    "sha256": "4fb61da8a17878d0536ebfa1d4dd3d35ad24291db653c1011675364f41a94768"
+  },
+  {
+    "id": "pear",
+    "file": "avatar-pear.webp",
+    "bytes": 8026,
+    "sha256": "2d028ddd3a3b2f111ce05b4300f52745fff5becf40c2812ec7a98b350204d760"
+  },
+  {
+    "id": "three-ears",
+    "file": "avatar-three-ears.webp",
+    "bytes": 6912,
+    "sha256": "5363c6b12dee839e0ad9a682a2ca92d77cb4f3b1231f47da2e2f694fab896955"
+  },
+  {
+    "id": "crown",
+    "file": "avatar-crown.webp",
+    "bytes": 7380,
+    "sha256": "f6e4da8a4849e363f30ab1fc4eb7e7f8ec94481866d9704f0b463c032354de03"
+  },
+  {
+    "id": "sprout",
+    "file": "avatar-sprout.webp",
+    "bytes": 7526,
+    "sha256": "c8e8c8e96caf28e895a83dd23f11fc38ec786e2701fe28fd5e7cb9b3915decce"
+  },
+  {
+    "id": "long-nose",
+    "file": "avatar-long-nose.webp",
+    "bytes": 8064,
+    "sha256": "1c56054f723fa9d054f1dc44b5d56efac4bfd00ea5afaf9b99f44baf6795d03d"
+  },
+  {
+    "id": "waving",
+    "file": "avatar-waving.webp",
+    "bytes": 8202,
+    "sha256": "b8252653963dde6fcc01bb8a67fa8cc7c59569b0444aa394d32edfd90dad90dd"
+  },
+  {
+    "id": "moustache",
+    "file": "avatar-moustache.webp",
+    "bytes": 7540,
+    "sha256": "e5a3e973c0de1c854dfe912175fbda960c02d74152ee8c87bacd595453483dd8"
+  },
+  {
+    "id": "rabbit",
+    "file": "avatar-rabbit.webp",
+    "bytes": 8136,
+    "sha256": "eb0c7660191058a17f335dc2dff2cecba35a06aace2648c4655d1b6fb76399a1"
+  },
+  {
+    "id": "triangle",
+    "file": "avatar-triangle.webp",
+    "bytes": 8608,
+    "sha256": "01bd64e973e4dd81fd8f44d0794398c4c7e1e591c83fea8905325e40d688d5b2"
+  }
+]

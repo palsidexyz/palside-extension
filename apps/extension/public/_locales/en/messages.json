@@ -1,0 +1,14 @@
+{
+  "name": {
+    "message": "Palside: Watch Charts with Friends"
+  },
+  "description": {
+    "message": "Watch charts with friends in the trenches: see what your squad is viewing, chat end-to-end encrypted, drop signals and danmaku."
+  },
+  "open": {
+    "message": "Open Palside"
+  },
+  "captureCommand": {
+    "message": "Screenshot this page"
+  }
+}

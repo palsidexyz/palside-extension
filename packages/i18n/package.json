@@ -1,0 +1,22 @@
+{
+  "name": "@palside/i18n",
+  "version": "0.1.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/palsidexyz/palside-extension.git",
+    "directory": "packages/i18n"
+  },
+  "homepage": "https://palside.xyz",
+  "bugs": "https://github.com/palsidexyz/palside-extension/issues",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/core.ts",
+    "./locale": "./src/locale.ts"
+  },
+  "dependencies": {
+    "@palside/shared": "*",
+    "use-intl": "4.14.7"
+  }
+}

@@ -1,0 +1,5 @@
+.scrim { position:fixed; inset:auto; max-width:none; max-height:none; margin:0; padding:0; border:0; background:var(--ui-scrim); overflow:hidden; }
+.scrim[open] { display:flex; align-items:flex-end; }
+.scrim::backdrop { background:transparent; }
+.sheet { position:relative; width:100%; max-height:calc(100% - 24px); overflow:auto; border-radius:var(--ui-radius-panel) var(--ui-radius-panel) 0 0; corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-primary); box-shadow:var(--ui-shadow-floating); outline:none; }
+@media (forced-colors: active) { .sheet { border-top:1px solid CanvasText; } }
