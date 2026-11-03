@@ -1,4 +1,5 @@
-import { IMAGE_MIME_TYPES } from '@palside/shared/contracts/limits';
+import { IMAGE_DOCUMENT_BYTES, IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
+import { DAY_MS } from '@palside/shared/units';
 import { IMAGE_LIMIT } from '../../domain/images/image-policy.ts';
 
 export type ImageSessionMode = 'view' | 'edit';
@@ -22,7 +23,6 @@ export class ImageSessionError extends Error {
   constructor(code: ImageSessionErrorCode) { super(code); this.name = 'ImageSessionError'; this.code = code; }
 }
 
-const DOCUMENT_BYTES = 256 * 1024;
 const SOURCE_CHARACTERS = 4 * Math.ceil(IMAGE_LIMIT.maxBytes / 3) + 32;
 const validRevision = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const fail = (code: ImageSessionErrorCode): never => { throw new ImageSessionError(code); };
@@ -47,7 +47,7 @@ export function documentCopy(value: unknown): ImageDocument {
   const encoder = new TextEncoder();
   function visit(item: unknown, depth: number): ImageDocument {
     if (++nodes > 50_000 || depth > 32) return fail('IMAGE_SESSION_INVALID');
-    if (typeof item === 'string') { bytes += encoder.encode(item).length; if (bytes > DOCUMENT_BYTES) fail('IMAGE_SESSION_INVALID'); return item; }
+    if (typeof item === 'string') { bytes += encoder.encode(item).length; if (bytes > IMAGE_DOCUMENT_BYTES) fail('IMAGE_SESSION_INVALID'); return item; }
     if (item === null || typeof item === 'boolean' || typeof item === 'number' && Number.isFinite(item)) return item;
     if (!item || typeof item !== 'object' || ancestors.has(item)) return fail('IMAGE_SESSION_INVALID');
     if (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype && Object.getPrototypeOf(item) !== null) return fail('IMAGE_SESSION_INVALID');
@@ -66,7 +66,7 @@ export function documentCopy(value: unknown): ImageDocument {
       for (const key of Object.keys(item)) {
         if (['__proto__', 'prototype', 'constructor'].includes(key)) return fail('IMAGE_SESSION_INVALID');
         bytes += encoder.encode(key).length;
-        if (bytes > DOCUMENT_BYTES) return fail('IMAGE_SESSION_INVALID');
+        if (bytes > IMAGE_DOCUMENT_BYTES) return fail('IMAGE_SESSION_INVALID');
         const descriptor = Object.getOwnPropertyDescriptor(item, key)!;
         if (!('value' in descriptor)) return fail('IMAGE_SESSION_INVALID');
         copy[key] = visit(descriptor.value, depth + 1);
@@ -76,7 +76,7 @@ export function documentCopy(value: unknown): ImageDocument {
     return copy;
   }
   const json = JSON.stringify(visit(value, 0));
-  if (encoder.encode(json).length > DOCUMENT_BYTES) fail('IMAGE_SESSION_INVALID');
+  if (encoder.encode(json).length > IMAGE_DOCUMENT_BYTES) fail('IMAGE_SESSION_INVALID');
   return JSON.parse(json) as ImageDocument;
 }
 
@@ -94,7 +94,7 @@ export class ImageSessionBroker {
     this.currentAccount = options.currentAccount;
     this.now = options.now ?? Date.now;
     this.createId = options.createId ?? (() => crypto.randomUUID());
-    this.ttlMs = options.ttlMs ?? 24 * 60 * 60 * 1000;
+    this.ttlMs = options.ttlMs ?? DAY_MS;
     this.maxSessions = options.maxSessions ?? 8;
     if (!Number.isSafeInteger(this.ttlMs) || this.ttlMs <= 0 || !Number.isSafeInteger(this.maxSessions) || this.maxSessions <= 0) fail('IMAGE_SESSION_INVALID');
     this.observedAccount = this.currentAccount();

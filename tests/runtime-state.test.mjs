@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -238,26 +239,35 @@ test('equal emits retain the revision and skip derived room work', () => {
 test('Hot subscriptions protect stale results until the last panel releases them', async t => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 100_000 });
   const service = runtime(); service.auth.session = { account: { id: 'self' }, token: 'token' };
-  let requests = 0; service.api.request = async () => { requests++; throw Error('offline'); };
-  service.state.rooms.hot = { '': { top: [], rising: [], at: Date.now() } };
-  service.emit();
-  void service.rooms.watchHot({ sourceId: 'one:hot', chain: null }).catch(() => {}); void service.rooms.watchHot({ sourceId: 'two:hot', chain: null }).catch(() => {});
+  let offline = false;
+  const requests = []; service.api.request = async (endpoint, options) => { requests.push({ endpoint, open: options.body.open }); if (offline) throw Error('offline'); return { subscribed: options.body.open }; };
+  await service.rooms.panelChanged(true);
+  await service.rooms.watchHot({ sourceId: 'one:hot', open: true });
+  await service.rooms.watchHot({ sourceId: 'two:hot', open: true });
+  service.rooms.consume({ type: 'hot', rooms: { rows: [] } });
   const revision = service.state.revision;
-  t.mock.timers.tick(600_000); await Promise.resolve(); service.emit();
-  assert.ok(service.state.rooms.hot); assert.equal(service.state.revision, revision);
-  service.rooms.watchHot({ sourceId: 'one:hot' }); assert.ok(service.state.rooms.hot);
-  service.rooms.dropPanel('two'); assert.equal(service.state.rooms.hot, undefined);
-  const stopped = requests; t.mock.timers.tick(60_000); await Promise.resolve(); assert.equal(requests, stopped);
+  offline = true; service.rooms.reconnected(); await new Promise(setImmediate);
+  t.mock.timers.tick(600_000); service.emit();
+  assert.deepEqual(service.state.rooms.hot, { rows: [], loaded: true }); assert.equal(service.state.revision, revision);
+  offline = false;
+  await service.rooms.watchHot({ sourceId: 'one:hot', open: false }); assert.ok(service.state.rooms.hot);
+  service.rooms.dropPanel('two'); await new Promise(setImmediate); assert.equal(service.state.rooms.hot, undefined);
+  assert.deepEqual(requests, [true, true, true, false].map(open => ({ endpoint: 'rooms.hotSubscription', open })));
+  t.mock.timers.tick(MINUTE_MS); await Promise.resolve(); assert.equal(requests.length, 4);
   service.rooms.reset();
 });
 
-test('empty Hot results receive an expiry deadline even when other room inputs are unchanged', async t => {
-  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 100_000 });
+test('empty Hot results are released with the subscription and late pushes cannot restore them', async () => {
   const service = runtime(); service.auth.session = { account: { id: 'self' }, token: 'token' };
-  service.api.request = async () => ({ top: [], rising: [], at: Date.now() });
-  service.emit(); await service.rooms.hot();
-  t.mock.timers.tick(599_999); service.emit(); assert.ok(service.state.rooms.hot);
-  t.mock.timers.tick(1); service.emit(); assert.equal(service.state.rooms.hot, undefined);
+  service.api.request = async (_endpoint, options) => ({ subscribed: options.body.open });
+  service.emit(); await service.rooms.watchHot({ sourceId: 'one:hot', open: true });
+  assert.deepEqual(service.state.rooms.hot, { rows: [], loaded: false });
+  service.rooms.consume({ type: 'hot', rooms: { rows: [] } });
+  assert.deepEqual(service.state.rooms.hot, { rows: [], loaded: true });
+  await service.rooms.watchHot({ sourceId: 'one:hot', open: false });
+  assert.equal(service.state.rooms.hot, undefined);
+  service.rooms.consume({ type: 'hot', rooms: { rows: [] } });
+  assert.equal(service.state.rooms.hot, undefined);
 });
 
 test('team mutation returns a small truthy receipt and snapshot remains explicit', async () => {
@@ -283,6 +293,8 @@ function receivers(t) {
     signals: { async routeSignals() { calls.signals++; } },
     notifications: { notificationState() {} },
   };
+  const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: Object.assign(new EventTarget(), { visibilityState: 'visible' }) });
   const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { addEventListener() {}, removeEventListener() {} } });
   browserHost.runtime = { connect() {
@@ -294,6 +306,7 @@ function receivers(t) {
   } };
   browserHost.windows = { async getCurrent() { return { id: ports.length }; } };
   for (let i = 0; i < 2; i++) t.after(bridge.observeState({ onState(state) { panels[i] = state; }, onDisconnect() {}, onError() {}, onLanguage() {}, onPage() {}, onCaptured() {}, onDanmaku() {} }));
+  t.after(() => { if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor); else delete globalThis.document; });
   t.after(() => { if (windowDescriptor) Object.defineProperty(globalThis, 'window', windowDescriptor); else delete globalThis.window; });
   return { bg, panels, ports, calls, sync: stateSync(bg) };
 }

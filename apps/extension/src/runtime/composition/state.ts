@@ -1,22 +1,21 @@
+import { siteById } from '@palside/shared/sites';
 import type { Preferences } from '../../domain/account/preferences';
 import type { RuntimeState } from './runtime-state';
 import { startedTeams } from '../teams/onboarding';
-import { defaultWebFeatures,readFavorites,readHosts,readInteraction,readWebFeatures } from '../../domain/annotations/interaction';
+import { readFavorites,readHosts,readSiteInteractions } from '../../domain/annotations/interaction';
 
 export const SNAPSHOT_INTERVAL = 15_000;
 export const READ_FLUSH_DELAY = 1_500;
-export const DAY = 86_400_000;
 
 export function defaultPreferences(): Preferences {
   return {
     current: '',
     notifications: 'off',
-    web: { ...defaultWebFeatures },
   };
 }
 
-type PreferencePatch = Pick<Preferences, 'current' | 'hiddenStickies' | 'forgottenTeams' | 'notificationPreview' | 'notifications' | 'web' | 'interaction' | 'favorites' | 'tokenOff' | 'restoreSites' | 'rooms'>;
-const preferenceFields = ['current', 'hiddenStickies', 'forgottenTeams', 'notificationPreview', 'notifications', 'web', 'interaction', 'favorites', 'tokenOff', 'restoreSites', 'rooms'] as const;
+type PreferencePatch = Pick<Preferences, 'current' | 'hiddenStickies' | 'forgottenTeams' | 'notificationPreview' | 'notifications' | 'share' | 'siteInteraction' | 'favorites' | 'tokenOff' | 'rooms' | 'toured'>;
+const preferenceFields = ['current', 'hiddenStickies', 'forgottenTeams', 'notificationPreview', 'notifications', 'share', 'siteInteraction', 'favorites', 'tokenOff', 'rooms', 'toured'] as const;
 
 /** Only these user-editable fields may be patched; policy and onboarding have their own writers. */
 export function readPreferencePatch(input: Record<string, unknown>): Partial<PreferencePatch> | undefined {
@@ -31,32 +30,28 @@ export function readPreferencePatch(input: Record<string, unknown>): Partial<Pre
       case 'hiddenStickies':
       case 'forgottenTeams':
         if (!Array.isArray(value) || value.some(id => typeof id !== 'string')) return;
-        patch[key] = [...new Set(value as string[])]; break;
+        patch[key] = [...new Set((value as string[]).toReversed())].slice(0, 500).reverse(); break;
       case 'notificationPreview':
+      case 'share':
+      case 'toured':
         if (typeof value !== 'boolean') return;
         patch[key] = value; break;
       case 'notifications':
         if (value !== 'off' && value !== 'mentions' && value !== 'all') return;
         patch.notifications = value; break;
       case 'rooms': {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([key, item]) => key !== 'off' || typeof item !== 'boolean')) return;
+        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([key, item]) => key === 'off' || key === 'noticed' ? typeof item !== 'boolean' : key !== 'site' || typeof item !== 'string' || !siteById(item))) return;
         patch.rooms = { ...value }; break;
       }
-      case 'web': {
-        const web = readWebFeatures(value);
-        if (!web) return;
-        patch.web = web; break;
-      }
-      case 'tokenOff':
-      case 'restoreSites': {
+      case 'tokenOff': {
         const hosts = readHosts(value);
         if (!hosts) return;
-        patch[key] = hosts; break;
+        patch.tokenOff = hosts; break;
       }
-      case 'interaction': {
-        const interaction = readInteraction(value);
-        if (!interaction) return;
-        patch.interaction = interaction; break;
+      case 'siteInteraction': {
+        const sites = readSiteInteractions(value);
+        if (!sites) return;
+        patch.siteInteraction = sites; break;
       }
       case 'favorites': {
         const favorites = readFavorites(value);
@@ -85,7 +80,6 @@ export function emptyState(): RuntimeState {
   return {
     rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} },
     revision: 0,
-    toggles: { share: false, interact: false },
     ready: false,
     authenticated: false,
     connection: {

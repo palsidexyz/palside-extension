@@ -10,7 +10,7 @@ export const adminEntityBan = nullable(strictObject({ expiresAt: nullable(Type.I
 /** These exclusions are independent; clearing the manual flag does not promise a place in the ranking. */
 export const adminEntityRanking = strictObject({ manualExcluded: Type.Boolean(), reportExcludedUntil: nullable(Type.Integer()) });
 /** `orders` counts all orders initiated by this account, in every state. Pending counts cover queued open case episodes and their reports. */
-export const adminAccountRow = strictObject({ ...adminAccountRef.properties, wallet: nullable(Type.String()), createdAt: Type.Integer(), ban: adminEntityBan, teams: Type.Integer(), orders: Type.Integer(), openCases: Type.Integer(), openReports: Type.Integer() });
+export const adminAccountRow = strictObject({ ...adminAccountRef.properties, wallet: nullable(Type.String()), createdAt: nullable(Type.Integer()), ban: adminEntityBan, teams: Type.Integer(), orders: Type.Integer(), openCases: Type.Integer(), openReports: Type.Integer() });
 export const adminTeamRow = strictObject({ ...adminTeamRef.properties, owner: adminAccountRef, members: Type.Integer(), recruiting: Type.Boolean(), ranking: adminEntityRanking, createdAt: Type.Integer(), openCases: Type.Integer(), openReports: Type.Integer() });
 export const adminAccountPage = page(adminAccountRow);
 export const adminTeamPage = page(adminTeamRow);

@@ -10,4 +10,6 @@
 /* 网站 opens under 网页互动 when it is switched on. */
 .reveal { overflow:hidden; animation:reveal .22s var(--ui-ease-feedback); }
 @keyframes reveal { from { max-height:0; opacity:0; } to { max-height:56px; opacity:1; } }
+/* 网站详情: the site's feature tiles under its 网页互动 row, in the same card. */
+.siteTiles { padding:0 14px 14px; }
 @media (prefers-reduced-motion:reduce) { .reveal { animation:none; } .profile { transition:none; } }

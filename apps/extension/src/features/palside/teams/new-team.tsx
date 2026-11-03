@@ -39,7 +39,7 @@ export function NewTeam({ c, invite = true }: { c: PalsideController; invite?: b
   return <section className={s.newTeam} aria-labelledby="new-team-name">
     <TeamAvatar team={c.team} size="xl" />
     <h2 id="new-team-name" className={s.nameLine}><span className={s.name}>{c.team.name}</span><span className={s.count}><UsersRound size={14} aria-hidden="true" /><CountText text={t('extension.dynamic.peopleCount', { count })} value={count} /></span></h2>
-    {invite && <Button variant={copied ? "surface" : "primary"} className={s.copy} disabled={busy} aria-busy={busy || undefined} onClick={() => void copy()}>
+    {invite && <Button variant={copied ? "surface" : "primary"} className={s.copy} data-tour="invite" disabled={busy} aria-busy={busy || undefined} onClick={() => void copy()}>
       {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
       <span aria-live="polite">{copied ? t('extension.newTeam.copied') : t('extension.copy.copyInvite')}</span>
     </Button>}

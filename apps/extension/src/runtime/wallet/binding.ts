@@ -1,3 +1,5 @@
+import { SECOND_MS } from '@palside/shared/units';
+import { WALLET_BINDING_TTL_MS, SUPPORTED_CHAINS } from '@palside/shared/rules/wallet';
 import { deriveIdentity, signEvent, verifyEvent } from '@palside/shared/identity';
 import { walletBindingTypedData, walletIdentityContent } from '@palside/shared/chain/orders';
 import type { WalletBinding, WalletChallenge } from '@palside/shared/contracts/chain';
@@ -15,11 +17,11 @@ export async function signWalletBinding(mnemonic: string, challenge: WalletChall
   const wallet = deriveWalletAccount(mnemonic), identity = deriveIdentity(mnemonic);
   try {
     if (challenge.accountId !== expected.accountId || identity.publicKey !== expected.accountId || challenge.chainId !== expected.chainId
-      || ![4663, 31337].includes(challenge.chainId) || challenge.address.toLowerCase() !== expected.address.toLowerCase()
-      || wallet.address.toLowerCase() !== expected.address.toLowerCase() || challenge.expiresAt <= now || challenge.expiresAt > now + 300_000
+      || !SUPPORTED_CHAINS.some(id => id === challenge.chainId) || challenge.address.toLowerCase() !== expected.address.toLowerCase()
+      || wallet.address.toLowerCase() !== expected.address.toLowerCase() || challenge.expiresAt <= now || challenge.expiresAt > now + WALLET_BINDING_TTL_MS
       || !/^0x[0-9a-f]{64}$/i.test(challenge.nonce) || !/^0x[0-9a-f]{64}$/i.test(challenge.id)) throw new Error('WALLET_BINDING_MISMATCH');
     const signature = await wallet.signTypedData(walletBindingTypedData(challenge));
-    const proof = signEvent({ kind: 27236, created_at: Math.floor(now / 1000), tags: [], content: walletIdentityContent(expected.accountId, expected.chainId, wallet.address) }, identity.secretKey);
+    const proof = signEvent({ kind: 27236, created_at: Math.floor(now / SECOND_MS), tags: [], content: walletIdentityContent(expected.accountId, expected.chainId, wallet.address) }, identity.secretKey);
     return { challengeId: challenge.id, signature, proof: { ...proof, kind: 27236 as const } };
   } finally { identity.secretKey.fill(0); identity.secretStorageKey.fill(0); }
 }

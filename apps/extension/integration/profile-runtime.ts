@@ -1,3 +1,4 @@
+import { SECOND_MS, DAY_MS as day } from '@palside/shared/units';
 import { decryptedEvent } from './private-event';
 import { translator } from '@palside/i18n';
 import { PalsideService } from '../src/runtime/composition/core';
@@ -104,7 +105,7 @@ async function run() {
     check(Number(attempts) === 2 && auth.cryptoInitialised, 'Periodic recovery did not retry incomplete startup');
     result.checks.push('Failed startup remains offline and permits the next periodic connection attempt');
 
-    const now = Date.now(), day = 86_400_000;
+    const now = Date.now();
     const originalTime = now - 29 * day, replyTime = now;
     const original: Message = { id: '$expiry-original', teamId: 'expiry-team', author: 'fixture-account', text: 'original body', time: '12:00', status: 'sent' };
     const reply: Message = { id: '$expiry-reply', teamId: 'expiry-team', author: 'fixture-account', text: 'reply body survives', time: '12:01', status: 'sent', replyTo: original.id };
@@ -131,7 +132,7 @@ async function run() {
 
     const local: Message = { id: 'bubble-transaction', teamId: 'bubble-team', author: session.account.id, text: 'bubble fixture', time: '12:00', status: 'sending' };
     const confirmedId = '$bubble-event';
-    service.state.remoteTeams = [remoteTeam({ id: local.teamId, roomId: '!bubble:local.test', periods: [{ joinedAt: now - 1000, leftAt: null }], people: [{ bio: '', tags: [], deleted: false, id: session.account.id, nickname: 'fixture', avatarId: null, matrixId: session.account.matrixId }], memberIds: [session.account.id] })];
+    service.state.remoteTeams = [remoteTeam({ id: local.teamId, roomId: '!bubble:local.test', periods: [{ joinedAt: now - SECOND_MS, leftAt: null }], people: [{ bio: '', tags: [], deleted: false, id: session.account.id, nickname: 'fixture', avatarId: null, matrixId: session.account.matrixId }], memberIds: [session.account.id] })];
     service.state.data.messages = [local];
     service.sending.outgoing.set(local.id, { message: local, createdAt: now, eventId: confirmedId });
     const emitted: number[] = [];

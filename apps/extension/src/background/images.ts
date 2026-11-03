@@ -1,10 +1,11 @@
-import { IMAGE_MIME_TYPES } from '@palside/shared/contracts/limits';
+import { IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
 import { parseCommand } from '../runtime/transport/command-map.ts';
 import { MessageError,errorMessage,message as uiMessage } from '@palside/i18n';
 import type { Browser } from 'wxt/browser';
 import { ImageSessionBroker,ImageSessionError,imageSource } from '../runtime/media/image-sessions.ts';
 import { IMAGE_LIMIT } from '../domain/images/image-policy.ts';
 import type { Background } from './index.ts';
+import { imageExpiry } from '../runtime/chat/message-expiry.ts';
 
 type Binding = { source: string; windowId?: number; ready?: Promise<void>; ports?: Set<Browser.runtime.Port> };
 
@@ -75,7 +76,7 @@ export function images(bg: Background) {
       const current = bg.state?.drafts[teamId];
       const attached = current?.value.attachment?.kind === 'image' && current.value.attachment.src === original;
       return mode === 'edit' ? attached && current?.revision === draft?.revision
-        : attached || Boolean(bg.state?.data.messages.some(message => message.teamId === teamId && !message.recalled && (!message.expiresAt || message.expiresAt > Date.now()) && message.attachment?.kind === 'image' && message.attachment.src === original));
+        : attached || Boolean(bg.state?.data.messages.some(message => message.teamId === teamId && !message.recalled && imageExpiry(message, message.expiresAt || Infinity) > Date.now() && message.attachment?.kind === 'image' && message.attachment.src === original));
     };
     if (mode === 'edit' && !inDraft || !available()) throw new MessageError(uiMessage('extension.runtime.imageUnavailable'));
     let src = original;

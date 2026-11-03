@@ -2,11 +2,10 @@
 import { Button } from '@palside/ui/button';
 import { errorMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
-import type { ChangeEvent, CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Ban, EyeOff, UserPlus } from 'lucide-react';
 import { Switch } from '@palside/ui/switch';
 import { defaultDanmakuSettings, type DanmakuSettings } from '../../../runtime/browser/page-protocol';
-import type { InteractionFeature } from '../../../domain/annotations/interaction';
 import { CountText } from '../ui/motion-details';
 import { DanmakuIcon, featureIcons } from '../ui/icons';
 import { SignalOptions } from './signal-settings';
@@ -17,7 +16,7 @@ import d from '../rooms/danmaku.module.css';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/pages.module.css';
 
-/** 互动选项: one tab per feature. Each opens on its own switch; what draws on web pages under it greys out, saying why, while 网页互动 is off. */
+/** 互动选项: how each feature looks and behaves. Whether it runs is chosen per site, in the site's sheet and 设置 › 网站. */
 export function InteractionSettings({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const chosen = useSocialUi().settingsTab ?? 'danmaku';
@@ -31,24 +30,11 @@ export function InteractionSettings({ c }: { c: PalsideController }) {
     <div className={d.settingsTabs}><Tabs id="interaction" label={t('extension.settings.interactionOptions')} value={tab} tabs={c.live ? tabs : tabs.slice(1)} onChange={settingsTab => setSocialUi({ settingsTab })} /></div>
     <div role="tabpanel" id="interaction-panel" aria-labelledby={`interaction-tab-${tab}`} className={s.page}>
       {tab === 'danmaku' && c.live && <DanmakuTab c={c} />}
-      {tab === 'signal' && <FeatureTab c={c} feature="signal"><div className={s.options}><SignalOptions c={c} /></div></FeatureTab>}
-      {tab === 'sticky' && <FeatureTab c={c} feature="sticky"><HiddenNotes c={c} /></FeatureTab>}
+      {tab === 'signal' && <SettingGroup><div className={s.options}><SignalOptions c={c} /></div></SettingGroup>}
+      {tab === 'sticky' && <SettingGroup><HiddenNotes c={c} /></SettingGroup>}
     </div>
     {c.preferenceError && <p className={s.error} role="alert">{c.preferenceError}</p>}
   </div>;
-}
-
-/** 信号 or 便利贴: its switch, then its options — greyed while it is off, or while 网页互动 is. */
-function FeatureTab({ c, feature, children }: { c: PalsideController; feature: InteractionFeature; children: ReactNode }) {
-  const t = useTranslations();
-  const on = c.interaction[feature];
-  const set = (event: ChangeEvent<HTMLInputElement>) => { void c.setInteraction({ [feature]: event.currentTarget.checked }).catch(() => {}); };
-  return <>
-    <SettingGroup>
-      <SettingControl icon={featureIcons[feature]()}><Switch className={settingRows.switch} label={t(`extension.web.${feature}`)} checked={on} onChange={set} /></SettingControl>
-    </SettingGroup>
-    <SettingGroup title={!c.web.interact ? t('extension.settings.interactOff') : undefined} dim={!c.web.interact || !on}>{children}</SettingGroup>
-  </>;
 }
 
 function HiddenNotes({ c }: { c: PalsideController }) {
@@ -60,14 +46,14 @@ function HiddenNotes({ c }: { c: PalsideController }) {
 
 /**
  * 弹幕: its switch (the rooms themselves — reading and sending in the panel), then 在网页上显示 — the same 弹幕 crossing the page, with
- * its look — which needs 网页互动, and the strangers 弹幕 brings: who is blocked and whether they may invite you into a squad.
+ * its look; which sites show them is chosen per site — and the strangers 弹幕 brings: who is blocked and whether they may invite you into a squad.
  */
 function DanmakuTab({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const rooms = c.live?.state.rooms;
   const off = Boolean(c.live?.state.preferences.rooms?.off);
   const blocked = rooms?.blocked.length ?? 0;
-  const why = off ? t('extension.settings.roomsOff') : !c.web.interact ? t('extension.settings.interactOff') : undefined;
+  const why = off ? t('extension.settings.roomsOff') : undefined;
   return <>
     <SettingGroup>
       <SettingControl icon={<DanmakuIcon size={16} />}>

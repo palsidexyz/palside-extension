@@ -1,19 +1,19 @@
 'use client';
+import { SECOND_MS } from '@palside/shared/units';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
-import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { tagLabel, tagKey } from '../../../domain/account/profile-tags';
 import { chatTime, errorMessage, localeOrEnglish, message as uiMessage } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
 import { Count, CountText, Swap } from '../ui/motion-details';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
-import { ArrowLeft, ArrowUp, Ban, Copy, Flag, Flame, Gift, HandCoins, Lock, MessageCircle, MonitorPlay, MoreHorizontal, Quote, Undo2, UserPlus, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { motionPresets } from '@palside/design/motion';
+import { ArrowUp, ArrowUpRight, Ban, Check, ChevronDown, Copy, Flag, Gift, HandCoins, MessageCircle, MoreHorizontal, Quote, Undo2, UserPlus, X } from 'lucide-react';
 import { Tooltip } from '@palside/ui/tooltip';
-import { ROOM_TEXT_MAX } from '@palside/shared/contracts/limits';
+import { ROOM_TEXT_MAX } from '@palside/shared/rules/rooms';
 import type { InviteOptions, RoomMessage, RoomPerson } from '../../../runtime/rooms/contract-types';
-import { TEAM_MEMBER_LIMIT } from '@palside/shared/contracts/limits';
+import { TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
 import type { RoomView } from '../../../runtime/rooms/state';
-import { requestSitesAccess } from '../../../runtime/browser/permissions';
 import { Sheet } from '@palside/ui/sheet';
 import { Button, IconButton } from '@palside/ui/button';
 import { Menu, MenuTrigger, MenuContent, MenuItem } from '@palside/ui/menu';
@@ -24,7 +24,13 @@ import { accountLabel } from '../account/account-label';
 import { capability } from '../settings/access';
 import { characterLength } from '../../../domain/chat/model';
 import { type Person } from '../../../domain/account/model';
-import { openRoom, roomPerson, roomView, roomsOn, tabRoomKey, tabView, teammateIds, useRoomRead, useRoomOpening, useRoomDrafts, roomQuoteReturn } from './rooms';
+import { openRoom, roomPerson, roomView, roomsOn, tabRoomKey, teammateIds, useRoomRead, useRoomOpening, useRoomDrafts, roomQuoteReturn, tokenSiteChoice, openTokenSite, useShownRoomKey } from './rooms';
+import type { Viewing } from '../../../domain/assets/model';
+import { DanmakuIcon, HotIcon } from '../ui/icons';
+import { SiteLogo } from '../assets/site-logo';
+import { openSiteSheet, pageSite, pageUnusable, SiteFace } from '../viewing/page-key';
+import { siteAllows } from '../../../domain/annotations/interaction';
+import type { Site } from '../settings/site-catalog';
 import { StancePoll } from './stance-poll';
 import { RoomPayments, TipPayment } from '../wallet/room-payments';
 import type { WalletPerson } from '@palside/shared/contracts/profiles';
@@ -35,7 +41,10 @@ import ac from '../settings/access-sheet.module.css';
 import card from '../account/person-card.module.css';
 import d from './danmaku.module.css';
 import { EmptyState } from '../chat/history-scope';
+import { ConnectionState, pageIssue } from '../feedback/session-notice';
 import { whenWalletOpen } from '../wallet/closed';
+import { TokenName,tokenLabel } from '../assets/token-name';
+import { tokenStats } from '../assets/token-data';
 
 /** Today as hour:minute, earlier days as the short date and time. */
 export function roomTime(at: number, now: number, locale: string) {
@@ -50,57 +59,138 @@ export function Faces({ c, people, count }: { c: PalsideController; people: Room
   return <span className={d.faces}>{drawn.map(person => <span key={person.id} data-mate={person.mate || undefined}><PersonAvatar person={person} size="xs" /></span>)}{count !== undefined && <b><Count value={count} /></b>}</span>;
 }
 
-/** 弹幕: the whole panel for one token — back to the team, the token, who is here, 热门; then 看法, the messages and a one-line box. */
+/**
+ * 弹幕 tab: the token's 看法 with 去网站 and 热门 on one row, then the messages and a one-line box. The token is the one being
+ * opened, else the pinned one, else the active tab's; on other pages the tab stays here and says what it is waiting for.
+ */
 export function DanmakuView({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const rooms = c.live?.state.rooms;
   const opening = useRoomOpening(c);
   const drafts = useRoomDrafts(c.live?.state.authenticated ? c.data.self : '');
-  const pinned = opening?.key ?? rooms?.pinned;
-  const room = rooms?.current?.key === pinned ? rooms?.current : undefined;
+  const key = useShownRoomKey(c);
+  const room = key && rooms?.current?.key === key ? rooms.current : undefined;
   const screen = c.screen, go = c.go, on = roomsOn(c);
-  useEffect(() => { if (screen === 'room' && (!on || !pinned)) go('chat'); }, [screen, on, pinned, go]);
-  if (c.screen !== 'room' || !pinned) return null;
-  const back = () => { void c.run('room-close'); c.go('chat'); };
-  return <div className={d.view} onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); back(); } }}>
-    <RoomHead c={c} roomKey={pinned} room={room} onBack={back} />
-    {room && <div className={d.pollWrap}><StancePoll c={c} roomKey={room.key} stance={room.stance} /></div>}
-    <RoomPayments c={c} roomKey={pinned} />
-    <SwitchRow c={c} pinned={pinned} />
-    {opening?.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => openRoom(c, opening.key, opening.profile) }}>{t('common.error')}</InlineFeedback>}
-    {room ? <RoomList key={room.key} c={c} room={room} /> : opening?.status !== 'error' ? <div className={d.empty}><p>{t('extension.copy.loading')}</p></div> : null}
-    {room && <RoomBar key={`bar-${room.key}`} c={c} room={room} drafts={drafts} />}
+  // 弹幕 cannot follow this site — Chrome has not allowed it, or 弹幕 is off there. Ask where it may be a token page: any page Chrome
+  // hides, or a token page it names. A page Chrome names but Palside cannot use (local, private, a browser page) says so instead.
+  const unusable = pageUnusable(c);
+  const blocked = siteBlocked(c);
+  const gate = Boolean(c.live) && !unusable && Boolean(blocked) && (!c.pageHost || Boolean(tabRoomKey(c)));
+  useEffect(() => { if (screen === 'room' && !on) go('chat'); }, [screen, on, go]);
+  // 弹幕 is live server data only: without the service the token's view is the connection state, never a list that may be stale.
+  const offline = Boolean(key) && Boolean(pageIssue(c, 'service'));
+  if (c.screen !== 'room') return null;
+  return <div className={d.view} onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); c.go('chat'); } }}>
+    {!offline && <RoomToolbar c={c} roomKey={key} room={room} />}
+    {key && !offline && <RoomPayments c={c} roomKey={key} />}
+    <SwitchRow c={c} shown={key} />
+    {!offline && opening?.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => openRoom(c, opening.key, opening.profile) }}>{t('common.error')}</InlineFeedback>}
+    {!key ? <Skeleton /> : offline ? <ConnectionState c={c} /> : room ? <RoomList key={room.key} c={c} room={room} /> : opening?.status !== 'error' ? <div className={d.empty}><p>{t('extension.copy.loading')}</p></div> : null}
+    {room && !offline ? <RoomBar key={`bar-${room.key}`} c={c} room={room} drafts={drafts} /> : <IdleBar />}
+    <AnimatePresence initial={false}>{!key && <Frost key="frost" c={c} reason={gate ? 'gate' : unusable ? 'unusable' : 'idle'} />}</AnimatePresence>
   </div>;
 }
 
-function RoomHead({ c, roomKey, room, onBack }: { c: PalsideController; roomKey: string; room?: RoomView; onBack: () => void }) {
+/** One row under the header: 看法, then 去网站 when the tab is not already on this token's page. 热门 lives in the header. */
+function RoomToolbar({ c, roomKey, room }: { c: PalsideController; roomKey?: string; room?: RoomView }) {
   const t = useTranslations();
-  const view = roomView(c, roomKey, room?.profile);
-  const unread = c.teams.some(team => team.joined && !team.muted && (team.unread > 0 || (team.mentions ?? 0) > 0));
-  const backLabel = c.team.joined ? t('extension.room.back', { name: c.team.name }) : t('common.back');
-  const count = room?.count ?? 0;
-  return <header className={d.head}>
-    <VisuallyHidden asChild><h1>{view.name}</h1></VisuallyHidden>
-    <Tooltip content={backLabel}><button type="button" className={d.back} aria-label={backLabel} onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />{c.team.joined && <TeamAvatar team={c.team} size="xs" />}{unread && <span className={d.backDot} />}</button></Tooltip>
-    <Tooltip content={t('extension.current.detail', { name: view.name })}><button type="button" className={d.title} aria-label={t('extension.current.detail', { name: view.name })} onClick={() => c.selectAsset(view.id, view)}>
-      <Token view={view} size="sm" /><span><strong>{view.name}</strong><small>{view.chain}</small></span>
-    </button></Tooltip>
-    <Tooltip content={t('extension.room.watching', { count })}><button type="button" className={d.watch} aria-label={t('extension.room.watching', { count })} onClick={() => { setSocialUi({ people: undefined }); c.go('room-people'); }}><Faces c={c} people={room?.faces ?? []} count={count} /></button></Tooltip>
-    <Tooltip content={t('extension.hot.title')}><IconButton size="sm" variant="quiet" label={t('extension.hot.title')} onClick={() => c.go('hot')}><Flame size={18} /></IconButton></Tooltip>
-  </header>;
+  const view = roomKey ? roomView(c, roomKey) : undefined;
+  // On this token's own page the site button would only repeat where the browser already is.
+  const choice = view && tabRoomKey(c) !== roomKey ? tokenSiteChoice(c, view, room?.profile?.site) : undefined;
+  return <div className={d.toolbar}>
+    <StancePoll c={c} roomKey={room?.key} stance={room?.stance} />
+    {view && choice?.site && <TokenSites c={c} view={view} sites={choice.sites} site={choice.site} />}
+  </div>;
 }
 
-/** The tab moved to another token: offer it, and keep counting the pinned one until the user switches. */
-function SwitchRow({ c, pinned }: { c: PalsideController; pinned: string }) {
+type TokenSite = ReturnType<typeof tokenSiteChoice>['sites'][number];
+/** 去网站: one click opens the token on the default site; ⌄ lists every site that shows it, the default ticked. A choice opens there and becomes the default. */
+function TokenSites({ c, view, sites, site }: { c: PalsideController; view: Viewing; sites: TokenSite[]; site: TokenSite }) {
+  const t = useTranslations();
+  const label = t('extension.room.openOn', { name: site.name });
+  const menuLabel = t('extension.dynamic.openSource', { name: tokenLabel(view, t) });
+  return <span className={d.sites}>
+    <Tooltip content={label}><button type="button" className={d.siteOpen} aria-label={label} onClick={() => openTokenSite(c, site)}>
+      <SiteLogo site={site} size="xs" /><span className={d.siteArrow} aria-hidden="true"><ArrowUpRight /></span>
+    </button></Tooltip>
+    <Menu boundarySelector="[data-palside-app]" align="end">
+      <Tooltip content={t('extension.room.otherSite')}><MenuTrigger asChild><button type="button" className={d.siteMore} aria-label={t('extension.room.otherSite')}><ChevronDown size={14} aria-hidden="true" /></button></MenuTrigger></Tooltip>
+      <MenuContent aria-label={menuLabel} className={d.siteMenu}>
+        <div className={d.siteMenuHead}>{menuLabel}</div>
+        {[site, ...sites.filter(item => item.id !== site.id)].map(item => <MenuItem key={item.id} icon={<SiteLogo site={item} size="xs" />} aria-current={item.id === site.id || undefined} onClick={() => openTokenSite(c, item)}>
+          <span className={d.chainOption}>{item.name}{item.id === site.id && <Check size={14} aria-hidden="true" />}</span>
+        </MenuItem>)}
+      </MenuContent>
+    </Menu>
+  </span>;
+}
+
+/** Why 弹幕 cannot follow this tab's site: Chrome has not allowed it (or hides which it is), or 网页互动 or 弹幕 is off there. */
+function siteBlocked(c: PalsideController): 'chrome' | 'site' | undefined {
+  if (capability(c, 'pick').state === 'access') return 'chrome';
+  if (c.pageHost && !siteAllows(c.siteInteraction, c.pageHost, 'danmaku')) return 'site';
+}
+
+/** The box before there is a token to talk about: the same shape, nothing to type into. */
+function IdleBar() {
+  const t = useTranslations();
+  return <div className={d.bar} aria-disabled="true">
+    <IconButton size="sm" variant="quiet" label={t('extension.wallet.createPacket')} disabled><Gift size={16} /></IconButton>
+    <input className={d.input} aria-label={t('extension.room.placeholder')} placeholder={t('extension.room.placeholder')} disabled />
+    <IconButton size="sm" variant="surface" className={d.send} label={t('extension.copy.sendMessage')} disabled><ArrowUp size={16} /></IconButton>
+  </div>;
+}
+
+/**
+ * The row under the toolbar. The tab moved to another token: offer it, and 切换 lets the 弹幕 follow the tab again. On this token's own
+ * page, when 弹幕 cannot show there: say the page shows none of it, and 授权 / 开启 opens the site's sheet.
+ */
+function SwitchRow({ c, shown }: { c: PalsideController; shown?: string }) {
   const t = useTranslations();
   const key = tabRoomKey(c);
-  const page = c.live?.page;
-  const view = key && key !== pinned ? tabView(page, page?.asset) : undefined;
-  if (!key || !view) return null;
+  if (!key || !shown) return null;
+  if (key === shown) {
+    const blocked = siteBlocked(c);
+    if (!c.pageHost || !blocked) return null;
+    return <div className={d.switchRow} data-notice="">
+      <SiteFace site={pageSite(c)} off className={d.noticeLogo} /><strong>{t('extension.room.notOnPage')}</strong>
+      <Button size="sm" variant="surface" className={d.switchButton} aria-haspopup="dialog" onClick={() => openSiteSheet(c, false)}>{t(blocked === 'chrome' ? 'extension.grant.allow' : 'extension.grant.turnOn')}</Button>
+    </div>;
+  }
+  // 切换 follows the tab, which 弹幕 can do only where Chrome allows the site.
+  if (!c.live?.page?.access.site) return null;
+  const view = roomView(c, key);
   return <div className={d.switchRow}>
-    <Token view={view} size="sm" /><strong>{view.name}</strong>
-    <Button size="sm" variant="surface" className={d.switchButton} onClick={() => openRoom(c, key)}>{t('extension.room.switch')}</Button>
+    <Token view={view} size="sm" /><strong><TokenName c={c} view={view} /></strong>
+    <Button size="sm" variant="surface" className={d.switchButton} onClick={() => { void c.run('room-close'); }}>{t('extension.room.switch')}</Button>
   </div>;
+}
+
+/** The shape of a room under the frost: grey avatars and lines only, so nothing unproven shows through. */
+function Skeleton() {
+  return <div className={d.skeleton} aria-hidden="true">
+    {[[34, 72], [48, 46], [40, 84], [56, 58], [44, 38]].map(([name, line], index) => <div key={index}><i /><span><b style={{ width: name }} /><b style={{ width: `${line}%` }} /></span></div>)}
+  </div>;
+}
+
+/**
+ * No token to show: the room frosts over and says why, with the way on. 热门 opens any token's room from anywhere; where Chrome has not
+ * allowed the site (or hides which it is) the page may be a token's, so 授权 comes first. It thaws as soon as a token arrives.
+ */
+function Frost({ c, reason }: { c: PalsideController; reason: 'idle' | 'unusable' | 'gate' }) {
+  const t = useTranslations();
+  const reduced = useReducedMotion();
+  const hot = () => c.go('hot');
+  return <motion.div className={d.frost} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback}>
+    <motion.div key={reason} className={d.frostBody} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback}>
+      {reason === 'gate' ? <SiteFace site={pageSite(c)} off className={d.gateLogo} /> : <span className={d.frostGlyph}>{reason === 'unusable' ? <Ban /> : <DanmakuIcon size={22} />}</span>}
+      <strong>{t(reason === 'gate' ? 'extension.room.gateTitle' : reason === 'unusable' ? 'extension.room.pageUnusable' : 'extension.room.noToken')}</strong>
+      {reason === 'gate'
+        ? <><Button variant="primary" className={d.frostAction} aria-haspopup="dialog" onClick={() => openSiteSheet(c, false)}>{t(siteBlocked(c) === 'site' ? 'extension.grant.turnOn' : 'extension.grant.allow')}</Button>
+          <button type="button" className={d.frostLink} onClick={hot}><HotIcon size={14} />{t('extension.hot.tokens')}</button></>
+        : <Button variant={reason === 'unusable' ? 'surface' : 'primary'} className={d.frostAction} leadingIcon={<HotIcon size={16} />} onClick={hot}>{t('extension.hot.tokens')}</Button>}
+    </motion.div>
+  </motion.div>;
 }
 
 function RoomList({ c, room }: { c: PalsideController; room: RoomView }) {
@@ -215,7 +305,7 @@ function LineMenu({ c, message, name, self }: { c: PalsideController; message: R
   const token = c.live?.state.rooms.current?.profile?.name ?? '';
   function quote() {
     const room = c.live?.state.rooms.current;
-    const view = room && roomView(c, room.key, room.profile);
+    const view = room && roomView(c, room.key);
     if (!room) return;
     const { owns, back } = roomQuoteReturn(c, room.key);
     // A token known only by its room key has no page to point at: the line goes in as text.
@@ -247,31 +337,6 @@ function LineMenu({ c, message, name, self }: { c: PalsideController; message: R
   </Menu>{tipping && <TipPayment c={c} messageId={message.id} onClose={() => setTipping(false)} />}</>;
 }
 
-/**
- * 在网页上显示 on this tab: `off`, `on`, `need` (on, but Chrome has not allowed the site the tab shows) or `paused` (网页互动 is off, so
- * nothing is drawn on any page whatever this says).
- */
-function danmakuState(c: PalsideController): 'on' | 'off' | 'need' | 'paused' {
-  if (!c.web.interact) return 'paused';
-  if (!c.live?.danmaku?.enabled) return 'off';
-  return capability(c, 'danmaku').state === 'access' ? 'need' : 'on';
-}
-
-/**
- * One press of 在网页上显示: on → off; off → on, asking Chrome for this site in the same click; unauthorised opens the grant sheet.
- * While 网页互动 is off it turns nothing on behind the user's back: it opens 设置, where 网页互动 is.
- */
-function pressDanmaku(c: PalsideController) {
-  const state = danmakuState(c), live = c.live;
-  if (!live) return;
-  if (state === 'paused') { c.go('settings'); return; }
-  if (state === 'need') { setSocialUi({ grant: 'danmaku' }); return; }
-  const save = (enabled: boolean) => live.command('danmaku-settings', { settings: { enabled } }).catch(error => c.setNotice(errorMessage(error)));
-  if (state === 'on') { void save(false); return; }
-  if (capability(c, 'danmaku').state === 'access' && c.pageHost) void requestSitesAccess([c.pageHost]).catch(() => false);
-  void save(true);
-}
-
 function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; drafts: ReturnType<typeof useRoomDrafts> }) {
   const t = useTranslations();
   const text = useSyncExternalStore(listener => { drafts.listeners.add(listener); return () => { drafts.listeners.delete(listener); }; }, () => drafts.values.get(room.key) ?? '', () => '');
@@ -289,10 +354,8 @@ function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; dr
   const waiting = room.slowUntil > now;
   useEffect(() => { if (!waiting) return; const timer = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(timer); }, [waiting]);
   const length = characterLength(text.trim());
-  const slow = Math.ceil((room.slowUntil - now) / 1000);
+  const slow = Math.ceil((room.slowUntil - now) / SECOND_MS);
   const ready = length > 0 && length <= ROOM_TEXT_MAX && !sending && slow <= 0 && !c.disconnected;
-  const state = danmakuState(c);
-  const switchLabel = state === 'need' ? (c.pageHost ? t('extension.toggle.interactNeed', { host: c.pageHost }) : t('extension.toggle.interactNeedHere')) : t(state === 'on' ? 'extension.room.pageOn' : state === 'paused' ? 'extension.room.pagePaused' : 'extension.room.pageOff');
   async function send() {
     if (!ready || drafts.sending.has(room.key)) return;
     setSending(true);
@@ -306,10 +369,6 @@ function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; dr
   }
   const sendLabel = slow > 0 ? t('extension.room.slow', { seconds: slow }) : c.disconnected ? t('extension.copy.sendWhenConnected') : t('extension.copy.sendMessage');
   return <div className={d.bar}>
-    <Tooltip content={switchLabel}>{state === 'need'
-      ? <button type="button" className={d.grant} aria-label={switchLabel} aria-haspopup="dialog" onClick={() => pressDanmaku(c)}><Lock aria-hidden="true" />{t('extension.grant.allow')}</button>
-      : <button type="button" className={d.toggle} data-state={state} aria-label={switchLabel} aria-pressed={state === 'on'} onClick={() => pressDanmaku(c)}><MonitorPlay size={17} /></button>}
-    </Tooltip>
     <Tooltip content={t('extension.wallet.createPacket')}><IconButton size="sm" variant="quiet" label={t('extension.wallet.createPacket')} onClick={() => whenWalletOpen(c, () => c.go('wallet-packet'))}><Gift size={16} /></IconButton></Tooltip>
     <input ref={input} className={d.input} value={text} aria-label={t('extension.room.placeholder')} placeholder={t('extension.room.placeholder')} onChange={event => setText(event.target.value)} onKeyDown={key} />
     {length > ROOM_TEXT_MAX - 10 && <small className={d.counter} data-over={length > ROOM_TEXT_MAX || undefined}><Count value={length} />/{ROOM_TEXT_MAX}</small>}
@@ -443,10 +502,10 @@ export function RoomPeople({ c }: { c: PalsideController }) {
   if (!key) return <EmptyState title={t('extension.room.noSpeakers')} />;
   const people = rooms?.people?.key === key ? rooms.people : undefined;
   const mates = teammateIds(c);
-  const view = roomView(c, key, rooms?.current?.key === key ? rooms.current.profile : rooms?.summaries[key]?.profile);
+  const view = roomView(c, key);
   const drawn = (people?.people ?? []).map(person => roomPerson(c, person, t('common.member'), mates)).sort((a, b) => Number(b.mate) - Number(a.mate));
   return <>
-    <div className={d.peopleHead}><Token view={view} size="sm" /><span className={d.peopleText}><strong>{view.name}</strong><small>{(count => <CountText text={t('extension.room.watching', { count })} value={count} />)(rooms?.current?.key === key ? rooms.current.count : rooms?.summaries[key]?.count ?? people?.count ?? 0)}</small></span><Faces c={c} people={rooms?.current?.key === key ? rooms.current.faces : rooms?.summaries[key]?.faces ?? []} /></div>
+    <div className={d.peopleHead}><Token view={view} size="sm" /><span className={d.peopleText}><strong><TokenName c={c} view={view} /></strong><small>{(count => <CountText text={t('extension.room.watching', { count })} value={count} />)(tokenStats(c, key)?.count ?? people?.count ?? 0)}</small></span><Faces c={c} people={tokenStats(c, key)?.faces ?? []} /></div>
     {read.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback>}
     {drawn.length ? <SettingGroup title={t('extension.room.speakers')}>{drawn.map(person => <button key={person.id} type="button" className={d.personRow} onClick={() => showPerson(c, person)}>
       <PersonAvatar person={person} size="sm" />

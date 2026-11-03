@@ -1,4 +1,4 @@
-import { ROOM_LOGO_URL_LENGTH } from '@palside/shared/contracts/limits';
+import { ROOM_LOGO_URL_LENGTH } from '@palside/shared/rules/rooms';
 import { siteImages } from '@palside/shared/sites';
 
 const prefix = 'data:image/png;base64,';

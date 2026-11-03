@@ -13,7 +13,6 @@ contract PalsideRedPacket is EIP712, ReentrancyGuard {
 
     enum Kind {
         Team,
-        Invitation,
         Room
     }
 
@@ -105,10 +104,10 @@ contract PalsideRedPacket is EIP712, ReentrancyGuard {
                 kind == Kind.Room || equalAmount < MIN_SHARE || equalAmount > total / count
                     || equalAmount * count != total || allocationHash != bytes32(0)
             ) revert InvalidPacket();
-        } else if (kind == Kind.Invitation || allocationHash == bytes32(0)) {
+        } else if (allocationHash == bytes32(0)) {
             revert InvalidPacket();
         }
-        uint256 duration = kind == Kind.Team ? 1 days : kind == Kind.Invitation ? 7 days : 1 hours;
+        uint256 duration = kind == Kind.Team ? 1 days : 1 hours;
         uint256 expiresAt = block.timestamp + duration + SETTLEMENT_WINDOW;
         packets[packetId] =
             Packet(msg.sender, token, kind, count, 0, total, total, equalAmount, expiresAt, allocationHash, false);

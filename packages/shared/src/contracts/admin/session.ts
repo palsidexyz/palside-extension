@@ -2,8 +2,6 @@ import Type from 'typebox';
 import { strictObject, type Infer } from '../validation.ts';
 import { nullable } from './common.ts';
 
-export const ADMIN_LOCK_MS = 15 * 60 * 1000;
-export const ADMIN_MAX_FAILURES = 5;
 const password = Type.String({ minLength: 1, maxLength: 1024 });
 const newPassword = Type.String({ minLength: 12, maxLength: 1024 });
 const totp = Type.String({ pattern: '^[0-9]{6}$' });

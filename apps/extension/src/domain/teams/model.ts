@@ -1,4 +1,5 @@
 import type { Team as TeamProfile,Request as TeamRequest } from '@palside/shared/models/teams';
+import type { TeamRetentionDays, TeamSnapshot } from '@palside/shared/contracts/team-model';
 import type { TeamActivityBadge, TeamActivitySummary } from '@palside/shared/team-activity';
 
 export type Team = TeamProfile & {
@@ -11,9 +12,19 @@ export type Team = TeamProfile & {
   applicationExpiresAt?: number;
   publishedAt?: number;
   recruitmentExpiresAt?: number;
-  retentionDays?: number;
+  /** Squad message period in days; `null` keeps messages permanently. */
+  retentionDays?: TeamRetentionDays;
   readonly?: boolean;
   readonlyReason?: string;
   requested?: boolean;
+  /** Live lobby only: in the recruiting pages, and the position in this account's application pages; each list keeps the server's order. */
+  listed?: boolean;
+  appliedOrder?: number;
 };
 export type Request = TeamRequest & { createdAt?: number; expiresAt?: number };
+
+type TeamMember = TeamSnapshot['people'][number];
+/** Current members that can still receive encrypted events; a purged account has no Matrix identity left. */
+export function liveMembers(team: Pick<TeamSnapshot, 'people' | 'memberIds'>) {
+  return team.people.filter((person): person is TeamMember & { matrixId: string } => !person.deleted && person.matrixId !== null && team.memberIds.includes(person.id));
+}

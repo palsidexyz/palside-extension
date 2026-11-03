@@ -1,3 +1,4 @@
+import { MINUTE_MS, HOUR_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -13,7 +14,7 @@ test('the local pacer mirrors the service: ten at once, then one per second, per
   for (let i = 0; i < 10; i++) assert.equal(pacer.reserve('team'), 1000);
   assert.equal(pacer.reserve('team'), 2000); assert.equal(pacer.reserve('team'), 3000);
   assert.equal(pacer.reserve('other'), 1000, 'teams pace independently');
-  clock = 60_000; assert.equal(pacer.reserve('team'), 60_000, 'an idle team refills its burst');
+  clock = MINUTE_MS; assert.equal(pacer.reserve('team'), MINUTE_MS, 'an idle team refills its burst');
 });
 
 test('a wait the service asked for moves the next slot exactly there', () => {
@@ -26,14 +27,14 @@ test('only short throttling is absorbed by queueing; quotas and other errors sur
   assert.equal(throttleWait({ httpStatus: 429, data: { retry_after_ms: 1200 } }), 1200);
   assert.equal(throttleWait(new ApiError(429, { error: 'RATE_LIMITED', retryAfterMs: 50 })), 250);
   assert.equal(throttleWait({ httpStatus: 429, data: { retry_after_ms: THROTTLE_MAX_WAIT + 1 } }), undefined);
-  assert.equal(throttleWait(new ApiError(429, { error: 'UPLOAD_QUOTA', retryAfterMs: 3600000 })), undefined);
+  assert.equal(throttleWait(new ApiError(429, { error: 'UPLOAD_QUOTA', retryAfterMs: HOUR_MS })), undefined);
   assert.equal(throttleWait({ httpStatus: 403 }), undefined);
 });
 
 test('throttled errors say how long to wait in a natural unit', () => {
   assert.equal(renderMessage('zh-CN', errorMessage(new ApiError(429, { error: 'RATE_LIMITED', retryAfterMs: 9000 }))), '操作过于频繁，请 9 秒后重试。');
   assert.equal(renderMessage('en', errorMessage(new ApiError(429, { error: 'RATE_LIMITED', retryAfterMs: 61000 }))), 'Too many attempts. Try again in 2 minutes.');
-  assert.equal(renderMessage('en', errorMessage(new ApiError(429, { error: 'RATE_LIMITED', retryAfterMs: 3600000 }))), 'Too many attempts. Try again in 1 hour.');
+  assert.equal(renderMessage('en', errorMessage(new ApiError(429, { error: 'RATE_LIMITED', retryAfterMs: HOUR_MS }))), 'Too many attempts. Try again in 1 hour.');
   assert.equal(renderMessage('zh-CN', errorMessage(new ApiError(429, { error: 'RATE_LIMITED' }))), '请求过于频繁，请稍后重试。');
   assert.match(renderMessage('zh-CN', sendFailure(new ApiError(429, { error: 'UPLOAD_QUOTA', retryAfterMs: 7200000 }), false, false).detail), /今日图片额度已用完，约 2 小时后恢复/);
 });

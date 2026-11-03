@@ -1,4 +1,4 @@
-import { TEAM_MEMBER_LIMIT,TEAM_JOINED_LIMIT } from '@palside/shared/contracts/limits';
+import { TEAM_MEMBER_LIMIT, TEAM_JOINED_LIMIT } from '@palside/shared/rules/teams';
 import { message as uiMessage, type TextMessage } from '@palside/i18n';
 import { useEffect, useRef } from 'react';
 import type { PanelState } from '../app/use-panel-state';

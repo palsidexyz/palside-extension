@@ -1,5 +1,5 @@
 import { getAddress, isAddress, zeroAddress } from 'viem';
-import { chainAmount } from '@palside/shared/chain/rules';
+import { chainAmount } from '@palside/shared/chain/amount';
 import type { ChainDeployment } from '@palside/shared/contracts/chain';
 
 export function walletAddress(value: string): `0x${string}` {

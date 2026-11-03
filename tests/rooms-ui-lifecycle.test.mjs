@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as units from '../packages/shared/src/units.ts';
+import { tokenNamed, withProfile } from '../apps/extension/src/runtime/viewing/token-profiles.ts';
+import { shortAddress, tokenPageUrl } from '../packages/shared/src/navigation.ts';
+import { siteById } from '../packages/shared/src/sites/index.ts';
 
 const root = 'apps/extension/src/features/palside/';
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -33,6 +37,11 @@ function fixture() {
       react.useEffect(() => subscribe(() => { host.dirty = true; }), [subscribe]);
       return snapshot();
     },
+    useMemo(factory, deps) {
+      const host = running, index = host.index++, previous = host.slots[index];
+      if (!previous || deps.some((value, i) => !Object.is(value, previous.deps[i]))) host.slots[index] = { deps, value: factory() };
+      return host.slots[index].value;
+    },
     useId: () => 'id',
   };
   react.useLayoutEffect = react.useEffect;
@@ -42,8 +51,9 @@ function fixture() {
     useTranslations: () => key => key, useLocale: () => 'en', useReducedMotion: () => true,
     motion: { span: 'motion.span' }, useSocialUi: () => social, setSocialUi: patch => Object.assign(social, patch),
     message: key => key, errorMessage: error => error.message, characterLength: text => [...text].length,
-    ROOM_TEXT_MAX: 200, TEAM_MEMBER_LIMIT: 30, viewAsset: view => view?.id,
-    capability: () => ({ state: 'on' }), accountLabel: id => id,
+    HOT_CHAIN_ORDER: [null, 'Robinhood', 'Solana', 'BNB Chain', 'Base', 'Ethereum'], ...units, ROOM_TEXT_MAX: 200, TEAM_MEMBER_LIMIT: 30, viewAsset: view => view?.id,
+    tokenNamed, withProfile, shortAddress, tokenPageUrl, siteById, tokenLabel: view => view.name, TokenName: 'TokenName',
+    capability: () => ({ state: 'on' }), accountLabel: id => id, pageUnusable: () => false, pageIssue: () => undefined, ConnectionState: 'ConnectionState',
   };
   function load(file) {
     if (modules.has(file)) return modules.get(file);
@@ -55,6 +65,7 @@ function fixture() {
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'Fragment' };
       if (name === './rooms' || name === '../rooms/rooms') return load('rooms/rooms.ts');
+      if (name === '../assets/token-data' || name === './token-data') return load('assets/token-data.ts');
       return new Proxy({ __esModule: true, default: new Proxy({}, { get: (_, key) => key }) }, { get: (target, key) => key in target ? target[key] : stubs[key] ?? key });
     };
     vm.runInNewContext(`(function(require, exports) { ${source}\n})`, { console, Map, Set, WeakMap, Date, JSON, setInterval, clearInterval, requestAnimationFrame: callback => frames.push(callback), document: { querySelector: () => ({ focus() {} }) } })(require, exports);
@@ -98,16 +109,16 @@ test('opening waits for the requested pinned snapshot; departure and replacement
   api.openRoom(c, 'token:Ethereum:a');
   let tree = view.render({ c });
   assert.equal(c.screen, 'room');
-  assert.equal(find(tree, 'RoomHead').props.roomKey, 'token:Ethereum:a');
+  assert.equal(find(tree, 'RoomToolbar').props.roomKey, 'token:Ethereum:a');
   take('room-open').resolve(); await drain(); view.render({ c });
   assert.equal(c.screen, 'room', 'command completion alone is not a snapshot');
   rooms.pinned = 'token:Ethereum:old'; view.render({ c });
-  assert.equal(find(view.render({ c }), 'RoomHead').props.roomKey, 'token:Ethereum:a');
+  assert.equal(find(view.render({ c }), 'RoomToolbar').props.roomKey, 'token:Ethereum:a');
   rooms.pinned = 'token:Ethereum:a'; view.render({ c });
   api.openRoom(c, 'token:Ethereum:b'); const b = take('room-open');
   api.openRoom(c, 'token:Ethereum:c'); b.reject(new Error('late')); await drain();
   tree = view.render({ c }); assert.equal(find(tree, 'InlineFeedback'), undefined);
-  assert.equal(find(tree, 'RoomHead').props.roomKey, 'token:Ethereum:c');
+  assert.equal(find(tree, 'RoomToolbar').props.roomKey, 'token:Ethereum:c');
   c.go('hot'); view.render({ c }); take('room-open').reject(new Error('late')); await drain();
   rooms.pinned = 'token:Ethereum:c'; assert.equal(view.render({ c }), null); assert.equal(c.screen, 'hot');
   assert.equal(calls.some(call => call[0] === 'go' && call[1] === 'chat'), false);
@@ -136,7 +147,7 @@ for (const kind of ['people', 'summary', 'blocks', 'invites', 'hot']) test(`${ki
   let read = hook.render({ key: 'a' }); assert.equal(read.status, 'error'); assert.equal(rooms.people, verified);
   read.retry(); assert.equal(hook.render({ key: 'a' }).status, 'loading');
   if (take('room-watch')) { take('room-watch').resolve(); await drain(); }
-  take(name).resolve({}); if (kind === 'hot') rooms.hot = { a: { top: [], rising: [] } }; await drain();
+  take(name).resolve({}); if (kind === 'hot') rooms.hot = { rows: [], loaded: true }; await drain();
   assert.equal(hook.render({ key: 'a' }).status, 'success');
   const before = calls.length; hook.render({ key: 'a' }); assert.equal(calls.length, before, 'unrelated render does not resubscribe');
   hook.render({ key: 'b' }); const old = take(name);
@@ -152,7 +163,7 @@ test('people, blocks, invites and Hot show retry without replacing verified rows
   rooms.people = { key: rooms.pinned, people: [{ id: 'friend', nickname: 'Friend' }], count: 1 };
   rooms.blocked = rooms.people.people;
   rooms.invites = [{ id: 'invite' }];
-  rooms.hot = { '': { rising: [{ key: 'room' }], top: [] } };
+  rooms.hot = { rows: [{ key: 'room', count: 3, stance: { bull: 0, hold: 0, bear: 0 }, faces: [] }], loaded: true };
   for (const [file, name] of [['rooms/danmaku-view.tsx', 'RoomPeople'], ['rooms/danmaku-view.tsx', 'BlockedPeople'], ['teams/invites.tsx', 'ReceivedInvites'], ['rooms/hot.tsx', 'Hot']]) {
     const tree = f.mount(f.load(file)[name]).render({ c });
     const feedback = find(tree, 'InlineFeedback'); assert.ok(feedback, name); feedback.props.action.onClick();
@@ -161,7 +172,7 @@ test('people, blocks, invites and Hot show retry without replacing verified rows
   assert.equal(retries, 4);
 });
 
-test('room quote completion closes only its originating navigation and keeps the original reference payload', async () => {
+test('room quote completion returns only its originating navigation to the chat and keeps the original reference payload', async () => {
   for (const leave of ['none', 'new-room', 'same-room-reopened', 'hot', 'unmount']) {
     const f = fixture(), { c, rooms, calls, take } = controller(), api = f.load('rooms/rooms.ts');
     c.screen = 'room'; rooms.pinned = 'token:Ethereum:token'; rooms.current = { key: rooms.pinned, profile: null };
@@ -175,7 +186,8 @@ test('room quote completion closes only its originating navigation and keeps the
     if (leave === 'hot') { c.go('hot'); owner.render(c); }
     if (leave === 'unmount') owner.unmount();
     take('attach-ref').resolve({}); await drain();
-    assert.equal(calls.some(call => call[0] === 'room-close'), leave === 'none', leave);
+    assert.equal(calls.some(call => call[0] === 'go' && call[1] === 'chat'), leave === 'none', leave);
+    assert.equal(calls.some(call => call[0] === 'room-close'), false, 'the 弹幕 tab keeps its token');
     menu.unmount(); if (leave !== 'unmount') owner.unmount();
   }
 });
@@ -239,4 +251,15 @@ test('closed invitation sheets and invitation inboxes remain empty without a liv
   assert.equal(sheet.render({ c }).props.open, false); sheet.unmount();
   const inbox = f.mount(f.load('teams/invites.tsx').ReceivedInvites);
   assert.equal(inbox.render({ c }), null); inbox.unmount();
+});
+
+test('unknown viewer counts stay absent until a verified room, summary or hot row exists', () => {
+  const f = fixture(), { c, rooms } = controller(), { roomCount } = f.load('rooms/rooms.ts');
+  assert.equal(roomCount(c, 'room'), undefined);
+  rooms.current = { key: 'room', count: 0, loading: true };
+  assert.equal(roomCount(c, 'room'), undefined);
+  rooms.hot = { rows: [{ key: 'room', count: 7, stance: { bull: 0, hold: 0, bear: 0 }, faces: [] }], loaded: true };
+  assert.equal(roomCount(c, 'room'), 7);
+  rooms.summaries.room = { count: 4 }; assert.equal(roomCount(c, 'room'), 4);
+  rooms.current.loading = false; assert.equal(roomCount(c, 'room'), 0);
 });

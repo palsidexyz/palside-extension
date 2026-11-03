@@ -6,29 +6,28 @@ import { useText } from '../ui/text';
 import { useTranslations } from 'use-intl';
 import { useAppearance } from '../settings/appearance';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { motionPresets } from '@palside/design/motion';
-import { X } from 'lucide-react';
 import { AlertDialog } from '@palside/ui/dialog';
-import { Button } from '@palside/ui/button';
+import { Toaster, toast } from '@palside/ui/toast';
 import { ImageEditor } from '../media/image-editor';
 import { usePalside, type PalsideProps } from './use-palside';
 import { PersonCard } from '../account/person-card';
 import { PaymentSheet, usePaymentSession } from '../wallet/payment-sheet';
 import { teamDefaultAvatars, TeamPortraits } from '../account/default-avatar';
-import { SocialSession, captureSocialUi, observeSocialPage, openWithReturn, useSocialUi } from '../annotations/social-state';
+import { SocialSession, captureSocialUi } from '../annotations/social-state';
 import { NoteSheet } from '../annotations/sticky-list';
 import { AllSitesSheet, GrantSheet, SitePicker } from '../settings/access-sheet';
 import { ReadSheet } from '../settings/privacy';
 import { Chat } from '../chat/chat';
 import { DanmakuView, InviteSheet, RoomPersonSheet } from '../rooms/danmaku-view';
+import { panelTabsShown } from './panel-tabs';
+import { ChatHeader } from '../chat/chat-header';
 import { openRoom } from '../rooms/rooms';
 import { Onboarding, onboardingScreens } from '../account/onboarding';
 const Panels = lazy(() => import('./panels').then(module => ({ default: module.Panels })));
 import { JoinSheet, TeamStart } from '../teams/team-start';
 import { ConnectionEmpty } from '../feedback/connection-empty';
-import { Action } from '../ui/primitives';
 import { siteForUrl } from '../settings/site-catalog';
+import { FirstRunTour } from './first-run-tour';
 import s from './palside.module.css';
 
 export function PalsideApp(props: PalsideProps) {
@@ -42,13 +41,9 @@ function PalsideSession(props: PalsideProps) {
   const t = useTranslations();
   const text = useText();
   const root = useRef<HTMLElement>(null);
-  const [jumpOrigin, setJumpOrigin] = useState<{ screen: 'shared' | 'search'; scrollTop: number; teamId: string }>();
-  const reduced = useReducedMotion();
+  const [jumpOrigin, setJumpOrigin] = useState<{ screen: 'search'; scrollTop: number; teamId: string }>();
   const c = usePalside(props);
   usePaymentSession(c.live?.state.authenticated ? c.live.state.account?.id : undefined);
-  const { returnTo } = useSocialUi();
-  const pageUrl = c.live?.page?.url;
-  useEffect(() => { observeSocialPage(pageUrl); }, [pageUrl, returnTo]);
   const appearance = useAppearance();
   const incomingInvite = c.data.pendingInvite;
   const [observedInvite, setObservedInvite] = useState(incomingInvite);
@@ -64,8 +59,27 @@ function PalsideSession(props: PalsideProps) {
   useEffect(() => { latest.current = c; });
   // A danmaku clicked on the page opens its 弹幕 view here.
   useEffect(() => onOpenRoom?.(key => openRoom(latest.current, key)), [onOpenRoom]);
-  useEffect(() => { if (!liveNoticeIdentity || !liveCommand) return; const timer = setTimeout(() => { void liveCommand('dismiss-notice').catch(() => {}); }, 6000); return () => clearTimeout(timer); }, [liveNoticeIdentity, liveCommand]);
-  const notice = c.notice || text(liveNotice);
+  // 弹幕 is on by default: the first time this account joins a token's 弹幕, say once that the service sees which token it is.
+  const leasedRoom = c.live?.state.rooms?.leased;
+  const roomPreferences = c.live?.state.preferences.rooms;
+  const roomNoticeSent = useRef(false);
+  useEffect(() => {
+    if (!leasedRoom || roomPreferences?.off || roomPreferences?.noticed || roomNoticeSent.current || !liveCommand) return;
+    roomNoticeSent.current = true;
+    latest.current.setNotice(uiMessage('extension.room.joinedNotice'));
+    void liveCommand('preferences', { accountId: latest.current.data.self, rooms: { noticed: true } }).catch(() => { roomNoticeSent.current = false; });
+  }, [leasedRoom, roomPreferences?.off, roomPreferences?.noticed, liveCommand]);
+  const liveNoticeText = text(liveNotice);
+  const shownLiveNotice = useRef('');
+  // The runtime's notice survives panel reconnects; closing or timing out its toast clears that same notice only.
+  useEffect(() => {
+    const id = liveNoticeText ? `runtime:${liveNoticeIdentity}` : '';
+    if (shownLiveNotice.current && shownLiveNotice.current !== id) toast.dismiss(shownLiveNotice.current);
+    shownLiveNotice.current = id;
+    if (!id) return;
+    const dismiss = () => { if (shownLiveNotice.current !== id) return; shownLiveNotice.current = ''; void liveCommand?.('dismiss-notice').catch(() => {}); };
+    toast(liveNoticeText, { id, duration: 6000, onDismiss: dismiss, onAutoClose: dismiss });
+  }, [liveNoticeText, liveNoticeIdentity, liveCommand]);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmFailure, setConfirmFailure] = useState<{ target: typeof c.confirmation; message: TextValue }>();
   const [jumpTarget, setJumpTarget] = useState<{ id: string; teamId: string }>();
@@ -78,6 +92,13 @@ function PalsideSession(props: PalsideProps) {
   const origin = jumpOrigin?.teamId === c.current ? jumpOrigin : undefined;
   // Account setup owns the whole panel, including the moment a restored account becomes signed in.
   const onboarding = c.working || onboardingScreens.includes(c.screen);
+  // 聊天 ⇄ 弹幕 slide toward the side their tab is on; the screen left behind decides the direction.
+  const [shownScreen, setShownScreen] = useState(c.screen);
+  const [leftScreen, setLeftScreen] = useState<typeof c.screen>();
+  if (shownScreen !== c.screen) { setLeftScreen(shownScreen); setShownScreen(c.screen); }
+  const tabs = !onboarding && !noKnownTeam && (c.screen === 'chat' || c.screen === 'room') && panelTabsShown(c);
+  // The first-run tour waits for a squad chat with nothing else open on it, once per account on this device.
+  const touring = Boolean(c.live?.state.authenticated && !c.live.state.preferences.toured) && !onboarding && !noKnownTeam && c.screen === 'chat' && c.team.joined && !c.team.readonly && !c.personId && !c.confirmation && !c.image;
   useEffect(() => {
     if (incomingJump && incomingJump === observedJump && liveCommand) void liveCommand('dismiss-jump', { messageId: incomingJump, windowId: incomingWindow }).catch(() => {});
   }, [incomingJump, incomingWindow, observedJump, liveCommand]);
@@ -85,12 +106,14 @@ function PalsideSession(props: PalsideProps) {
     setObservedJump(incomingJump);
     if (incomingJump) { setJumpTarget({ id: incomingJump, teamId: c.current }); setJumpOrigin(undefined); c.openNotification(); }
   }
-  return <main ref={root} className={s.app} data-palside-app data-appearance={appearance} onClick={event => { const link = event.target instanceof Element ? event.target.closest('a') : null; if (!event.defaultPrevented && c.live && link?.href && /^https?:/.test(link.href)) { event.preventDefault(); const live = c.live; const href = link.href; const source = link.hasAttribute('data-palside-source'); const session = captureSocialUi(); const open = () => { if (!session.current()) return Promise.resolve(); return (source ? openWithReturn(live, href) : live.openPage(href, source)).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); }; if (siteForUrl(href)) void open(); else c.setConfirmation({ title: uiMessage('extension.copy.openLinkTitle'), description: uiMessage('extension.dynamic.openLinkDescription', { host: new URL(href).hostname }), confirm: async () => { await open(); } }); } }} onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented && c.screen !== 'chat' && !['welcome', 'password', 'nickname'].includes(c.screen)) { e.preventDefault(); c.go('chat'); } }}><TeamPortraits value={portraits}>
-    {onboarding || (c.live && !c.live.state.authenticated) ? null : noKnownTeam ? c.screen === 'chat' ? c.disconnected ? <ConnectionEmpty c={c} /> : <TeamStart c={c} /> : null : <Chat key={c.current} c={c} jumpId={jumpTarget?.teamId === c.current ? jumpTarget.id : undefined} clearJump={() => { setJumpTarget(undefined); setJumpOrigin(undefined); }} originLabel={origin ? t(origin.screen === 'shared' ? 'extension.copy.sharedItems' : 'extension.copy.searchMessages') : undefined} searchQuery={origin?.screen === 'search' ? c.query : undefined} onReturn={origin ? () => { c.go(origin.screen); requestAnimationFrame(() => { const element = root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]'); if (element) element.scrollTop = origin.scrollTop; }); } : undefined} />}
+  return <main ref={root} className={s.app} data-palside-app data-appearance={appearance} data-from={tabs ? leftScreen : undefined} onClick={event => { const link = event.target instanceof Element ? event.target.closest('a') : null; if (!event.defaultPrevented && c.live && link?.href && /^https?:/.test(link.href)) { event.preventDefault(); const live = c.live; const href = link.href; const session = captureSocialUi(); const open = () => { if (!session.current()) return Promise.resolve(); return live.openPage(href).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); }; if (siteForUrl(href)) void open(); else c.setConfirmation({ title: uiMessage('extension.copy.openLinkTitle'), description: uiMessage('extension.dynamic.openLinkDescription', { host: new URL(href).hostname }), confirm: async () => { await open(); } }); } }} onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented && c.screen !== 'chat' && !['welcome', 'password', 'nickname'].includes(c.screen)) { e.preventDefault(); c.go('chat'); } }}><TeamPortraits value={portraits}>
+    {tabs && <ChatHeader c={c} tabs onTeam={id => { c.chooseTeam(id); setJumpTarget(undefined); setJumpOrigin(undefined); }} />}
+    {onboarding || (c.live && !c.live.state.authenticated) ? null : noKnownTeam ? c.screen === 'chat' ? c.disconnected ? <ConnectionEmpty c={c} /> : <TeamStart c={c} /> : null : <Chat key={c.current} c={c} jumpId={jumpTarget?.teamId === c.current ? jumpTarget.id : undefined} clearJump={() => { setJumpTarget(undefined); setJumpOrigin(undefined); }} originLabel={origin ? t('extension.copy.searchMessages') : undefined} searchQuery={origin?.screen === 'search' ? c.query : undefined} onReturn={origin ? () => { c.go(origin.screen); requestAnimationFrame(() => { const element = root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]'); if (element) element.scrollTop = origin.scrollTop; }); } : undefined} />}
     {!onboarding && c.live && <DanmakuView c={c} />}
-    {onboarding ? <Onboarding c={c} /> : c.screen !== 'chat' && c.screen !== 'room' ? <Suspense fallback={<div className={s.empty} role="status">{t('extension.copy.loading')}</div>}><Panels key={c.screen} c={c} onJump={id => { if (c.screen === 'shared' || c.screen === 'search') setJumpOrigin({ screen: c.screen, scrollTop: root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]')?.scrollTop ?? 0, teamId: c.current }); setJumpTarget({ id, teamId: c.current }); c.go('chat'); }} /></Suspense> : null}
+    {onboarding ? <Onboarding c={c} /> : c.screen !== 'chat' && c.screen !== 'room' ? <Suspense fallback={<div className={s.empty} role="status">{t('extension.copy.loading')}</div>}><Panels key={c.screen} c={c} onJump={id => { if (c.screen === 'search') setJumpOrigin({ screen: c.screen, scrollTop: root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]')?.scrollTop ?? 0, teamId: c.current }); setJumpTarget({ id, teamId: c.current }); c.go('chat'); }} /></Suspense> : null}
     {!onboarding && <JoinSheet c={c} />}
-    <AnimatePresence initial={false}>{notice && <motion.div key="notice" initial={{ opacity: 0, y: reduced ? 0 : -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: reduced ? 0 : -4 }} transition={reduced ? motionPresets.reduced : motionPresets.expand} className={s.toast} role="status" aria-live="polite" aria-atomic="true"><span>{notice}</span>{c.notice && c.noticeUndo && <Button size="sm" variant="surface" className={s.toastAction} onClick={() => { const undo = c.noticeUndo; c.setNotice(''); undo?.(); }}>{t('extension.sites.undo')}</Button>}<Action className={s.toastClose} label={t('extension.copy.closeNotice')} onClick={() => { c.setNotice(''); if (liveCommand) void liveCommand('dismiss-notice'); }}><X size={14} /></Action></motion.div>}</AnimatePresence>
+    {touring && <FirstRunTour key={`tour:${c.current}`} c={c} />}
+    <Toaster label={t('extension.copy.notices')} closeLabel={t('extension.copy.closeNotice')} />
     <AlertDialog confirmLabel={text(c.confirmation?.action) || t('common.confirm')} tone={c.confirmation?.danger ? 'danger' : undefined} cancelLabel={t('common.cancel')} placement="bottom" boundarySelector="[data-palside-app]" open={Boolean(c.confirmation)} title={text(c.confirmation?.title)} description={text(c.confirmation?.description)} onOpenChange={open => { if (!open) c.setConfirmation(undefined); }} pending={confirmBusy} error={confirmFailure?.target === c.confirmation ? text(confirmFailure?.message) : undefined} onConfirm={async () => { if (confirmBusy || !c.confirmation) return; const target = c.confirmation; setConfirmBusy(true); setConfirmFailure(undefined); try { await target.confirm(); c.setConfirmation(undefined); } catch (error) { setConfirmFailure({ target, message: error instanceof Error ? errorMessage(error) : uiMessage('common.error') }); } finally { setConfirmBusy(false); } }} />
     {c.personId && <PersonCard key={c.personId} c={c} />}
     {c.live && <PaymentSheet c={c} />}
@@ -98,7 +121,7 @@ function PalsideSession(props: PalsideProps) {
     {c.live && <RoomPersonSheet c={c} />}
     {c.live && <InviteSheet c={c} />}
     <SitePicker c={c} />
-    {c.live && <GrantSheet c={c} />}
+    <GrantSheet c={c} />
     {c.live && <AllSitesSheet c={c} />}
     <ReadSheet c={c} />
     {c.image && (!c.live || c.messages.some(message => !message.recalled && message.attachment?.kind === 'image' && message.attachment.src === c.image?.src)) && <ImageEditor mode="view" src={c.image.src} name={c.image.name} teamId={c.current} command={c.live?.command} onClose={() => c.setImage(undefined)} />}

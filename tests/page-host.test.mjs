@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { addBackgroundHost, startWorker, stateSender } from './helpers/background-host.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +16,7 @@ function fixture({ site = true, origins, url = 'https://example.com/', saved = [
   let pagePort;
   let perform = async () => ({ ok: true });
   const operations = [], injections = [];
-  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', web: { share: true, interact: true }, notifications: 'off' }, toggles: { share: false, interact: auto }, remoteTeams: [{ id: 'one', joined: true }, { id: 'two', joined: true }], items: { danmaku: [], stickies: saved }, data: { views: [], messages: [], people: [] }, drafts: {} };
+  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { [new URL(url).hostname]: { on: auto, danmaku: true, signal: true, sticky: true } }, notifications: 'off', share: false }, remoteTeams: [{ id: 'one', joined: true }, { id: 'two', joined: true }], items: { danmaku: [], stickies: saved }, data: { views: [], messages: [], people: [] }, drafts: {} };
   const active = { id: 1, windowId: 10, url, active: true, status: 'complete', title: 'Example' };
   const browser = {
     runtime: { id: 'qa', getURL: value => `chrome-extension://qa${value}`, getContexts: async () => [{}], sendMessage: async ({ command }) => command.name === 'snapshot' ? { ok: true, value: state } : (operations.push(command), perform(command)), onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event() },
@@ -36,10 +37,10 @@ function fixture({ site = true, origins, url = 'https://example.com/', saved = [
   const sendState = stateSender(browser);
   const broadcast = () => sendState(state);
   broadcast();
-  const command = (name, payload = {}) => new Promise(resolve => browser.runtime.onMessage.emit({ type: 'palside/command', command: { name, payload: { ...(name === 'toggle' ? {} : name === 'quote-sticky' ? { teamId: 'one' } : { windowId: 10, teamId: 'one' }), ...payload } } }, port.sender, resolve));
+  const command = (name, payload = {}) => new Promise(resolve => browser.runtime.onMessage.emit({ type: 'palside/command', command: { name, payload: { ...(name === 'toggle' || name === 'preferences' ? {} : name === 'quote-sticky' ? { teamId: 'one' } : { windowId: 10, teamId: 'one' }), ...payload } } }, port.sender, resolve));
   const native = message => pagePort.onMessage.emit({ ...message, contextId: pageMessages.filter(value => value.type === 'pick' && value.on).at(-1)?.contextId });
-  // 网页互动 is one switch: saving it broadcasts state, and the background follows it for every granted site.
-  const interact = (on = true) => { state = { ...state, toggles: { ...state.toggles, interact: on } }; broadcast(); };
+  // A per-site 网页互动 change broadcasts state for the active host.
+  const interact = (on = true) => { const host = new URL(active.url).hostname; state = { ...state, preferences: { ...state.preferences, siteInteraction: { ...state.preferences.siteInteraction, [host]: { ...state.preferences.siteInteraction[host], on } } } }; broadcast(); };
   const status = () => messages.filter(message => message.type === 'page').at(-1)?.status;
   return { interact, status, perform: fn => { perform = fn; }, operations, injections, browser, port, pagePort, messages, pageMessages, active, command, host, timers, native, state: () => state, update: patch => { state = { ...state, ...patch }; broadcast(); }, expire: () => { for (const fn of [...timers.values()]) fn(); } };
 }
@@ -87,7 +88,7 @@ test('worker restart restores notes from 网页互动 for every page of a grante
   assert.ok(other.injections.length > 0);
   assert.equal(other.status().stickyEnabled, true);
   assert.equal(other.pageMessages.filter(message => message.type === 'stickies').at(-1).items.length, 0);
-  restored.update({ account: { id: 'bob' }, toggles: { share: false, interact: false } }); await flush(); await flush();
+  restored.update({ account: { id: 'bob' }, preferences: { ...restored.state().preferences, siteInteraction: { ...restored.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } }); await flush(); await flush();
   assert.equal(restored.pageMessages.at(-1).type, 'off');
   assert.equal(restored.status().stickyEnabled, false);
 });
@@ -208,7 +209,7 @@ test('revoking page access stops a one-off ordinary page', async () => {
 
 
 
-const savedMark = (patch = {}) => ({ id: '$saved', revision: '$saved', teamId: 'one', author: 'alice', text: '', target, caption: 'hello world', url: 'https://example.com/', site: 'example.com', timestamp: Date.now(), expiresAt: Date.now() + 60_000, ...patch });
+const savedMark = (patch = {}) => ({ id: '$saved', revision: '$saved', teamId: 'one', author: 'alice', text: '', target, caption: 'hello world', url: 'https://example.com/', site: 'example.com', timestamp: Date.now(), expiresAt: Date.now() + MINUTE_MS, ...patch });
 
 test('native selection saves an empty-body note on a page with 网页互动', async () => {
   const f = fixture({ auto: true }); await flush(); await flush(); await flush();
@@ -257,20 +258,20 @@ test('same-URL refresh re-injects a 网页互动 page with a new document contex
   await flush(); assert.equal(f.operations.filter(command => command.name === 'attach-ref').length, 0);
 });
 
-test('cold worker restores only with 网页互动 on a granted site; saved marks cannot bypass the choice', async () => {
+test('cold worker projects saved marks only when 网页互动 is on for that granted site', async () => {
   for (const scenario of [
-    { saved: [savedMark()], auto: true, restore: true },
-    { saved: [savedMark()], restore: false },
-    { saved: [savedMark({ expiresAt: Date.now() - 1 })], auto: true, restore: true, projected: false },
-    { saved: [savedMark({ url: 'https://example.com/other' })], restore: false },
-    { saved: [savedMark({ teamId: 'two' })], restore: false },
-    { saved: [savedMark({ expiresAt: Date.now() - 1 })], restore: false },
-    { saved: [savedMark()], site: false, restore: false },
+    { saved: [savedMark()], auto: true, on: true },
+    { saved: [savedMark()], on: false },
+    { saved: [savedMark({ expiresAt: Date.now() - 1 })], auto: true, on: true, projected: false },
+    { saved: [savedMark({ url: 'https://example.com/other' })], on: false },
+    { saved: [savedMark({ teamId: 'two' })], on: false },
+    { saved: [savedMark({ expiresAt: Date.now() - 1 })], on: false },
+    { saved: [savedMark()], site: false, on: false },
   ]) {
     const f = fixture(scenario); await flush(); await flush(); await flush();
-    assert.equal(f.injections.length > 0, scenario.restore);
-    assert.equal(f.pageMessages.some(message => message.type === 'stickies' && message.items.some(item => item.id === '$saved')), scenario.restore && scenario.projected !== false, 'saved notes appear only on pages that open with 互动');
-    assert.equal(f.pageMessages.some(message => message.type === 'pick' && message.on), scenario.restore);
+    assert.equal(f.injections.length > 0, scenario.on);
+    assert.equal(f.pageMessages.some(message => message.type === 'stickies' && message.items.some(item => item.id === '$saved')), scenario.on && scenario.projected !== false, 'saved notes appear only on pages where 网页互动 is on');
+    assert.equal(f.pageMessages.some(message => message.type === 'pick' && message.on), scenario.on);
   }
 });
 
@@ -311,7 +312,7 @@ test('locating a saved ordinary-page mark opens its source, waits for load, and 
   assert.equal(f.pageMessages.some(message => message.type === 'stickies' && message.items.length), false);
   assert.equal(f.pageMessages.some(message => message.type === 'pick' && message.on), false);
   assert.equal(f.status().interactive, false); assert.equal(f.status().stickyEnabled, false);
-  assert.equal(f.state().toggles.interact, false);
+  assert.equal(f.state().preferences.siteInteraction['example.com'].on, false);
 });
 
 
@@ -354,7 +355,7 @@ test('a host granted for both protocols registers both without opting into shari
     assert.deepEqual(Array.from(f.host.calls.register.at(-1)[0].matches), ['http://custom.example.com/*', 'https://custom.example.com/*']);
     assert.ok(f.pageMessages.some(message => message.type === 'config'));
     assert.equal(f.pageMessages.some(message => message.type === 'pick' && message.on), true);
-    assert.equal(f.state().toggles.share, false);
+    assert.equal(f.state().preferences.share, false);
     assert.equal(f.operations.some(command => command.name === 'preferences'), false);
   }
 });
@@ -365,7 +366,7 @@ test('automatic pages open with notes and selection; turning 网页互动 off st
   assert.ok(f.pageMessages.some(message => message.type === 'config'));
   assert.equal(f.pageMessages.some(message => message.type === 'pick' && message.on && message.canSticky), true);
   assert.equal(f.pageMessages.some(message => message.type === 'stickies' && message.items.some(item => item.id === '$saved')), true);
-  f.update({ toggles: { share: true, interact: false } });
+  f.update({ preferences: { ...f.state().preferences, share: true, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } });
   await flush(); await flush();
   assert.equal(f.pageMessages.at(-1).type, 'off');
   assert.equal(f.pageMessages.some(message => message.type === 'pick-result' && message.requestId === 'pending-auto'), false);
@@ -381,8 +382,8 @@ test('automatic pages open with notes and selection; turning 网页互动 off st
 test('turning 网页互动 off tears down its open page at once and keeps it off after refresh', async () => {
   const f = fixture({ auto: true, saved: [savedMark()] }); await flush(); await flush(); await flush();
   const before = f.pageMessages.length;
-  f.perform(async command => { if (command.name === 'toggle') f.interact(command.payload.interact); return { ok: true }; });
-  assert.equal((await f.command('toggle', { interact: false })).ok, true);
+  f.perform(async command => { if (command.name === 'preferences') f.interact(command.payload.siteInteraction['example.com'].on); return { ok: true }; });
+  assert.equal((await f.command('preferences', { accountId: 'alice', siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } })).ok, true);
   await flush(); await flush();
   assert.ok(f.pageMessages.slice(before).some(message => message.type === 'off'));
   assert.equal(f.status().interactive, false); assert.equal(f.status().connected, false);
@@ -393,13 +394,13 @@ test('turning 网页互动 off tears down its open page at once and keeps it off
   f.active.status = 'complete'; f.browser.tabs.onUpdated.emit(1, { status: 'complete' }, f.active);
   await flush(); await flush();
   assert.equal(f.injections.length, count);
-  assert.equal(f.state().toggles.interact, false);
+  assert.equal(f.state().preferences.siteInteraction['example.com'].on, false);
 });
 
 test('turning 网页互动 on connects its open page immediately and the panel status follows', async () => {
   const f = fixture({ saved: [savedMark()] }); await flush(); await flush();
-  f.perform(async command => { if (command.name === 'toggle') f.interact(command.payload.interact); return { ok: true }; });
-  assert.equal((await f.command('toggle', { interact: true })).ok, true);
+  f.perform(async command => { if (command.name === 'preferences') f.interact(command.payload.siteInteraction['example.com'].on); return { ok: true }; });
+  assert.equal((await f.command('preferences', { accountId: 'alice', siteInteraction: { 'example.com': { on: true, danmaku: true, signal: true, sticky: true } } })).ok, true);
   await flush(); await flush(); await flush();
   assert.ok(f.injections.length > 0);
   assert.equal(f.pageMessages.some(message => message.type === 'pick' && message.on && message.canSticky), true);
@@ -408,15 +409,15 @@ test('turning 网页互动 on connects its open page immediately and the panel s
   assert.equal(status.interactive, true); assert.equal(status.connected, true); assert.equal(status.stickyEnabled, true);
 });
 
-test('automatic registration cannot finish stale after disable, revoke, logout, or account change', async () => {
+test('automatic registration cannot finish stale after site disable, revoke, logout, or account change', async () => {
   for (const change of [
-    f => f.update({ toggles: { share: false, interact: false } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['<all_urls>'] }); },
     f => f.update({ authenticated: false }),
-    f => f.update({ account: { id: 'bob' }, toggles: { share: false, interact: false } }),
+    f => f.update({ account: { id: 'bob' }, preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } }),
     f => f.update({ preferences: { ...f.state().preferences, current: 'missing' } }),
   ]) {
-    const f = fixture(); await flush(); await flush();
+    const f = fixture({ origins: ['https://example.com/*'] }); await flush(); await flush();
     let finish; const registrations = new Map();
     f.browser.scripting.registerContentScripts = scripts => new Promise(resolve => { finish = () => { for (const script of scripts) registrations.set(script.id, script); resolve(); }; });
     f.browser.scripting.unregisterContentScripts = async ({ ids }) => { for (const id of ids) registrations.delete(id); };
@@ -431,18 +432,22 @@ test('automatic registration cannot finish stale after disable, revoke, logout, 
   }
 });
 
-test('switching 网页互动 on reports registration failure while retaining the saved switch', async () => {
-  const f = fixture({ site: false, origins: ['*://other.example.com/*'] }); await flush(); await flush();
-  f.perform(async command => { if (command.name === 'toggle') f.interact(command.payload.interact); return { ok: true }; });
-  f.browser.scripting.registerContentScripts = async () => { throw new Error('registration failed'); };
-  const failed = await f.command('toggle', { interact: true });
-  assert.equal(failed.ok, false);
-  assert.equal(f.state().toggles.interact, true);
+test('registration failure preserves the site setting and a later site change retries registration', async () => {
+  const f = fixture({ origins: ['https://example.com/*'] }); await flush(); await flush();
+  f.perform(async command => { if (command.name === 'preferences') f.interact(command.payload.siteInteraction['example.com'].on); return { ok: true }; });
+  let attempts = 0;
+  f.browser.scripting.registerContentScripts = async () => { attempts++; throw new Error('registration failed'); };
+  const failed = await f.command('preferences', { accountId: 'alice', siteInteraction: { 'example.com': { on: true, danmaku: true, signal: true, sticky: true } } });
+  assert.equal(failed.ok, true);
+  await flush(); await flush();
+  assert.equal(attempts, 1);
+  assert.equal(f.state().preferences.siteInteraction['example.com'].on, true);
   const registered = [];
   f.browser.scripting.registerContentScripts = async scripts => { registered.push(...scripts); };
-  const retried = await f.command('toggle', { interact: true });
-  assert.equal(retried.ok, true);
-  assert.deepEqual(Array.from(registered.at(-1).matches), ['http://other.example.com/*', 'https://other.example.com/*']);
+  f.interact(false); await flush();
+  f.interact(true); await flush();
+  await flush(); await flush(); await flush();
+  assert.deepEqual(Array.from(registered.at(-1).matches), ['https://example.com/*']);
 });
 
 test('automatic page admission and SPA navigation honor exact host grants with no fixed-site exceptions', async () => {
@@ -471,17 +476,17 @@ test('granting page access does not modify either persistent switch', async () =
   await flush(); await flush();
   assert.equal(f.operations.some(command => command.name === 'preferences'), false);
   assert.equal(f.injections.length, 0);
-  assert.deepEqual(f.state().toggles, { share: false, interact: false });
+  assert.equal(f.state().preferences.share, false); assert.equal(f.state().preferences.siteInteraction['example.com'].on, false);
 });
 
 test('delayed page admission cannot bind a revoked, disabled or navigated document', async () => {
   for (const change of [
-    f => f.update({ toggles: { share: false, interact: false } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['<all_urls>'] }); },
     f => { f.active.url = 'https://other.example.com/'; f.browser.tabs.onUpdated.emit(1, { url: f.active.url }, f.active); },
     f => { f.active.status = 'loading'; f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.active); f.active.status = 'complete'; },
     f => f.update({ authenticated: false }),
-    f => f.update({ account: { id: 'bob' }, toggles: { share: false, interact: false } }),
+    f => f.update({ account: { id: 'bob' }, preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } }),
   ]) {
     const f = fixture({ auto: true }); await flush(); await flush(); await flush();
     f.pagePort.onDisconnect.emit();
@@ -540,4 +545,19 @@ test('removing a site from 已授权网站 unregisters its page layer and stops 
   assert.equal(f.host.calls.unregister.at(-1).ids[0], 'palside-page');
   assert.equal(f.pageMessages.at(-1).type, 'off');
   assert.equal(f.status().interactive, false); assert.equal(f.status().granted, false);
+});
+
+test('a page layer that connected while its tab was still loading gets signals once the tab completes', async () => {
+  const f = fixture({ auto: true });
+  f.browser.windows.get = async id => ({ id, focused: true, incognito: false });
+  await flush(); await flush(); await flush();
+  const configs = () => f.pageMessages.filter(message => message.type === 'signal-config');
+  // Subresources still loading do not make the page ineligible; a navigation rotates the tab instead.
+  f.active.status = 'loading'; f.browser.windows.onFocusChanged.emit(10); await flush(); await flush(); await flush();
+  assert.equal(configs().at(-1).on, true);
+  const before = configs().length;
+  f.active.status = 'complete';
+  f.browser.tabs.onUpdated.emit(1, { status: 'complete' }, f.active); await flush(); await flush(); await flush();
+  assert.ok(configs().length > before);
+  assert.equal(configs().at(-1).on, true);
 });

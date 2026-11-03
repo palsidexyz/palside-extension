@@ -4,11 +4,12 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import * as shared from '../packages/shared/src/extension.ts';
+import { extensionPagePolicy } from '../packages/shared/src/extension-policy.ts';
 import { validateExtensionManifest } from '../scripts/lib/extension-artifact.mjs';
 
 function config(env) {
   const source = readFileSync(new URL('../apps/extension/wxt.config.ts', import.meta.url), 'utf8').replace(/^import .*;\n/gm, '').replace('export default ', 'const config = ');
-  const result = vm.runInNewContext(ts.transpileModule(source + '\nconfig;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, { ...shared, URL, process: { env }, defineConfig: value => value, tailwindcss: () => ({}) });
+  const result = vm.runInNewContext(ts.transpileModule(source + '\nconfig;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, { ...shared, extensionPagePolicy, URL, process: { env }, defineConfig: value => value, tailwindcss: () => ({}) });
   return { manifest: result.manifest, vite: result.vite() };
 }
 test('release config rejects foreign origins and injects the same pinned origin into the background', () => {

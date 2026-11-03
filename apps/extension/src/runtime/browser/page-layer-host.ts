@@ -7,8 +7,10 @@ import { broadOrigin,grantedHost } from './permissions.ts';
 import type { RuntimeState } from '../composition/runtime-state';
 import { pageCapabilities,type CapabilityAccess,type CapabilityTab } from './page-capabilities.ts';
 import { SIGNAL_TTL,readSignal } from '../annotations/signals.ts';
-import { interactionAllows } from '../../domain/annotations/interaction.ts';
+import { siteAllows,siteDraws } from '../../domain/annotations/interaction.ts';
+import { tabIcon } from '../viewing/viewing.ts';
 import { normalizeSiteHost } from '../../domain/assets/site-host.ts';
+import { expired } from '../../domain/chat/expiry.ts';
 
 export { visibleStickies };
 
@@ -16,7 +18,7 @@ export { visibleStickies };
 export function freshPageSignals(previous: RuntimeState | undefined, next: RuntimeState, url: string, now = Date.now()) {
   if (!previous || previous.account?.id !== next.account?.id || pageTeam(previous) !== pageTeam(next) || !pageTeam(next)) return [];
   const seen = new Set((previous.signals ?? []).map(item => `${item.teamId}:${item.personId}:${item.id}`));
-  return (next.signals ?? []).filter(item => item.teamId === pageTeam(next) && item.url === pageScopeUrl(url) && item.sentAt + SIGNAL_TTL > now && readSignal(item, now) && !seen.has(`${item.teamId}:${item.personId}:${item.id}`));
+  return (next.signals ?? []).filter(item => item.teamId === pageTeam(next) && item.url === pageScopeUrl(url) && item.at + SIGNAL_TTL > now && readSignal(item, now) && !seen.has(`${item.teamId}:${item.personId}:${item.id}`));
 }
 
 /** A connected page script: its tab and document, the page it is on, and that page's asset and unfound notes. */
@@ -29,10 +31,6 @@ export function locateResponse(requestId: string, message: unknown): LocateResul
   const value = message as { type?: unknown; requestId?: unknown; result?: unknown };
   if (value.type !== 'located' || value.requestId !== requestId) return;
   return ['shown', 'missing', 'hidden', 'other-site', 'unavailable'].includes(value.result as string) ? value.result as LocateResult : undefined;
-}
-/** 网页互动 is 启用, has a feature on and is switched on in the composer. */
-export function interacting(state: RuntimeState | undefined) {
-  return Boolean(state?.preferences.web.interact && state.toggles.interact && interactionAllows(state.preferences.interaction));
 }
 export function pageTeam(state: RuntimeState | undefined) { return state?.authenticated ? state.remoteTeams.find(team => team.joined && team.id === state.preferences.current)?.id : undefined; }
 export function pageAsset(url: string, state?: RuntimeState): AssetKey | undefined {
@@ -56,22 +54,26 @@ export function pageScript(matches: string[]) {
 }
 /** The page layer's registration patterns: every 已授权网站 as Chrome granted it, while 网页互动 runs for a joined team. */
 export function pageMatches(state: RuntimeState | undefined, origins: readonly string[], roomEnabled = false) {
-  if (!(pageTeam(state) && interacting(state)) && !roomEnabled) return [];
+  const sites = state?.preferences.siteInteraction;
+  const team = Boolean(pageTeam(state));
+  // A site runs the page layer while 网页互动 is on there with 信号 or 便利贴 for a joined team, or with 弹幕 while a room is open.
+  const runs = (host: string) => team && siteDraws(sites, host) || roomEnabled && siteAllows(sites, host, 'danmaku');
+  if (!team && !roomEnabled) return [];
   if (origins.some(broadOrigin)) return ['http://*/*', 'https://*/*'];
   return [...new Set(origins.flatMap(origin => {
     const host = normalizeSiteHost(grantedHost(origin));
-    return !host ? [] : origin.startsWith('*') ? [`http://${host}/*`, `https://${host}/*`] : [`https://${host}/*`];
+    return !host || !runs(host) ? [] : origin.startsWith('*') ? [`http://${host}/*`, `https://${host}/*`] : [`https://${host}/*`];
   }))].sort();
 }
-export function pageStatus(windowId: number, tab: (CapabilityTab & { title?: string; favicon?: string }) | undefined, ports: readonly PageConnection[], access: CapabilityAccess, state?: RuntimeState): PageStatus {
+export function pageStatus(windowId: number, tab: (CapabilityTab & { title?: string; favicon?: string; favIconUrl?: string }) | undefined, ports: readonly PageConnection[], access: CapabilityAccess, state?: RuntimeState): PageStatus {
   const port = ports.find(port => port.windowId === windowId && port.tabId === tab?.id && (!tab?.url || port.url === tab.url));
   const url = tab?.url ?? port?.url;
   const host = pageUrlHost(url);
   const asset = port?.asset ?? (url ? pageAsset(url, state) : undefined);
   const capabilities = pageCapabilities(tab && { ...tab, url }, access);
   const granted = Boolean(pageTeam(state) && capabilities.pick.state === 'ready');
-  const interaction = state?.preferences.interaction;
-  const interactive = Boolean(granted && interacting(state));
+  const sites = state?.preferences.siteInteraction;
+  const interactive = Boolean(granted && siteAllows(sites, host));
   const tokenProfile = Boolean(host && siteProfile(host));
   return {
     windowId,
@@ -83,10 +85,11 @@ export function pageStatus(windowId: number, tab: (CapabilityTab & { title?: str
     access,
     title: tab?.url ? tab.title : undefined,
     favicon: tab?.url ? tab.favicon : undefined,
+    icon: tab?.url ? tabIcon(tab.favIconUrl) : undefined,
     granted,
     interactive,
-    stickyEnabled: interactive && interactionAllows(interaction, 'sticky'),
-    signalEnabled: interactive && interactionAllows(interaction, 'signal'),
+    stickyEnabled: granted && siteAllows(sites, host, 'sticky'),
+    signalEnabled: granted && siteAllows(sites, host, 'signal'),
     connected: Boolean(access.site && port),
     tokenProfile,
     missingStickies: port?.missingStickies ?? [],
@@ -96,7 +99,7 @@ export function pageDiff(previous: RuntimeState | undefined, state: RuntimeState
   const team = pageTeam(state);
   if (!team || pageTeam(previous) !== team || previous?.account?.id !== state.account?.id) return [];
   const oldMessages = new Set(previous?.data.messages.map(message => message.id));
-  const messages = state.data.messages.filter(message => message.teamId === team && message.liveArrival && message.status === 'sent' && !message.recalled && message.ref && message.ref.target.kind !== 'danmaku' && !oldMessages.has(message.id) && (message.expiresAt === undefined || message.expiresAt > now));
+  const messages = state.data.messages.filter(message => message.teamId === team && message.liveArrival && message.status === 'sent' && !message.recalled && message.ref && message.ref.target.kind !== 'danmaku' && !oldMessages.has(message.id) && !expired(message.expiresAt, now));
   const samePage = (a: string, b: string) => Boolean(pageScopeUrl(a) && pageScopeUrl(a) === pageScopeUrl(b));
   // The background admits and removes ports under the site 互动 policy or a one-off action.
   return ports.filter(port => pageScopeUrl(port.url)).map(port => ({

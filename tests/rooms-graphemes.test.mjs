@@ -1,10 +1,9 @@
-import { decodeContract } from '../packages/shared/src/contracts/validation.ts';
+import { decodeContract, graphemeLength, ContractDecodeError } from '../packages/shared/src/contracts/validation.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { graphemeLength, ContractDecodeError } from '../packages/shared/src/contracts/validation.ts';
 import { roomMessage } from '../packages/shared/src/contracts/rooms.ts';
 import { endpointsById } from '../packages/shared/src/contracts/endpoints.ts';
-import { ROOM_TEXT_MAX } from '../packages/shared/src/contracts/limits.ts';
+import { ROOM_TEXT_MAX } from '@palside/shared/rules/rooms';
 import { textLength } from '../packages/ui/src/internal/form-values.ts';
 
 const key = `token:sol:${'a'.repeat(32)}`;

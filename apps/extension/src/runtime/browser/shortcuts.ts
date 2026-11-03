@@ -1,3 +1,4 @@
+import { browserPlatform } from './platform';
 import { browser } from 'wxt/browser';
 
 /** Chrome's own page for extension shortcuts: Palside can read its shortcut but only the user can change it, there. */
@@ -10,8 +11,8 @@ export async function captureShortcut(host = browser): Promise<string> {
 }
 
 /** The manifest's suggested 截图 key as Chrome shows it on this computer: Alt+Shift+S reads ⌥⇧S on a Mac. */
-export function suggestedCaptureShortcut(platform = typeof navigator === 'undefined' ? '' : navigator.platform) {
-  return /Mac|iPhone|iPad/.test(platform) ? '⌥⇧S' : 'Alt+Shift+S';
+export function suggestedCaptureShortcut(platform = browserPlatform()) {
+  return /mac|iphone|ipad/i.test(platform) ? '⌥⇧S' : 'Alt+Shift+S';
 }
 
 export function openShortcuts(host = browser) {

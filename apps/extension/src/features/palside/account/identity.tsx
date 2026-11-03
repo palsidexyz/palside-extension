@@ -1,7 +1,8 @@
 'use client';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { errorMessage, localeOrEnglish, pastTime, message as uiMessage, type TextValue } from '@palside/i18n';
-import { npubEncode, PIN_LENGTH } from '@palside/shared/identity';
+import { npubEncode } from '@palside/shared/identity';
+import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useTranslations } from 'use-intl';
 import { useEffect, useState } from 'react';
 import { Copy, Eye, EyeOff, Fingerprint, KeyRound, Laptop } from 'lucide-react';

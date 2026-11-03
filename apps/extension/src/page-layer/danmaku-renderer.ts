@@ -1,3 +1,4 @@
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import Danmaku from 'danmaku/dist/esm/danmaku.dom.js';
 import type { PageDanmaku,PageDown,PageUp,DanmakuSettings } from '../runtime/browser/page-protocol';
 import { defaultDanmakuSettings,normalizeDanmakuSettings,danmakuLimits } from '../runtime/browser/page-protocol';
@@ -47,7 +48,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
   let areaFrame: number | undefined;
   function relativeTime(data: PageDanmaku) {
     if (!data.timestamp) return '';
-    const minutes = Math.round((data.timestamp - Date.now()) / 60_000);
+    const minutes = Math.round((data.timestamp - Date.now()) / MINUTE_MS);
     const format = new Intl.RelativeTimeFormat(context.labels.locale, { numeric: 'auto' });
     return Math.abs(minutes) < 60 ? format.format(minutes, 'minute') : format.format(Math.round(minutes / 60), 'hour');
   }
@@ -59,6 +60,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     // The engine measures this line, including padding and margins, before allocating its lane.
     element.dataset.size = danmakuSettings.size;
     element.dataset.id = data.id;
+    if (data.replay) element.dataset.replay = '';
     if (data.self) element.dataset.self = '';
     else if (data.mate) element.dataset.mate = '';
     element.textContent = data.text;
@@ -93,7 +95,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
   let hovered: { element: HTMLElement; flight?: Flight; last: number; frame: number } | undefined;
   function hold(now: number) {
     if (!hovered) return;
-    const step = (now - hovered.last) / 1000;
+    const step = (now - hovered.last) / SECOND_MS;
     hovered.last = now;
     if (!media.paused && hovered.flight) { hovered.flight.time! += step; hovered.flight._utc! += step; }
     hovered.frame = requestAnimationFrame(hold);
@@ -152,7 +154,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     for (const [id, expiry] of arrivals) if (expiry <= now) arrivals.delete(id);
     for (const item of items) {
       if (arrivals.has(item.id)) continue;
-      arrivals.set(item.id, now + 60_000);
+      arrivals.set(item.id, now + MINUTE_MS);
       if (arrivals.size > 256) arrivals.delete(arrivals.keys().next().value!);
       if ((context.reducedMotion ? staticArea.childElementCount : activeDanmaku(danmaku).length) >= danmakuLimits[danmakuSettings.density]) continue;
       if (context.reducedMotion) {
@@ -186,7 +188,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     pruneDanmaku(danmaku, cutoff);
     trimFlights();
     for (const [id, expiry] of arrivals) if (expiry <= Date.now()) arrivals.delete(id);
-  }, 1_000);
+  }, SECOND_MS);
 
   function syncDanmakuArea() {
     const rect = measureDanmakuArea(danmakuSettings.area);

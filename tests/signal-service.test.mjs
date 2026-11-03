@@ -8,7 +8,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
   return next(specifier, context);
 } });
 const { SignalService } = await import('../apps/extension/src/runtime/annotations/signal-service.ts');
-const { SIGNAL_EVENT, SIGNAL_TTL } = await import('../apps/extension/src/runtime/annotations/signals.ts');
+const { SIGNAL_CLOCK_SKEW, SIGNAL_EVENT, SIGNAL_TTL } = await import('../apps/extension/src/runtime/annotations/signals.ts');
 hooks.deregister();
 const payload = () => ({ url: 'https://example.com/page', kind: 'attention', target: { kind: 'page' } });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -136,7 +136,7 @@ test('relay response cannot succeed under changed account or team', async t => {
 
 test('consume requires encrypted real current teammate and ignores self and spoofed metadata', t => {
   const f = fixture(t);
-  for (const event of [f.event({}, '@peer', false), f.event({}, '@self'), f.event({}, '@outsider'), f.event({ teamId: 'other' }), f.event({ sentAt: Date.now() - SIGNAL_TTL })]) f.service.consume(event, f.session);
+  for (const event of [f.event({}, '@peer', false), f.event({}, '@self'), f.event({}, '@outsider'), f.event({ teamId: 'other' }), f.event({ sentAt: Date.now() - SIGNAL_CLOCK_SKEW - 1 })]) f.service.consume(event, f.session);
   f.service.consume(f.event(), { ...f.session });
   f.team.people[1].deleted = true;
   f.service.consume(f.event(), f.session);
@@ -148,14 +148,14 @@ test('consume requires encrypted real current teammate and ignores self and spoo
   assert.equal(f.runtime.state.signals.length, 1);
 });
 
-test('expiry follows original timestamp even as later signals arrive', t => {
+test('expiry counts from arrival, so a sender whose clock runs behind still shows for the full lifetime', t => {
   const f = fixture(t);
   f.service.consume(f.event({ sentAt: Date.now() - 4_000 }), f.session);
   t.mock.timers.tick(500);
   f.service.consume(f.event({ id: 'fedcba9876543210' }), f.session);
-  t.mock.timers.tick(500);
+  t.mock.timers.tick(SIGNAL_TTL - 500);
   assert.deepEqual(f.runtime.state.signals.map(item => item.id), ['fedcba9876543210']);
-  t.mock.timers.tick(4_500);
+  t.mock.timers.tick(500);
   assert.equal(f.runtime.state.signals.length, 0);
 });
 
@@ -166,7 +166,7 @@ test('receive bounds both state and dedupe, preserving replay protection at capa
   const emits = f.emits();
   f.service.consume(f.event({ id: '0000000000000000' }), f.session);
   assert.equal(f.emits(), emits);
-  t.mock.timers.tick(SIGNAL_TTL);
+  t.mock.timers.tick(SIGNAL_CLOCK_SKEW);
   f.service.consume(f.event({ id: '0000000000000600' }), f.session);
   assert.equal(f.runtime.state.signals.length, 1);
 });

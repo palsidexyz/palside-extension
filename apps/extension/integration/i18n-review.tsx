@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { IntlProvider } from 'use-intl';
@@ -20,16 +21,16 @@ const params = new URLSearchParams(location.search);
 const initial: RuntimeState = {
   revision: 0, ready: true, rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} }, authenticated: params.get('scene') !== 'login', 
   account: { bio: '', tags: [], id: 'you', nickname: 'Fixture user', avatarId: null, matrixId: '@fixture:test', revision: 0, acceptTeamInvites: true },
-  toggles: { share: true, interact: false },
+  
   connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
-  data: { ...palsideFixtures, messages: palsideFixtures.messages.map((value, index) => ({ ...value, timestamp: Date.now() - (20 - index) * 60000 })) }, drafts: {},
-  preferences: { current: 'night', web: { share: true, interact: true }, notifications: 'off' },
+  data: { ...palsideFixtures, messages: palsideFixtures.messages.map((value, index) => ({ ...value, timestamp: Date.now() - (20 - index) * MINUTE_MS })) }, drafts: {},
+  preferences: { current: 'night', share: true, notifications: 'off', toured: true },
   remoteTeams: palsideFixtures.teams.map(team => ({ reason: null, revision: 0, inviteSuspended: false, id: team.id, name: team.name, description: team.description, ownerId: team.owner, roomId: '!fixture:test', avatarId: null, memberCount: team.memberIds.length, joined: team.joined, publishedAt: null, recruitmentExpiresAt: null, retentionDays: 7, membersCanInvite: false, memberIds: team.memberIds, people: [], periods: [], preferences: { muted: false, readIds: [], revision: 0 }, requests: [], bans: [], transfer: null })),
   config: { websiteUrl: 'http://localhost:3000', signupDifficulty: 0 }, invitations: {}, items: { stickies: [] },
 };
 if (params.get('scene') === 'state') {
   initial.data = { ...initial.data, messages: [
-    ...Array.from({ length: 40 }, (_, index) => ({ id: `language-history-${index}`, teamId: 'night', author: 'mia', text: `Reading sample ${index + 1} · 阅读样例`, time: '', timestamp: Date.now() - (60 - index) * 60000, status: 'sent' as const })),
+    ...Array.from({ length: 40 }, (_, index) => ({ id: `language-history-${index}`, teamId: 'night', author: 'mia', text: `Reading sample ${index + 1} · 阅读样例`, time: '', timestamp: Date.now() - (60 - index) * MINUTE_MS, status: 'sent' as const })),
     ...initial.data.messages,
     { id: 'language-pending', teamId: 'night', author: 'you', text: 'Pending sample · 发送状态样例', time: '', timestamp: Date.now(), status: 'sending' },
   ] };

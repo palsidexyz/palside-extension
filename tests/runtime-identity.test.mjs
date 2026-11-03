@@ -6,11 +6,11 @@ import { deviceKeyPublication, ensureCryptoIdentity, ownDeviceSigned, sendBlock,
 import { deriveIdentity, generateMnemonic } from '../packages/shared/src/identity.ts';
 
 test('device label maps supported platforms', () => {
-  assert.equal(deviceLabel({ platform: 'MacIntel' }), 'macOS · Chrome');
-  assert.equal(deviceLabel({ platform: 'Win32' }), 'Windows · Chrome');
-  assert.equal(deviceLabel({ platform: 'Linux x86_64' }), 'Linux · Chrome');
-  assert.equal(deviceLabel({ userAgentData: { platform: 'Chrome OS' }, platform: 'Linux' }), 'ChromeOS · Chrome');
-  assert.equal(deviceLabel({ platform: '' }), 'Chrome');
+  assert.equal(deviceLabel({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140.0' }), 'macOS · Chrome');
+  assert.equal(deviceLabel({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0' }), 'Windows · Chrome');
+  assert.equal(deviceLabel({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64) Chrome/140.0' }), 'Linux · Chrome');
+  assert.equal(deviceLabel({ userAgentData: { platform: 'Chrome OS' }, userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' }), 'ChromeOS · Chrome');
+  assert.equal(deviceLabel({ userAgent: '' }), 'Chrome');
 });
 
 test('signed API request retries AUTH_EXPIRED once using Date clock offset and exact body bytes', async t => {

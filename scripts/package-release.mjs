@@ -91,7 +91,7 @@ export async function packageRelease({ directory = defaultDirectory, output = de
   if (!manifest) throw new Error('Missing manifest.json in extension directory');
   const parsedManifest = JSON.parse(manifest.bytes.toString('utf8'));
   const zipName = releaseZipName(parsedManifest);
-  const errors = validateExtensionManifest(parsedManifest);
+  const errors = validateExtensionManifest(parsedManifest, undefined, true);
   if (errors.length) throw new Error(`Release manifest rejected:\n${errors.join('\n')}`);
   if (files.some(file => file.path === zipName)) throw new Error(`Extension file conflicts with release ZIP: ${zipName}`);
   const zip = zipFiles(files, timestamp);

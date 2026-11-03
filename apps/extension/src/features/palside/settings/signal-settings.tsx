@@ -8,8 +8,9 @@ import { defaultSignalSettings, defaultWheel, isEmote, signalEmotes, signalKinds
 import { Range, Seg, Sub, SubSwitch, Tabs } from '../ui/sub-rows';
 import type { PalsideController } from '../app/use-palside';
 import s from './signal-settings.module.css';
+import { browserPlatform } from '../../../runtime/browser/platform';
 
-const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const mac = browserPlatform() === 'macOS';
 const keyNames: Record<SignalModifier, string> = mac ? { Control: '⌃ Control', Alt: '⌥ Option', Shift: '⇧ Shift' } : { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift' };
 const keySymbols: Record<SignalModifier, string> = mac ? { Control: '⌃', Alt: '⌥', Shift: '⇧' } : { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift' };
 export const signalKeyName = (key: readonly SignalModifier[]) => key.map(modifier => keyNames[modifier]).join(' + ');

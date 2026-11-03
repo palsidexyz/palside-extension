@@ -1,3 +1,4 @@
+import { SECOND_MS } from '../units.ts';
 // Adapted from darrenprx/lolPing (MIT), c98806ae96a4dd83ca9c12be224878057f3d3ae7. See LICENSE.
 import type { PingTag, SignalPing } from './manifest';
 import { TAG_COLORS } from './room-colors';
@@ -51,6 +52,6 @@ export function spawnPing(layer: HTMLElement, def: SignalPing, x: number, y: num
   }
   while (layer.childElementCount >= MAX_PINGS) layer.firstElementChild?.remove();
   layer.append(root);
-  if (!opts.keep) setTimeout(() => root.remove(), opts.durationS * 1000 + 150);
+  if (!opts.keep) setTimeout(() => root.remove(), opts.durationS * SECOND_MS + 150);
   return root;
 }

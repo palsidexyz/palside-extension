@@ -70,9 +70,7 @@ return runtime.rooms.people(p.key);
 }
 
 export async function roomHotCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-hot" }>) {
- const p = command.payload ?? {};
-    const runtime = this.runtime;
-return runtime.rooms.watchHot(p);
+  return this.runtime.rooms.watchHot(command.payload);
 }
 
 export async function inviteListCommand(this: RuntimeCommands) {

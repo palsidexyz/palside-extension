@@ -1,6 +1,8 @@
-import { decodeFunctionData, encodeFunctionData, hashMessage, isAddress, maxUint256, parseAbi, recoverAddress, serializeSignature, type Address, type Hex, type LocalAccount } from 'viem';
+import { decodeFunctionData, encodeFunctionData, hashMessage, isAddress, parseAbi, recoverAddress, serializeSignature, type Address, type Hex, type LocalAccount } from 'viem';
 import { entryPoint07Address, getUserOperationHash, type UserOperation } from 'viem/account-abstraction';
 import { hashAuthorization } from 'viem/utils';
+import { SUPPORTED_CHAINS } from '../rules/wallet.ts';
+import { UINT256_MAX } from './amount.ts';
 import type { OrderAuthorization } from './orders.ts';
 
 export const RELAY_DELEGATE = '0x77021100bD87b7008E5E1989d0eB38555d0d0000' as const;
@@ -40,7 +42,7 @@ export const sameRelayAddress = (a: unknown, b: unknown): boolean => typeof a ==
 export function relayJson<T>(value: T): T { return JSON.parse(JSON.stringify(value, (_, v: unknown) => typeof v === 'bigint' ? v.toString(10) : v)) as T; }
 export function relayAmount(value: unknown): bigint {
   relayAssert(typeof value === 'string' && /^(0|[1-9][0-9]*)$/.test(value), 'Invalid decimal amount');
-  const amount = BigInt(value); relayAssert(amount < maxUint256, 'Unlimited approval or overflowing amount'); return amount;
+  const amount = BigInt(value); relayAssert(amount < UINT256_MAX, 'Unlimited approval or overflowing amount'); return amount;
 }
 export function relayUserOperation(data: Record<string, unknown>): UserOperation<'0.7'> {
   const result = { ...data };
@@ -57,7 +59,7 @@ export function relayApprove(token: Address, spender: Address, amount: string): 
   return { to: token, value: '0', data: encodeFunctionData({ abi: approveAbi, functionName: 'approve', args: [spender, BigInt(amount)] }) };
 }
 export function validateRelayCalls(actual: readonly RelayCall[], expected: readonly RelayCall[]): void {
-  relayAssert(actual.length === expected.length && actual.length > 0, 'Prepared call count mismatch');
+  relayAssert(actual.length === expected.length && actual.length > 0 && actual.length <= 8, 'Prepared call count mismatch');
   actual.forEach((call, i) => {
     relayAssert(call.value === '0' && expected[i]!.value === '0' && sameRelayAddress(call.to, expected[i]!.to) && call.data.toLowerCase() === expected[i]!.data.toLowerCase(), 'Prepared calls differ from the approved order');
   });
@@ -66,7 +68,7 @@ export function validateRelayCalls(actual: readonly RelayCall[], expected: reado
 export function validateRelayEnvelope(envelope: RelaySigningEnvelope, expected: RelaySigningExpectation, now = Date.now()): void {
   relayAssert(Number.isSafeInteger(envelope.expiresAt) && now < envelope.expiresAt, 'Prepared request expired');
   relayAssert(envelope.orderId === expected.orderId && envelope.orderFingerprint === expected.orderFingerprint, 'Order binding mismatch');
-  relayAssert([4663, 31337].includes(expected.chainId) && envelope.chainId === expected.chainId, 'Unexpected chain');
+  relayAssert(SUPPORTED_CHAINS.some(id => id === expected.chainId) && envelope.chainId === expected.chainId, 'Unexpected chain');
   relayAssert(sameRelayAddress(envelope.account, expected.account), 'Account mismatch');
   validateRelayCalls(envelope.calls, expected.calls);
   // Palside only ever sponsors network fees; any other fee mode is refused before signing.

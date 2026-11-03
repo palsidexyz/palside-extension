@@ -1,11 +1,12 @@
 'use client';
+import { KIB } from '@palside/shared/units';
 import { Button, IconButton } from '@palside/ui/button';
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Ban, Bell, Clock, Coins, HardDrive, Highlighter, MapPin, Scissors, Star, TextQuote, Users, X } from 'lucide-react';
+import { Activity, Ban, Bell, Clock, Coins, HardDrive, Highlighter, MapPin, Scissors, Star, TextQuote, Users, X } from 'lucide-react';
 import { emptyFavorites } from '../../../domain/annotations/interaction';
-import { revokeAllSites, revokeNotifications } from '../../../runtime/browser/permissions';
+import { revokeAllSites, revokeNotifications, revokeTabs } from '../../../runtime/browser/permissions';
 import { CountText } from '../ui/motion-details';
 import { Sheet } from '@palside/ui/sheet';
 import { ChromeMark, DanmakuIcon, ShareIcon } from '../ui/icons';
@@ -19,26 +20,27 @@ import sheet from './access-sheet.module.css';
 import pages from '../app/pages.module.css';
 import s from './privacy.module.css';
 
-/** The Chrome permissions Palside runs on, named as Chrome's own prompt words them. `active` (当前标签页) comes with the install. */
-type Permission = 'tabs' | 'sites' | 'active' | 'notifications';
+/** The Chrome permissions Palside runs on, named as Chrome's own prompt words them. `active` (当前标签页) and `idle` (设备空闲状态) come with the install. */
+type Permission = 'tabs' | 'sites' | 'active' | 'idle' | 'notifications';
 
 /** Each permission and the features that use it. 弹幕 follows the tab's token only on an added site, like every page feature. */
 const cards: [Permission, ReadKey[]][] = [
   ['tabs', ['share']],
   ['sites', ['token', 'quote', 'signal', 'sticky', 'room']],
   ['active', ['shot']],
+  ['idle', ['presence']],
   ['notifications', ['notify']],
 ];
-const uses: Record<ReadKey, Permission[]> = { share: ['tabs'], token: ['sites'], quote: ['sites'], signal: ['sites'], sticky: ['sites'], room: ['sites'], shot: ['active'], notify: ['notifications'] };
+const uses: Record<ReadKey, Permission[]> = { share: ['tabs'], token: ['sites'], quote: ['sites'], signal: ['sites'], sticky: ['sites'], room: ['sites'], shot: ['active'], presence: ['idle'], notify: ['notifications'] };
 
 const readIcons: Record<ReadKey, () => ReactNode> = {
   share: () => <ShareIcon size={14} />, token: () => <Coins size={14} />, quote: () => <TextQuote size={14} />, signal: () => <MapPin size={14} />,
-  sticky: () => <Highlighter size={14} />, room: () => <DanmakuIcon size={14} />, shot: () => <Scissors size={14} />, notify: () => <Bell size={14} />,
+  sticky: () => <Highlighter size={14} />, room: () => <DanmakuIcon size={14} />, shot: () => <Scissors size={14} />, presence: () => <Activity size={14} />, notify: () => <Bell size={14} />,
 };
 
-/** Granted now (`true`/`false`), or `undefined` for 当前标签页, which is always there and cannot be taken back. */
+/** Granted now (`true`/`false`), or `undefined` for 当前标签页 and 设备空闲状态, which are always there and cannot be taken back. */
 function granted(permission: Permission, grants: Grants, c: PalsideController) {
-  if (permission === 'active') return undefined;
+  if (permission === 'active' || permission === 'idle') return undefined;
   if (permission === 'sites') { const { all, hosts } = allowedSites(c, grants); return all || hosts.length > 0; }
   return grants[permission];
 }
@@ -53,23 +55,18 @@ function PermissionState({ c, grants, permission }: { c: PalsideController; gran
   return <span className={s.state} data-on={on || undefined}>{text}</span>;
 }
 
-/**
- * 隐私与数据: one card per Chrome permission — Chrome's mark, the permission in Chrome's words, whether it is allowed now, 收回 — and the
- * features that use it; each feature opens what it reads, who sees it and for how long. Then what stays on this device.
- * 收回 gives the permission back to Chrome and turns off what used it; turning that on again later does not make Chrome ask again.
- */
-export function Privacy({ c }: { c: PalsideController }) {
+/** 收回: confirm, then give the permission back to Chrome; what used it turns off. Shared by 隐私与数据 and each feature's read sheet. */
+function useRevoke(c: PalsideController, grants: Grants) {
   const t = useTranslations();
-  const grants = useGrants(c);
   const preferences = usePreferences(c.live);
-  const favorites = c.favorites.sites.length + c.favorites.pages.length;
-  function revoke(permission: Permission) {
+  return function revoke(permission: Permission) {
     const intent = permission === 'notifications' ? preferences.beginPermission('notifications') : undefined;
     const { all, hosts } = allowedSites(c, grants);
     const scope = all ? t('extension.sites.allSites') : t('extension.web.siteCount', { count: hosts.length });
     const take = {
-      tabs: () => c.setWeb('share', false),
-      sites: () => { if (c.web.interact) c.setWeb('interact', false); else void revokeAllSites().catch(() => []); },
+      // Chrome taking 读取您的浏览记录 back switches 共享在看 off in the background, with its notice.
+      tabs: () => c.live ? void revokeTabs().then(done => { if (!done) c.setNotice(uiMessage('common.error')); }, () => c.setNotice(uiMessage('common.error'))) : void c.toggle('share', false),
+      sites: () => { if (c.live) void revokeAllSites().catch(() => []); },
       notifications: () => {
         if (!intent?.current()) return;
         const failed = () => { if (intent.current()) c.setNotice(uiMessage('extension.settings.notifyDenied')); };
@@ -80,12 +77,25 @@ export function Privacy({ c }: { c: PalsideController }) {
         return work;
       },
       active: () => {},
+      idle: () => {},
     }[permission];
     c.setConfirmation({
       title: uiMessage(`extension.privacy.revoke_${permission}_title`), description: permission === 'sites' ? uiMessage('extension.privacy.revoke_sites', { scope }) : uiMessage(`extension.privacy.revoke_${permission}`),
       action: uiMessage('extension.privacy.revoke'), danger: true, confirm: take,
     });
-  }
+  };
+}
+
+/**
+ * 隐私与数据: one card per Chrome permission — Chrome's mark, the permission in Chrome's words, whether it is allowed now, 收回 — and the
+ * features that use it; each feature opens what it reads, who sees it and for how long. Then what stays on this device.
+ * 收回 gives the permission back to Chrome and turns off what used it; turning that on again later does not make Chrome ask again.
+ */
+export function Privacy({ c }: { c: PalsideController }) {
+  const t = useTranslations();
+  const grants = useGrants(c);
+  const favorites = c.favorites.sites.length + c.favorites.pages.length;
+  const revoke = useRevoke(c, grants);
   return <div className={`${pages.page} ${s.page}`}>
     <section className={settingRows.group} aria-label={t('extension.privacy.chrome')}>
     <div className={settingRows.head}><span>{t('extension.privacy.chrome')}</span></div>
@@ -117,6 +127,7 @@ export function Privacy({ c }: { c: PalsideController }) {
 export function ReadSheet({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const grants = useGrants(c);
+  const revoke = useRevoke(c, grants);
   const id = useSocialUi().read;
   const close = () => setSocialUi({ read: undefined });
   const permissions = id ? uses[id] : [];
@@ -129,7 +140,8 @@ export function ReadSheet({ c }: { c: PalsideController }) {
       </header>
       <div className={s.permBox}>
         <small>{t('extension.privacy.chrome')}</small>
-        {permissions.map(permission => <div key={permission} className={s.permRow}><ChromeMark size={18} /><b>{t(`extension.privacy.perm_${permission}`)}</b><PermissionState c={c} grants={grants} permission={permission} /></div>)}
+        {permissions.map(permission => <div key={permission} className={s.permRow}><ChromeMark size={18} /><b>{t(`extension.privacy.perm_${permission}`)}</b><PermissionState c={c} grants={grants} permission={permission} />
+          {granted(permission, grants, c) && <Button size="xs" variant="surface" className={s.revoke} onClick={() => { close(); revoke(permission); }}>{t('extension.privacy.revoke')}</Button>}</div>)}
       </div>
       <p className={sheet.lead}>{t(`extension.privacy.read.${id}.line`)}</p>
       <dl className={sheet.facts}>
@@ -142,7 +154,7 @@ export function ReadSheet({ c }: { c: PalsideController }) {
 function formatBytes(bytes: number, locale: string) {
   const units = ['B', 'KB', 'MB', 'GB'];
   let value = bytes, unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  while (value >= KIB && unit < units.length - 1) { value /= KIB; unit += 1; }
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: unit > 1 && value < 10 ? 1 : 0 }).format(value)} ${units[unit]}`;
 }
 

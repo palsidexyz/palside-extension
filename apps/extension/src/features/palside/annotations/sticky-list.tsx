@@ -9,7 +9,7 @@ import { locateFeedback } from './locate-feedback';
 import { characterLength } from '../../../domain/chat/model';
 import { personFor } from '../../../domain/account/model';
 import { STICKY_MAX, pageScopeUrl, viewAsset, visibleStickies as teamStickies, type AssetKey, type Sticky, type StickyScope } from '../../../domain/annotations/social';
-import { captureSocialUi, navigateWithReturn, setSocialUi, useSocialUi } from './social-state';
+import { captureSocialUi, setSocialUi, useSocialUi } from './social-state';
 import { relativeTime } from '../assets/asset-discussion';
 import { tabView } from '../rooms/rooms';
 import { withTargetAccess } from '../settings/access';
@@ -126,7 +126,7 @@ function Note({ c, sticky, hidden = false, focused = false }: { c: PalsideContro
     lock.current = true; setBusy(true); setFailure('');
     try { await work(); } catch (error) { setFailure(text(errorMessage(error))); } finally { lock.current = false; setBusy(false); }
   }
-  const find = () => run(async () => { const result = await navigateWithReturn(live!, sticky.url ?? '', () => live!.command('locate-sticky', { teamId: c.current, stickyId: sticky.id })); const key = locateFeedback[result]; if (key) setFailure(t(key)); });
+  const find = () => run(async () => { const { result } = await live!.command('locate-sticky', { teamId: c.current, stickyId: sticky.id }); const key = locateFeedback[result]; if (key) setFailure(t(key)); });
   const quoteToChat = () => {
     const session = captureSocialUi();
     return run(async () => {

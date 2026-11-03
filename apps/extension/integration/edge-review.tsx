@@ -1,3 +1,4 @@
+import { SECOND_MS, DAY_MS } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
 import tokenMetadata from './fixtures/token-metadata.json';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -36,18 +37,18 @@ function Review() {
   const [state, setState] = useState<RuntimeState>({
     revision: 0, ready: true, rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} }, authenticated: scene !== 'login', connection: { networkOnline: true, service: scene === 'readonly' || scene === 'empty' ? 'unavailable' : 'ready', messaging: 'ready', retrying: false },
     account: { bio: '', tags: [], id: data.self, nickname: scene === 'invite-nickname' ? '' : '测试成员', avatarId: null, matrixId: '@review:example.test', revision: 0, acceptTeamInvites: true }, data,
-    toggles: { share: false, interact: false }, drafts: scene === 'readonly' ? { night: { revision: 1, updatedAt: now, value: { text: '保留的未发送文字' } } } : {}, preferences: { web: { share: true, interact: true }, current: data.teams[0]?.id ?? '', notifications: 'all', notificationPreview: true },
+    drafts: scene === 'readonly' ? { night: { revision: 1, updatedAt: now, value: { text: '保留的未发送文字' } } } : {}, preferences: { toured: true, share: false, current: data.teams[0]?.id ?? '', notifications: 'all', notificationPreview: true },
     remoteTeams: [], lobbyTeams: [], config: { websiteUrl: 'https://example.test', signupDifficulty: 0 },
-    items: { stickies: [] }, invitations: { night: scene === 'invite' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + 86400000, active: true, password: new URLSearchParams(location.search).get('password'), suspended: false }
-      : scene === 'suspended' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + 86400000, active: false, password: 'K7M2', suspended: true }
-      : {suspended: false, password: null,  url: 'https://example.test/invite/synthetic', expiresAt: now - 1000, active: true } },
+    items: { stickies: [] }, invitations: { night: scene === 'invite' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + DAY_MS, active: true, password: new URLSearchParams(location.search).get('password'), suspended: false }
+      : scene === 'suspended' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + DAY_MS, active: false, password: 'K7M2', suspended: true }
+      : {suspended: false, password: null,  url: 'https://example.test/invite/synthetic', expiresAt: now - SECOND_MS, active: true } },
     ...(scene === 'password' ? { setup: 'password' as const } : {}),
   });
   // Drains a synthetic queue one slot per second, as the service pacing would: the head goes out, the rest move up.
   useEffect(() => {
     if (scene !== 'pacing') return;
     const ids = Array.from({ length: 4 }, (_, i) => `paced-${i}`);
-    const queueOf = (pending: string[], at: number) => pending.length ? { night: { count: pending.length, nextAt: at, items: pending.map((id, i) => ({ id, at: at + i * 1000 })) } } : undefined;
+    const queueOf = (pending: string[], at: number) => pending.length ? { night: { count: pending.length, nextAt: at, items: pending.map((id, i) => ({ id, at: at + i * SECOND_MS })) } } : undefined;
     let restart: ReturnType<typeof setTimeout> | undefined;
     const start = () => { restart = undefined; setState(old => ({ ...old, data: { ...old.data, messages: old.data.messages.map(message => ids.includes(message.id) ? { ...message, status: 'sending' as const } : message) }, sendQueue: queueOf(ids, Date.now() + 2400) })); };
     start();
@@ -56,7 +57,7 @@ function Review() {
       if (!queue) { restart ??= setTimeout(start, 1500); return old; }
       if (queue.nextAt > Date.now()) return old;
       const [head, ...rest] = queue.items;
-      return { ...old, data: { ...old.data, messages: old.data.messages.map(message => message.id === head?.id ? { ...message, status: 'sent' as const } : message) }, sendQueue: queueOf(rest.map(item => item.id), Date.now() + 1000) };
+      return { ...old, data: { ...old.data, messages: old.data.messages.map(message => message.id === head?.id ? { ...message, status: 'sent' as const } : message) }, sendQueue: queueOf(rest.map(item => item.id), Date.now() + SECOND_MS) };
     }), 100);
     return () => { clearInterval(timer); clearTimeout(restart); };
   }, []);
@@ -78,7 +79,7 @@ function Review() {
       if (payload?.password !== 'K7M2') { joinFailures++; throw joinFailures >= 5 ? fail('INVITE_PASSWORD_LOCKED', { retryAfter: 3600 }) : fail('INVITE_PASSWORD_WRONG', { remaining: 5 - joinFailures }); }
       return { teamId: 'night' } as T;
     }
-    if (name === 'invitation' && payload?.action === 'regenerate') setState(old => ({ ...old, invitations: { night: {suspended: false, password: null,  url: 'https://example.test/invite/synthetic', expiresAt: Date.now() + 86400000, active: true } } }));
+    if (name === 'invitation' && payload?.action === 'regenerate') setState(old => ({ ...old, invitations: { night: {suspended: false, password: null,  url: 'https://example.test/invite/synthetic', expiresAt: Date.now() + DAY_MS, active: true } } }));
     if (name === 'invitation' && payload?.action === 'revoke') setState(old => ({ ...old, invitations: { night: { ...old.invitations.night!, active: false } } }));
     if (name === 'profile') setState(old => ({ ...old, account: old.account ? { ...old.account, nickname: String(payload?.name) } : undefined, data: { ...old.data, people: old.data.people.map(person => person.id === data.self ? { ...person, name: String(payload?.name) } : person) } }));
     if (name === 'draft' && draftFailure) { draftFailure = false; throw new MessageError({ key: 'extension.runtime.draftChanged' }); }

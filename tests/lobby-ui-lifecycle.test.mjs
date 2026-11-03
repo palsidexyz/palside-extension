@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { productionModules } from './helpers/production-module.mjs';
+import { DAY_MS } from '@palside/shared/units';
 
 const root = 'apps/extension/src/features/palside/teams/';
 const require = createRequire(import.meta.url);
@@ -40,7 +41,7 @@ const module = { exports: {} };
 const source = ts.transpileModule(readFileSync(root + 'lobby.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
 const production = productionModules();
 vm.runInNewContext(`(function(require, module, exports) { ${source}\n })`)(name => {
-  if (name === 'react' || name === 'react/jsx-runtime' || name === '@palside/shared/contracts/limits' || name === '@palside/i18n') return require(name);
+  if (name === 'react' || name === 'react/jsx-runtime' || name.startsWith('@palside/shared/rules/') || name === '@palside/i18n') return require(name);
   if (name === 'use-intl') return { useTranslations: () => key => key };
   if (name === '../../../domain/teams/lobby-values') return production('apps/extension/src/domain/teams/lobby-values.ts');
   if (name.endsWith('.css')) return { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) };
@@ -52,7 +53,9 @@ function nodes(tree, predicate) {
   if (!tree || typeof tree !== 'object') return [];
   return [...(predicate(tree) ? [tree] : []), ...nodes(tree.props?.children, predicate)];
 }
-function lobby(p) { return Lobby({ c: { ...p.view, ...p.actions, discoveryTeams: [], people: [], now: Date.now() } }); }
+// The sort control shows only above a non-empty recruiting list, so lobby views that use it render one open squad.
+const recruiting = [{ id: 'open', name: 'Open squad', listed: true, published: true, recruitmentExpiresAt: Date.now() + DAY_MS, members: [], memberCount: 1 }];
+function lobby(p, discoveryTeams = []) { return Lobby({ c: { ...p.view, ...p.actions, discoveryTeams, people: [], now: Date.now() } }); }
 
 test('failed entry and the rendered Retry share one loading/error owner', async () => {
   const p = panel(); const entry = p.actions.refreshLobby();
@@ -74,7 +77,7 @@ for (const mutation of ['requestTeam', 'cancelApplication']) test(`${mutation} c
   p.actions[mutation]('team', 'note');
   const input = nodes(lobby(p), node => node.type === 'Input')[0];
   input.props.onChange({ target: { value: 'new squad' } }); p.Render();
-  const sort = nodes(lobby(p), node => node.type === 'select')[0];
+  const sort = nodes(lobby(p, recruiting), node => node.type === 'select')[0];
   sort.props.onChange({ target: { value: 'latest' } }); p.Render(); p.tick();
   assert.deepEqual(p.calls[1].payload, { q: 'new squad', sort: 'latest' });
   p.calls[0].resolve({ done: true }); await drain();

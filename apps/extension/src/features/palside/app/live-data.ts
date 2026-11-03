@@ -1,4 +1,4 @@
-import { defaultInteraction,defaultWebFeatures,emptyFavorites } from '../../../domain/annotations/interaction';
+import { emptyFavorites } from '../../../domain/annotations/interaction';
 import type { PanelData,PanelDataInput } from './panel-data';
 export function livePanelData({ data, scenario, initialTeam }: PanelDataInput): PanelData {
   return {
@@ -12,16 +12,14 @@ export function livePanelData({ data, scenario, initialTeam }: PanelDataInput): 
     setRequests: () => {},
     localCurrent: initialTeam.id,
     setCurrent: () => {},
-    localInteraction: defaultInteraction,
-    setLocalInteraction: () => {},
+    localSiteInteraction: {},
+    setLocalSiteInteraction: () => {},
     localFavorites: emptyFavorites,
     setLocalFavorites: () => {},
     localDrafts: {},
     setDrafts: () => {},
-    localWeb: defaultWebFeatures,
-    setLocalWeb: () => {},
-    localToggles: { share: false, interact: false },
-    setLocalToggles: () => {},
+    localShare: false,
+    setLocalShare: () => {},
     localSites: ['gmgn.ai', 'dexscreener.com'],
     setLocalSites: () => {},
     localTokenOff: [],

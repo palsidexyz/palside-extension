@@ -92,7 +92,7 @@ contract PalsideTest is Test {
         bytes32 first = createEqual("first", PalsideRedPacket.Kind.Team, 2, 1 ether);
         vm.startPrank(alice);
         secondToken.approve(address(packets), 6 ether);
-        bytes32 second = packets.createPacket(secondToken, "second", PalsideRedPacket.Kind.Invitation, 6 ether, 2, 3 ether, 0);
+        bytes32 second = packets.createPacket(secondToken, "second", PalsideRedPacket.Kind.Team, 6 ether, 2, 3 ether, 0);
         vm.expectRevert(PalsideRedPacket.InvalidPacket.selector);
         packets.createPacket(secondToken, "first", PalsideRedPacket.Kind.Team, 1 ether, 1, 1 ether, 0);
         vm.stopPrank();
@@ -103,7 +103,7 @@ contract PalsideTest is Test {
         claimEqual(first, carol, 1, 1 ether);
         assertEq(token.balanceOf(carol), 1 ether);
         assertEq(secondToken.balanceOf(carol), 0);
-        vm.warp(block.timestamp + 7 days + packets.SETTLEMENT_WINDOW());
+        vm.warp(block.timestamp + 1 days + packets.SETTLEMENT_WINDOW());
         packets.refundExpired(second);
         assertEq(secondToken.balanceOf(alice), secondToken.INITIAL_SUPPLY() - 3 ether);
         assertEq(secondToken.balanceOf(address(packets)), 0);
@@ -238,17 +238,14 @@ contract PalsideTest is Test {
 
     function testKindDurations() public {
         bytes32 team = createEqual("t", PalsideRedPacket.Kind.Team, 1, 1 ether);
-        bytes32 invitation = createEqual("i", PalsideRedPacket.Kind.Invitation, 1, 1 ether);
         bytes32 room = packets.packetIdFor(alice, "r");
         bytes32 hash = keccak256(abi.encode(room, uint32(0), 1 ether, bytes32(0), bytes32(0)));
         vm.prank(alice);
         packets.createPacket(token, "r", PalsideRedPacket.Kind.Room, 1 ether, 1, 0, hash);
         (,,,,,,,, uint256 te,,) = packets.packets(team);
-        (,,,,,,,, uint256 ie,,) = packets.packets(invitation);
         (,,,,,,,, uint256 re,,) = packets.packets(room);
         uint256 settlement = packets.SETTLEMENT_WINDOW();
         assertEq(te, block.timestamp + 1 days + settlement);
-        assertEq(ie, block.timestamp + 7 days + settlement);
         assertEq(re, block.timestamp + 1 hours + settlement);
     }
 
@@ -264,8 +261,6 @@ contract PalsideTest is Test {
         packets.createPacket(token, "unequal", PalsideRedPacket.Kind.Team, 3 ether, 2, 1 ether, 0);
         vm.expectRevert(PalsideRedPacket.InvalidPacket.selector);
         packets.createPacket(token, "room", PalsideRedPacket.Kind.Room, 1 ether, 1, 1 ether, 0);
-        vm.expectRevert(PalsideRedPacket.InvalidPacket.selector);
-        packets.createPacket(token, "invite", PalsideRedPacket.Kind.Invitation, 1 ether, 1, 0, bytes32(uint256(1)));
         vm.expectRevert(PalsideRedPacket.InvalidPacket.selector);
         packets.createPacket(token, "hash", PalsideRedPacket.Kind.Team, 1 ether, 1, 0, 0);
         vm.stopPrank();

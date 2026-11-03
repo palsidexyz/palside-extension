@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { translator } from '@palside/i18n';
 import { startPageLayer } from '../src/page-layer';
 import type { CaptureLabels, PageDown, PageUp } from '../src/runtime/browser/page-protocol';
@@ -39,7 +40,7 @@ const people = [{ name: 'Kai' }, { name: 'Robin' }, { name: 'Mia' }];
 const lines = ['这根量有点猛', '我先上车了', '止盈设好没', '持有人涨得好快', '等回调', '看这个大单'];
 if (scene === 'danmaku' || scene === 'hidden') {
   let n = 0;
-  const emit = () => { const i = n++; down({ type: 'danmaku', items: [{ id: `d${i}`, key: 'token:solana:fixture', text: lines[i % lines.length]!, author: people[i % 3]!, self: i % 4 === 1, timestamp: Date.now() - i * 60_000 }] }); };
+  const emit = () => { const i = n++; down({ type: 'danmaku', items: [{ id: `d${i}`, key: 'token:solana:fixture', text: lines[i % lines.length]!, author: people[i % 3]!, self: i % 4 === 1, timestamp: Date.now() - i * MINUTE_MS }] }); };
   for (let i = 0; i < 4; i++) setTimeout(emit, i * 300);
   setInterval(emit, 900);
 }
@@ -57,10 +58,10 @@ const quote = (exact: string) => ({ kind: 'quote' as const, exact, prefix: '', s
 if (scene === 'stickies' || scene === 'hidden') setTimeout(() => {
   const now = Date.now();
   down({ type: 'stickies', items: [
-    { id: 's1', target: quote('1,237'), text: '这笔卖单之后量就起来了，盯一下', author: { name: 'Mia' }, timestamp: now - 3 * 60_000 },
-    { id: 's2', target: quote('1,348'), text: '这笔买单再观察一下', author: { name: 'Kai' }, timestamp: now - 40 * 60_000 },
-    { id: 's3', target: quote('1,348'), text: '同意，等放量', author: { name: 'Robin' }, timestamp: now - 12 * 60_000 },
-    { id: 's4', target: quote('不存在的文字'), text: '找不到的便利贴', author: { name: 'Kai' }, timestamp: now - 90 * 60_000 },
+    { id: 's1', target: quote('1,237'), text: '这笔卖单之后量就起来了，盯一下', author: { name: 'Mia' }, timestamp: now - 3 * MINUTE_MS },
+    { id: 's2', target: quote('1,348'), text: '这笔买单再观察一下', author: { name: 'Kai' }, timestamp: now - 40 * MINUTE_MS },
+    { id: 's3', target: quote('1,348'), text: '同意，等放量', author: { name: 'Robin' }, timestamp: now - 12 * MINUTE_MS },
+    { id: 's4', target: quote('不存在的文字'), text: '找不到的便利贴', author: { name: 'Kai' }, timestamp: now - 90 * MINUTE_MS },
   ] });
 }, 300);
 setTimeout(() => reviewStatus('ready'), 600);

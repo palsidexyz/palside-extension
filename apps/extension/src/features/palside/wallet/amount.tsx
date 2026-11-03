@@ -1,4 +1,5 @@
 'use client';
+import NumberFlow from '@number-flow/react';
 import { Counter } from '@palside/ui/counter';
 
 export function formatPals(value: string, decimals = 18) {
@@ -14,4 +15,12 @@ export function PalsAmount({ value, decimals = 18, hidden = false, price }: { va
   const cents = price && BigInt(price.denominator) > 0n ? BigInt(value) * BigInt(price.numerator) * 100n / (10n ** BigInt(decimals) * BigInt(price.denominator)) : undefined;
   // NumberFlow receives only exactly representable display integers; amounts stay bigint everywhere else.
   return <span title={`${text} PALS`}>{whole <= BigInt(Number.MAX_SAFE_INTEGER) && !text.includes('.') ? <Counter value={Number(whole)} /> : text}<small> PALS</small>{cents !== undefined && <small> ≈ ${cents / 100n}.{(cents % 100n).toString().padStart(2, '0')}</small>}</span>;
+}
+
+export function AnimatedAmount({ value, decimals = 18, minimumFractionDigits = 0, maximumFractionDigits = 4, prefix = '' }: { value: string; decimals?: number; minimumFractionDigits?: number; maximumFractionDigits?: number; prefix?: string }) {
+  const amount = BigInt(value), precision = Math.min(decimals, maximumFractionDigits);
+  const divisor = 10n ** BigInt(decimals - precision), scaled = (amount + divisor / 2n) / divisor;
+  const number = scaled <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(scaled) / 10 ** precision : undefined;
+  const exact = precision ? `${scaled / 10n ** BigInt(precision)}.${(scaled % 10n ** BigInt(precision)).toString().padStart(precision, '0')}` : scaled.toString();
+  return number !== undefined && number.toFixed(precision) === exact ? <NumberFlow value={number} prefix={prefix} locales="en-US" format={{ minimumFractionDigits, maximumFractionDigits }} /> : <>{prefix}{formatPals(value, decimals)}</>;
 }

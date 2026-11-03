@@ -1,6 +1,8 @@
+import { CHAT_TEXT_MAX } from '@palside/shared/rules/messages';
 import type { Message as MessageContent,Draft as DraftContent } from '@palside/shared/models/chat';
 import type { TextValue } from '@palside/i18n';
 import type { PageRef } from '../annotations/social.ts';
+import { expired } from './expiry.ts';
 export type { Attachment } from '@palside/shared/models/chat';
 
 /** liveArrival and failure metadata are local runtime concerns, never stored or sent as message content. */
@@ -42,7 +44,7 @@ export function emojiOnly(text: string) {
   const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text.replace(/\s+/g, '')), part => part.segment);
   return parts.length > 0 && parts.length <= 3 && parts.every(part => /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(part) && !/\p{L}/u.test(part) && (Array.from(part).length > 1 || /\p{Emoji_Presentation}/u.test(part)));
 }
-export function canSend(draft: Draft) { return Boolean(draft.text.trim() || draft.attachment || draft.ref) && characterLength(draft.text) <= 4000; }
+export function canSend(draft: Draft) { return Boolean(draft.text.trim() || draft.attachment || draft.ref) && characterLength(draft.text) <= CHAT_TEXT_MAX; }
 /** A quote range from storage or the wire, or undefined when it is not a well-formed, non-empty range. */
 export function readQuoteRange(value: unknown): QuoteRange | undefined {
   if (!value || typeof value !== 'object') return;
@@ -55,7 +57,7 @@ export function readQuoteRange(value: unknown): QuoteRange | undefined {
 export function quotedFragment(original: Message | undefined, range: QuoteRange | undefined, referenceExpiresAt?: number, now = Date.now()) {
   if (!original || !range || original.recalled || original.status !== 'sent') return;
   const expiresAt = original.expiresAt ?? referenceExpiresAt;
-  if (Number.isFinite(expiresAt) && expiresAt! <= now) return;
+  if (expired(expiresAt, now)) return;
   if ((original.editedAt ?? 0) !== range.base || range.end > original.text.length) return;
   return original.text.slice(range.start, range.end).trim() || undefined;
 }

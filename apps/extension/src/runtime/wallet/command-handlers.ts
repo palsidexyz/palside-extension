@@ -13,6 +13,7 @@ export const walletHandlers = {
   },
   'wallet-packet': async function (command) { return this.runtime.api.request('chain.packet', { params: command.payload }); },
   'wallet-refresh': async function () { return this.runtime.wallet.refresh(); },
+  'wallet-lock': async function () { this.runtime.wallet.lock(); },
   'wallet-unlock': async function (command) { return this.runtime.wallet.unlock(command.payload.password); },
   'wallet-records': async function (command) { return (await this.runtime.wallet.start()).records(command.payload.direction, command.payload.more); },
   'wallet-recovery': async function (command) { return (await this.runtime.wallet.start()).recoveries(command.payload?.more); },

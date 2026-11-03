@@ -4,16 +4,17 @@ import { useTranslations } from 'use-intl';
 import { Star, X } from 'lucide-react';
 import { pageScopeUrl } from '../../../domain/annotations/social';
 import { normalizeSiteHost } from '../../../domain/assets/site-host';
-import { captureSocialUi, openWithReturn } from '../annotations/social-state';
-import { currentPage } from '../viewing/page-strip';
+import { captureSocialUi } from '../annotations/social-state';
+import { currentPage } from '../viewing/current-page';
 import { SettingGroup } from '../settings/setting-rows';
 import { SiteLogo } from '../assets/site-logo';
-import { siteForUrl, type Site } from '../settings/site-catalog';
+import { siteForUrl, siteOf, type Site } from '../settings/site-catalog';
 import { Action, Token } from '../ui/primitives';
 import { EmptyState } from '../chat/history-scope';
 import type { Viewing } from '../../../domain/assets/model';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/pages.module.css';
+import { tokenLabel } from '../assets/token-name';
 
 const LIMIT = 200;
 
@@ -41,16 +42,16 @@ export function Favorites({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const view = currentPage(c);
   const host = normalizeSiteHost(c.live?.page?.host);
-  const site: Site | undefined = host ? c.sites.find(item => item.domain === host) ?? { id: host, name: host, domain: host } : undefined;
+  const site: Site | undefined = host ? siteOf(c, host) : undefined;
   const pageSaved = Boolean(view && isFavoritePage(c, view.url));
   const siteSaved = Boolean(host && c.favorites.sites.includes(host));
-  const open = (url: string) => { const session = captureSocialUi(); if (c.live) void openWithReturn(c.live, url).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); else window.open(url, '_blank', 'noopener'); };
-  const sites = c.favorites.sites.map(domain => c.sites.find(item => item.domain === domain) ?? { id: domain, name: domain, domain });
+  const open = (url: string) => { const session = captureSocialUi(); if (c.live) void c.live.openPage(url).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); else window.open(url, '_blank', 'noopener'); };
+  const sites = c.favorites.sites.map(domain => siteOf(c, domain));
   const star = (on: boolean) => <Star size={16} className={on ? s.starOn : s.star} aria-hidden="true" />;
   return <div className={s.page} data-fill>
     {view && site && <div className={s.card}>
       <button type="button" className={s.row} aria-pressed={pageSaved} onClick={() => toggleFavoritePage(c, view)}>
-        <Token view={view} size="sm" /><span className={s.text}><strong>{view.name}</strong><small>{t('extension.web.thisPage')}</small></span>{star(pageSaved)}
+        <Token view={view} size="sm" /><span className={s.text}><strong>{tokenLabel(view, t)}</strong><small>{t('extension.web.thisPage')}</small></span>{star(pageSaved)}
       </button>
       <button type="button" className={s.row} aria-pressed={siteSaved} onClick={() => toggleFavoriteSite(c, site.domain)}>
         <SiteLogo site={site} size="sm" /><span className={s.text}><strong>{site.name}</strong><small>{t('extension.web.thisSite')}</small></span>{star(siteSaved)}
@@ -69,6 +70,6 @@ export function Favorites({ c }: { c: PalsideController }) {
         <Action label={t('extension.web.unsave', { name: item.title })} onClick={() => toggleFavoritePage(c, { url: item.url, name: item.title })}><X size={14} /></Action>
       </div>)}
     </SettingGroup>}
-    {!sites.length && !c.favorites.pages.length && <EmptyState icon={<Star />} title={t('extension.web.noFavorites')} fill={!(view && site)} />}
+    {!sites.length && !c.favorites.pages.length && <EmptyState icon={<Star />} title={t('extension.web.noFavorites')} />}
   </div>;
 }

@@ -33,7 +33,7 @@ export async function requireLocalChain(rpc) {
 }
 async function main() {
   const privateRoot = privateDirectory(process.argv.slice(2), 'dev-chain');
-  for (const key of ['PALSIDE_CHAIN_RPC_URL', 'PALSIDE_CHAIN_RPC']) if (process.env[key] && localRpc(process.env[key]) !== localRpc(LOCAL_RPC)) throw new Error(`${key} must be ${LOCAL_RPC}`);
+  if (process.env.PALSIDE_CHAIN_RPC_URL && localRpc(process.env.PALSIDE_CHAIN_RPC_URL) !== localRpc(LOCAL_RPC)) throw new Error(`PALSIDE_CHAIN_RPC_URL must be ${LOCAL_RPC}`);
   requireDependencies();
   const probe = createServer();
   const available = await new Promise((accept, reject) => { probe.once('error', error => error.code === 'EADDRINUSE' ? accept(false) : reject(error)); probe.listen(8545, '127.0.0.1', () => probe.close(() => accept(true))); });
@@ -59,7 +59,7 @@ async function main() {
     })()]);
     if (await rpcCall(LOCAL_RPC, 'eth_getCode', [LOCAL_PACKETS, 'latest']) === '0x') {
       console.log('Deploying local MockPALS and red packet contracts...');
-      deploy = spawn(process.execPath, [resolve(root, 'scripts/chain/deploy.mjs')], { cwd: root, stdio: 'inherit', env: { ...process.env, PALSIDE_CHAIN_RPC: LOCAL_RPC } });
+      deploy = spawn(process.execPath, [resolve(root, 'scripts/chain/deploy.mjs')], { cwd: root, stdio: 'inherit', env: { ...process.env, PALSIDE_CHAIN_RPC_URL: LOCAL_RPC } });
       await new Promise((accept, reject) => { deploy.once('error', reject); deploy.once('exit', code => code === 0 ? accept() : reject(new Error(`Local deployment failed (${code}); use a fresh private root if this chain has prior deployments`))); });
       const result = localDeployment();
       if (result.chainId !== 31337 || result.token?.toLowerCase() !== LOCAL_TOKEN.toLowerCase() || result.redPacket?.toLowerCase() !== LOCAL_PACKETS.toLowerCase() || result.signer?.toLowerCase() !== LOCAL_SIGNER.toLowerCase()) throw new Error('Deployment addresses differ from the deterministic local addresses; stop and use a fresh private root');

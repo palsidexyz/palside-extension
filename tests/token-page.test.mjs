@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { parseHTML } from 'linkedom';
-import { readVisibleToken, matchesTokenPage } from '../apps/extension/src/runtime/viewing/token-page.ts';
+import { readVisibleToken, matchesTokenPage, tokenName } from '../apps/extension/src/runtime/viewing/token-page.ts';
 import { identifyPage } from '../packages/shared/src/navigation.ts';
 import { siteProfile } from '../packages/shared/src/sites/index.ts';
 
@@ -47,6 +47,7 @@ test('host boundary validates source, network and full contract; pool data canno
 });
 
 test('GMGN trend decorations never become names or veto the contract-bound public heading',()=>{
-  for(const title of ['↑ $0.001 | GMGN.AI','↓ $0.001 | GMGN.AI','▲ $0.001 | GMGN.AI','↑ PONS $0.001 | GMGN.AI','PONS ↑ $0.001 | GMGN.AI']) assert.equal(fixture({title}).run()?.name,'PONS',title);
-  for(const name of ['↑','↓','▲','↗','$0.001','+12%']) assert.equal(fixture({title:'↑ $0.001 | GMGN.AI',name}).run(),undefined,name);
+  // The isolated read supplies candidates; background sharing applies the common name validator.
+  for(const title of ['↑ $0.001 | GMGN.AI','↓ $0.001 | GMGN.AI','▲ $0.001 | GMGN.AI','↑ PONS $0.001 | GMGN.AI','PONS ↑ $0.001 | GMGN.AI']) assert.equal(tokenName(fixture({title}).run()?.name),'PONS',title);
+  for(const name of ['↑','↓','▲','↗','$0.001','+12%']) assert.equal(tokenName(fixture({title:'↑ $0.001 | GMGN.AI',name}).run()?.name),undefined,name);
 });

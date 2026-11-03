@@ -27,6 +27,14 @@ export function DanmakuIcon({ size }: { size?: number }) {
   </Glyph>;
 }
 
+/** 热门: a filled two-tone flame, orange around a yellow core, flat; the one coloured icon in the header. */
+export function HotIcon({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="var(--ui-ink-flame)" d="M12.6 2.2c.3 2.9 2 4.4 3.6 6.1 1.5 1.6 2.8 3.4 2.8 6.1A7 7 0 0 1 12 21.5a7 7 0 0 1-7-7c0-2.5 1.2-4.3 2.6-5.7.2 1.6 1 2.8 2.3 3.3-.6-3.9.6-7.4 2.7-9.9Z" />
+    <path fill="var(--ui-ink-flame-core)" d="M12.2 12.8c-1.7 1.4-2.7 2.7-2.7 4.3a2.6 2.6 0 0 0 5.2 0c0-1.6-1-2.9-2.5-4.3Z" />
+  </svg>;
+}
+
 /** 共享在看: lucide's Radio geometry with explicit wave groups so the composer can pulse them. */
 export function ShareIcon({ size, className }: { size?: number; className?: { center?: string; inner?: string; outer?: string } }) {
   return <Glyph size={size}>

@@ -39,7 +39,7 @@ button.rec:hover, .recItem:not([data-editing]) > div.rec:hover { background:var(
 .editor[data-compact] textarea { min-height:36px; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); padding:8px 14px; }
 .editor[data-compact]:focus-within textarea { min-height:64px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); padding:8px 10px; }
 .editor textarea::placeholder { color:var(--ui-ink-muted); }
-.editor textarea:focus { outline:none; box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }
+.editor textarea:focus { outline:none; }
 .editorBar { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
 .counter { margin-inline-end:auto; font-size:var(--ui-type-caption); color:var(--ui-text-secondary); font-variant-numeric:tabular-nums; }
 .counter[data-over] { color:var(--ui-ink-error); }

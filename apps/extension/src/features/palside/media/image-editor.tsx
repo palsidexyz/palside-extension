@@ -90,8 +90,16 @@ export function ImageEditor({ src, name, mode = 'edit', teamId, command, standal
   }, [standalone]);
   useEffect(() => {
     if (!remote || !command) return;
-    let active = true; let timer: ReturnType<typeof setTimeout>;
+    let active = true; let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = 750; let polling = false;
+    const schedule = () => {
+      if (!active || document.visibilityState === 'hidden') return;
+      timer = setTimeout(() => void poll(), delay);
+      delay = Math.min(delay * 2, 5000);
+    };
     const poll = async () => {
+      if (!active || polling || document.visibilityState === 'hidden') return;
+      polling = true;
       try {
         const next = await command('image-session-read', { id: remote.id });
         if (!active) return;
@@ -107,11 +115,16 @@ export function ImageEditor({ src, name, mode = 'edit', teamId, command, standal
         if (error && typeof error === 'object' && 'code' in error && error.code === 'IMAGE_SESSION_UNAVAILABLE') {
           setRemote(undefined); return;
         }
-      }
-      if (active) timer = setTimeout(() => void poll(), 750);
+      } finally { polling = false; }
+      schedule();
     };
-    timer = setTimeout(() => void poll(), 750);
-    return () => { active = false; clearTimeout(timer); };
+    const visibilityChanged = () => {
+      clearTimeout(timer);
+      if (document.visibilityState !== 'hidden') { delay = 750; void poll(); }
+    };
+    document.addEventListener('visibilitychange', visibilityChanged);
+    schedule();
+    return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibilityChanged); };
   }, [remote, command, text]);
   async function openWindow() {
     if (!command || !teamId || busyRef.current) return;

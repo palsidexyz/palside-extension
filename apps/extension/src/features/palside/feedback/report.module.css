@@ -15,7 +15,7 @@ legend.title { margin-bottom:8px; }
 .reasons { display:flex; flex-wrap:wrap; gap:8px; }
 .reason { position:relative; display:inline-flex; align-items:center; min-height:34px; padding:6px 14px; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); font-size:var(--ui-type-callout); line-height:20px; color:var(--ui-text-primary); cursor:pointer; transition:background-color .18s,box-shadow .18s; }
 .reason:hover { background:var(--ui-control-hover); }
-.reason[data-checked] { background:color-mix(in srgb, var(--ui-accent) 24%, var(--ui-canvas)); box-shadow:inset 0 0 0 1.5px var(--ui-text-primary); font-weight:500; }
+.reason[data-checked] { background:var(--ui-accent-soft); box-shadow:inset 0 0 0 1.5px var(--ui-text-primary); font-weight:500; }
 .reason input { position:absolute; inset:0; margin:0; opacity:0; cursor:inherit; }
 .reason:has(input:focus-visible) { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
 fieldset:disabled .reason { opacity:.55; cursor:default; }

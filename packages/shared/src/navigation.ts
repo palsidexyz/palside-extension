@@ -38,8 +38,11 @@ const credentialNames = new Set([
   'accesstoken', 'refreshtoken', 'idtoken', 'authtoken', 'authenticationtoken', 'authorizationtoken', 'sessiontoken', 'csrftoken', 'xsrftoken', 'securitytoken', 'bearertoken', 'apitoken', 'logintoken',
   'auth', 'authentication', 'authorization', 'authcode', 'authorizationcode', 'authkey', 'jwt', 'session', 'sessionid', 'sessionkey', 'apikey', 'apisecret', 'clientsecret', 'secret', 'password', 'passwd', 'pwd',
   'signature', 'sig', 'credential', 'credentials', 'oauthtoken', 'oauthtokensecret', 'oauthsignature', 'oauthverifier', 'xamzcredential', 'xamzsignature', 'xamzsecuritytoken', 'xgoogcredential', 'xgoogsignature', 'xgoogsecuritytoken',
+  // One-time sign-in and recovery material: OAuth/OIDC callbacks, SAML posts, magic links, one-time codes and reset links.
+  'code', 'state', 'nonce', 'codeverifier', 'ticket', 'otp', 'magiclink', 'resettoken', 'verificationtoken', 'samlresponse', 'samlrequest', 'relaystate',
+  'privatekey', 'mnemonic', 'seedphrase',
 ]);
-/** Preserve meaningful page routing, including hash routes. Never send embedded authentication credentials. */
+/** Preserve meaningful page routing, including hash routes. A URL carrying authentication or one-time sign-in material is never shared (callers fall back to the site name). */
 export function publicShareUrl(input: string): string | null {
   const url = websiteUrl(input); if (!url) return null;
   const route = siteByDomain(url.hostname)?.identify?.routes.find(route => new RegExp(route.path, route.flags).test(url.pathname));

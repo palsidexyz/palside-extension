@@ -5,6 +5,10 @@
 .logo[data-size="xs"] { --logo-size:16px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
 .logo[data-size="lg"] { --logo-size:40px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
 /* A site already 开启 in 添加网站: the logo greys out. */
+.logo .letter { position:absolute; inset:0; display:grid; place-items:center; font-size:var(--ui-type-footnote); font-weight:600; line-height:1; }
+.logo[data-size="lg"] .letter { font-size:var(--ui-type-headline); }
+.logo[data-size="sm"] .letter, .logo[data-size="xs"] .letter { font-size:var(--ui-type-caption); }
+.logo[data-off] .letter { opacity:.5; }
 .logo[data-off] img { filter:grayscale(1); opacity:.45; }
 .logo[data-off] svg { opacity:.5; }
 .logo[data-plate="light"] { background:var(--ui-logo-plate-light); }

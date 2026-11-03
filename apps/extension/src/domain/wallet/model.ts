@@ -1,13 +1,14 @@
+import { SECOND_MS } from '@palside/shared/units';
 import type { ChainClientConfig, ChainOrder, ChainOrderInput } from '@palside/shared/contracts/chain';
-import { chainAmount, palsUnit } from '@palside/shared/chain/rules';
+import { chainAmount, palsUnit } from '@palside/shared/chain/amount';
 
 export const WALLET_PATH = "m/44'/60'/0'/0/0" as const;
-export const WALLET_LIMITS = Object.freeze({ single: 250n, daily: 1000n, privateKeyExposureMs: 30_000 });
+export const WALLET_LIMITS = Object.freeze({ privateKeyExposureMs: 30_000 });
 export type PaymentPhase = 'review' | 'password' | 'signing' | 'submitting' | 'pending' | 'confirmed' | 'failed' | 'expired';
 export type WalletPayment = {
   id: string; input: ChainOrderInput; order: ChainOrder; phase: PaymentPhase;
   passwordRequired: boolean; total: string; error?: string; requestId?: string;
-  signed?: boolean;
+  signed?: boolean; pendingSince?: number; quickPayResetAt?: number;
 };
 export type WalletPreferences = { smallPayments: boolean; hideAmounts: boolean };
 export type WalletAvailability = 'loading' | 'closed' | 'locked' | 'ready' | 'offline';
@@ -16,9 +17,23 @@ export type WalletBaseState = {
   preferences: WalletPreferences; payment?: WalletPayment; openedNotice: boolean;
 };
 export function paymentTotal(order: ChainOrder): bigint { return chainAmount(order.amount); }
-export function allowsSmallPayment(input: ChainOrderInput, amount: bigint, spent: bigint, decimals: number): boolean {
-  const unit = palsUnit(decimals);
-  return !(input.kind === 'transfer' && 'recipient' in input) && amount > 0n && amount <= WALLET_LIMITS.single * unit && spent + amount <= WALLET_LIMITS.daily * unit;
+export function quickPayLimits(config: ChainClientConfig['quickPay']) {
+  const single = BigInt(config.single), daily = BigInt(config.daily);
+  return { single: single < 250n ? single : 250n, daily: daily < BigInt(SECOND_MS) ? daily : BigInt(SECOND_MS) };
+}
+export function smallPaymentStatus(input: ChainOrderInput, amount: bigint, spent: bigint, decimals: number, config: ChainClientConfig['quickPay']): 'allowed' | 'password' | 'daily-limit' {
+  const unit = palsUnit(decimals), limits = quickPayLimits(config);
+  if (input.kind === 'transfer' && 'recipient' in input || amount <= 0n || amount > limits.single * unit) return 'password';
+  return spent + amount <= limits.daily * unit ? 'allowed' : 'daily-limit';
+}
+export function nextUtcDay(now = Date.now()) {
+  const date = new Date(now);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
+}
+export function nearestEqualPacketTotal(total: bigint, count: number, decimals: number): bigint {
+  const shares = BigInt(count), minimum = palsUnit(decimals) * shares;
+  const lower = total / shares * shares, upper = lower + shares;
+  return lower < minimum ? minimum : total - lower <= upper - total ? lower : upper;
 }
 export function terminalPayment(phase: PaymentPhase): boolean { return phase === 'confirmed' || phase === 'failed' || phase === 'expired'; }
 /** Decimal input never passes through a floating point number. */

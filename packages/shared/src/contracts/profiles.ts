@@ -3,7 +3,7 @@ import { denseArray, contractString, strictObject } from './validation.ts';
 import { id, matrixId, count, text } from './common.ts';
 import { walletBinding } from './chain.ts';
 import { normalizeTagText, presetTagIds } from './rules.ts';
-import { NICKNAME_LENGTH, BIO_LENGTH, TAG_COUNT, TAG_LENGTH } from './limits.ts';
+import { NICKNAME_LENGTH, BIO_LENGTH, TAG_COUNT, TAG_LENGTH } from '../rules/accounts.ts';
 export const walletPerson = strictObject({ wallet: Type.Union([walletBinding, Type.Null()]) });
 export type WalletPerson = Static<typeof walletPerson>;
 export { presetTagIds };
@@ -20,6 +20,6 @@ export const personFields = { id, nickname: text(NICKNAME_LENGTH), avatarId: Typ
 export const person = strictObject(personFields);
 export const account = strictObject({ ...personFields, acceptTeamInvites: Type.Boolean(), bio: text(BIO_LENGTH), tags: profileTags, matrixId, revision: count });
 export type Account = Static<typeof account>;
-export const teamPerson = strictObject({ ...personFields, bio: text(BIO_LENGTH), tags: profileTags, matrixId, deleted: Type.Boolean() });
+export const teamPerson = strictObject({ ...personFields, bio: text(BIO_LENGTH), tags: profileTags, matrixId: Type.Union([matrixId, Type.Null()]), deleted: Type.Boolean() });
 export const profileUpdate = Type.Refine(strictObject({ nickname: Type.Optional(text(NICKNAME_LENGTH, 1)), bio: Type.Optional(text(BIO_LENGTH)), tags: Type.Optional(profileTags), acceptTeamInvites: Type.Optional(Type.Boolean()) }), value => Object.values(value).some(item => item !== undefined), () => 'expected a profile field');
 export type RoomPerson = Static<typeof person>;

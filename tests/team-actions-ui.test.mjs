@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { productionModules } from './helpers/production-module.mjs';
-import { TEAM_MEMBER_LIMIT } from '../packages/shared/src/contracts/limits.ts';
+import { TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
 
 const root = 'apps/extension/src/features/palside/teams/';
 function panel(live = false) {

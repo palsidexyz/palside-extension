@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { decodeContract } from '../packages/shared/src/contracts/validation.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -82,7 +83,7 @@ test('past moments read as just now, minutes ago within the hour, then a short d
   const now = new Date(2026, 9, 17, 12, 0).getTime();
   assert.equal(pastTime(now - 20_000, 'zh-CN', now), '刚刚');
   assert.equal(pastTime(now - 20_000, 'en', now), 'just now');
-  assert.equal(pastTime(now - 5 * 60_000, 'zh-CN', now), '5分钟前');
+  assert.equal(pastTime(now - 5 * MINUTE_MS, 'zh-CN', now), '5分钟前');
   assert.equal(pastTime(new Date(2026, 9, 16, 9, 5).getTime(), 'zh-CN', now), '10月16日 09:05');
   assert.equal(pastTime(NaN, 'en', now), '');
 });

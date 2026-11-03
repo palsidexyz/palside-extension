@@ -1,3 +1,4 @@
+import { DAY_MS } from '@palside/shared/units';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import type { Api } from '../transport/api';
 import type { ClientStorage } from './storage';
@@ -46,7 +47,7 @@ async function runSubmission(api: Pick<Api, 'request'>, storage: ReportStorage, 
     body = await makeBody(); guard();
     reservation = JSON.stringify({ key, body });
     body = (JSON.parse(reservation) as { body: ReportSubmission }).body;
-    await storage.put(record, account, 'operation', reservation, Date.now() + 86_400_000); guard();
+    await storage.put(record, account, 'operation', reservation, Date.now() + DAY_MS); guard();
   }
   try {
     const result = await api.request('reports.submit', { body, key }); guard();

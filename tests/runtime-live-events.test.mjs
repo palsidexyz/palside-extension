@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectLiveEvents } from '../apps/extension/src/runtime/transport/live-events.ts';
@@ -18,7 +19,7 @@ test('silent SSE streams become unknown at the heartbeat deadline and reconnect'
     t.mock.timers.tick(59_999); await drain(); assert.deepEqual(states, [true]);
     t.mock.timers.tick(1); await drain(); assert.deepEqual(states, [true, false]); assert.equal(signals[0].aborted, true);
     t.mock.timers.tick(1000); await drain(); assert.equal(signals.length, 2); assert.equal(states.at(-1), true);
-  } finally { stop(); t.mock.timers.tick(60_000); await drain(); }
+  } finally { stop(); t.mock.timers.tick(MINUTE_MS); await drain(); }
 });
 
 test('SSE comment heartbeats reset the idle deadline without generating product events', async t => {
@@ -30,7 +31,7 @@ test('SSE comment heartbeats reset the idle deadline without generating product 
     await drain();
     for (let i = 0; i < 4; i++) { t.mock.timers.tick(25_000); stream.enqueue(new TextEncoder().encode(': heartbeat\n\n')); await drain(); }
     assert.deepEqual(states, [true]); assert.deepEqual(refreshes, []);
-    t.mock.timers.tick(60_000); await drain(); assert.deepEqual(states, [true, false]);
+    t.mock.timers.tick(MINUTE_MS); await drain(); assert.deepEqual(states, [true, false]);
   } finally { stop(); }
 });
 
@@ -59,18 +60,31 @@ for (const random of [0, 0.5, 0.999]) test(`SSE 429 waits for Retry-After plus b
   } finally { stop(); }
 });
 
-for (const status of [401, 503]) test(`SSE ${status} retains its reconnect backoff with bounded jitter and stop cancels it`, async t => {
+test('SSE 401 reports unauthorized once and stops reconnecting', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 0 });
+  let calls = 0, unauthorized = 0; const states = [], signals = [];
+  t.mock.method(globalThis, 'fetch', async (_url, init) => { calls++; signals.push(init.signal); return new Response('{}', { status: 401 }); });
+  const stop = connectLiveEvents({ baseUrl: 'https://service.test', token: () => 'token', onRefresh() {}, onState: value => states.push(value), onUnauthorized: () => { unauthorized++; } });
+  try {
+    await drain(); assert.deepEqual(states, [false]); assert.equal(unauthorized, 1); assert.equal(signals[0].aborted, true);
+    t.mock.timers.tick(30_500); await drain(); assert.equal(calls, 1);
+    t.mock.timers.tick(MINUTE_MS); await drain(); assert.equal(calls, 1); assert.equal(unauthorized, 1); assert.deepEqual(states, [false]);
+    stop(); t.mock.timers.tick(MINUTE_MS); await drain(); assert.equal(calls, 1); assert.equal(unauthorized, 1);
+  } finally { stop(); }
+});
+
+test('SSE 503 retains its reconnect backoff with bounded jitter and stop cancels it', async t => {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 0 });
   t.mock.method(Math, 'random', () => 0.5);
   let calls = 0; const states = [];
-  t.mock.method(globalThis, 'fetch', async () => { calls++; return new Response('{}', { status }); });
+  t.mock.method(globalThis, 'fetch', async () => { calls++; return new Response('{}', { status: 503 }); });
   const stop = connectLiveEvents({ baseUrl: 'https://service.test', token: () => 'token', onRefresh() {}, onState: value => states.push(value) });
   try {
     await drain(); assert.deepEqual(states, [false]);
-    const first = status === 401 ? 30_500 : 1500;
+    const first = 1500;
     t.mock.timers.tick(first - 1); await drain(); assert.equal(calls, 1);
     t.mock.timers.tick(1); await drain(); assert.equal(calls, 2);
-    stop(); t.mock.timers.tick(60_000); await drain(); assert.equal(calls, 2);
+    stop(); t.mock.timers.tick(MINUTE_MS); await drain(); assert.equal(calls, 2);
   } finally { stop(); }
 });
 

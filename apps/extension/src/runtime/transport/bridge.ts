@@ -1,3 +1,4 @@
+import { SECOND_MS } from '@palside/shared/units';
 import type { CommandName, CommandArgs, CommandResult } from './command-map';
 import { errorMessage,MessageError,message as uiMessage,type TextValue } from '@palside/i18n';
 import { isRoomKey } from '@palside/shared/contracts/rules';
@@ -9,6 +10,7 @@ import type { RuntimeState } from '../composition/runtime-state';
 import { stateForPanel } from './panel-state.ts';
 import { applyPatch,type StatePatch } from './state-patch.ts';
 import type { DanmakuSettings,PageStatus } from '../browser/page-protocol';
+import { readSiteIcon, type SiteIcon } from '../../domain/assets/site-icon.ts';
 
 type OpenStickyRequest = { id: string; url?: string; teamId?: string };
 const openStickyListeners = new Set<(request: OpenStickyRequest) => void>();
@@ -47,8 +49,8 @@ export async function command<N extends CommandName>(...args: CommandArgs<N>): P
   return result.value;
 }
 
-export async function openPage(url: string, reuse = false) {
-  const result: Reply = await browser.runtime.sendMessage({ type: 'palside/open', url, reuse });
+export async function openPage(url: string) {
+  const result: Reply = await browser.runtime.sendMessage({ type: 'palside/open', url });
   if (!result.ok) {
     throw new MessageError(result.text ?? errorMessage(result));
   }
@@ -62,24 +64,38 @@ type PanelHandlers = {
   onPage: (status: PageStatus) => void;
   onCaptured: (capture: { src: string; teamId?: string }) => void;
   onDanmaku: (settings: DanmakuSettings) => void;
+  onSiteIcons: (icons: Record<string, SiteIcon>) => void;
 };
 
-/** The panel's port to the background: state, language, page status and danmaku settings in; `hello`, `resync` and activity out. Reconnects on loss. */
-export function observeState({ onState, onError, onLanguage, onDisconnect, onPage, onCaptured, onDanmaku }: PanelHandlers) {
+/** The panel's port to the background: state, language, page status, danmaku settings and site icons in; `hello`, `resync` and activity out. Reconnects on loss. */
+export function observeState({ onState, onError, onLanguage, onDisconnect, onPage, onCaptured, onDanmaku, onSiteIcons }: PanelHandlers) {
   let port: ReturnType<typeof browser.runtime.connect> | undefined;
   let closed = false;
   let firstConnection = true;
+  let retryDelay = 500;
   let reconnect: ReturnType<typeof setTimeout> | undefined;
 
+  function scheduleReconnect() {
+    clearTimeout(reconnect);
+    if (closed || document.visibilityState === 'hidden') return;
+    reconnect = setTimeout(connect, retryDelay);
+    retryDelay = Math.min(retryDelay * 2, 5000);
+  }
+  const visibilityChanged = () => {
+    clearTimeout(reconnect);
+    if (!port && document.visibilityState !== 'hidden') connect();
+  };
+  document.addEventListener('visibilitychange', visibilityChanged);
+
   function connect() {
-    if (closed) {
+    if (closed || document.visibilityState === 'hidden') {
       return;
     }
     try {
       port = browser.runtime.connect({ name: 'palside/panel' });
     } catch {
       onDisconnect();
-      reconnect = setTimeout(connect, 500);
+      scheduleReconnect();
       return;
     }
     const current = port;
@@ -93,7 +109,7 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
       }
       try {
         current.postMessage({ type: 'hello', windowId, activity: firstConnection });
-        if (hotSubscription?.chain !== undefined) void command('room-hot', hotSubscription).catch(() => {});
+        if (hotSubscription?.open) void command('room-hot', hotSubscription).catch(() => {});
         for (const watch of roomWatches.values()) void command('room-watch', watch).catch(() => {});
         firstConnection = false;
         if (latest) {
@@ -111,6 +127,7 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
         onLanguage(message.state);
       }
       if (message.type === 'state') {
+        retryDelay = 500;
         latest = message.state;
         resyncRequested = false;
         onState(stateForPanel(message.state, windowId));
@@ -124,6 +141,7 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
           }
         } else {
           resyncRequested = false;
+          retryDelay = 500;
           latest = applyPatch(latest, patch);
           onState(stateForPanel(latest, windowId));
         }
@@ -140,6 +158,9 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
       if (message.type === 'danmaku') {
         onDanmaku(message.settings);
       }
+      if (message.type === 'site-icons' && message.icons && typeof message.icons === 'object') {
+        onSiteIcons(Object.fromEntries(Object.entries(message.icons as Record<string, unknown>).flatMap(([host, value]) => { const icon = readSiteIcon(value); return icon ? [[host, icon]] : []; })));
+      }
       if (message.type === 'page') {
         onPage(message.status);
       }
@@ -148,12 +169,11 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
       }
     });
     current.onDisconnect.addListener(() => {
-      if (port === current) {
-        port = undefined;
-        onDisconnect();
-      }
+      if (port !== current) return;
+      port = undefined;
+      onDisconnect();
       if (!closed) {
-        reconnect = setTimeout(connect, 500);
+        scheduleReconnect();
       }
     });
   }
@@ -161,7 +181,7 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
   connect();
   let lastActivity = 0;
   const activity = (event: Event) => {
-    if (!event.isTrusted || Date.now() - lastActivity < 1000) {
+    if (!event.isTrusted || Date.now() - lastActivity < SECOND_MS) {
       return;
     }
     lastActivity = Date.now();
@@ -177,6 +197,7 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
   return () => {
     closed = true;
     clearTimeout(reconnect);
+    document.removeEventListener('visibilitychange', visibilityChanged);
     for (const type of ['pointerdown', 'click', 'keydown', 'wheel']) {
       window.removeEventListener(type, activity, { capture: true });
     }

@@ -1,3 +1,4 @@
+import { DEVICE_IDLE_SECONDS } from '@palside/shared/rules/accounts';
 import { errorMessage } from '@palside/i18n';
 import { createPageOpener } from '../runtime/browser/open-page.ts';
 import type { NotificationIdentity } from '../runtime/chat/notification-policy.ts';
@@ -13,6 +14,7 @@ import { selection } from './selection.ts';
 import { sharing } from './sharing.ts';
 import { roomTab } from './room-tab.ts';
 import { signals } from './signals.ts';
+import { siteIcons } from './site-icons.ts';
 import { stateSync } from './state.ts';
 import { stickies } from './stickies.ts';
 
@@ -27,6 +29,7 @@ export interface Parts {
   stickies: ReturnType<typeof stickies>;
   danmaku: ReturnType<typeof danmaku>;
   signals: ReturnType<typeof signals>;
+  siteIcons: ReturnType<typeof siteIcons>;
   sharing: ReturnType<typeof sharing>;
   roomTab: ReturnType<typeof roomTab>;
   notifications: ReturnType<typeof notifications>;
@@ -34,7 +37,7 @@ export interface Parts {
   panel: ReturnType<typeof panel>;
   commands: ReturnType<typeof commands>;
 }
-export type Background = Context & Parts & { openPage: (url: string, reuse?: boolean) => Promise<void> };
+export type Background = Context & Parts & { openPage: (url: string) => Promise<void> };
 
 /** Starts the MV3 service worker: builds the parts, then registers every browser listener synchronously. */
 export function startBackground(env: BackgroundEnv) {
@@ -48,6 +51,7 @@ export function startBackground(env: BackgroundEnv) {
   bg.stickies = stickies(bg);
   bg.danmaku = danmaku(bg);
   bg.signals = signals(bg);
+  bg.siteIcons = siteIcons(bg);
   bg.sharing = sharing(bg);
   bg.roomTab = roomTab(bg);
   bg.notifications = notifications(bg);
@@ -119,6 +123,12 @@ export function startBackground(env: BackgroundEnv) {
     }
     if (fromOffscreen) {
       switch (message.type) {
+        case 'palside/account-cleanup':
+          if (typeof message.accountId !== 'string' || !message.accountId) return;
+          return answer(Promise.all([
+            bg.notifications.clearAccount(message.accountId),
+            ...(message.preservePreferences === true ? [] : [bg.signals.clearAccount(message.accountId)]),
+          ]).then(() => ({ ok: true })), failed);
         case 'palside/runtime-ready': bg.sync.runtimeReady(message.epoch); return;
         case 'palside/runtime-error':
           for (const port of bg.panels.keys()) bg.post(port, { type: 'error', message: message.message });
@@ -133,28 +143,29 @@ export function startBackground(env: BackgroundEnv) {
     }
     if (!fromPanel) return;
     if (message.type === 'palside/command') return answer(bg.commands.panelCommand(message.command ?? {}, sender.url!, sender.documentId), failed);
-    if (message.type === 'palside/open') return answer(bg.openPage(String(message.url), message.reuse === true).then(value => ({ ok: true, value })), failed);
+    if (message.type === 'palside/open') return answer(bg.openPage(String(message.url)).then(value => ({ ok: true, value })), failed);
   });
 
   bg.notifications.listenNotifications();
   browser.permissions.onAdded.addListener(added => {
     bg.notifications.listenNotifications();
     bg.pages.syncPermissions(Boolean(added.origins?.length));
-    if (added.origins?.length) void bg.roomTab.refresh();
+    if (added.origins?.length) { void bg.roomTab.refresh(); bg.siteIcons.added(added.origins); }
   });
   browser.permissions.onRemoved.addListener(removed => {
     // Revoke page sessions synchronously, before any queued permission reads can finish.
     if (removed.origins?.length) bg.pages.clearPages();
     // 共享在看 cannot run without 读取您的浏览记录: switch it off and say why.
-    if (removed.permissions?.includes('tabs') && bg.state?.toggles.share) void bg.run({ name: 'toggle', payload: { share: false, revoked: true } }).catch(() => {});
+    if (removed.permissions?.includes('tabs') && bg.state?.preferences.share) void bg.run({ name: 'toggle', payload: { share: false, revoked: true } }).catch(() => {});
     bg.pages.syncPermissions(Boolean(removed.origins?.length));
     // 弹幕 follows a tab's token only on an added site.
-    if (removed.origins?.length) void bg.roomTab.refresh();
+    if (removed.origins?.length) { void bg.roomTab.refresh(); void bg.siteIcons.prune(); }
   });
 
   browser.windows.onRemoved.addListener(windowId => { void bg.roomTab.refresh(); bg.capture.discardCapture(windowId); bg.selection.discardPick(windowId); bg.images.imageWindowClosed(windowId); });
   browser.windows.onFocusChanged.addListener(windowId => { void bg.roomTab.refresh(windowId); bg.signals.signalActivity(); void bg.sharing.observer.refresh(true); });
-  browser.tabs.onActivated.addListener(({ windowId }) => {
+  browser.tabs.onActivated.addListener(({ tabId, windowId }) => {
+    void browser.tabs.get(tabId).then(tab => bg.siteIcons.tab(tab)).catch(() => {});
     void bg.roomTab.refresh();
     bg.capture.discardCapture(windowId);
     bg.selection.resetWindowSelection(windowId);
@@ -167,6 +178,7 @@ export function startBackground(env: BackgroundEnv) {
     if (change.url !== undefined || change.status === 'loading') bg.capture.invalidateActiveTab(tabId, change.url ?? tab.url);
     if ((change.status === 'loading' || change.url !== undefined) && (bg.capture.captures.get(tab.windowId)?.tabId === tabId || tab.active)) bg.capture.discardCapture(tab.windowId);
     bg.pages.tabNavigated(tabId, change, tab);
+    if (change.favIconUrl) void bg.siteIcons.tab(tab);
     if (tab.active) void bg.roomTab.refresh();
     if (tab.active && [...bg.panels.values()].includes(tab.windowId)) {
       if (change.url || change.status) void bg.sharing.observer.refresh(false, !change.url && change.status === 'complete');
@@ -182,9 +194,15 @@ export function startBackground(env: BackgroundEnv) {
   });
 
   // 活跃 lasts five minutes after the last input; onStateChanged follows the same interval.
-  browser.idle.onStateChanged.addListener(value => { bg.sharing.updateDeviceState(value === 'active' ? 'active' : 'away'); void bg.sharing.observer.refresh(value === 'active'); });
-  browser.idle.setDetectionInterval(300);
-  void browser.idle.queryState(300).then(value => bg.sharing.updateDeviceState(value === 'active' ? 'active' : 'away')).catch(() => {});
+  browser.idle.onStateChanged.addListener(value => {
+    bg.sharing.updateDeviceState(value === 'active' ? 'active' : 'away'); void bg.sharing.observer.refresh(value === 'active');
+    // A locked screen forgets the wallet's unlocked signing key; the next payment asks for the password.
+    if (value === 'locked' && bg.state?.authenticated) void bg.run({ name: 'wallet-lock', payload: {} }).catch(() => {});
+  });
+  browser.idle.setDetectionInterval(DEVICE_IDLE_SECONDS);
+  void browser.idle.queryState(DEVICE_IDLE_SECONDS).then(value => bg.sharing.updateDeviceState(value === 'active' ? 'active' : 'away')).catch(() => {});
   void bg.pages.registerPageLayer().catch(() => {});
+  // A site revoked while the worker slept leaves its icon behind.
+  void bg.siteIcons.prune().catch(() => {});
   return bg;
 }

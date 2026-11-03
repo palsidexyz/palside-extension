@@ -20,13 +20,15 @@ export type PageStatus = {
   access: AccessStatus;
   title?: string;
   favicon?: string;
+  /** The tab's own icon address, for this panel only (see `tabIcon`); never shared. */
+  icon?: string;
   /** A joined team is current and this site's access is granted, so page actions run here. */
   granted: boolean;
-  /** 网页互动 runs here: it is switched on and `granted`. One-off actions never change it. */
+  /** 网页互动 runs here: it is on for this site and `granted`. One-off actions never change it. */
   interactive: boolean;
-  /** 便利贴 show and can be added here: `interactive` ∧ the 便利贴 switch under 网页互动. */
+  /** 便利贴 show and can be added here: `interactive` ∧ this site's 便利贴 switch. */
   stickyEnabled: boolean;
-  /** Signals send and show here: `interactive` ∧ the signal switch under 网页互动. */
+  /** Signals send and show here: `interactive` ∧ this site's 信号 switch. */
   signalEnabled: boolean;
   signalSettings?: SignalSettings;
   /** The page script is running in the active tab, for 互动 or for a one-off action (quote, locate, capture). */
@@ -72,7 +74,8 @@ export function normalizeDanmakuSettings(value: unknown): DanmakuSettings {
   const density = input.density === 'low' || input.density === 'high' ? input.density : 'mid';
   return { enabled: input.enabled !== false, area, density, speed, size, opacity };
 }
-export type PageDanmaku = { id: string; key: string; text: string; author: PagePerson; self?: boolean; mate?: boolean; timestamp?: number };
+/** replay: sent before the page opened, replayed once and drawn lighter than live lines. */
+export type PageDanmaku = { id: string; key: string; text: string; author: PagePerson; self?: boolean; mate?: boolean; replay?: true; timestamp?: number };
 /** Public display fields only; account IDs, wallet addresses and payment credentials stay in the extension. */
 /** Opens the room in the side panel; claims and payment actions never run in the page. */
 export type PageRoomPacket = { roomKey: string };

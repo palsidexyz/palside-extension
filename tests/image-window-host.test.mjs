@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@palside/shared/units';
 import { productionModules } from './helpers/production-module.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -265,7 +266,7 @@ test('image lifecycle ports revoke loaded windows and reject sessions absent aft
 test('an expired image session revokes and closes its window before the binding is dropped', async t => {
   let now = Date.now(); t.mock.method(Date, 'now', () => now);
   const f = fixture(); const first = (await f.open()).value.id;
-  now += 25 * 3600_000;
+  now += 25 * HOUR_MS;
   await f.open();
   assert.ok(f.revoked.includes(first)); assert.deepEqual(f.removed, [100]);
   await f.command('logout'); await new Promise(resolve => setImmediate(resolve));

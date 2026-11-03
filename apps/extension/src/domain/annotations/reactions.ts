@@ -1,4 +1,4 @@
-import { REACTION_TTL_MS } from '@palside/shared/contracts/limits';
+import { REACTION_TTL_MS } from '@palside/shared/rules/interactions';
 /** The fixed team reaction set; receivers ignore anything else. `name` selects the translated label. */
 export const reactionEmojis = [
   { emoji: '🔥', name: 'fire' },

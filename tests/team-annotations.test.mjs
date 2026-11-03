@@ -1,3 +1,4 @@
+import { DAY_MS as day } from '@palside/shared/units';
 import { decodeContract } from '../packages/shared/src/contracts/validation.ts';
 import { productionModules } from './helpers/production-module.mjs';
 import { endpointsById } from '../packages/shared/src/contracts/endpoints.ts';
@@ -16,7 +17,6 @@ import { requireEncryptedSend, teamSendGuard } from '../apps/extension/src/runti
 import { installEncryptedRoom } from './helpers/encrypted-room.mjs';
 
 const asset = 'Ethereum:0x1111111111111111111111111111111111111111';
-const day = 86_400_000;
 const url = 'https://docs.example.com/guide?version=2#/install';
 const target = { kind: 'quote', exact: 'Public text', prefix: '', suffix: '' };
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -43,6 +43,7 @@ function fixture(timelineGlobals) {
     sending: { outgoing: new Map(), inFlight: new Set() },
     sharing: { peerViewing: new Map() },
     rooms: { async clearLocal() {} },
+    tokens: { remember: () => false, apply: view => view },
     emit() {},
   };
   installEncryptedRoom(runtime.auth.client);

@@ -1,14 +1,17 @@
-import { graphemeLength } from '@palside/shared/contracts/rules';
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
+import { graphemeLength, isRoomKey, roomKeyForAsset, stances } from '@palside/shared/contracts/rules';
 import type { EndpointId } from '@palside/shared/contracts/endpoints';
 import type { ApiOptions,ApiResult } from '../transport/api';
-import { isRoomKey,roomKeyForAsset,stances } from '@palside/shared/contracts/rules';
-import { ROOM_HOT_REFRESH_MS,ROOM_MESSAGE_LIMIT,ROOM_PAGE_SIZE,ROOM_RENEW_MS,ROOM_TEXT_MAX } from '@palside/shared/contracts/limits';
-import type { RoomEvent,RoomMessage,RoomPerson,RoomProfileInput,RoomStance,Stance,StanceCounts } from './contract-types';
+import { ROOM_MESSAGE_LIMIT, ROOM_RENEW_MS, ROOM_TEXT_MAX } from '@palside/shared/rules/rooms';
+import type { RoomEvent,RoomMessage,RoomPerson,RoomProfile,RoomProfileInput,RoomStance,Stance,StanceCounts } from './contract-types';
 import { ApiError } from '../transport/api';
 import { commandError } from '../composition/commands';
 import type { PalsideService } from '../composition/core';
 
-const SUMMARY_LIMIT = 64, RESULT_TTL = 10 * 60_000;
+const SUMMARY_LIMIT = 64, RESULT_TTL = 10 * MINUTE_MS;
+/** A token's public numbers this recent are reused instead of read again; live events and 热门 keep them current meanwhile. */
+const SUMMARY_FRESH_MS = 30 * SECOND_MS, PEOPLE_FRESH_MS = 15 * SECOND_MS;
+const RECENT_ROOMS = 3, RECENT_ROOM_MS = 5 * MINUTE_MS;
 
 const emptyRooms = () => ({ summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} });
 const emptyStance = (): RoomStance => ({ bull: 0, hold: 0, bear: 0, mine: null });
@@ -19,6 +22,8 @@ export class RoomService {
   constructor(runtime: PalsideService) { this.runtime = runtime; }
   private panels = false;
   private tab?: string;
+  /** The active tab's token room, which the panel names before any room is open. */
+  get tabKey() { return this.tab; }
   private tabProfile?: RoomProfileInput;
   private pinnedProfile?: RoomProfileInput;
   private epoch = 0;
@@ -28,11 +33,11 @@ export class RoomService {
   private summaryAccess = new Map<string, number>();
   private watches = new Map<string, string>();
   private peopleAt = 0;
-  private hotAt = new Map<string, number>();
-  private hotReads = new Map<string, object>();
-  private hotSources = new Map<string, string | null>();
-  private hotPolls = new Map<string | null, ReturnType<typeof setInterval>>();
-  private hotWork = new Map<string | null, Promise<unknown>>();
+  /** When each token's summary was last confirmed by the service: a read, a room snapshot or a 热门 push. */
+  private summaryFetched = new Map<string, number>();
+  private hotSources = new Set<string>();
+  private hotQueue: Promise<unknown> = Promise.resolve();
+  private hotOpen = false;
   private peopleRead = 0;
   private invitesRead = 0;
   private blocksVersion = 0;
@@ -82,6 +87,15 @@ export class RoomService {
   }
   private serial<T>(work: () => Promise<T>): Promise<T> { const next = this.queue.catch(() => {}).then(work); this.queue = next; return next; }
   private stop() { clearTimeout(this.leaseTimer); this.leaseTimer = undefined; }
+  /** The last few rooms' lines, in memory only, so switching back does not start from an empty list. */
+  private recent = new Map<string, { at: number; messages: RoomMessage[]; slowUntil: number; slowMs: number }>();
+  private keepRecent() {
+    const room = this.runtime.state.rooms.current;
+    if (!room || room.loading || !this.messages.size) return;
+    this.recent.delete(room.key);
+    this.recent.set(room.key, { at: Date.now(), messages: [...this.messages.values()].slice(-ROOM_MESSAGE_LIMIT), slowUntil: room.slowUntil, slowMs: room.slowMs });
+    while (this.recent.size > RECENT_ROOMS) this.recent.delete(this.recent.keys().next().value!);
+  }
   private clearCurrent() {
     this.version++; this.messages.clear(); this.retracted.clear(); this.folded.clear(); this.updates = []; this.cursor = undefined;
     this.paging = undefined; this.snapshotWork = undefined;
@@ -91,9 +105,8 @@ export class RoomService {
     const token = this.runtime.auth.session?.token;
     if (token && this.remoteLease) void this.serial(() => this.runtime.api.request('rooms.lease', { body: { key: null }, token })).catch(() => {});
     this.dropHot('');
-    this.hotReads.clear(); this.hotAt.clear();
     this.stop(); this.epoch++; this.reads++; this.clearCurrent(); this.panels = false; this.tab = undefined; this.tabProfile = undefined; this.pinnedProfile = undefined; this.remoteLease = false;
-    this.blocksQueue = Promise.resolve(); this.stanceQueues.clear(); this.stanceVersions.clear(); this.summaryReads.clear(); this.summaryAccess.clear(); this.watches.clear(); this.clearAvatars(); this.runtime.state.rooms = emptyRooms();
+    this.blocksQueue = Promise.resolve(); this.stanceQueues.clear(); this.stanceVersions.clear(); this.summaryReads.clear(); this.summaryAccess.clear(); this.summaryFetched.clear(); this.recent.clear(); this.watches.clear(); this.clearAvatars(); this.runtime.tokens.clear(); this.runtime.state.rooms = emptyRooms();
   }
   private clearAvatars() {
     this.avatarVersion++; for (const url of this.avatarUrls.values()) URL.revokeObjectURL(url);
@@ -121,8 +134,15 @@ export class RoomService {
     if (same && (!refresh || state.current?.loading)) { this.runtime.emit(); return this.snapshotWork ?? this.queue; }
     this.stop();
     if (!same) {
+      this.keepRecent();
       this.clearCurrent();
-      if (key) state.current = { key, profile: null, count: 0, stance: emptyStance(), faces: [], messages: [], hasMore: false, loading: true, slowUntil: 0 };
+      if (key) {
+        // Returning to a room shows its last lines and its token's known numbers at once; the snapshot below then replaces both with the service's.
+        const kept = this.recent.get(key), summary = state.summaries[key];
+        const recent = kept && Date.now() - kept.at < RECENT_ROOM_MS ? kept : undefined;
+        state.current = { key, profile: summary?.profile ?? null, count: summary?.count ?? 0, stance: summary?.stance ?? emptyStance(), faces: summary?.faces ?? [], messages: [], hasMore: false, loading: true, slowUntil: recent?.slowUntil ?? 0, slowMs: recent?.slowMs ?? 0 };
+        if (recent) for (const message of recent.messages) this.messages.set(message.id, message);
+      }
     } else { state.current!.loading = true; this.updates = []; }
     const room = state.current, scope = this.scope(), version = this.version, token = this.runtime.auth.session?.token;
     this.runtime.emit();
@@ -138,7 +158,7 @@ export class RoomService {
           const profile = state.pinned ? this.pinnedProfile : this.tabProfile;
           const lease = await scope.wait(this.runtime.api.request('rooms.lease', { body: { key, ...(profile ? { profile } : {}) }, token }));
           if (version !== this.version) return false;
-          state.leased = key; room!.slowUntil = Math.max(room!.slowUntil, lease.slowUntil);
+          state.leased = key; room!.slowMs = lease.slowMs; room!.slowUntil = Math.max(room!.slowUntil, lease.slowUntil);
           // Snapshot reads must never delay lease renewal or release.
           this.scheduleLease(); return true;
         });
@@ -149,9 +169,9 @@ export class RoomService {
         ]));
         if (version !== this.version) return;
         this.messages = new Map(); for (const message of page.messages) this.append(message);
-        this.cursor = page.messages[0]?.id; Object.assign(room!, summary, { hasMore: page.hasMore, loading: false });
+        this.cursor = page.messages[0]?.id; Object.assign(room!, summary, { hasMore: page.hasMore, loading: false }); this.rememberProfile(key, summary.profile);
         const updates = this.updates; this.updates = []; for (const update of updates) update();
-        state.summaries[key] = { key, profile: room!.profile, count: room!.count, stance: room!.stance, faces: room!.faces, at: Date.now() };
+        state.summaries[key] = { key, profile: room!.profile, count: room!.count, stance: room!.stance, faces: room!.faces, at: Date.now() }; this.summaryFetched.set(key, Date.now());
         this.retryAvatars(); this.runtime.emit();
       } catch (error) {
         if (scope.current() && version === this.version) { this.clearCurrent(); this.scheduleLease(); this.runtime.emit(); }
@@ -173,7 +193,7 @@ export class RoomService {
         scope.check(); if (version !== this.version || this.target() !== key) return;
         const profile = this.runtime.state.rooms.pinned ? this.pinnedProfile : this.tabProfile;
         const result = await scope.wait(this.runtime.api.request('rooms.lease', { body: { key, ...(profile ? { profile } : {}) } }));
-        if (version === this.version) { this.update(() => { this.applyCount(key, result.count); const room = this.runtime.state.rooms.current; if (room) room.slowUntil = Math.max(room.slowUntil, result.slowUntil); }); this.runtime.emit(); }
+        if (version === this.version) { this.update(() => { this.applyCount(key, result.count); const room = this.runtime.state.rooms.current; if (room) { room.slowUntil = Math.max(room.slowUntil, result.slowUntil); room.slowMs = result.slowMs; } }); this.runtime.emit(); }
       });
     } finally { if (scope.current() && version === this.version) this.scheduleLease(); }
   }
@@ -181,6 +201,7 @@ export class RoomService {
     if (!this.runtime.auth.session) return;
     this.retryAvatars(); this.prune();
     if (!this.panels || !this.enabled()) return;
+    void this.syncHot(true).catch(() => {});
     void this.sync(true).catch(() => {});
   }
   send(input: unknown): Promise<unknown> {
@@ -195,7 +216,7 @@ export class RoomService {
       try {
         const result = await this.runtime.api.request('rooms.send', { body: { key: room.key, text }, key: pending.id, token: session.token });
         this.pendingSends.delete(logical); scope.check();
-        if (version === this.version) { this.update(() => { this.append(result.message); room.slowUntil = Math.max(room.slowUntil, result.slowUntil); }); this.runtime.emit(); }
+        if (version === this.version) { this.update(() => { this.append(result.message); room.slowUntil = Math.max(room.slowUntil, result.slowUntil); room.slowMs = result.slowMs; }); this.runtime.emit(); }
         return result;
       } catch (error) {
         const rejected = error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && !['RESULT_UNKNOWN', 'INVALID_RESPONSE'].includes(error.code);
@@ -207,7 +228,7 @@ export class RoomService {
         if (error instanceof ApiError && error.code === 'ROOM_SLOW') {
           const retryAfterMs = error.retryAfterMs ?? 0;
           if (version === this.version) { const until = Date.now() + retryAfterMs; this.update(() => { room.slowUntil = Math.max(room.slowUntil, until); }); this.runtime.emit(); }
-          throw Object.assign(commandError(error.code, 'extension.room.slow', { seconds: Math.ceil(retryAfterMs / 1000) }), { retryAfterMs });
+          throw Object.assign(commandError(error.code, 'extension.room.slow', { seconds: Math.ceil(retryAfterMs / SECOND_MS) }), { retryAfterMs });
         }
         throw error;
       }
@@ -224,28 +245,18 @@ export class RoomService {
     })();
     this.paging = work; void work.finally(() => { if (this.paging === work) this.paging = undefined; }).catch(() => {}); return work;
   }
-  /** Search only this room's retained pool; account and room changes cancel the lookup. */
   async find(roomKey: unknown, input: unknown) {
     const room = this.requireRoom(), key = this.key(roomKey), id = this.id(input), scope = this.scope(), version = this.version;
-    const current = () => version === this.version && room.key === key && this.enabled();
-    const found = () => Boolean(this.messages.has(id) && !this.runtime.state.rooms.blocked.some(person => person.id === this.messages.get(id)?.author.id));
-    let scanned = this.messages.size;
-    for (let page = 0; current(); page++) {
-      scope.check();
-      if (found()) return { found: true };
-      if (!room.hasMore || !this.cursor || scanned >= ROOM_MESSAGE_LIMIT || page >= Math.ceil(ROOM_MESSAGE_LIMIT / ROOM_PAGE_SIZE)) break;
-      const before = this.cursor;
-      let result: ApiResult<'rooms.messages'>;
-      try { result = await scope.wait(this.more()); }
-      catch (error) {
-        if (error instanceof ApiError && error.code === 'ROOM_MESSAGE_NOT_FOUND') return { found: false };
-        throw error;
-      }
-      if (!current()) break;
-      scanned += result.messages.length;
-      if (!result.messages.length || before === this.cursor) break;
+    if (room.key !== key) return { found: false };
+    try {
+      const message = await scope.wait(this.runtime.api.request('rooms.message', { query: { key, id } }));
+      if (version !== this.version || !this.enabled() || this.retracted.has(id) || this.runtime.state.rooms.blocked.some(person => person.id === message.author.id)) return { found: false };
+      this.update(() => this.append(message)); this.runtime.emit();
+      return { found: true };
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'ROOM_MESSAGE_NOT_FOUND') return { found: false };
+      throw error;
     }
-    return { found: current() && found() };
   }
   async retract(input: unknown) {
     const room = this.requireRoom(), id = this.id(input), scope = this.scope(), version = this.version;
@@ -257,7 +268,7 @@ export class RoomService {
     const result = await scope.wait(this.runtime.api.request('rooms.report', { body: { key: room.key, id } }));
     if (version === this.version) { this.update(() => { const message = this.messages.get(id); if (result.folded) this.folded.add(id); if (message) this.messages.set(id, { ...message, reported: true, folded: message.folded || result.folded }); }); this.runtime.emit(); } return result;
   }
-  private hotRows() { return Object.values(this.runtime.state.rooms.hot ?? {}).flatMap(hot => [...hot.top, ...hot.rising]); }
+  private hotRows() { return this.runtime.state.rooms.hot?.rows ?? []; }
   private applyStance(key: string, counts: StanceCounts, mine?: Stance | null) {
     const state = this.runtime.state.rooms;
     for (const row of [state.current, state.summaries[key]]) if (row?.key === key) row.stance = { ...counts, mine: mine === undefined ? row.stance.mine : mine };
@@ -277,6 +288,8 @@ export class RoomService {
       if (previous.mine) next[previous.mine] = Math.max(0, next[previous.mine] - 1);
       if (next.mine) next[next.mine]++;
       const version = (this.stanceVersions.get(key) ?? 0) + 1; this.stanceVersions.set(key, version);
+      // My own vote makes the next summary read the service, not a pre-vote copy.
+      this.summaryFetched.delete(key);
       this.applyStance(key, next, next.mine); this.runtime.emit();
       try {
         const result = await scope.wait(this.runtime.api.request('rooms.stance', { body: { key, value } }));
@@ -311,11 +324,13 @@ export class RoomService {
   private touchSummary(key: string) { this.summaryAccess.delete(key); this.summaryAccess.set(key, Date.now()); }
   async summary(input: unknown) {
     this.requireEnabled(); const key = this.key(input), scope = this.scope(), reads = this.reads, stanceVersion = this.stanceVersions.get(key), read = {};
+    const known = this.runtime.state.rooms.summaries[key], fetched = this.summaryFetched.get(key);
+    if (known && fetched !== undefined && Date.now() - fetched < SUMMARY_FRESH_MS) { this.touchSummary(key); return known; }
     this.summaryReads.set(key, read);
     try {
       const result = await scope.wait(this.read('rooms.summary', { query: { key } }, stanceVersion));
       if (reads === this.reads && read === this.summaryReads.get(key) && this.enabled()) {
-        this.touchSummary(key);
+        this.touchSummary(key); this.rememberProfile(key, result.profile); this.summaryFetched.set(key, Date.now());
         const previous = this.runtime.state.rooms.summaries[key];
         const next = { ...result, ...(previous && stanceVersion !== this.stanceVersions.get(key) ? { stance: previous.stance } : {}), at: previous?.at ?? Date.now() };
         if (!this.sameRead(previous, next)) { this.runtime.state.rooms.summaries[key] = { ...next, at: Date.now() }; this.runtime.emit(); }
@@ -324,52 +339,39 @@ export class RoomService {
     } finally { if (this.summaryReads.get(key) === read) this.summaryReads.delete(key); }
   }
   async people(input: unknown) {
-    this.requireEnabled(); const key = this.key(input), scope = this.scope(), reads = this.reads, version = ++this.peopleRead;
+    this.requireEnabled(); const key = this.key(input), scope = this.scope(), reads = this.reads;
+    const known = this.runtime.state.rooms.people;
+    if (known?.key === key && this.peopleAt && Date.now() - this.peopleAt < PEOPLE_FRESH_MS) return { count: known.count, people: known.people };
+    const version = ++this.peopleRead;
     const result = await scope.wait(this.read('rooms.people', { query: { key } }));
     if (reads === this.reads && version === this.peopleRead && this.enabled()) this.peopleAt = Date.now();
     if (reads === this.reads && version === this.peopleRead && this.enabled() && !this.sameRead(this.runtime.state.rooms.people, { key, ...result })) { this.runtime.state.rooms.people = { key, ...result }; this.runtime.emit(); } return result;
   }
-  async watchHot(input: { sourceId?: unknown; chain?: unknown }) {
-    const source = this.id(input.sourceId), chain = input.chain;
-    if (chain !== undefined && chain !== null && (typeof chain !== 'string' || !/^[A-Za-z ]{2,24}$/.test(chain))) throw commandError('INVALID_INPUT', 'common.error');
-    if (chain === undefined) this.hotSources.delete(source);
-    else { this.requireEnabled(); this.hotSources.set(source, chain); }
-    this.pollHot(); this.runtime.emit();
-    if (chain !== undefined) await (this.hotWork.get(chain as string | null) ?? this.readHot(chain as string | null));
+  async watchHot(input: { sourceId?: unknown; open: boolean }) {
+    const source = this.id(input.sourceId);
+    if (!input.open) this.hotSources.delete(source);
+    else { this.requireEnabled(); this.hotSources.add(source); }
+    await this.syncHot();
   }
   dropHot(prefix: string) {
     for (const source of this.hotSources.keys()) if (source.startsWith(prefix)) this.hotSources.delete(source);
-    this.pollHot();
+    void this.syncHot().catch(() => {});
   }
-  private pollHot() {
-    const chains = new Set(this.hotSources.values());
-    for (const [chain, timer] of this.hotPolls) if (!chains.has(chain) || !this.enabled()) { clearInterval(timer); this.hotPolls.delete(chain); this.hotWork.delete(chain); }
-    if (!this.enabled()) return;
-    for (const chain of chains) if (!this.hotPolls.has(chain)) {
-      const read = () => { void this.hot(chain ?? undefined).catch(() => {}); };
-      this.hotPolls.set(chain, setInterval(read, ROOM_HOT_REFRESH_MS)); void this.readHot(chain);
-    }
-  }
-  private readHot(chain: string | null) {
-    const work = this.hot(chain ?? undefined);
-    this.hotWork.set(chain, work);
-    void work.catch(() => { if (this.hotWork.get(chain) === work) this.hotWork.delete(chain); });
+  private syncHot(force = false) {
+    const open = this.enabled() && this.hotSources.size > 0, token = this.runtime.auth.session?.token;
+    if (!open && this.runtime.state.rooms.hot) { this.runtime.state.rooms.hot = undefined; this.runtime.emit(); }
+    if (!token || !force && open === this.hotOpen) return this.hotQueue;
+    this.hotOpen = open;
+    if (open && !this.runtime.state.rooms.hot) { this.runtime.state.rooms.hot = { rows: [], loaded: false }; this.runtime.emit(); }
+    const scope = this.scope();
+    const work = this.hotQueue.catch(() => {}).then(async () => {
+      const result = await this.runtime.api.request('rooms.hotSubscription', { body: { open }, token });
+      scope.check();
+      if (open && !result.subscribed) this.hotOpen = false;
+    });
+    this.hotQueue = work;
+    void work.catch(() => { if (scope.current() && this.hotQueue === work) this.hotOpen = false; });
     return work;
-  }
-  async hot(chain?: unknown) {
-    this.requireEnabled(); if (chain !== undefined && (typeof chain !== 'string' || !/^[A-Za-z ]{2,24}$/.test(chain))) throw commandError('INVALID_INPUT', 'common.error');
-    const filter = (chain as string | undefined) ?? '', scope = this.scope(), reads = this.reads, read = {}, stances = new Map(this.stanceVersions);
-    this.hotReads.set(filter, read);
-    try {
-      const result = await scope.wait(this.read('rooms.hot', { query: { chain: chain as string | undefined } }, JSON.stringify([...stances])));
-      if (reads === this.reads && this.hotReads.get(filter) === read && this.enabled()) {
-        this.hotAt.set(filter, Date.now());
-        const previous = this.runtime.state.rooms.hot?.[filter];
-        for (const row of [...result.top, ...result.rising]) if (stances.get(row.key) !== this.stanceVersions.get(row.key)) { const current = this.runtime.state.rooms.summaries[row.key]?.stance; if (current) Object.assign(row, { stance: { bull: current.bull, hold: current.hold, bear: current.bear } }); }
-        const next = { ...result, at: previous?.at ?? result.at };
-        if (!this.sameRead(previous, next)) { this.runtime.state.rooms.hot = { ...this.runtime.state.rooms.hot, [filter]: { ...next, at: result.at } }; this.runtime.emit(); }
-      } return result;
-    } finally { if (this.hotReads.get(filter) === read) this.hotReads.delete(filter); }
   }
   async blocks() {
     this.requireAccount(); const scope = this.scope(), version = this.blocksVersion, read = ++this.blocksRead;
@@ -418,16 +420,18 @@ export class RoomService {
     if (this.runtime.auth.refreshing) await scope.wait(this.runtime.auth.refreshing.catch(() => {}));
     await scope.wait(this.runtime.refresh()); return result;
   }
-  async clearLocal() { this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.reads++; this.clearAvatars(); return { cleared: true }; }
+  async clearLocal() { this.summaryFetched.clear(); this.recent.clear(); this.peopleAt = 0; this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.reads++; this.clearAvatars(); this.runtime.tokens.clear(); return { cleared: true }; }
+  /** The service's voted name and icon fill the memory-only token cache; a page read on this device stays stronger. */
+  private rememberProfile(key: string, profile: RoomProfile | null | undefined) { if (profile && key.startsWith('token:')) this.runtime.tokens.put(key.slice('token:'.length), profile, 'room'); }
   preferencesChanged() {
-    this.pollHot();
-    if (this.runtime.state.preferences.rooms?.off) { this.reads++; this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.clearAvatars(); }
+    void this.syncHot().catch(() => {});
+    if (this.runtime.state.preferences.rooms?.off) { this.reads++; this.recent.clear(); this.summaryFetched.clear(); this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.clearAvatars(); }
     return this.sync();
   }
   async settings(input: { off?: unknown }) {
     this.requireAccount(); if (Object.keys(input).some(key => key !== 'off') || typeof input.off !== 'boolean') throw commandError('INVALID_INPUT', 'common.error');
     const scope = this.scope(), previous = this.runtime.state.preferences;
-    this.runtime.state.preferences = { ...previous, rooms: { off: input.off } }; const submitted = this.runtime.state.preferences;
+    this.runtime.state.preferences = { ...previous, rooms: { ...previous.rooms, off: input.off } }; const submitted = this.runtime.state.preferences;
     const syncing = this.preferencesChanged(); void syncing.catch(() => {});
     try { await scope.wait(this.runtime.sharing.savePreferences()); }
     catch (error) { if (scope.current() && this.runtime.state.preferences === submitted) { this.runtime.state.preferences = previous; void this.preferencesChanged().catch(() => {}); this.runtime.emit(); } throw error; }
@@ -442,6 +446,19 @@ export class RoomService {
     this.update(() => { for (const message of messages) if (this.messages.has(message.id)) this.append(message); });
   }
   consume(event: RoomEvent) {
+    if (event.type === 'hot') {
+      if (this.enabled() && this.hotSources.size) {
+        // One record per token: a newer 热门 push also refreshes that token's summary, keeping this account's own vote.
+        const summaries = this.runtime.state.rooms.summaries;
+        for (const row of event.rooms.rows) {
+          this.rememberProfile(row.key, row.profile);
+          const summary = summaries[row.key];
+          if (summary) { summaries[row.key] = { ...summary, count: row.count, stance: { ...row.stance, mine: summary.stance.mine }, faces: row.faces, at: Date.now() }; this.summaryFetched.set(row.key, Date.now()); }
+        }
+        this.runtime.state.rooms.hot = { rows: event.rooms.rows, loaded: true }; this.runtime.emit();
+      }
+      return;
+    }
     if (!this.enabled() || !this.panels || this.runtime.state.rooms.current?.key !== event.key) return;
     this.update(() => this.applyEvent(event)); this.runtime.emit();
   }
@@ -451,7 +468,7 @@ export class RoomService {
     for (const row of [state.current, state.summaries[key], ...this.hotRows()]) if (row?.key === key) row.count = count;
     if (state.people?.key === key) state.people.count = count;
   }
-  private applyEvent(event: RoomEvent) {
+  private applyEvent(event: Exclude<RoomEvent, { type: 'hot' }>) {
     if (event.type === 'message') this.append(event.message);
     else if (event.type === 'folded') { this.folded.add(event.id); const message = this.messages.get(event.id); if (message) this.messages.set(event.id, { ...message, folded: true }); }
     else if (event.type === 'retract') { this.retracted.add(event.id); this.messages.delete(event.id); }
@@ -485,7 +502,7 @@ export class RoomService {
       return JSON.stringify([state.current?.key, state.current?.faces, [...this.messages], state.blocked,
         [...Object.values(state.summaries), ...this.hotRows()].map(row => [row.key, row.faces]),
         state.people?.key, state.people?.people, state.invites, [...this.avatarUrls], [...this.avatarFailures].map(([id, failure]) => [id, failure.until]),
-        [...this.watches], [...this.hotSources], [...this.summaryAccess], [...this.hotAt], this.peopleAt, state.pinned,
+        [...this.watches], [...this.hotSources], [...this.summaryAccess], this.peopleAt, state.pinned,
         this.enabled(), this.runtime.state.connection.networkOnline, this.runtime.auth.session?.token, this.epoch]);
     };
     if (input() === this.pruneInput && Date.now() < this.pruneAt) return;
@@ -494,17 +511,11 @@ export class RoomService {
     // Avatar retries and cached results expire on their own; prune again at the earliest of them.
     const now = Date.now(), state = this.runtime.state.rooms;
     const deadlines = [...[...this.avatarFailures.values()].map(failure => failure.until), ...[...this.summaryAccess.values()].map(at => at + RESULT_TTL),
-      ...Object.keys(state.hot ?? {}).map(chain => this.hotAt.get(chain)! + RESULT_TTL), ...state.people ? [this.peopleAt + RESULT_TTL] : []];
+      ...state.people ? [this.peopleAt + RESULT_TTL] : []];
     this.pruneAt = Math.min(Infinity, ...deadlines.filter(at => at > now));
   }
   private pruneResults() {
     const state = this.runtime.state.rooms, now = Date.now(), watches = [...this.watches.values()];
-    const hotChains = new Set([...this.hotSources.values()].map(chain => chain ?? ''));
-    for (const chain of Object.keys(state.hot ?? {})) {
-      if (!this.hotAt.has(chain)) this.hotAt.set(chain, now);
-      if (!hotChains.has(chain) && this.hotAt.get(chain)! + RESULT_TTL <= now) { delete state.hot![chain]; this.hotAt.delete(chain); }
-    }
-    if (state.hot && !Object.keys(state.hot).length) state.hot = undefined;
     if (state.people && !watches.includes(state.people.key) && (this.peopleAt || (this.peopleAt = now)) + RESULT_TTL <= now) state.people = undefined;
     const protectedKeys = new Set([state.current?.key, state.pinned, ...watches, ...this.hotRows().map(row => row.key)]);
     for (const [key, row] of Object.entries(state.summaries)) if (!this.summaryAccess.has(key)) this.summaryAccess.set(key, row.at);

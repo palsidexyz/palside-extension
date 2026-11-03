@@ -14,6 +14,8 @@ import { quotedText } from './quotes';
 import { roomTime } from '../rooms/danmaku-view';
 import type { PalsideController } from '../app/use-palside';
 import s from './composer-social.module.css';
+import { tokenLabel } from '../assets/token-name';
+import { liveView } from '../assets/token-data';
 
 /** The pending page reference or 弹幕 line above the input. */
 export function ComposerRows({ c }: { c: PalsideController }) {
@@ -37,17 +39,18 @@ export function RefLine({ c, ref_ }: { c: PalsideController; ref_: PageRef }) {
   const t = useTranslations();
   const locale = useLocale();
   const target = ref_.target;
+  const view = liveView(c, ref_.view);
   if (target.kind === 'danmaku') {
     const person = danmakuPerson(c, target, t('common.member'));
     return <span className={s.refBody}>
-      <span className={s.refHead}><Token view={ref_.view} size="xs" /><span className={s.refSource}>{ref_.view.name}</span><span className={s.refSub}>{roomTime(target.at, c.now, locale)}</span><span className={s.refTag}>{t('extension.room.name')}</span></span>
+      <span className={s.refHead}><Token view={view} size="xs" /><span className={s.refSource}>{tokenLabel(view, t)}</span><span className={s.refSub}>{roomTime(target.at, c.now, locale)}</span><span className={s.refTag}>{t('extension.room.name')}</span></span>
       <span className={s.refLine}><PersonAvatar person={person} size="xs" /><span className={s.refText} title={ref_.caption}><b>{person.name}</b>{ref_.caption}</span></span>
     </span>;
   }
   let host = '';
   try { host = new URL(ref_.view.url).hostname.replace(/^www\./, ''); } catch { /* The saved page name remains available. */ }
   return <span className={s.refBody}>
-    <span className={s.refHead}><Token view={ref_.view} size="xs" /><span className={s.refSource} title={ref_.view.name}>{ref_.view.name}</span><span className={s.refSub}>{host !== ref_.view.name ? host : ''}</span><span className={s.refTag}>{t('extension.composer.refPage')}</span></span>
+    <span className={s.refHead}><Token view={view} size="xs" /><span className={s.refSource} title={tokenLabel(view, t)}>{tokenLabel(view, t)}</span><span className={s.refSub}>{host !== tokenLabel(view, t) ? host : ''}</span><span className={s.refTag}>{t('extension.composer.refPage')}</span></span>
     <span className={s.refText} title={ref_.caption}>{ref_.caption}</span>
   </span>;
 }

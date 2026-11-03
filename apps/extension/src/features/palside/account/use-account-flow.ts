@@ -32,8 +32,10 @@ async function previewInvite(url: string) {
 // Deriving keys is local and instant; only password-set, which registers and connects, takes long enough to show.
   const createAccount = async () => {
     if (!mounted.current || !ownsScreen() || screen !== 'confirm-phrase' || flow !== 'create' || activeGeneration.current !== generation) return;
-    await identityStep(async () => { await live!.command('account-create'); if (mounted.current && activeGeneration.current === generation) setPhrase([]); });
+    await identityStep(() => live!.command('account-create'));
   };
+  // The quiz is keyed by the phrase, so the words are dropped only once the runtime has moved on to the password step.
+  useLayoutEffect(() => { if (screen === 'password' && flow === 'create' && phrase.length) setPhrase([]); }, [screen, flow, phrase, setPhrase]);
 const restoreAccount = (words: string[]) => { activeGeneration.current = undefined; setFlow('restore'); return identityStep(() => live!.command('account-login', { words: words.map(word => word.trim().toLowerCase()) })); };
 const setPassword = (password: string) => identityStep(async () => { setWorking(true); try { await live!.command('password-set', { password }); } finally { setWorking(false); } if (data.pendingInvite) getActions().openInvitation(); else getActions().go('chat'); });
   return { startCreate, previewInvite, createAccount, restoreAccount, setPassword };

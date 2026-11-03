@@ -1,6 +1,8 @@
 import type { PageUp } from '../runtime/browser/page-protocol';
 import type { OverlayHost } from './overlay-host';
 
+const SAVED_MARK_MS = 3_500;
+
 export function createSelectionMenu(context: OverlayHost, send: (message: PageUp) => void) {
   const { documentLayer, documentPoint, later } = context;
   let selectionMenu: HTMLElement | undefined;
@@ -29,7 +31,7 @@ export function createSelectionMenu(context: OverlayHost, send: (message: PageUp
     status.append(label, open); documentLayer.append(status); savedMark = status;
     const point = documentPoint(Math.max(8, Math.min(innerWidth - status.offsetWidth - 8, selectionAt.x)), Math.max(8, Math.min(innerHeight - status.offsetHeight - 8, selectionAt.y + 8)));
     status.style.transform = `translate(${point.x}px,${point.y}px)`;
-    later(() => { status.remove(); if (savedMark === status) savedMark = undefined; }, 3500);
+    later(() => { status.remove(); if (savedMark === status) savedMark = undefined; }, SAVED_MARK_MS);
   }
   function showSelection(at: { x: number; y: number }, actions: { sticky?: () => void; quote?: () => void; cancel: () => void }) {
     hideSelection(); savedMark?.remove(); savedMark = undefined;

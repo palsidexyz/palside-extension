@@ -9,6 +9,7 @@ import { text } from '../composition/state';
 import { commandError } from '../composition/commands';
 import type { RuntimeCommands } from '../composition/dispatch';
 import type { HandlerRegistry } from '../composition/handler-registry';
+import { liveMembers } from '../../domain/teams/model.ts';
 
 async function localMnemonic(commands: RuntimeCommands, password: string, check: () => void) {
   const runtime = commands.runtime;
@@ -80,14 +81,18 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
           const storageKey = [...crypto.getRandomValues(new Uint8Array(32))];
           let result: ApiResult<'accounts.create'>;
           if (runtime.auth.authMode === 'create') {
-            if (!runtime.state.config.signupDifficulty) runtime.state.config = await attempt.wait(runtime.api.request('system.config', { signal: attempt.signal }));
-            try { result = await runtime.api.request('accounts.create', { body, secretKey: identity.secretKey, difficulty: runtime.state.config.signupDifficulty, signal: attempt.signal }); }
+            runtime.state.config = await attempt.wait(runtime.api.request('system.config', { signal: attempt.signal }));
+            try {
+              result = await runtime.api.request('accounts.create', { body, secretKey: identity.secretKey, difficulty: runtime.state.config.signupDifficulty, signal: attempt.signal,
+                onProofOfWorkSlow: () => { if (attempt.current()) { runtime.state.signupWaiting = true; runtime.emit(); } },
+              });
+            }
             catch (error) {
               if (error instanceof ApiError && error.code === 'RESULT_UNKNOWN') throw error;
               attempt.check();
               if (!(error instanceof ApiError) || error.code !== 'ACCOUNT_EXISTS') throw error;
               result = await runtime.api.request('devices.create', { body, secretKey: identity.secretKey, signal: attempt.signal });
-            }
+            } finally { if (attempt.current() && runtime.state.signupWaiting) { runtime.state.signupWaiting = undefined; runtime.emit(); } }
           } else result = await runtime.api.request('devices.create', { body, secretKey: identity.secretKey, signal: attempt.signal });
           if (!attempt.current()) {
             await runtime.auth.revokeDevice({ ...result, storageKey });
@@ -165,7 +170,7 @@ export async function identityApproveCommand(this: RuntimeCommands, command: Ext
       runtime.auth.requireConnection();
       const team = runtime.state.remoteTeams.find(item => item.id === text(p.teamId) && item.joined);
       if (!team || !runtime.auth.client) throw new MessageError(uiMessage('extension.runtime.teamUnavailable'));
-      await approveIdentities(runtime.auth.client, team.people.filter(person => team.memberIds.includes(person.id)).map(person => person.matrixId)); return;
+      await approveIdentities(runtime.auth.client, liveMembers(team).map(person => person.matrixId)); return;
 }
 
 export async function logoutCommand(this: RuntimeCommands) {

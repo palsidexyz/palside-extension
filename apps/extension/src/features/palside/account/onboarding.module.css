@@ -139,3 +139,7 @@
   .track i { animation-duration:3s; }
   .segments li::after,.phrase,.watchRow,.watchFace { transition:none; }
 }
+.waiting { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); animation:waitingIn .24s var(--ui-ease-feedback) both; }
+.waiting button { padding:0; border:0; background:transparent; color:var(--ui-text-primary); font:inherit; font-weight:600; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+@keyframes waitingIn { from { opacity:0; transform:translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .waiting { animation-name:none; } }

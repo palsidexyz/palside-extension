@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 /**
  * Opens every review page in `apps/extension/integration` (except the live-services `index.html`) in headless Chrome.
  * A page fails on an uncaught exception, a console or network error, a request leaving the review server,
@@ -24,7 +25,7 @@ const pages = {
   'baseline-review': { check: true, run: true, viewport: { width: 600, height: 1000 } },
   'chat-reading': { check: true, run: true },
   'connection-review': { check: true, variants: scenes('service', 'sync', 'connecting', 'crypto', 'readonly', 'empty', 'login') },
-  'design-review': { variants: scenes('chat', 'add-site', 'blocked', 'cache-clear-error', 'cache-read-error', 'detail', 'draft', 'follow-off', 'grant', 'hot', 'invites', 'lobby', 'pokes', 'read', 'ref', 'room-empty', 'room-slow', 'security', 'start', 'stickies', 'shared-tokens') },
+  'design-review': { variants: [...scenes('chat', 'add-site', 'blocked', 'cache-clear-error', 'cache-read-error', 'detail', 'draft', 'follow-off', 'grant', 'hot', 'invites', 'lobby', 'pokes', 'read', 'ref', 'room-empty', 'room-slow', 'security', 'start', 'stickies', 'shared-tokens'), 'scene=start&tour=1'] },
   'edge-review': { allow: [/\/intentionally-missing-token\.webp$/], variants: scenes('normal', 'assets', 'empty', 'failure', 'invite', 'invite-nickname', 'missing', 'no-team', 'pacing', 'password', 'readonly', 'suspended') },
   'i18n-review': { variants: ['', ...scenes('login')] },
   'notification-runtime': { check: true, run: true },
@@ -101,7 +102,7 @@ async function visit({ page, path, key }) {
     };
     const status = () => evaluate('document.documentElement.dataset.review ?? ""');
     if (page.check) {
-      const outcome = await until(async () => ['passed', 'failed'].includes(await status()) && await status(), `${path} self-check`, 60_000).catch(error => error.message);
+      const outcome = await until(async () => ['passed', 'failed'].includes(await status()) && await status(), `${path} self-check`, MINUTE_MS).catch(error => error.message);
       if (outcome !== 'passed') {
         // Self-check pages print `{ checks, error }`; show the error and the last check that held.
         const text = await evaluate(`document.querySelector('#result, pre, [role=alert]')?.textContent ?? ''`);

@@ -59,6 +59,7 @@ export function startLiveSync(auth: SessionRuntime, session: RuntimeDevice, curr
   return auth.connectLiveEvents({
       baseUrl: runtime.api.baseUrl,
       token: () => current() ? session.token : undefined,
+      onUnauthorized: () => { if (current()) void auth.expireRuntimeDevice().catch(() => {}); },
       onRefresh: refreshScope => { if (current() && status.initialIssued && refreshScope === 'me') auth.requestRefresh(['account', 'blocks']); },
       onState: open => {
         if (!current()) return;

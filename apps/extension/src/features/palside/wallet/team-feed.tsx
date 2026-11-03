@@ -17,7 +17,7 @@ import { Envelope, PacketCard } from './packet';
 import s from './wallet.module.css';
 
 type FeedPacket = ApiResult<'chain.teamFeed'>['packets'][number];
-type ClaimLine = { sender: string; claimer: string; last: boolean };
+type ClaimLine = { sender: string | null; claimer: string | null; last: boolean };
 type TeamPaymentItem = { id: string; timestamp: number; packet?: FeedPacket; transfer?: ApiResult<'chain.teamFeed'>['transfers'][number]; level?: number; claim?: ClaimLine };
 /** Like a group chat: the sender sees each grab, the grabber sees their own, and the sender hears when the last share went. */
 function claimLines(packet: FeedPacket, self: string): TeamPaymentItem[] {
@@ -53,7 +53,7 @@ export function TeamPaymentCard({ c, item }: { c: PalsideController; item: TeamP
 /** A one-line system event under the packet, with a small envelope; it rises in when a grab arrives live. */
 function ClaimEvent({ c, line, timestamp }: { c: PalsideController; line: ClaimLine; timestamp: number }) {
   const t = useTranslations(), reduced = useReducedMotion(), [arriving] = useState(() => Date.now() - timestamp < 5_000);
-  const name = (id: string) => personFor(c.people, id, t('common.member')).name, self = c.data.self;
+  const name = (id: string | null) => personFor(c.people, id, t('common.member'), t('common.deletedMember')).name, self = c.data.self;
   const text = line.claimer === self ? line.sender === self ? t('extension.wallet.youClaimedOwn') : t('extension.wallet.youClaimed', { name: name(line.sender) }) : t('extension.wallet.claimedYours', { name: name(line.claimer) });
   return <motion.p className={`${s.levelEvent} ${s.claimEvent}`} initial={arriving && !reduced ? { opacity: 0, y: 6 } : false} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
     <Envelope size="xs" /><span>{text}{line.last && <>{t('extension.wallet.allClaimedSuffix')}</>}</span>
@@ -61,11 +61,11 @@ function ClaimEvent({ c, line, timestamp }: { c: PalsideController; line: ClaimL
 }
 
 /** A payment sits in the timeline like a message from whoever paid: their avatar and name, on their side, with the time beside it. */
-function PaymentRow({ c, author, timestamp, children }: { c: PalsideController; author: string; timestamp: number; children: ReactNode }) {
+function PaymentRow({ c, author, timestamp, children }: { c: PalsideController; author: string | null; timestamp: number; children: ReactNode }) {
   const t = useTranslations(), locale = useLocale(), self = author === c.data.self;
-  const person = personFor(c.people, author, t('common.member')), known = c.people.some(item => item.id === author);
+  const person = personFor(c.people, author, t('common.member'), t('common.deletedMember')), known = author !== null && c.people.some(item => item.id === author);
   return <div className={`${m.message} ${self ? m.selfMessage : ''}`}>
-    <PersonAvatar person={person} onClick={known ? () => c.setPersonId(author) : undefined} />
+    <PersonAvatar person={person} onClick={known ? () => c.setPersonId(author!) : undefined} />
     <div className={m.messageContent}>
       {!self && <div className={m.messageMeta}><strong>{person.name}</strong></div>}
       <div className={m.messageLine}>
@@ -81,7 +81,7 @@ function TransferCard({ c, transfer }: { c: PalsideController; transfer: NonNull
   const t = useTranslations(), reduced = useReducedMotion();
   const [arriving] = useState(() => Date.now() - transfer.createdAt < 5_000), [settled] = useState(transfer.status === 'confirmed');
   // Everyone in the squad reads it the same way: the row already shows who paid, the line says to whom.
-  const line = transfer.recipientId === c.data.self ? t('extension.wallet.transferToYou') : t('extension.wallet.transferTo', { name: personFor(c.people, transfer.recipientId, t('common.member')).name });
+  const line = transfer.recipientId === c.data.self ? t('extension.wallet.transferToYou') : t('extension.wallet.transferTo', { name: personFor(c.people, transfer.recipientId, t('common.member'), t('common.deletedMember')).name });
   const state = transfer.status === 'confirmed' ? 'done' : transfer.status === 'failed' || transfer.status === 'expired' ? 'failed' : 'sending';
   return <motion.div className={s.transferCard} data-state={state} initial={arriving && !reduced ? { opacity: 0, y: 14, scale: .96 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 360, damping: 30 }}>
     <span className={s.transferTop}><Token view={PALS} size="card" /><span><strong><PalsAmount value={transfer.amount} /></strong><small>{line}</small></span></span>

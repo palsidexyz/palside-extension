@@ -1,0 +1,25 @@
+/* 聊天 | 弹幕: a 36px control-grey track with a 2px inset — the page capsule's height and top edge — and the page you are on is a white
+   thumb with a hairline edge that slides between two equal columns. Flat like the rest of the row: no shadow, no depth. The words never move. */
+.switch { position:relative; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; flex:none; align-items:stretch; height:36px; padding:2px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.thumb { position:absolute; top:2px; bottom:2px; left:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); box-shadow:0 0 0 1px var(--ui-border-soft); transition:transform .34s var(--ui-ease-feedback), width .34s var(--ui-ease-feedback); }
+.switch button { position:relative; z-index:1; display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:0 9px; border:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); font-weight:500; line-height:20px; white-space:nowrap; cursor:pointer; transition:color .2s var(--ui-ease-feedback); }
+.switch button[aria-selected=true] { color:var(--ui-text-primary); font-weight:600; }
+.switch button:not([aria-selected=true]):hover { color:var(--ui-text-primary); }
+.switch button:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.dot { width:6px; height:6px; border-radius:50%; background:var(--ui-text-primary); animation:pin .3s var(--ui-ease-feedback) both; }
+.mention { color:var(--ui-ink-accent); font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; animation:pin .3s var(--ui-ease-feedback) both; }
+@keyframes pin { from { opacity:0; transform:scale(.4); } }
+
+/* The 弹幕 title: the token, its name and › on one line, like the squad title; it opens 详情. */
+.title { display:flex; align-items:center; gap:10px; flex:0 1 auto; min-width:0; max-width:100%; margin:-3px -5px; padding:3px 5px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; transition:background-color .18s var(--ui-ease-feedback); }
+.title:hover { background:var(--ui-control-surface); }
+.title:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+/* The same 32px lead as the squad avatar, so switching pages never moves the left edge or the name. */
+.title > :first-child { --token-size:32px; flex:none; }
+.title [data-chain-badge] { display:none; }
+.title h1, .plain { min-width:0; overflow:hidden; font-size:var(--ui-type-headline); font-weight:600; letter-spacing:-.02em; line-height:20px; text-overflow:ellipsis; white-space:nowrap; }
+.plain { font-size:var(--ui-type-title); line-height:24px; letter-spacing:-.025em; }
+.chevron { flex:none; margin-left:-7px; color:var(--ui-text-secondary); transition:color .18s var(--ui-ease-feedback); }
+.title:hover .chevron { color:var(--ui-text-primary); }
+
+@media (prefers-reduced-motion:reduce) { .thumb, .switch button, .chevron { transition:none; } .dot, .mention { animation:none; } }

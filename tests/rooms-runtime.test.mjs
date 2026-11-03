@@ -1,14 +1,16 @@
+import { DAY_MS, MINUTE_MS } from '@palside/shared/units';
 import { endpointsById, pathFor } from '../packages/shared/src/contracts/endpoints.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
-import { ROOM_HOT_REFRESH_MS, ROOM_MESSAGE_LIMIT, ROOM_RENEW_MS } from '../packages/shared/src/contracts/limits.ts';
+import { ROOM_MESSAGE_LIMIT, ROOM_RENEW_MS } from '@palside/shared/rules/rooms';
 
 const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && context.parentURL?.includes('/runtime/')) return next(specifier + '.ts', context);
   return next(specifier, context);
 } });
 const { RoomService } = await import('../apps/extension/src/runtime/rooms/rooms.ts');
+const { TokenProfiles } = await import('../apps/extension/src/runtime/viewing/token-profiles.ts');
 const { Api, ApiError } = await import('../apps/extension/src/runtime/transport/api.ts');
 const { readPreferences, readPreferencePatch, emptyState } = await import('../apps/extension/src/runtime/composition/state.ts');
 hooks.deregister();
@@ -20,7 +22,7 @@ const summary = (room = key, patch = {}) => ({ key: room, profile: { name: 'Toke
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 function fixture(t, rows = new Map()) {
-  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 100 * 86400_000 });
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 100 * DAY_MS });
   const calls = [], writes = [], avatarCalls = [], created = [], revoked = [], handlers = new Map();
   let generation = 0, emits = 0, saved = 0, sequence = 0, blocked = [], pendingInvites = [], refreshed = 0;
   t.mock.method(URL, 'createObjectURL', () => { const url = `blob:room-${++sequence}`; created.push(url); return url; });
@@ -33,20 +35,21 @@ function fixture(t, rows = new Map()) {
       options = { ...options, method: endpoint.method };
       calls.push({ path, options }); const route = `${options.method ?? 'GET'} ${path.split('?')[0]}`;
       if (handlers.has(route)) return handlers.get(route)(path, options);
-      if (route === 'POST /rooms/lease') return { key: options.body.key, count: options.body.key ? 2 : 0, slowUntil: 500 };
+      if (route === 'POST /rooms/lease') return { key: options.body.key, count: options.body.key ? 2 : 0, slowUntil: 500, slowMs: 15_000 };
       if (route === 'GET /rooms/summary') return summary(new URL(path, 'https://api.test').searchParams.get('key'));
-      if (route === 'POST /rooms/messages') return { message: message('sent', self, { text: options.body.text, key: options.body.key }), slowUntil: Date.now() + 5_000 };
+      if (route === 'POST /rooms/messages') return { message: message('sent', self, { text: options.body.text, key: options.body.key }), slowUntil: Date.now() + 15_000, slowMs: 15_000 };
       if (route === 'GET /rooms/messages') return { messages: [], hasMore: false };
       if (route === 'POST /rooms/report') return { folded: true };
       if (route === 'POST /rooms/retract') return { retracted: true };
       if (route === 'POST /rooms/stance') return { ...stance(), mine: options.body.value };
       if (route === 'GET /rooms/people') return { count: 2, people: [peer] };
-      if (route === 'GET /rooms/hot') return { rising: [{ ...summary(), rise: 2 }], top: [summary()], at: Date.now() };
+      if (route === 'POST /rooms/hot/subscription') return { subscribed: options.body.open };
+      if (route === 'GET /rooms/message') return message(options.query.id);
       if (route === 'POST /rooms/blocks') blocked = options.body.blocked ? [peer] : [];
       if (route.endsWith('/rooms/blocks')) return { people: blocked };
       if (route === 'GET /team-invites') return { invites: pendingInvites };
       if (route === 'GET /team-invites/options') return { accepts: true, teams: [{ teamId: 'team', state: 'can' }] };
-      if (route === 'POST /team-invites') return { invite: { id: 'invite', expiresAt: Date.now() + 7 * 86400_000 } };
+      if (route === 'POST /team-invites') return { invite: { id: 'invite', expiresAt: Date.now() + 7 * DAY_MS } };
       if (route === 'POST /team-invites/invite/accept') { pendingInvites = []; return { teamId: 'team' }; }
       if (route === 'POST /team-invites/invite/ignore') { pendingInvites = []; return { ignored: true }; }
       if (route === 'PATCH /me' || route === 'POST /teams/team/invite-permission') return {};
@@ -54,6 +57,7 @@ function fixture(t, rows = new Map()) {
     }, async roomAvatar(room, account) { avatarCalls.push({ key: room, account }); return new Blob(['avatar'], { type: 'image/png' }); } },
     storage: { async get(id) { return structuredClone(rows.get(id)?.value); }, async put(id, account, kind, value) { const row = { account, kind, value: structuredClone(value) }; rows.set(id, row); writes.push({ id, ...row }); }, async remove(id) { rows.delete(id); } },
     sharing: { async savePreferences() { saved++; } },
+    tokens: new TokenProfiles(),
     dispatch: { mutate(id, options) { return runtime.api.request(id, { ...options, key: 'operation-key-0001' }); } },
     async refresh() { refreshed++; runtime.state.remoteTeams = [{ id: 'team', joined: true }]; },
     emit() { service.prune(); emits++; },
@@ -103,7 +107,7 @@ test('rapid lease changes serialize and discard stale snapshots', async t => {
 });
 
 test('off releases an in-flight lease and clears all public queries; late responses cannot restore them', async t => {
-  const f = fixture(t); await f.enter(); await f.service.summary(key); await f.service.hot('Solana'); await f.service.people(key);
+  const f = fixture(t); await f.enter(); await f.service.summary(key); await f.service.watchHot({ sourceId: 'one:hot', open: true }); await f.service.people(key);
   const gate = deferred(); f.handlers.set('GET /rooms/summary', () => gate.promise); const pending = f.service.summary(otherKey);
   await f.service.settings({ off: true }); assert.equal(f.runtime.state.rooms.current, undefined); assert.deepEqual(f.runtime.state.rooms.summaries, {}); assert.equal(f.runtime.state.rooms.hot, undefined); assert.equal(f.runtime.state.rooms.people, undefined);
   gate.resolve(summary(otherKey)); await pending; assert.deepEqual(f.runtime.state.rooms.summaries, {});
@@ -252,21 +256,23 @@ test('paging keeps chronological order, deduplicates, and cannot resurrect retra
   await f.service.retract('new'); assert.deepEqual(f.runtime.state.rooms.current.messages.map(item => item.id), ['old']);
 });
 
-test('messages have no age expiry and keep only the newest thousand', async t => {
+test('messages have no age expiry and keep only the newest ten thousand', async t => {
   const f = fixture(t); await f.enter();
   f.service.consume({ key, type: 'message', message: message('ancient', peer, { createdAt: 1 }) });
-  t.mock.timers.tick(30 * 86400_000); f.runtime.emit(); assert.equal(f.runtime.state.rooms.current.messages[0].id, 'ancient');
+  t.mock.timers.tick(30 * DAY_MS); f.runtime.emit(); assert.equal(f.runtime.state.rooms.current.messages[0].id, 'ancient');
+  const emit = f.runtime.emit; f.runtime.emit = () => {};
   for (let i = 0; i < ROOM_MESSAGE_LIMIT; i++) f.service.consume({ key, type: 'message', message: message(String(i), peer, { createdAt: i + 2 }) });
+  f.runtime.emit = emit; emit();
   assert.equal(f.runtime.state.rooms.current.messages.length, ROOM_MESSAGE_LIMIT); assert.ok(!f.runtime.state.rooms.current.messages.some(item => item.id === 'ancient'));
 });
 
-test('stance updates optimistically, synchronizes summary/hot, rolls back failure and supports withdrawal', async t => {
-  const f = fixture(t); await f.enter(); await f.service.hot(); const gate = deferred();
+test('stance updates optimistically, synchronizes summary, rolls back failure and supports withdrawal', async t => {
+  const f = fixture(t); await f.enter(); await f.service.watchHot({ sourceId: 'one:hot', open: true }); const gate = deferred();
   f.handlers.set('POST /rooms/stance', () => gate.promise); const pending = f.service.stance(key, 'bull'); await settle();
   assert.deepEqual(f.runtime.state.rooms.current.stance, { bull: 4, hold: 2, bear: 1, mine: 'bull' });
-  assert.equal(f.runtime.state.rooms.summaries[key].stance.mine, 'bull'); assert.equal(f.runtime.state.rooms.hot[''].top[0].stance.bull, 4);
+  assert.equal(f.runtime.state.rooms.summaries[key].stance.mine, 'bull');
   const rejected = assert.rejects(pending, /failed/); gate.reject(Error('failed')); await rejected;
-  assert.deepEqual(f.runtime.state.rooms.current.stance, stance()); assert.equal(f.runtime.state.rooms.hot[''].rising[0].stance.bull, 3);
+  assert.deepEqual(f.runtime.state.rooms.current.stance, stance());
   f.handlers.delete('POST /rooms/stance'); await f.service.stance(key, 'bear'); assert.equal(f.runtime.state.rooms.current.stance.mine, 'bear');
   await f.service.stance(key, null); assert.equal(f.runtime.state.rooms.current.stance.mine, null);
 });
@@ -275,65 +281,6 @@ test('stance needs no lease, and stale summary reads cannot undo a vote', async 
   const f = fixture(t); await f.service.summary(key); const gate = deferred(); f.handlers.set('GET /rooms/summary', () => gate.promise);
   const reading = f.service.summary(key); await f.service.stance(key, 'bull'); gate.resolve(summary()); await reading;
   assert.equal(f.runtime.state.rooms.summaries[key].stance.mine, 'bull'); assert.equal(f.count('POST /rooms/lease'), 0);
-});
-
-test('summary, people and hot preserve keys and independent chain results', async t => {
-  const f = fixture(t); await f.service.summary(otherKey); assert.equal(f.runtime.state.rooms.summaries[otherKey].at, Date.now());
-  await f.service.people(key); assert.equal(f.runtime.state.rooms.people.key, key);
-  const gate = deferred(); f.handlers.set('GET /rooms/hot', path => path.includes('Solana') ? gate.promise : { rising: [], top: [], at: 2 });
-  const first = f.service.hot('Solana'); await f.service.hot('Ethereum'); gate.resolve({ rising: [], top: [], at: 1 }); await first;
-  assert.equal(f.runtime.state.rooms.hot.Ethereum.at, 2); assert.equal(f.runtime.state.rooms.hot.Solana.at, 1); assert.ok(f.calls.some(call => call.path === '/rooms/hot?chain=Solana'));
-});
-
-test('independent panel Hot polls retain each chain through overlapping requests and filter changes', async t => {
-  const f = fixture(t), queues = new Map();
-  f.handlers.set('GET /rooms/hot', path => {
-    const chain = new URL(path, 'https://api.test').searchParams.get('chain') ?? '', gate = deferred();
-    queues.set(chain, [...queues.get(chain) ?? [], gate]); return gate.promise;
-  });
-  const result = (room, count) => ({ top: [summary(room, { count })], rising: [], at: Date.now() });
-  f.service.watchHot({ sourceId: 'one:hot', chain: 'Solana' });
-  f.service.watchHot({ sourceId: 'two:hot', chain: 'Ethereum' });
-  queues.get('Ethereum')[0].resolve(result(otherKey, 10)); await settle();
-  queues.get('Solana')[0].resolve(result(key, 20)); await settle();
-  assert.equal(f.runtime.state.rooms.hot.Ethereum.top[0].count, 10); assert.equal(f.runtime.state.rooms.hot.Solana.top[0].count, 20);
-  t.mock.timers.tick(ROOM_HOT_REFRESH_MS); await settle();
-  queues.get('Solana')[1].resolve(result(key, 21)); await settle();
-  assert.equal(f.runtime.state.rooms.hot.Ethereum.top[0].count, 10);
-  queues.get('Ethereum')[1].resolve(result(otherKey, 11)); await settle();
-  f.service.watchHot({ sourceId: 'one:hot', chain: null });
-  queues.get('')[0].resolve(result(key, 30)); await settle();
-  t.mock.timers.tick(ROOM_HOT_REFRESH_MS); await settle();
-  assert.equal(queues.get('Solana').length, 2); assert.equal(queues.get('Ethereum').length, 3); assert.equal(queues.get('').length, 2);
-  queues.get('Ethereum')[2].resolve(result(otherKey, 12)); queues.get('')[1].resolve(result(key, 31)); await settle();
-  assert.equal(f.runtime.state.rooms.hot.Ethereum.top[0].count, 12); assert.equal(f.runtime.state.rooms.hot[''].top[0].count, 31);
-  f.service.dropPanel('one'); t.mock.timers.tick(ROOM_HOT_REFRESH_MS); await settle();
-  assert.equal(queues.get('').length, 2); assert.equal(queues.get('Ethereum').length, 4);
-  queues.get('Ethereum')[3].resolve(result(otherKey, 13)); await settle();
-});
-
-test('Hot request generations reject older same-chain responses without invalidating another chain', async t => {
-  const f = fixture(t), stale = deferred(); await f.enter();
-  f.handlers.set('GET /rooms/hot', () => stale.promise); const first = f.service.hot('Solana');
-  await f.service.stance(key, 'bull');
-  f.handlers.set('GET /rooms/hot', path => ({ top: [summary(path.includes('Ethereum') ? otherKey : key, { count: 99 })], rising: [], at: 2 }));
-  await f.service.hot('Solana'); await f.service.hot('Ethereum');
-  stale.resolve({ top: [summary(key, { count: 1 })], rising: [], at: 1 }); await first;
-  assert.equal(f.runtime.state.rooms.hot.Solana.top[0].count, 99); assert.equal(f.runtime.state.rooms.hot.Ethereum.top[0].count, 99);
-});
-
-test('Hot caches expire by chain while live counts, stances and blocks reach every cached result', async t => {
-  const f = fixture(t); await f.enter();
-  await f.service.hot(); await f.service.hot('Solana');
-  f.service.watchHot({ sourceId: 'one:hot', chain: 'Ethereum' }); await settle();
-  f.service.consume({ key, type: 'count', count: 42 }); f.service.consume({ key, type: 'stance', stance: { bull: 20, hold: 2, bear: 1 } });
-  await f.service.block(peer.id, true);
-  for (const hot of Object.values(f.runtime.state.rooms.hot)) for (const row of [...hot.top, ...hot.rising]) {
-    assert.equal(row.count, 42); assert.equal(row.stance.bull, 20); assert.deepEqual(row.faces, []);
-  }
-  t.mock.timers.tick(10 * 60_000); f.service.prune();
-  assert.equal(f.runtime.state.rooms.hot[''], undefined); assert.equal(f.runtime.state.rooms.hot.Solana, undefined); assert.ok(f.runtime.state.rooms.hot.Ethereum);
-  f.service.dropPanel('one'); assert.equal(f.runtime.state.rooms.hot, undefined);
 });
 
 test('block hides authors, faces and people, revokes avatars; unblock permits author messages again', async t => {
@@ -395,9 +342,10 @@ test('account reset rejects late work, releases with the old bearer and clears a
   assert.equal(f.calls.filter(call => call.path === '/rooms/lease').at(-1).options.token, 'token');
 });
 
-test('preferences have only participation off and fresh state has no recent or active fields', () => {
+test('preferences preserve participation settings and fresh state has no transient toggle or room fields', () => {
   assert.deepEqual(readPreferences({ rooms: { off: true } }).rooms, { off: true }); assert.equal(readPreferencePatch({ rooms: { intro: true } }), undefined);
-  assert.equal(readPreferences({ rooms: { intro: true } }).rooms, undefined); assert.deepEqual(emptyState().toggles, { share: false, interact: false });
+  assert.equal(readPreferences({ rooms: { intro: true } }).rooms, undefined); assert.deepEqual(emptyState().preferences, { current: '', notifications: 'off' });
+  assert.equal('toggles' in emptyState(), false);
   assert.equal('recent' in emptyState().rooms, false); assert.equal('active' in emptyState().rooms, false);
 });
 
@@ -407,16 +355,6 @@ test('API uses accountId for room avatars and preserves slow errors without rout
   assert.equal(new URL(calls[0].url).searchParams.get('accountId'), 'peer'); assert.equal(calls[0].options.headers.Authorization, 'Bearer bearer');
   for (let i = 0; i < 2; i++) await assert.rejects(api.request('rooms.send', { body: { key, text: 'hi' }, key: 'retry-operation-0001' }), error => error.code === 'ROOM_SLOW' && error.retryAfterMs === 2500);
   assert.equal(calls.length, 3); assert.equal(calls[1].options.headers['Idempotency-Key'], 'retry-operation-0001');
-});
-
-test('summary refreshes after shared reads and a vote outranks older hot responses', async t => {
-  const f = fixture(t); await f.enter(); const old = deferred(); let reads = 0;
-  f.handlers.set('GET /rooms/summary', () => ++reads === 1 ? old.promise : summary(key, { count: 30 }));
-  const first = f.service.summary(key), shared = f.service.summary(key); old.resolve(summary(key, { count: 1 })); await Promise.all([first, shared]); assert.equal(reads, 1);
-  await f.service.summary(key); assert.equal(f.runtime.state.rooms.summaries[key].count, 30);
-  const hot = deferred(); f.handlers.set('GET /rooms/hot', () => hot.promise); const reading = f.service.hot(); await f.service.stance(key, 'bull');
-  f.service.consume({ key, type: 'stance', stance: { bull: 20, hold: 10, bear: 5 } }); hot.resolve({ top: [summary()], rising: [], at: Date.now() }); await reading;
-  assert.equal(f.runtime.state.rooms.hot[''].top[0].stance.bull, 20); assert.equal(f.runtime.state.rooms.current.stance.mine, 'bull');
 });
 
 test('accept waits out an older team snapshot and requests a fresh post-join snapshot', async t => {
@@ -463,48 +401,49 @@ for (const operation of ['send', 'report', 'retract', 'more']) test(`in-flight $
   if (operation === 'more') { assert.deepEqual(room.messages.map(item => item.id), ['older', 'existing']); assert.equal(room.hasMore, false); }
 });
 
-for (const [method, args, route] of [['summary', [key], '/rooms/summary'], ['people', [key], '/rooms/people'], ['hot', ['Solana'], '/rooms/hot'], ['blocks', [], '/rooms/blocks'], ['invites', [], '/team-invites']]) {
+for (const [method, args, route] of [['summary', [key], '/rooms/summary'], ['people', [key], '/rooms/people'], ['blocks', [], '/rooms/blocks'], ['invites', [], '/team-invites']]) {
   test(`concurrent ${method} reads share one request and unchanged refreshes do not emit`, async t => {
     const f = fixture(t), gate = deferred();
-    const result = method === 'summary' ? summary() : method === 'people' ? { count: 2, people: [peer] } : method === 'hot' ? { top: [summary()], rising: [], at: Date.now() } : method === 'blocks' ? { people: [peer] } : { invites: [] };
+    const result = method === 'summary' ? summary() : method === 'people' ? { count: 2, people: [peer] } : method === 'blocks' ? { people: [peer] } : { invites: [] };
     f.handlers.set(`GET ${route}`, () => gate.promise);
     const first = f.service[method](...args), second = f.service[method](...args); await settle();
     assert.equal(f.count(`GET ${route}`), 1);
     gate.resolve(structuredClone(result)); await Promise.all([first, second]);
     const emits = f.emits(); t.mock.timers.tick(30_000);
-    f.handlers.set(`GET ${route}`, () => structuredClone({ ...result, ...(method === 'hot' ? { at: Date.now() } : {}) }));
+    f.handlers.set(`GET ${route}`, () => structuredClone(result));
     await f.service[method](...args);
     assert.equal(f.count(`GET ${route}`), 2, 'explicit refresh still reaches the service');
     assert.equal(f.emits(), emits, 'timestamps alone do not publish a new revision');
   });
 }
 
-for (const method of ['summary', 'hot']) test(`${method} reads after a vote do not share a stale pre-vote request`, async t => {
+for (const method of ['summary']) test(`${method} reads after a vote do not share a stale pre-vote request`, async t => {
   const f = fixture(t); await f.service.summary(key);
   const gate = deferred(), route = `GET /rooms/${method}`;
   f.handlers.set(route, () => gate.promise);
   const old = f.service[method](...(method === 'summary' ? [key] : []));
   await f.service.stance(key, 'bull');
   const current = summary(key, { stance: { bull: 4, hold: 2, bear: 1, mine: 'bull' } });
-  f.handlers.set(route, () => method === 'summary' ? current : { top: [current], rising: [], at: Date.now() });
+  f.handlers.set(route, () => current);
   const fresh = f.service[method](...(method === 'summary' ? [key] : [])); await settle();
-  gate.resolve(method === 'summary' ? summary() : { top: [summary()], rising: [], at: Date.now() });
+  gate.resolve(summary());
   await Promise.all([old, fresh]);
-  assert.equal(method === 'summary' ? f.runtime.state.rooms.summaries[key].stance.bull : f.runtime.state.rooms.hot[''].top[0].stance.bull, 4);
+  assert.equal(f.runtime.state.rooms.summaries[key].stance.bull, 4);
 });
 
 test('read deduplication ends at account replacement and failed reads can be retried', async t => {
-  const f = fixture(t), gate = deferred(); f.handlers.set('GET /rooms/hot', () => gate.promise);
-  const old = assert.rejects(f.service.hot(), { code: 'ACCOUNT_CHANGED' });
+  const f = fixture(t), gate = deferred(); f.handlers.set('GET /rooms/summary', () => gate.promise);
+  const old = assert.rejects(f.service.summary(key), { code: 'ACCOUNT_CHANGED' });
   f.service.reset(); f.runtime.auth.session = { account: { id: 'other' }, token: 'other' };
-  f.handlers.set('GET /rooms/hot', () => ({ top: [], rising: [], at: Date.now() }));
-  await f.service.hot(); assert.equal(f.count('GET /rooms/hot'), 2);
-  gate.resolve({ top: [summary()], rising: [], at: Date.now() }); await old;
-  assert.deepEqual(f.runtime.state.rooms.hot[''].top, []);
-  f.handlers.set('GET /rooms/hot', () => { throw new ApiError(503, { error: 'SERVICE_UNAVAILABLE' }); });
-  await assert.rejects(f.service.hot(), { status: 503 });
-  f.handlers.set('GET /rooms/hot', () => ({ top: [], rising: [], at: Date.now() }));
-  await f.service.hot(); assert.equal(f.count('GET /rooms/hot'), 4);
+  f.handlers.set('GET /rooms/summary', () => summary());
+  await f.service.summary(key); assert.equal(f.count('GET /rooms/summary'), 2);
+  gate.resolve(summary()); await old;
+  assert.equal(f.runtime.state.rooms.summaries[key].key, key);
+  f.handlers.set('GET /rooms/summary', () => { throw new ApiError(503, { error: 'SERVICE_UNAVAILABLE' }); });
+  t.mock.timers.tick(31_000); // a fresh summary is reused; an older one is read again
+  await assert.rejects(f.service.summary(key), { status: 503 });
+  f.handlers.set('GET /rooms/summary', () => summary());
+  await f.service.summary(key); assert.equal(f.count('GET /rooms/summary'), 4);
 });
 
 test('a new offscreen room service acquires the unchanged host tab with background and panels retained', async t => {
@@ -558,6 +497,7 @@ test('summary LRU and expiry preserve all displayed keys and release unreference
   const f = fixture(t); await f.enter(); await f.service.open({ key: otherKey });
   f.service.watch('panel:details', key);
   f.handlers.set('GET /rooms/summary', path => { const room = new URL(path, 'https://api.test').searchParams.get('key'); return summary(room, { faces: [{ ...peer, id: 'cached-peer', avatarId: 'shared' }] }); });
+  t.mock.timers.tick(31_000); // past the room snapshot's fresh summary
   await f.service.summary(key); await settle(); const url = f.runtime.state.rooms.avatars['cached-peer'];
   const roomKey = i => `token:Ethereum:0x${i.toString(16).padStart(40, '0')}`;
   for (let i = 0; i < 70; i++) { await f.service.summary(roomKey(i)); t.mock.timers.tick(1); }
@@ -565,22 +505,12 @@ test('summary LRU and expiry preserve all displayed keys and release unreference
   assert.ok(f.runtime.state.rooms.summaries[key]); assert.ok(f.runtime.state.rooms.summaries[otherKey]);
   await f.service.summary(roomKey(20)); await f.service.summary(roomKey(71));
   assert.ok(f.runtime.state.rooms.summaries[roomKey(20)]); assert.equal(f.runtime.state.rooms.summaries[roomKey(8)], undefined);
-  t.mock.timers.tick(10 * 60_000); f.service.prune();
+  t.mock.timers.tick(10 * MINUTE_MS); f.service.prune();
   assert.deepEqual(Object.keys(f.runtime.state.rooms.summaries).sort(), [key, otherKey].sort());
   assert.equal(f.runtime.state.rooms.avatars['cached-peer'], url); assert.ok(!f.revoked.includes(url));
   f.service.watch('panel:details'); f.service.prune();
   assert.equal(f.runtime.state.rooms.summaries[key], undefined); assert.ok(f.revoked.includes(url));
 });
-test('people and hot results expire only after their displayed references are released', async t => {
-  const f = fixture(t);
-  f.service.watchHot({ sourceId: 'one:hot', chain: null }); f.service.watch('two:people', key);
-  await f.service.hot(); await f.service.people(key);
-  t.mock.timers.tick(10 * 60_000); f.service.prune();
-  assert.ok(f.runtime.state.rooms.hot); assert.ok(f.runtime.state.rooms.people);
-  f.service.dropPanel('one'); assert.equal(f.runtime.state.rooms.hot, undefined); assert.ok(f.runtime.state.rooms.people);
-  f.service.dropPanel('two'); assert.equal(f.runtime.state.rooms.people, undefined);
-});
-
 
 function history(f, count) {
   const messages = Array.from({ length: count }, (_, index) => message(`history-${index}`, peer, { createdAt: index }));
@@ -589,54 +519,6 @@ function history(f, count) {
     return { messages: messages.slice(Math.max(0, end - 50), end), hasMore: end > 50 };
   });
 }
-
-test('quoted message lookup pages back to the target and reuses loaded messages', async t => {
-  const f = fixture(t); history(f, ROOM_MESSAGE_LIMIT); await f.enter();
-  assert.equal(f.runtime.state.rooms.current.messages.length, 50);
-  assert.deepEqual(await f.service.find(key, 'history-975'), { found: true });
-  assert.equal(f.count('GET /rooms/messages'), 1);
-  assert.deepEqual(await f.service.find(key, 'history-870'), { found: true });
-  assert.equal(f.count('GET /rooms/messages'), 3);
-  assert.ok(f.runtime.state.rooms.current.messages.some(row => row.id === 'history-870'));
-  assert.deepEqual(await f.service.find(key, 'history-0'), { found: true });
-  assert.equal(f.count('GET /rooms/messages'), 20);
-  assert.equal(f.runtime.state.rooms.current.messages.length, ROOM_MESSAGE_LIMIT);
-});
-
-test('quoted message lookup stops at the retained cap even if more history is offered', async t => {
-  const f = fixture(t); history(f, ROOM_MESSAGE_LIMIT + 100); await f.enter();
-  assert.deepEqual(await f.service.find(key, 'history-0'), { found: false });
-  assert.equal(f.count('GET /rooms/messages'), 20);
-  assert.equal(f.runtime.state.rooms.current.messages.length, ROOM_MESSAGE_LIMIT);
-  assert.deepEqual(await f.service.find(key, 'history-0'), { found: false });
-  assert.equal(f.count('GET /rooms/messages'), 20);
-});
-
-test('quoted message lookup handles exhausted, blocked, empty and stalled history', async t => {
-  const f = fixture(t); history(f, 75); await f.enter();
-  assert.deepEqual(await f.service.find(key, 'missing'), { found: false });
-  assert.equal(f.count('GET /rooms/messages'), 2);
-  f.runtime.state.rooms.blocked = [peer];
-  assert.deepEqual(await f.service.find(key, 'history-0'), { found: false });
-  f.runtime.state.rooms.current.hasMore = true;
-  f.handlers.set('GET /rooms/messages', () => ({ messages: [], hasMore: true }));
-  assert.deepEqual(await f.service.find(key, 'missing'), { found: false });
-  assert.equal(f.count('GET /rooms/messages'), 3);
-  f.handlers.set('GET /rooms/messages', () => ({ messages: [message('history-0')], hasMore: true }));
-  assert.deepEqual(await f.service.find(key, 'missing'), { found: false });
-  assert.equal(f.count('GET /rooms/messages'), 4);
-});
-
-test('quoted message lookup stops when the room changes during paging', async t => {
-  const f = fixture(t); history(f, 100); await f.enter();
-  const gate = deferred(); f.handlers.set('GET /rooms/messages', () => gate.promise);
-  const finding = f.service.find(key, 'history-0'); await settle();
-  f.handlers.delete('GET /rooms/messages'); await f.service.open({ key: otherKey });
-  gate.resolve({ messages: [message('history-0')], hasMore: true });
-  assert.deepEqual(await finding, { found: false });
-  assert.equal(f.runtime.state.rooms.current.key, otherKey);
-  assert.deepEqual(f.runtime.state.rooms.current.messages, []);
-});
 
 test('danmaku runtime accepts sixty composed graphemes and rejects sixty-one before sending', async t => {
   const f = fixture(t); await f.enter();
@@ -649,25 +531,107 @@ test('danmaku runtime accepts sixty composed graphemes and rejects sixty-one bef
   }
 });
 
-
-test('quoted lookup shares manual paging and handles a removed history cursor', async t => {
-  const f = fixture(t); history(f, 100); await f.enter();
-  const gate = deferred(); f.handlers.set('GET /rooms/messages', () => gate.promise);
-  const paging = f.service.more(), finding = f.service.find(key, 'history-0');
-  assert.equal(f.count('GET /rooms/messages'), 2);
-  gate.resolve({ messages: [message('history-0', peer, { createdAt: 0 })], hasMore: true });
-  await paging; assert.deepEqual(await finding, { found: true });
-  f.handlers.set('GET /rooms/messages', () => { throw new ApiError(404, { error: 'ROOM_MESSAGE_NOT_FOUND' }); });
-  assert.deepEqual(await f.service.find(key, 'missing'), { found: false });
+test('hot uses one device subscription across panels, local filters, and no polling', async t => {
+  const f = fixture(t); await f.enter();
+  await f.service.watchHot({ sourceId: 'one:hot', open: true });
+  assert.deepEqual(f.runtime.state.rooms.hot, { rows: [], loaded: false });
+  await f.service.watchHot({ sourceId: 'two:hot', open: true });
+  await f.service.watchHot({ sourceId: 'one:hot', open: true });
+  assert.equal(f.count('POST /rooms/hot/subscription'), 1);
+  const rows = [{ ...summary(), count: 5, rise: 3 }];
+  f.service.consume({ type: 'hot', rooms: { rows } });
+  assert.deepEqual(f.runtime.state.rooms.hot, { rows, loaded: true });
+  t.mock.timers.tick(MINUTE_MS); await settle();
+  assert.equal(f.count('POST /rooms/hot/subscription'), 1);
+  assert.equal(f.count('GET /rooms/hot'), 0);
+  f.service.dropPanel('one'); await settle(); assert.equal(f.count('POST /rooms/hot/subscription'), 1);
+  f.service.dropPanel('two'); await settle();
+  assert.equal(f.calls.filter(call => call.path === '/rooms/hot/subscription').at(-1).options.body.open, false);
+  assert.equal(f.runtime.state.rooms.hot, undefined);
+  f.service.consume({ type: 'hot', rooms: { rows } }); assert.equal(f.runtime.state.rooms.hot, undefined);
 });
 
-test('account replacement cancels quoted lookup without applying late history', async t => {
-  const f = fixture(t); history(f, 100); await f.enter();
-  const gate = deferred(); f.handlers.set('GET /rooms/messages', () => gate.promise);
-  const finding = f.service.find(key, 'history-0');
-  f.invalidate(); f.service.reset();
-  const rejected = assert.rejects(finding, { code: 'ACCOUNT_CHANGED' });
-  gate.resolve({ messages: [message('history-0')], hasMore: true });
-  await rejected;
-  assert.equal(f.runtime.state.rooms.current, undefined);
+test('hot reopens after SSE reconnect and closes when participation is disabled', async t => {
+  const f = fixture(t); await f.enter();
+  await f.service.watchHot({ sourceId: 'one:hot', open: true });
+  f.service.reconnected(); await settle();
+  assert.equal(f.count('POST /rooms/hot/subscription'), 2);
+  await f.service.settings({ off: true }); await settle();
+  assert.equal(f.calls.filter(call => call.path === '/rooms/hot/subscription').at(-1).options.body.open, false);
+  assert.equal(f.runtime.state.rooms.hot, undefined);
+});
+
+test('quote lookup makes one scoped ID request and preserves the history cursor', async t => {
+  const f = fixture(t); history(f, ROOM_MESSAGE_LIMIT); await f.enter();
+  const initial = f.runtime.state.rooms.current.messages[0].id;
+  f.handlers.set('GET /rooms/message', (_path, options) => message(options.query.id, peer, { createdAt: 0 }));
+  assert.deepEqual(await f.service.find(key, 'history-0'), { found: true });
+  assert.equal(f.count('GET /rooms/messages'), 1); assert.equal(f.count('GET /rooms/message'), 1);
+  assert.ok(f.runtime.state.rooms.current.messages.some(row => row.id === 'history-0'));
+  await f.service.more();
+  assert.equal(f.calls.filter(call => call.path.startsWith('/rooms/messages?')).at(-1).options.query.before, initial);
+});
+
+test('quote lookup handles removal, blocks, room changes, retractions and account replacement', async t => {
+  const f = fixture(t); await f.enter();
+  f.handlers.set('GET /rooms/message', () => { throw new ApiError(404, { error: 'ROOM_MESSAGE_NOT_FOUND' }); });
+  assert.deepEqual(await f.service.find(key, 'missing'), { found: false });
+  f.handlers.set('GET /rooms/message', () => message('blocked')); f.runtime.state.rooms.blocked = [peer];
+  assert.deepEqual(await f.service.find(key, 'blocked'), { found: false }); f.runtime.state.rooms.blocked = [];
+  for (const transition of ['retract', 'room', 'account']) {
+    await f.service.open({ key }); const gate = deferred();
+    f.handlers.set('GET /rooms/message', () => gate.promise); const finding = f.service.find(key, transition);
+    if (transition === 'retract') f.service.consume({ key, type: 'retract', id: transition });
+    if (transition === 'room') await f.service.open({ key: otherKey });
+    if (transition === 'account') { f.invalidate(); f.service.reset(); }
+    const check = transition === 'account' ? assert.rejects(finding, { code: 'ACCOUNT_CHANGED' }) : finding.then(result => assert.deepEqual(result, { found: false }));
+    gate.resolve(message(transition)); await check;
+  }
+});
+
+test('effective server slow interval reaches the composer state', async t => {
+  const f = fixture(t); await f.enter();
+  assert.equal(f.runtime.state.rooms.current.slowMs, 15_000);
+  await f.service.send('hello');
+  assert.equal(f.runtime.state.rooms.current.slowUntil, Date.now() + 15_000);
+  assert.equal(f.runtime.state.rooms.current.slowMs, 15_000);
+});
+
+test('hot faces load avatars, respect blocks, and room stance/count updates reach the row', async t => {
+  const f = fixture(t); await f.enter();
+  await f.service.watchHot({ sourceId: 'one:hot', open: true });
+  f.service.consume({ type: 'hot', rooms: { rows: [{ ...summary(), faces: [{ ...peer, avatarId: 'hot-avatar' }] }] } });
+  await settle(); assert.equal(f.avatarCalls.length, 1); assert.ok(f.runtime.state.rooms.avatars.peer);
+  await f.service.stance(key, 'bull');
+  assert.deepEqual(f.runtime.state.rooms.hot.rows[0].stance, { bull: 3, hold: 2, bear: 1 });
+  f.service.consume({ key, type: 'stance', stance: { bull: 7, hold: 2, bear: 1 } });
+  f.service.consume({ key, type: 'count', count: 8 });
+  assert.equal(f.runtime.state.rooms.hot.rows[0].stance.bull, 7); assert.equal(f.runtime.state.rooms.hot.rows[0].count, 8);
+  await f.service.block(peer.id, true);
+  assert.deepEqual(f.runtime.state.rooms.hot.rows[0].faces, []); assert.equal(f.runtime.state.rooms.avatars.peer, undefined);
+});
+
+test('a fresh summary is reused instead of read again, and expires back to the service', async t => {
+  const f = fixture(t); await f.service.panelChanged(true);
+  await f.service.summary(otherKey); await f.service.summary(otherKey);
+  assert.equal(f.count('GET /rooms/summary'), 1);
+  t.mock.timers.tick(31_000);
+  await f.service.summary(otherKey);
+  assert.equal(f.count('GET /rooms/summary'), 2);
+});
+
+test('switching back to a recent room shows its last lines and known numbers while the service snapshot loads', async t => {
+  const f = fixture(t), gate = deferred();
+  f.handlers.set('GET /rooms/messages', (path) => path.includes(encodeURIComponent(otherKey)) || path.includes(otherKey) ? { messages: [], hasMore: false } : { messages: [message('kept')], hasMore: false });
+  await f.enter();
+  assert.deepEqual(f.runtime.state.rooms.current.messages.map(item => item.id), ['kept']);
+  await f.service.tabChanged({ asset: otherKey.slice(6) });
+  f.handlers.set('GET /rooms/messages', () => gate.promise);
+  const back = f.service.tabChanged({ asset: key.slice(6) }); await settle();
+  const room = f.runtime.state.rooms.current;
+  assert.equal(room.key, key); assert.equal(room.loading, true);
+  assert.deepEqual(room.messages.map(item => item.id), ['kept']);
+  assert.equal(room.count, 2, 'numbers come from the token summary');
+  gate.resolve({ messages: [message('fresh')], hasMore: false }); await back;
+  assert.deepEqual(f.runtime.state.rooms.current.messages.map(item => item.id), ['fresh'], 'the service snapshot replaces kept lines');
 });

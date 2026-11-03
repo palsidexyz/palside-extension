@@ -16,14 +16,14 @@ const ended = () => Object.assign(new Error('session ended'), { code: 'IMAGE_SES
 function fixture() {
   const slots = [], effects = [], timers = new Map(), calls = [], restored = [];
   let cursor = 0, timerId = 0, dirty = true, view, closed = 0, saved = 0;
-  const translate = key => key;
+  const translate = key => key, text = value => value.key;
   const node = { focus() {}, closest() {}, addEventListener() {}, removeEventListener() {}, showModal() {}, close() {} };
   const React = { Fragment: 'fragment', createElement(type, props, ...children) {
     if (props?.ref) props.ref.current = node;
     return { type, props: props ?? {}, children };
   } };
   const context = {
-    React, initialState, useTranslations: () => translate, useText: () => value => value.key,
+    React, initialState, useTranslations: () => translate, useText: () => text,
     errorMessage,
     s: new Proxy({}, { get: (_, key) => key }),
     Button: 'Button', IconButton: 'IconButton', AlertDialog: 'AlertDialog', ArrowLeft: 'ArrowLeft', Maximize2: 'Maximize2', Minus: 'Minus', Plus: 'Plus', Scan: 'Scan',
@@ -37,9 +37,9 @@ function fixture() {
       }
     },
     createImageWorkspace: () => ({ getSnapshot: () => ({ ops: ['panel edit'] }), restoreState: value => restored.push(value), updateLabels() {}, stop() {}, complete() { saved++; } }),
-    document: { activeElement: null }, HTMLElement: class {}, ResizeObserver: class { observe() {} disconnect() {} },
+    document: Object.assign(new EventTarget(), { activeElement: null, visibilityState: 'visible' }), HTMLElement: class {}, ResizeObserver: class { observe() {} disconnect() {} },
     window: { addEventListener() {}, removeEventListener() {} },
-    setTimeout(fn, ms) { assert.equal(ms, 750); timers.set(++timerId, fn); return timerId; },
+    setTimeout(fn, ms) { timers.set(++timerId, { fn, ms }); return timerId; },
     clearTimeout(id) { timers.delete(id); },
   };
   const Editor = vm.runInNewContext(`${compiled}; ImageEditor`, context);
@@ -52,11 +52,11 @@ function fixture() {
   function nodes(value = render()) { return value && typeof value === 'object' ? [value, ...value.children.flat(Infinity).flatMap(child => child === undefined ? [] : nodes(child))] : []; }
   function button(label) { return nodes().find(item => item.props.label === label || item.type === 'Button' && item.children.includes(label)); }
   async function click(label) { const target = button(label); assert.ok(target); assert.ok(!target.props.disabled); target.props.onClick(); await settle(); }
-  async function poll() { assert.equal(timers.size, 1); const [id, fn] = timers.entries().next().value; timers.delete(id); fn(); await settle(); return calls.at(-1); }
+  async function poll(delay = 750) { assert.equal(timers.size, 1); const [id, timer] = timers.entries().next().value; assert.equal(timer.ms, delay); timers.delete(id); timer.fn(); await settle(); return calls.at(-1); }
   const locked = () => nodes().find(item => item.props.className === 'stage').props.inert;
   const alert = () => nodes().find(item => item.props.role === 'alert')?.children[0];
   render();
-  return { calls, restored, timers, settle, click, poll, locked, alert, button, closed: () => closed, saved: () => saved,
+  return { calls, restored, timers, document: context.document, settle, click, poll, locked, alert, button, closed: () => closed, saved: () => saved,
     async open() { await click('extension.image.openWindow'); calls.at(-1).resolve(session); await settle(); assert.equal(locked(), true); },
     stop() { for (const slot of slots) slot?.cleanup?.(); },
   };
@@ -65,12 +65,12 @@ function fixture() {
 test('transient read failures keep editing and saving locked and retry the same session', async t => {
   const f = fixture(); t.after(f.stop); await f.open();
   for (let i = 0; i < 2; i++) {
-    const read = await f.poll(); assert.equal(read.name, 'image-session-read'); assert.equal(read.payload.id, session.id);
+    const read = await f.poll(750 * 2 ** i); assert.equal(read.name, 'image-session-read'); assert.equal(read.payload.id, session.id);
     read.reject(new Error('transport unavailable')); await f.settle();
     assert.equal(f.locked(), true); assert.equal(f.button('extension.copy.save').props.disabled, true);
     assert.equal(f.button('common.cancel').props.disabled, true); assert.equal(f.alert(), 'common.error');
   }
-  (await f.poll()).resolve(session); await f.settle();
+  (await f.poll(3000)).resolve(session); await f.settle();
   assert.equal(f.locked(), true); assert.equal(f.alert(), undefined); assert.equal(f.saved(), 0);
 });
 
@@ -86,7 +86,7 @@ test('explicit handback after a failed read restores the popup document and unlo
 test('only a proven closed window unlocks polling recovery', async t => {
   const f = fixture(); t.after(f.stop); await f.open();
   (await f.poll()).resolve({ ...session, windowOpen: undefined }); await f.settle(); assert.equal(f.locked(), true);
-  (await f.poll()).resolve({ ...session, windowOpen: false }); await f.settle();
+  (await f.poll(1500)).resolve({ ...session, windowOpen: false }); await f.settle();
   assert.equal(f.locked(), false); assert.deepEqual(f.restored, [session.document]);
 });
 
@@ -111,4 +111,19 @@ test('a read completed after handback cannot restore ownership or overwrite the 
   await f.click('extension.image.returnPanel'); f.calls.at(-1).resolve({ ...session, windowOpen: false }); await f.settle();
   read.reject(new Error('late failure')); await f.settle();
   assert.equal(f.locked(), false); assert.equal(f.alert(), undefined); assert.equal(f.timers.size, 0); assert.deepEqual(f.restored, [session.document]);
+});
+
+test('popup reads back off to five seconds and pause while the panel is hidden', async t => {
+  const f = fixture(); t.after(f.stop); await f.open();
+  for (const delay of [750, 1500, 3000, 5000, 5000]) {
+    (await f.poll(delay)).resolve(session); await f.settle();
+    assert.equal(f.locked(), true);
+  }
+  const before = f.calls.length;
+  f.document.visibilityState = 'hidden'; f.document.dispatchEvent(new Event('visibilitychange'));
+  assert.equal(f.timers.size, 0); assert.equal(f.calls.length, before);
+  f.document.visibilityState = 'visible'; f.document.dispatchEvent(new Event('visibilitychange')); await f.settle();
+  assert.equal(f.calls.length, before + 1); assert.equal(f.calls.at(-1).name, 'image-session-read');
+  f.calls.at(-1).resolve(session); await f.settle();
+  (await f.poll(750)).resolve(session); await f.settle();
 });

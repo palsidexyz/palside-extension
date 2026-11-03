@@ -1,24 +1,42 @@
-/* 共享在看 and 网页互动, left of send: a pair of 32px circles, the composer tools' size. On = accent-soft fill; off = muted with a slash; on where it cannot
-   run = dimmed; on for a site Chrome has not allowed = an amber 授权 pill. The state is in the tooltip. */
-.toggle { position:relative; display:inline-grid; place-items:center; flex:none; width:32px; height:32px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--ui-ink-muted); cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
-.toggle > svg { width:18px; height:18px; stroke-width:1.8; }
-.toggle:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
-.toggle[data-on] { background:var(--ui-accent-soft); color:var(--ui-ink-accent); }
-.toggle:not([data-on])::after { content:""; position:absolute; left:50%; top:50%; width:20px; height:1.6px; border-radius:1px; background:currentColor; box-shadow:0 0 0 1.5px var(--ui-control-surface); transform:translate(-50%, -50%) rotate(-40deg); pointer-events:none; }
-.grant { display:inline-flex; align-items:center; gap:4px; flex:none; height:32px; padding:0 12px 0 10px; border:0; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-ink-warning) 16%, var(--ui-canvas)); color:var(--ui-ink-warning); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; }
-.grant svg { width:13px; height:13px; }
-.grant:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
-.toggle[data-dim] > svg { opacity:.45; }
-.toggle[data-dim]:hover > svg { opacity:.8; }
+/* 共享在看, the right half of the header's page capsule: the same 32px square and 24px tile as the site half, flat like every control.
+   Off = a canvas tile, wave struck through. On = the tile fills with the accent, the slash retracts, the centre fills and the two waves
+   draw outward; while the page is shared they breathe. On where this page cannot be shared = waves faded, a ban badge where the site
+   half shows its badge. The state is also in the tooltip, the accessible name and aria-pressed. */
+.toggle { position:relative; display:inline-grid; place-items:center; flex:none; width:32px; height:32px; padding:0; border:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-secondary); cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background-color .18s var(--ui-ease-feedback); }
+.toggle:hover { background:var(--ui-control-hover); }
 .toggle:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.toggle[aria-busy] { cursor:progress; }
+.key { --knock:var(--ui-canvas); position:relative; display:grid; place-items:center; width:24px; height:24px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas);
+  transition:background-color .22s var(--ui-ease-feedback), color .2s var(--ui-ease-feedback); }
+.key > svg { overflow:visible; }
+.toggle:hover .key { color:var(--ui-text-primary); }
+.toggle[data-on] .key { --knock:var(--ui-accent); color:var(--ui-on-accent); background:var(--ui-accent); }
 
-.toggle[data-on] .center { fill:currentColor; }
-.toggle[data-live] :is(.waveInner,.waveOuter) { animation:wave 3s ease-in-out infinite both; }
-.toggle[data-live] .waveOuter { animation-delay:.3s; }
-@keyframes wave { 0%,60%,100% { opacity:.45; } 20%,30% { opacity:1; } }
+.center { transition:fill .2s var(--ui-ease-feedback), r .3s cubic-bezier(.3, 1.6, .5, 1); }
+.waveInner, .waveOuter { stroke-dasharray:1; opacity:.8; transition:opacity .3s var(--ui-ease-feedback); }
+.slash, .knock { stroke-dasharray:1; stroke-dashoffset:0; transition:stroke-dashoffset .26s var(--ui-ease-feedback), stroke .22s var(--ui-ease-feedback); }
+.knock { stroke:var(--knock); stroke-width:4.5; }
+.toggle[data-on] .center { fill:currentColor; r:2.6px; }
+.toggle[data-on] :is(.slash, .knock) { stroke-dashoffset:-1; }
+/* Turning on draws the waves from the centre outward; sharing then lets them breathe in turn. */
+.toggle[data-on] .waveInner { opacity:1; animation:draw .38s .08s cubic-bezier(.3, .7, .3, 1) both; }
+.toggle[data-on] .waveOuter { opacity:1; animation:draw .38s .18s cubic-bezier(.3, .7, .3, 1) both; }
+.toggle[data-live] .waveInner { animation:draw .38s .08s cubic-bezier(.3, .7, .3, 1) both, wave 2.8s .8s ease-in-out infinite; }
+.toggle[data-live] .waveOuter { animation:draw .38s .18s cubic-bezier(.3, .7, .3, 1) both, wave 2.8s 1.1s ease-in-out infinite; }
+.toggle[data-dim] :is(.waveInner, .waveOuter) { opacity:.45; }
+/* Waiting for Chrome's prompt: the tile breathes until Chrome answers. */
+.toggle[aria-busy] .key { animation:asking 1.1s ease-in-out infinite; }
+@keyframes draw { from { stroke-dashoffset:1; } }
+@keyframes wave { 0%,55%,100% { opacity:1; } 20% { opacity:.35; } }
+@keyframes asking { 50% { opacity:.55; } }
+
+/* Same size and place as the site half's badge. */
+.ban { position:absolute; right:1px; bottom:1px; display:grid; place-items:center; width:15px; height:15px; border-radius:50%; background:var(--ui-canvas); color:var(--ui-danger); box-shadow:0 0 0 2px var(--ui-control-surface); transform:scale(0); transition:transform .3s cubic-bezier(.3, 1.6, .5, 1); pointer-events:none; }
+.ban > svg { width:11px; height:11px; }
+.toggle[data-dim] .ban { transform:scale(1); transition-delay:.1s; }
 
 @media (prefers-reduced-motion:reduce) {
-  .toggle { transition:none; }
-  .toggle[data-live] :is(.waveInner,.waveOuter) { animation:none; opacity:1; }
+  .toggle, .key, .center, .slash, .knock, .ban { transition:none; }
+  .toggle[data-on] :is(.waveInner, .waveOuter), .toggle[aria-busy] .key { animation:none; }
 }
-@media (forced-colors:active) { .toggle[data-on], .grant { outline:1px solid Highlight; } }
+@media (forced-colors:active) { .toggle[data-on] .key { outline:1px solid Highlight; } }

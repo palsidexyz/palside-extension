@@ -7,7 +7,7 @@
 .lobbyTabs [role="tab"] { flex:1; min-width:0; min-height:34px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border:0; border-radius:calc(var(--ui-radius-l) - 4px); corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); white-space:nowrap; transition:background .18s, color .18s; }
 .lobbyTabs [role="tab"][aria-selected="true"] { background:var(--ui-canvas); color:var(--ui-text-primary); font-weight:500; }
 .tabCount { min-width:18px; height:18px; padding:0 5px; border-radius:var(--ui-radius-pill); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); line-height:18px; font-variant-numeric:tabular-nums; }
-.lobbyPanel { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
+.lobbyPanel { flex:1 0 auto; display:flex; flex-direction:column; gap:12px; margin-top:12px; }
 .applications { display:flex; flex-direction:column; gap:var(--ui-space-1); }
 .applicationRow { display:flex; align-items:center; gap:10px; min-height:52px; padding:8px 6px; border:0; background:none; color:var(--ui-text-primary); text-align:left; cursor:pointer; border-radius:0; }
 .applicationRow:last-child { border-bottom:0; }
@@ -61,3 +61,4 @@
 @media(prefers-reduced-motion:reduce) { .card,.lobbyTabs [role="tab"] { transition:none; } }
 
 .acceptInvite { background:var(--ui-solid); color:var(--ui-on-solid); }
+.more { min-height: 32px; display: grid; place-items: center; color: var(--ui-text-secondary); font-size: var(--ui-type-footnote); }

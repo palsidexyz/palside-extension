@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as retentionRules from '../apps/extension/src/features/palside/teams/retention.ts';
 
 const source = readFileSync(new URL('../apps/extension/src/features/palside/teams/team-settings.tsx', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -40,7 +41,7 @@ function fixture({ retention = 7, live = true } = {}) {
     setConfirmation(value) { c.confirmation = value; },
     setTeams(update) { c.teams = update(c.teams); c.team = c.teams[0]; },
   };
-  c.teams = [c.team, { id: 'other', retentionDays: 14 }];
+  c.teams = [c.team, { id: 'other', retentionDays: 30 }];
   if (live) c.live = { state: { remoteTeams: [] }, command: (...args) => { calls.push(args); return command(...args); } };
   const context = {
     exports: {}, Error,
@@ -53,7 +54,7 @@ function fixture({ retention = 7, live = true } = {}) {
       if (name === '@palside/i18n') return { message, errorMessage };
       if (name === 'use-intl') return { useTranslations: () => key => key };
       if (name === '../ui/text') return { useText: () => text };
-      if (name === './retention') return { defaultRetentionDays: 7, retentionOptions: [1, 7, 14, 30], retentionPeriod: days => message(`retention.${days}`) };
+      if (name === './retention') return retentionRules;
       if (name.endsWith('.css')) return { default: {} };
       return new Proxy({}, { get: (_, key) => key === 'settingRows' ? {} : key });
     },
@@ -65,7 +66,7 @@ function fixture({ retention = 7, live = true } = {}) {
   const render = () => { cursor = 0; return context.exports.TeamSettings({ c }); };
   const select = () => find(render(), 'ValueSelect').props;
   const confirmation = () => vm.runInContext(`{${dialogCode}}`, confirmationContext).props;
-  return { c, calls, select, confirmation, change: days => select().onChange({ target: { value: String(days) } }), command: fn => { command = fn; } };
+  return { c, calls, select, confirmation, change: days => select().onChange({ target: { value: retentionRules.retentionKey(days) } }), command: fn => { command = fn; } };
 }
 const drain = () => new Promise(resolve => setImmediate(resolve));
 
@@ -73,7 +74,7 @@ for (const failure of [Object.assign(new Error('offline'), { code: 'CONNECTION_U
   test(`rejected increase opens existing error dialog and retry is handled (${typeof failure})`, async () => {
     const f = fixture();
     f.command(async () => { throw failure; });
-    f.change(14);
+    f.change(30);
     await drain();
     assert.equal(f.confirmation().open, true);
     assert.equal(f.confirmation().description, failure.code ?? 'common.error');
@@ -90,7 +91,7 @@ for (const failure of [Object.assign(new Error('offline'), { code: 'CONNECTION_U
 }
 
 test('decrease waits for confirmation, preserves failure feedback, and can succeed on retry', async () => {
-  const f = fixture({ retention: 14 });
+  const f = fixture({ retention: 30 });
   f.command(async () => { throw Object.assign(new Error('offline'), { code: 'CONNECTION_UNAVAILABLE' }); });
   f.change(7);
   assert.equal(f.calls.length, 0);
@@ -99,7 +100,7 @@ test('decrease waits for confirmation, preserves failure feedback, and can succe
   assert.equal(f.confirmation().error, 'CONNECTION_UNAVAILABLE');
   assert.equal(f.confirmation().open, true);
   assert.equal(f.select().disabled, false);
-  assert.equal(f.c.team.retentionDays, 14);
+  assert.equal(f.c.team.retentionDays, 30);
   f.command(async () => {});
   await f.confirmation().onConfirm();
   assert.equal(f.confirmation().open, false);
@@ -109,7 +110,7 @@ for (const live of [true, false]) test(`successful increase and confirmed decrea
   const f = fixture({ live });
   f.change(7);
   assert.equal(f.calls.length, 0);
-  f.change(14);
+  f.change(30);
   await drain();
   assert.equal(f.c.confirmation, undefined);
   f.change(1);
@@ -117,13 +118,13 @@ for (const live of [true, false]) test(`successful increase and confirmed decrea
   assert.equal(f.c.confirmation, undefined);
   assert.equal(f.select().disabled, false);
   if (live) assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [
-    ['retention', { teamId: 'team', retentionDays: 14 }],
+    ['retention', { teamId: 'team', retentionDays: 30 }],
     ['retention', { teamId: 'team', retentionDays: 1 }],
   ]);
-  else assert.deepEqual(f.c.teams.map(team => team.retentionDays), [1, 14]);
+  else assert.deepEqual(f.c.teams.map(team => team.retentionDays), [1, 30]);
 });
 
-for (const days of [1, 14]) test(`pending ${days < 7 ? 'decrease' : 'increase'} blocks same-tick and rerendered conflicting actions`, async () => {
+for (const days of [1, 30]) test(`pending ${days < 7 ? 'decrease' : 'increase'} blocks same-tick and rerendered conflicting actions`, async () => {
   const f = fixture();
   let resolve;
   f.command(() => new Promise(done => { resolve = done; }));
@@ -132,7 +133,7 @@ for (const days of [1, 14]) test(`pending ${days < 7 ? 'decrease' : 'increase'} 
   const pending = days < 7 ? f.confirmation().onConfirm() : undefined;
   staleSelect.onChange({ target: { value: '30' } });
   f.change(1);
-  f.change(14);
+  f.change(30);
   if (days < 7) await f.c.confirmation.confirm();
   assert.equal(f.calls.length, 1);
   assert.equal(f.select().disabled, true);
@@ -144,4 +145,18 @@ for (const days of [1, 14]) test(`pending ${days < 7 ? 'decrease' : 'increase'} 
   f.change(30);
   await drain();
   assert.equal(f.calls.length, 2);
+});
+
+test('permanent is a selectable value and shortening it waits for confirmation', async () => {
+  const f = fixture({ retention: null, live: false });
+  assert.equal(f.select().value, 'forever');
+  f.change(30);
+  assert.equal(f.c.team.retentionDays, null);
+  await f.confirmation().onConfirm();
+  assert.equal(f.c.team.retentionDays, 30);
+  f.change(null);
+  await drain();
+  assert.equal(f.c.team.retentionDays, null);
+  f.change(14);
+  assert.equal(f.c.team.retentionDays, null);
 });

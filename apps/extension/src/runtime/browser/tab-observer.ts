@@ -1,4 +1,7 @@
+import { SECOND_MS } from '@palside/shared/units';
 import { identifyPage,type PageIdentity } from '@palside/shared/navigation';
+
+const VIEWING_LOAD_RECHECKS = 12;
 
 /** Who observes for which team: every public page in the focused panel window qualifies while a policy exists. */
 export type ObservationPolicy = { key: string; context?: string };
@@ -15,7 +18,7 @@ type ObserverHost = {
 };
 
 /** Real navigation clears immediately; harmless repeated notifications keep the current generation. */
-export function createTabObserver(host: ObserverHost, settleMs = 1000) {
+export function createTabObserver(host: ObserverHost, settleMs = SECOND_MS) {
   let generation = 0;
   let checks = 0;
   let observed: string | undefined;
@@ -60,7 +63,7 @@ export function createTabObserver(host: ObserverHost, settleMs = 1000) {
         // completion notification. Keep checking this exact foreground page, bounded
         // to twelve intervals; do not claim device activity again or publish while loading.
         if (current.loading) {
-          if (++loadingChecks >= 12) throw new Error('page still loading');
+          if (++loadingChecks >= VIEWING_LOAD_RECHECKS) throw new Error('page still loading');
           waitingForLoad = true; schedule(); return;
         }
         if (waitingForLoad) { waitingForLoad = false; schedule(); return; }

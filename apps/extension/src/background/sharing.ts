@@ -1,3 +1,5 @@
+import { MINUTE_MS } from '@palside/shared/units';
+import { DEVICE_IDLE_SECONDS } from '@palside/shared/rules/accounts';
 import type { DeviceState } from '@palside/shared/contracts/presence';
 import { MessageError,errorMessage } from '@palside/i18n';
 import type { Browser } from 'wxt/browser';
@@ -9,6 +11,7 @@ import { hasPanelForWindow } from '../runtime/browser/panel-context.ts';
 import { pageName } from '../runtime/viewing/page-title.ts';
 import { createTabObserver,type ObservationPolicy } from '../runtime/browser/tab-observer.ts';
 import { matchesTokenPage,readVisibleToken,resolveTokenMetadata,tokenName,type TokenPageMetadata,type TokenPageRequest } from '../runtime/viewing/token-page.ts';
+import { validateTokenLogo } from '../runtime/viewing/token-logo.ts';
 import { pageView } from '../runtime/viewing/view-snapshot.ts';
 import type { Background } from './index.ts';
 import type { Tab } from './context.ts';
@@ -29,14 +32,14 @@ export function sharing(bg: Background) {
 
   function observationPolicy(): ObservationPolicy | undefined {
     const state = bg.state;
-    if (!state?.authenticated || !state.preferences.web.share || !state.toggles.share || connectionStatus(state.connection) !== 'connected') return;
+    if (!state?.authenticated || !state.preferences.share || connectionStatus(state.connection) !== 'connected') return;
     const team = state.remoteTeams.find(team => team.id === state.preferences.current && team.joined);
     if (!team) return;
     const key = JSON.stringify([state.account?.id, team.id]);
     return { context: key, key };
   }
   async function activePage() {
-    if (!observationPolicy() || await browser.idle.queryState(60) === 'locked') return;
+    if (!observationPolicy() || await browser.idle.queryState(DEVICE_IDLE_SECONDS) === 'locked') return;
     const window = await browser.windows.getLastFocused();
     if (!window.focused || window.incognito || window.id === undefined || ![...bg.panels.values()].includes(window.id)) return;
     const tab = await bg.activeTab(window.id);
@@ -71,7 +74,7 @@ export function sharing(bg: Background) {
     const page = async () => {
       const window = await browser.windows.getLastFocused();
       if (!window.focused || window.incognito || window.id !== request.context.windowId || ![...bg.panels.values()].includes(window.id)) return;
-      if (await browser.idle.queryState(60) === 'locked') return;
+      if (await browser.idle.queryState(DEVICE_IDLE_SECONDS) === 'locked') return;
       const tab = await bg.activeTab(window.id);
       return tab?.id === request.context.tabId && !tab.incognito && tab.status !== 'loading' && tab.url && matchesTokenPage(tab.url, request.identity) ? tab : undefined;
     };
@@ -79,7 +82,7 @@ export function sharing(bg: Background) {
     if (tab?.id === undefined || !tab.url || !(await accessStatus(tab.url, browser)).site || !eligible() || accountId !== bg.state?.account?.id) return;
     const key = JSON.stringify([accountId, request.teamId, request.context.windowId, tab.id, document, tab.url, request.identity.host, request.identity.chain, request.identity.address]);
     let saved = tokenMetadata.get(key);
-    if (!saved || saved.policy !== version || saved.preferences !== preferences || Date.now() - saved.at > 60_000) {
+    if (!saved || saved.policy !== version || saved.preferences !== preferences || Date.now() - saved.at > MINUTE_MS) {
       saved = { attempts: 0, at: Date.now(), policy: version, preferences }; tokenMetadata.set(key, saved);
       if (tokenMetadata.size > 100) tokenMetadata.delete(tokenMetadata.keys().next().value!);
     }
@@ -92,7 +95,10 @@ export function sharing(bg: Background) {
       const after = await page();
       if (!after || after.url !== tab.url || !(await accessStatus(tab.url, browser)).site || !eligible()) return;
       const result = results.find(result => result.frameId === 0)?.result;
-      if (tokenName(result?.name)) saved.value = result;
+      const name = tokenName(result?.name);
+      const logo = await validateTokenLogo(result?.logo);
+      if (!eligible()) return;
+      if (name) saved.value = { name, logo };
       return saved.value;
     } catch { return; }
   }

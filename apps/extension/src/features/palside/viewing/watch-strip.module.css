@@ -1,17 +1,27 @@
-/* Top slot: one 52px row of equal columns — 在看 chips (two at most), or one card — and a +N square. Never scrolls, never cut off.
-   Chip insets are kept tight so a token name of eight characters still fits beside two faces at the default panel width. */
+/* Top slot: one 44px row from the left edge — 在看 chips as wide as their content (two at most, shrinking together when long), or one card
+   across the row — and a +N square. Never scrolls, never cut off. */
 .region { --watch-more:44px; overflow:hidden; flex-shrink:0; }
-.strip { display:grid; gap:6px; height:60px; padding:0 16px 8px; }
-.card { min-width:0; }
-.chip { position:relative; display:flex; align-items:stretch; min-width:0; height:52px; padding:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.strip { display:flex; gap:6px; height:52px; padding:0 16px 8px; }
+.card { flex:1; min-width:0; }
+.chip { position:relative; display:flex; flex:0 1 auto; align-items:stretch; min-width:0; height:44px; padding:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .chip > [data-token-lock] { align-self:center; margin-inline:-6px 2px; }
-.target { display:flex; flex:1; align-items:center; gap:5px; min-width:0; padding:0 2px 0 3px; border-radius:calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs) var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px); corner-shape:var(--ui-corner-shape); text-align:left; background:transparent; border:0; color:var(--ui-text-primary); }
+.target { display:flex; flex:1; align-items:center; gap:7px; min-width:0; padding:0 4px 0 5px; border-radius:calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs) var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px); corner-shape:var(--ui-corner-shape); text-align:left; background:transparent; border:0; color:var(--ui-text-primary); }
 .target > [data-token-size][data-token-size] { --token-size:24px; }
 .text { flex:1; min-width:0; }
 .text strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-callout); line-height:18px; font-weight:600; letter-spacing:-.01em; }
 .text small { display:flex; align-items:center; gap:3px; overflow:hidden; font-size:var(--ui-type-caption); line-height:14px; color:var(--ui-text-secondary); white-space:nowrap; }
 .text small svg { flex:none; }
-/* Who: two overlapping faces and a +N disc of the same size. The user's own face is the only accent in the chip. */
+/* A token chip: the name opens its 弹幕 (the whole chip but the source line is that target), the source line opens the page. */
+.target[data-split] { position:relative; }
+.roomName { display:block; max-width:100%; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.roomName::after { content:""; position:absolute; inset:0; border-radius:inherit; }
+.roomName:focus-visible { outline:none; }
+.roomName:focus-visible::after { box-shadow:var(--ui-focus-ring); }
+.sourceLine { position:relative; z-index:1; display:flex; align-items:center; gap:3px; max-width:100%; margin:0 -3px; padding:0 3px; border:0; border-radius:3px; background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-caption); line-height:14px; white-space:nowrap; overflow:hidden; cursor:pointer; transition:color .16s var(--ui-ease-feedback); }
+.sourceLine svg { flex:none; }
+.sourceLine:hover, .sourceLine[aria-expanded=true] { color:var(--ui-text-primary); text-decoration:underline; text-underline-offset:2px; }
+.sourceLine:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+/* Who: two overlapping faces and a +N disc of the same size; the user's own face leads, unmarked. */
 .count { display:flex; flex:none; align-items:center; padding:0 4px 0 2px; border:0; border-radius:var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px) calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); --stack-edge:var(--ui-control-surface); }
 .count:hover { --stack-edge:var(--ui-control-hover); }
 .count:active { --stack-edge:var(--ui-control-recess); }
@@ -20,9 +30,8 @@
 .face > :global([data-person-avatar][data-avatar-size]) { --person-size:20px; --person-font:8px; }
 .face { position:relative; display:grid; flex:none; border-radius:50%; box-shadow:0 0 0 1.5px var(--stack-edge); }
 .face [data-presence] { display:none; }
-.face[data-self] { box-shadow:0 0 0 1.5px var(--stack-edge), 0 0 0 3px var(--ui-accent); }
 .rest { position:relative; display:flex; align-items:center; justify-content:center; flex:none; white-space:nowrap; min-width:20px; height:20px; padding:0 3px; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-text-primary) 9%, var(--stack-edge)); box-shadow:0 0 0 1.5px var(--stack-edge); color:var(--ui-text-primary); font-size:var(--ui-type-caption); line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
-.more { display:grid; place-items:center; width:var(--watch-more); height:52px; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-callout)/1 var(--font-geist-mono), ui-monospace, monospace; cursor:pointer; }
+.more { display:grid; place-items:center; flex:none; width:var(--watch-more); height:44px; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-callout)/1 var(--font-geist-mono), ui-monospace, monospace; cursor:pointer; }
 .more:hover, .more[aria-expanded="true"] { background:var(--ui-control-hover); }
 .more:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 /* +N: the chips and waiting 喊你来看 the row has no room for, as full-width rows. */
@@ -32,7 +41,7 @@
 .moreList .count { width:auto; min-height:0; padding:0 7px 0 4px; gap:0; border-radius:var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px) calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
 .moreList .pokeOpen { width:auto; min-height:0; padding:0 12px; justify-content:center; font-size:var(--ui-type-footnote); line-height:16px; font-weight:600; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
 .moreList .pokeOpen:hover { background:color-mix(in srgb, var(--ui-text-primary) 86%, var(--ui-canvas)); }
-.moreList .chip { height:48px; }
+.moreList .chip { height:44px; }
 .pokeRow { display:flex; align-items:center; gap:8px; min-height:48px; padding:0 6px 0 10px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .pokeRow [data-presence] { display:none; }
 .pokeText { display:flex; flex:1; flex-direction:column; min-width:0; }

@@ -1011,5 +1011,5 @@ export const contractSourceDigests = {
   "contracts/foundry.toml": "0148ad94ab4bd17acbec6a2bbeef6ea5517662574fb9f36c092728bcc1bfa7d0",
   "contracts/dependencies.json": "b6042832cb10b90231a79eb48df2d0e0e5acdca1d1e44d32384f5a84fa5aebf8",
   "contracts/src/MockPALS.sol": "33a3bfb27b67bd1c1783a81a00804857f7d3128f05da1f169b9db2263bcd141a",
-  "contracts/src/PalsideRedPacket.sol": "8bb3a4a4a238b2e769e1a34ab25aa83bcf71d5340f9d2cec362f7951994e5405"
+  "contracts/src/PalsideRedPacket.sol": "d04dcb7e49da82038cf7eef34b797e9cd43f42823ba8ead9b3c186231331d1df"
 } as const;

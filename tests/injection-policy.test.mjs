@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { pageMatches, pageScript } from '../apps/extension/src/runtime/browser/page-layer-host.ts';
 import { manualPageLayerPolicy, validatePageLayerRegistration } from '../scripts/lib/extension-artifact.mjs';
 test('Chrome grants alone determine automatic registrations while 网页互动 runs', () => {
-  const state = { authenticated: true, preferences: { current: 't', web: { share: true, interact: true } }, toggles: { share: false, interact: true }, remoteTeams: [{ id: 't', joined: true }] };
+  const state = { authenticated: true, preferences: { current: 't' }, remoteTeams: [{ id: 't', joined: true }] };
   const script = pageScript(pageMatches(state, ['https://custom.example.com/*', '*://both.example.com/*', 'https://api.example.org/*']));
   assert.deepEqual(validatePageLayerRegistration(script), []);
   assert.deepEqual(script.matches, ['http://both.example.com/*', 'https://api.example.org/*', 'https://both.example.com/*', 'https://custom.example.com/*']);
@@ -25,13 +25,13 @@ test('registration validation rejects broad or malformed patterns and allows exa
   for (const patch of [{ matches: [] }, { matches: ['https://example.com/*'], allFrames: true }, { matches: ['https://example.com/*'], persistAcrossSessions: true }, { matches: ['https://example.com/*'], matchOriginAsFallback: true }, { matches: ['https://example.com/*'], js: ['remote.js'] }]) assert.ok(validatePageLayerRegistration({ ...base, ...patch }).length);
 });
 test('registration requires 网页互动 on for a joined current team and never trusts malformed grants', () => {
-  const state = { authenticated: true, preferences: { current: 't', web: { share: true, interact: true } }, toggles: { share: false, interact: true }, remoteTeams: [{ id: 't', joined: true }] };
+  const state = { authenticated: true, preferences: { current: 't' }, remoteTeams: [{ id: 't', joined: true }] };
   assert.deepEqual(pageMatches(state, ['https://*.example.com/*', 'https://example.com/path/*', 'notifications']), []);
   const origins = ['https://example.com/*'];
   assert.deepEqual(pageMatches(state, origins), ['https://example.com/*']);
   for (const patch of [{ authenticated: false }, { remoteTeams: [] }, { remoteTeams: [{ id: 't', joined: false }] }, { preferences: { ...state.preferences, current: 'other' } },
-    { toggles: { share: true, interact: false } }, { preferences: { ...state.preferences, web: { share: true, interact: false } } },
-    { preferences: { ...state.preferences, interaction: { danmaku: false, signal: false, sticky: false } } }]) assert.deepEqual(pageMatches({ ...state, ...patch }, origins), [], JSON.stringify(patch));
+    { preferences: { ...state.preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } },
+    { preferences: { ...state.preferences, siteInteraction: { 'example.com': { on: true, danmaku: true, signal: false, sticky: false } } } }]) assert.deepEqual(pageMatches({ ...state, ...patch }, origins), [], JSON.stringify(patch));
 });
 
 test('page layer registrations allow only the isolated execution world', () => {

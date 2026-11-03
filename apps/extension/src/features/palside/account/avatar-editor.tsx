@@ -1,5 +1,5 @@
 'use client';
-import { AVATAR_BYTES, IMAGE_MIME_TYPES } from '@palside/shared/contracts/limits';
+import { AVATAR_BYTES, IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
 import { errorMessage, message as uiMessage, MessageError } from '@palside/i18n';
 
 import { useTextState } from '../ui/text';

@@ -5,11 +5,13 @@ import { fill } from './text';
 import type { OverlayHost } from './overlay-host';
 import { face } from './overlay-host';
 
+const REFERENCE_HOLD_MS = 4_000;
+
 export function createReferenceOutline(context: OverlayHost, send: (message: PageUp) => void) {
   const { stage, timers, later } = context;
   const references = new Map<string, { refresh: (located: NonNullable<ReturnType<typeof locate>>, person: PagePerson, focus: boolean, duration: number) => void; remove: () => void }>();
   /** One outline per target: another locate refreshes it instead of piling up identical boxes and frame loops. */
-  function showReference(target: RefTarget, person: PagePerson, requestId?: string, focus = false, duration = 4_000) {
+  function showReference(target: RefTarget, person: PagePerson, requestId?: string, focus = false, duration = REFERENCE_HOLD_MS) {
     const key = JSON.stringify(Object.entries(target).sort(([a], [b]) => a.localeCompare(b)));
     let located = locate(target);
     let element = located?.el ?? located?.range?.startContainer.parentElement;

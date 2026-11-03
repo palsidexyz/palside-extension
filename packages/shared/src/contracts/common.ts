@@ -1,7 +1,7 @@
 import { Value } from 'typebox/value';
 import Type, { type StaticDecode as Static } from 'typebox';
 import { contractString, safeInteger, strictObject } from './validation.ts';
-import { EVENT_ID_LENGTH, IDENTIFIER_LENGTH } from './limits.ts';
+import { EVENT_ID_LENGTH, IDENTIFIER_LENGTH } from '../rules/messages.ts';
 import { INVITE_PASSWORD_PATTERN } from './rules.ts';
 export const id = contractString({ min: 1, max: IDENTIFIER_LENGTH, pattern: /^[^\s\x00-\x1f\x7f]+$/u });
 export const eventId = contractString({ min: 1, max: EVENT_ID_LENGTH, pattern: /^[^\s\x00-\x1f\x7f]+$/u });

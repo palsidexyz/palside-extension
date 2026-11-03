@@ -1,3 +1,4 @@
+import { SECOND_MS, MINUTE_MS, HOUR_MS, DAY_MS } from '@palside/shared/units';
 import { createTranslator, type AbstractIntlMessages } from 'use-intl/core';
 import { PUBLIC_LINKS } from '@palside/shared/public-links';
 import en from './en.json' with { type: 'json' };
@@ -36,7 +37,7 @@ export function clockTime(timestamp: number, locale: Locale) {
 export function pastTime(timestamp: number, locale: Locale, now = Date.now()) {
   const date = new Date(timestamp);
   if (!Number.isFinite(date.getTime())) return '';
-  const minutes = Math.floor((now - timestamp) / 60_000);
+  const minutes = Math.floor((now - timestamp) / MINUTE_MS);
   if (minutes < 0 || minutes >= 60) return shortDateTime(date, locale, now);
   const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'narrow' });
   return minutes === 0 ? translator(locale)('common.justNow') : relative.format(-minutes, 'minute');
@@ -47,7 +48,7 @@ export function deadlineTime(timestamp: number, locale: Locale, now = Date.now()
   if (!Number.isFinite(date.getTime())) return '';
   const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
   const midnight = (value: number) => new Date(value).setHours(0, 0, 0, 0);
-  const days = Math.round((midnight(timestamp) - midnight(now)) / 86_400_000);
+  const days = Math.round((midnight(timestamp) - midnight(now)) / DAY_MS);
   if (days === 0 || days === 1) return `${new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(days, 'day')} ${time}`;
   if (days > 1 && days < 7) return `${new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date)} ${time}`;
   return shortDateTime(date, locale, now);
@@ -70,13 +71,13 @@ export function errorMessage(error: unknown): TextMessage {
     const messages = en.extension.errors;
     const code = value.reason && Object.hasOwn(messages, `${value.code}_${value.reason}`) ? `${value.code}_${value.reason}` : value.code;
     if (code === 'ACCOUNT_BANNED') return message('extension.errors.ACCOUNT_BANNED', { email: PUBLIC_LINKS.contactEmail });
-    const wait = typeof value.retryAfterMs === 'number' && Number.isFinite(value.retryAfterMs) && value.retryAfterMs > 0 ? Math.ceil(value.retryAfterMs / 1000) : undefined;
+    const wait = typeof value.retryAfterMs === 'number' && Number.isFinite(value.retryAfterMs) && value.retryAfterMs > 0 ? Math.ceil(value.retryAfterMs / SECOND_MS) : undefined;
     // Throttling says how long to wait, in the largest whole unit that still reads naturally.
     if (wait && (code === 'RATE_LIMITED' || code === 'UPLOAD_QUOTA')) {
-      if (code === 'UPLOAD_QUOTA') return message('extension.errors.UPLOAD_QUOTA', { count: Math.ceil(wait / 3600) });
+      if (code === 'UPLOAD_QUOTA') return message('extension.errors.UPLOAD_QUOTA', { count: Math.ceil(wait * SECOND_MS / HOUR_MS) });
       return wait < 60 ? message('extension.errors.RATE_LIMITED_SECONDS', { count: wait })
-        : wait < 3600 ? message('extension.errors.RATE_LIMITED_MINUTES', { count: Math.ceil(wait / 60) })
-        : message('extension.errors.RATE_LIMITED_HOURS', { count: Math.ceil(wait / 3600) });
+        : wait * SECOND_MS < HOUR_MS ? message('extension.errors.RATE_LIMITED_MINUTES', { count: Math.ceil(wait * SECOND_MS / MINUTE_MS) })
+        : message('extension.errors.RATE_LIMITED_HOURS', { count: Math.ceil(wait * SECOND_MS / HOUR_MS) });
     }
     // A join password lock lasts at most an hour, so it always reads in minutes.
     if (code === 'INVITE_PASSWORD_LOCKED') return message('extension.errors.INVITE_PASSWORD_LOCKED', { count: Math.max(1, Math.ceil((wait ?? 60) / 60)) });

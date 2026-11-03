@@ -12,5 +12,5 @@ export type AdminResource = typeof adminResources[number];
 export const adminPages = { cases: adminCasePage, accounts: adminAccountPage, teams: adminTeamPage, orders: adminOrderPage, packets: adminPacketPage, words: adminWordPage, jobs: adminJobPage, audit: adminAuditPage } as const;
 export type AdminRow<R extends AdminResource> = Infer<typeof adminPages[R]>['items'][number];
 export type AdminPage<R extends AdminResource> = Infer<typeof adminPages[R]>;
-/** CSV export uses the list filters without paging (at most 10000 rows). */
+/** CSV export uses the list filters without paging, up to `ADMIN_EXPORT_LIMIT` rows (checked by the service). */
 export const adminExportResources = ['accounts', 'teams', 'orders', 'audit'] as const;

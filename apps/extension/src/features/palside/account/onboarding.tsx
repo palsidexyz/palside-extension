@@ -1,8 +1,9 @@
 'use client';
+import { SECOND_MS } from '@palside/shared/units';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
-import { NICKNAME_LENGTH } from '@palside/shared/contracts/limits';
+import { NICKNAME_LENGTH, PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { errorMessage, message as uiMessage, type TextValue } from '@palside/i18n';
-import { ENGLISH_WORDS, PIN_LENGTH } from '@palside/shared/identity';
+import { ENGLISH_WORDS } from '@palside/shared/identity';
 import { useTranslations } from 'use-intl';
 import { Count } from '../ui/motion-details';
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
@@ -164,7 +165,7 @@ function WelcomeArt() {
     const move = (event: PointerEvent) => { const box = area.getBoundingClientRect(); pointer = { x: (event.clientX - box.left) / box.width * 2 - 1, y: (event.clientY - box.top) / box.height * 2 - 1 }; };
     const leave = () => { pointer = undefined; };
     const tick = (now: number) => {
-      const seconds = (now - start) / 1000, target = pointer ?? { x: Math.sin(seconds * .42) * .5, y: Math.cos(seconds * .31) * .4 };
+      const seconds = (now - start) / SECOND_MS, target = pointer ?? { x: Math.sin(seconds * .42) * .5, y: Math.cos(seconds * .31) * .4 };
       x += (target.x - x) * .06; y += (target.y - y) * .06;
       element.style.setProperty('--px', x.toFixed(4)); element.style.setProperty('--py', y.toFixed(4));
       frame = requestAnimationFrame(tick);
@@ -350,6 +351,7 @@ function PasswordSetup({ c }: { c: PalsideController }) {
     <div className={o.pinBlock}>
       <PinInput outlined reveal aria-label={t('extension.copy.password')} aria-invalid={Boolean(error)} aria-describedby={error ? 'pin-error' : undefined} autoComplete="off" autoFocus value={pin} disabled={c.authBusy} onValueChange={value => { setPin(value); setError(''); }} />
       {error && <p id="pin-error" className={edge.error} role="alert">{text(error)}</p>}
+      {c.live?.state?.signupWaiting && <p className={o.waiting} role="status">{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>}
     </div>
   </Step>;
 }

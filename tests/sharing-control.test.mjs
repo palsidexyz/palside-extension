@@ -15,7 +15,7 @@ hooks.deregister();
 function fixture() {
   const value = new PalsideService();
   const view = { id: 'current', url: 'https://gmgn.ai/token/current' };
-  Object.assign(value.state, { authenticated: true, account: {}, connection: { networkOnline: true, service: 'ready', messaging: 'ready' }, preferences: { current: 'team', web: { share: true, interact: true } }, toggles: { share: true, interact: false }, remoteTeams: [{ id: 'team', joined: true, preferences: { readIds: [] } }] });
+  Object.assign(value.state, { authenticated: true, account: {}, connection: { networkOnline: true, service: 'ready', messaging: 'ready' }, preferences: { current: 'team', share: true }, remoteTeams: [{ id: 'team', joined: true, preferences: { readIds: [] } }] });
   value.sharing.selectedDevice = true; value.sharing.page = view;
   value.sharing.ownViewing = { view, teamId: 'team', expiresAt: Date.now() + 30000 };
   return value;
@@ -29,8 +29,8 @@ test('sharing control drops old pages, teams, expired leases and superseded devi
     const value = fixture(); value.emit(); change(value); value.emit(); assert.equal(value.state.publishedViewing, undefined);
   }
 });
-test('sharing control clears selection on disconnect, 共享在看 switched off or 禁用, leaving and logout', () => {
-  for (const change of [v => { v.state.connection.networkOnline = false; }, v => { v.state.toggles.share = false; }, v => { v.state.preferences.web = { share: false, interact: true }; }, v => { v.state.remoteTeams[0].joined = false; }, v => { v.state.authenticated = false; }]) {
+test('sharing control clears selection on disconnect, 共享在看 switched off, leaving and logout', () => {
+  for (const change of [v => { v.state.connection.networkOnline = false; }, v => { v.state.preferences.share = false; }, v => { v.state.remoteTeams[0].joined = false; }, v => { v.state.authenticated = false; }]) {
     const value = fixture(); value.emit(); change(value); value.emit(); assert.equal(value.state.publishedViewing, undefined);
   }
 });

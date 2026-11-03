@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const h = React.createElement;
 const phrase = ['abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident'];
 const compiled = new Map();
-async function fixture(t) {
+async function fixture(t, { lateScreen = false } = {}) {
   const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
   const saved = Object.getOwnPropertyDescriptors(globalThis);
   Object.assign(globalThis, { window, document, IS_REACT_ACT_ENVIRONMENT: true });
@@ -26,8 +26,9 @@ async function fixture(t) {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => translate },
     '@palside/i18n': { errorMessage: error => error.message, message: key => key },
-    '@palside/shared/identity': { ENGLISH_WORDS: phrase, PIN_LENGTH: 6 },
-    '@palside/shared/contracts/limits': { NICKNAME_LENGTH: 32 },
+    '@palside/shared/identity': { ENGLISH_WORDS: phrase },
+    '@palside/shared/units': require('@palside/shared/units'),
+    '@palside/shared/rules/accounts': require('@palside/shared/rules/accounts'),
     '@palside/shared/person-avatars': { avatarPath: name => name },
     'motion/react': { useReducedMotion: () => true },
     'lucide-react': Object.fromEntries(['ArrowLeft', 'Check', 'Copy', 'Eye', 'ShieldAlert', 'Users'].map(name => [name, noop])),
@@ -60,7 +61,8 @@ async function fixture(t) {
   const live = { command: async name => {
     sent.push(name);
     if (commandFailure) throw commandFailure;
-    if (name === 'account-create') update({ screen: 'password' });
+    // The real runtime announces the password step in a later state patch unless the fixture says otherwise.
+    if (name === 'account-create' && !lateScreen) update({ screen: 'password' });
     if (name === 'account-generate') return { words: [...phrase].reverse() };
   } };
   function Harness() {
@@ -102,7 +104,7 @@ async function fixture(t) {
     }
     now = end;
   };
-  return { sent, timers, document, choose, advance, unmount, click,
+  return { sent, timers, document, choose, advance, unmount, click, phrase: () => c.phrase,
     actions: () => actions, patch: patch => act(() => update(patch)),
     fail: error => { commandFailure = error; },
     back: () => click(document.querySelector('[aria-label="common.back"]')),
@@ -152,6 +154,16 @@ test('account action rejects stale screen, phrase and flow generations', async t
   await f.patch({ screen: 'confirm-phrase', flow: 'create' });
   const stale = f.actions().createAccount;
   await f.unmount(); await stale(); assert.deepEqual(f.sent, []);
+});
+
+test('creation keeps the answered quiz until the runtime reaches the password step', async t => {
+  const f = await fixture(t, { lateScreen: true });
+  await f.choose(); await f.advance(420); await f.choose(); await f.advance(420);
+  assert.deepEqual(f.sent, ['account-create']);
+  assert.equal(f.phrase().length, phrase.length);
+  assert.ok(f.document.querySelector('.choice[data-state="right"]'));
+  await f.patch({ screen: 'password' });
+  assert.equal(f.phrase().length, 0);
 });
 
 test('failed creation retains the existing retry action', async t => {

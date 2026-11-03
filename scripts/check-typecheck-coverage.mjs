@@ -1,3 +1,4 @@
+import { MIB } from '@palside/shared/units';
 import { execFileSync } from 'node:child_process';
 import { existsSync, globSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
@@ -34,7 +35,7 @@ function checkTypecheckCoverage(directory = root) {
     try {
       output = execFileSync(process.execPath, [
         resolve(directory, 'node_modules/typescript/bin/tsc'), '-p', program, '--listFilesOnly', '--pretty', 'false', '--incremental', 'false',
-      ], { cwd: directory, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+      ], { cwd: directory, encoding: 'utf8', maxBuffer: 32 * MIB, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (error) {
       throw new Error(`${relative(directory, program)} could not list its files:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
     }

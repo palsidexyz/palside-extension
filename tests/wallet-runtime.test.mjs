@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -20,15 +21,17 @@ const { parseCommand } = await import('../apps/extension/src/runtime/transport/c
 const { walletHandlers } = await import('../apps/extension/src/runtime/wallet/command-handlers.ts');
 const { WalletRuntime } = await import('../apps/extension/src/runtime/wallet/runtime.ts');
 const { receiveRequest, checkTransferAddress } = await import('../apps/extension/src/runtime/wallet/receive.ts');
-const { parsePals } = await import('../apps/extension/src/domain/wallet/model.ts');
+const { parsePals, quickPayLimits, smallPaymentStatus, nearestEqualPacketTotal, nextUtcDay } = await import('../apps/extension/src/domain/wallet/model.ts');
 const { walletDeadlines } = await import('../apps/extension/src/features/palside/wallet/clock.ts');
 const { recoveryLabel } = await import('../apps/extension/src/features/palside/wallet/recovery-state.ts');
+const { quotaResetText } = await import('../apps/extension/src/features/palside/wallet/quota.ts');
 hooks.deregister();
 const mnemonic = 'test test test test test test test test test test test junk'; // Public viem/anvil fixture only.
 const address = deriveWalletAccount(mnemonic).address;
 const recipient = '0x1111111111111111111111111111111111111111';
 const deployment = { chainId: 4663, token: '0x2222222222222222222222222222222222222222', packetContract: '0x4444444444444444444444444444444444444444', decimals: 18 };
 const unit = 10n ** 18n;
+const quickPay = { single: '250', daily: '1000' };
 function host() {
   const values = new Map(), tails = new Map();
   const storage = { async get(key) { return structuredClone(values.get(key)); }, async put(key, _account, _kind, value) { values.set(key, structuredClone(value)); } };
@@ -38,7 +41,7 @@ function host() {
 const paymentOwner = f => ({ accountId: 'self', paymentId: f.controller.snapshot().payment.id });
 function fixture(t) {
   const local = host(); let now = 1_800_000_000_000, signed = 0, submits = 0;
-  const config = { enabled: true, version: 1, deployment, dailySponsoredLimit: 20, updatedAt: now };
+  const config = { enabled: true, version: 1, deployment, dailySponsoredLimit: 50, quickPay, minimumLiquidity: '0', updatedAt: now };
   let order;
   const keys = { unlocked: true, async unlock(password) { if (password !== '123456') throw Object.assign(new Error('WRONG_PASSWORD'), { code: 'WRONG_PASSWORD' }); return address; }, async sign(_envelope, expectation) { assert.equal(expectation.account, address); signed++; return { requestId: 'request', signatures: [] }; }, dispose() {} };
   const api = {
@@ -74,15 +77,15 @@ test('receive URI uses the current PALS chain and transfer recipients exclude se
 });
 test('small payments default off and atomic reservations cap concurrent windows at 1000 PALS', async () => {
   const h = host(), a = new WalletLocalState(h.storage, 'self', () => {}, h.locks), b = new WalletLocalState(h.storage, 'self', () => {}, h.locks);
-  assert.equal(await a.canSkip({ kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(unit) }, unit, 18), false);
+  assert.equal(await a.smallPayment({ kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(unit) }, unit, 18, quickPay), 'password');
   await a.setPreferences({ smallPayments: true });
-  assert.equal(await a.reserve('address', { kind: 'transfer', recipient, amount: String(unit) }, unit, 18), false);
-  assert.equal(await a.reserve('large', { kind: 'tip', messageId: 'message', amount: String(250n * unit + 1n) }, 250n * unit + 1n, 18), false);
-  const results = await Promise.all(Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).reserve(String(i), { kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(250n * unit) }, 250n * unit, 18)));
+  assert.equal(await a.reserve('address', { kind: 'transfer', recipient, amount: String(unit) }, unit, 18, quickPay), false);
+  assert.equal(await a.reserve('large', { kind: 'tip', messageId: 'message', amount: String(250n * unit + 1n) }, 250n * unit + 1n, 18, quickPay), false);
+  const results = await Promise.all(Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).reserve(String(i), { kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(250n * unit) }, 250n * unit, 18, quickPay)));
   assert.equal(results.filter(Boolean).length, 4);
-  assert.equal(await b.reserve('0', { kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(250n * unit) }, 250n * unit, 18), false);
+  assert.equal(await b.reserve('0', { kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(250n * unit) }, 250n * unit, 18, quickPay), false);
   await a.release('0');
-  assert.equal(await b.reserve('new', { kind: 'tip', messageId: 'message', amount: String(250n * unit) }, 250n * unit, 18), true);
+  assert.equal(await b.reserve('new', { kind: 'tip', messageId: 'message', amount: String(250n * unit) }, 250n * unit, 18, quickPay), true);
 });
 test('local password failures are shared, persisted, and lock for fifteen minutes', async () => {
   const h = host(); let now = 1000;
@@ -307,7 +310,7 @@ function signingEnvelope(order, authorization = {}, operationCalls = orderCalls(
   const expected = { orderId: order.id, orderFingerprint: orderFingerprint(order, calls), account: address, chainId: deployment.chainId, calls };
   const request = { type: 'user-operation-v070', chainId: deployment.chainId, data: { sender: address, nonce: '0', callData: encodeFunctionData({ abi: relayBatchAbi, functionName: 'executeBatch', args: [operationCalls.map(call => ({ target: call.to, value: BigInt(call.value), data: call.data }))] }), callGasLimit: '100000', verificationGasLimit: '100000', preVerificationGas: '100000', maxFeePerGas: '1', maxPriorityFeePerGas: '1', paymaster: recipient, paymasterData: '0x', paymasterVerificationGasLimit: '100000', paymasterPostOpGasLimit: '100000' }, signatureRequest: { type: 'personal_sign' } };
   const hash = relayOperationHash(request); request.signatureRequest = { type: 'personal_sign', rawPayload: hashMessage({ raw: hash }), data: { raw: hash } };
-  return { expected, envelope: { requestId: 'request', ...expected, expiresAt: Date.now() + 60000, requests: [request], fee: { mode: 'sponsored' }, authorizationNonce: null, orderAuthorization: authorization } };
+  return { expected, envelope: { requestId: 'request', ...expected, expiresAt: Date.now() + MINUTE_MS, requests: [request], fee: { mode: 'sponsored' }, authorizationNonce: null, orderAuthorization: authorization } };
 }
 for (const input of [
   { kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(unit) },
@@ -389,7 +392,7 @@ test('random packet allocation conserves bigint amount and uses independent comm
   assert.equal(result.packet.amounts.reduce((sum, amount) => sum + BigInt(amount), 0n), 100n * unit);
   assert.ok(result.packet.amounts.every(amount => BigInt(amount) >= unit));
   assert.equal(new Set(result.packet.allocationSalts).size, 20);
-  assert.throws(() => createPacketInput({ kind: 'invitation', scope: 'team', count: 3, distribution: 'equal', total: String(10n * unit) }));
+  assert.throws(() => createPacketInput({ kind: 'team', scope: 'team', count: 3, distribution: 'equal', total: String(10n * unit) }));
 });
 test('binding is signed by both local wallet and identity and rejects server substitutions', async () => {
   const accountId = deriveIdentity(mnemonic).publicKey, now = Date.now();
@@ -693,7 +696,7 @@ test('a different device submitting after recovery review changes to original-op
 test('recovery UI distinguishes relay inclusion from business completion and preserves unknown over quote expiry', () => {
   assert.equal(recoveryLabel({ order: { status: 'submitted' }, relay: { state: 'confirmed' } }), 'recoveryIndexing');
   assert.equal(recoveryLabel({ order: { status: 'confirmed' }, relay: { state: 'confirmed' } }), 'confirmed');
-  assert.equal(recoveryLabel({ order: { status: 'expired' }, relay: { state: 'uncertain' } }), 'recoveryUnknown');
+  assert.equal(recoveryLabel({ order: { status: 'expired' }, relay: { state: 'uncertain' } }), 'pending');
   assert.equal(recoveryLabel({ order: { status: 'expired' }, relay: { state: 'cancelled', fundsReserved: true } }), 'recoveryCancelled');
   assert.equal(recoveryLabel({ order: { status: 'failed' }, relay: { state: 'failed' } }), 'recoveryFailed');
 });
@@ -810,4 +813,124 @@ test('preference commands require the initiating account at the transport bounda
   assert.throws(() => parseCommand({ name: 'preferences', payload: { current: 'team' } }));
   const payload = { accountId: 'self', current: 'team' };
   assert.deepEqual(parseCommand({ name: 'preferences', payload }).payload, payload);
+});
+
+
+test('quick-pay uses server limits with hard caps and whole PALS arithmetic', () => {
+  const input = { kind: 'tip', messageId: 'message', amount: '1' };
+  assert.deepEqual(quickPayLimits({ single: '9999', daily: '99999' }), { single: 250n, daily: 1000n });
+  assert.deepEqual(quickPayLimits({ single: '20', daily: '40' }), { single: 20n, daily: 40n });
+  assert.equal(smallPaymentStatus(input, 20n * unit, 20n * unit, 18, { single: '20', daily: '40' }), 'allowed');
+  assert.equal(smallPaymentStatus(input, 20n * unit + 1n, 0n, 18, { single: '20', daily: '40' }), 'password');
+  assert.equal(smallPaymentStatus(input, unit, 40n * unit, 18, { single: '20', daily: '40' }), 'daily-limit');
+});
+
+test('daily reservations reset at UTC midnight, including concurrent lower-limit reservations', async () => {
+  const h = host(); let now = Date.parse('2026-10-31T23:59:59Z');
+  const local = new WalletLocalState(h.storage, 'self', () => {}, h.locks, () => now);
+  const input = { kind: 'tip', messageId: 'message', amount: String(10n * unit) }, limits = { single: '10', daily: '20' };
+  await local.setPreferences({ smallPayments: true });
+  const result = await Promise.all(['a', 'b', 'c'].map(id => local.reserve(id, input, 10n * unit, 18, limits)));
+  assert.equal(result.filter(Boolean).length, 2);
+  assert.equal(await local.smallPayment(input, unit, 18, limits), 'daily-limit');
+  now += 1000;
+  assert.equal(await local.smallPayment(input, unit, 18, limits), 'allowed');
+  assert.equal(await local.reserve('d', input, unit, 18, limits), true);
+});
+
+test('review and confirmation use refreshed limits and carry the UTC reset deadline', async t => {
+  const f = fixture(t); await f.controller.start(); await f.controller.setSmallPayments(true, '123456');
+  const input = { kind: 'tip', messageId: 'message', amount: String(10n * unit) };
+  assert.equal((await f.controller.review(input)).passwordRequired, false);
+  f.config.quickPay = { single: '5', daily: '10' }; f.config.version++;
+  await f.controller.refresh();
+  assert.equal((await f.controller.confirm(paymentOwner(f))).phase, 'password');
+  assert.deepEqual(f.counts(), { signed: 0, submits: 0 });
+  f.config.quickPay = { single: '10', daily: '10' }; f.config.version++; await f.controller.refresh();
+  await f.controller.local.reserve('another-payment', input, 10n * unit, 18, f.config.quickPay);
+  const review = await f.controller.review(input);
+  assert.equal(review.passwordRequired, true);
+  assert.equal(review.quickPayResetAt, nextUtcDay(review.order.createdAt));
+});
+
+test('quota reset labels describe the next UTC midnight in the local timezone', () => {
+  const old = process.env.TZ;
+  const t = (key, values) => ({ key, ...values });
+  try {
+    process.env.TZ = 'Asia/Taipei';
+    let now = Date.parse('2026-10-31T23:00:00Z');
+    assert.deepEqual(quotaResetText(t, 'zh-CN', nextUtcDay(now), now), { key: 'extension.wallet.today', time: '08:00' });
+    now = Date.parse('2026-10-31T12:00:00Z');
+    assert.deepEqual(quotaResetText(t, 'zh-CN', nextUtcDay(now), now), { key: 'extension.wallet.tomorrow', time: '08:00' });
+    process.env.TZ = 'America/New_York';
+    now = Date.parse('2026-11-01T12:00:00Z');
+    assert.deepEqual(quotaResetText(t, 'en', nextUtcDay(now), now), { key: 'extension.wallet.today', time: '19:00' });
+  } finally { if (old === undefined) delete process.env.TZ; else process.env.TZ = old; }
+});
+
+test('equal packets suggest the nearest divisible total while respecting the minimum share', () => {
+  for (const total of [10n * unit, 10n * unit + 1n, 10n * unit + 2n, 1n]) {
+    const nearest = nearestEqualPacketTotal(total, 3, 18);
+    assert.equal(nearest % 3n, 0n);
+    assert.ok(nearest >= 3n * unit);
+    if (total >= 3n * unit) assert.ok(nearest >= total - 1n && nearest <= total + 1n);
+    const input = { kind: 'team', scope: 'team', count: 3, distribution: 'equal', total: nearest.toString() };
+    assert.equal(new Set(createPacketInput(input).packet.amounts).size, 1);
+  }
+  assert.throws(() => createPacketInput({ kind: 'team', scope: 'team', count: 3, distribution: 'equal', total: String(10n * unit) }), /INVALID_PACKET_AMOUNT/);
+});
+
+test('pending polling starts at 3 seconds then backs off to 30 seconds indefinitely without repaying', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(t); await f.controller.start();
+  await f.controller.review({ kind: 'transfer', recipient, amount: String(unit) });
+  let checks = 0;
+  f.api.status = async () => { checks++; throw new Error('OFFLINE'); };
+  await f.controller.confirm(paymentOwner(f), '123456');
+  const settle = () => new Promise(resolve => setImmediate(resolve));
+  const tick = async ms => { f.advance(ms); t.mock.timers.tick(ms); await settle(); };
+  for (let i = 0; i < 40; i++) {
+    const before = checks; await tick(2999); assert.equal(checks, before);
+    await tick(1); assert.equal(checks, before + 1);
+  }
+  for (const delay of [6000, 6000, 6000, 6000, 6000, 12000, 12000, 12000, 24000, 30000, 30000]) {
+    const before = checks; await tick(delay - 1); assert.equal(checks, before);
+    await tick(1); assert.equal(checks, before + 1);
+  }
+  assert.equal(f.controller.snapshot().payment.phase, 'pending');
+  assert.deepEqual(f.counts(), { signed: 1, submits: 1 });
+  const persisted = f.values.get('self:wallet-payment');
+  assert.equal(persisted.pendingSince, f.order().createdAt);
+  f.controller.dispose();
+  const restored = new WalletController({ ...f, accountId: 'self', address, now: () => f.order().createdAt + 1_000_000, check() {}, validateRecipient: async () => {} });
+  t.after(() => restored.dispose());
+  const before = checks; await restored.start(); assert.equal(checks, before + 1);
+  t.mock.timers.tick(29999); await settle(); assert.equal(checks, before + 1);
+  t.mock.timers.tick(1); await settle(); assert.equal(checks, before + 2);
+});
+
+test('a stale prepared status cannot make a submitted payment payable again', async t => {
+  const f = fixture(t); await f.controller.start();
+  await f.controller.review({ kind: 'transfer', recipient, amount: String(unit) });
+  await f.controller.confirm(paymentOwner(f), '123456');
+  f.api.status = async () => ({ requestId: 'request', orderId: f.order().id, state: 'prepared', envelope: null });
+  f.order().status = 'quoted';
+  assert.equal((await f.controller.reconcile()).phase, 'pending');
+  await assert.rejects(f.controller.confirm(paymentOwner(f), '123456'), /PAYMENT_BUSY/);
+  assert.deepEqual(f.counts(), { signed: 1, submits: 1 });
+});
+
+test('an order event that first makes a payment pending starts continuous polling', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(t); await f.controller.start();
+  await f.controller.review({ kind: 'transfer', recipient, amount: String(unit) });
+  f.order().status = 'submitted';
+  await f.controller.handleEvent({ type: 'order', accountId: 'self', order: f.order() });
+  let checks = 0; const order = f.api.order;
+  f.api.order = async () => { checks++; return order(); };
+  f.advance(3000); t.mock.timers.tick(3000);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(checks, 1);
+  assert.equal(f.controller.snapshot().payment.phase, 'pending');
+  assert.deepEqual(f.counts(), { signed: 0, submits: 0 });
 });

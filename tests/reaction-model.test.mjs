@@ -1,4 +1,4 @@
-import { REACTION_TTL_MS } from '@palside/shared/contracts/limits';
+import { REACTION_TTL_MS } from '@palside/shared/rules/interactions';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ReactionBatcher, pruneReactions, readReaction, REACTION_DISPLAY, REACTION_MAX_COUNT } from '../apps/extension/src/domain/annotations/reactions.ts';

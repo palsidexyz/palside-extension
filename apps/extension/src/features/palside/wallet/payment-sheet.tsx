@@ -1,6 +1,7 @@
 'use client';
+import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowLeft, X } from 'lucide-react';
 import { errorMessage } from '@palside/i18n';
@@ -17,6 +18,7 @@ import { useText } from '../ui/text';
 import { PersonAvatar, Token } from '../ui/primitives';
 import { Dots, DrawnCheck, Fit, Rise, Step, Swap } from '../ui/motion-details';
 import { PalsAmount, formatPals } from './amount';
+import { quotaResetText } from './quota';
 import { recordLabels } from './recovery-state';
 import s from './payment.module.css';
 
@@ -76,8 +78,9 @@ const stepOf = (phase: PaymentPhase): FlowStep => phase === 'review' || phase ==
 const ORDER: Record<FlowStep, number> = { compose: 0, confirm: 1, busy: 2, done: 3, failed: 3 };
 
 export function PaymentSheet({ c }: { c: PalsideController }) {
-  const sheet = useSheetState(), payment = c.live?.state.wallet?.payment;
+  const sheet = useSheetState(), payment = c.live?.state.wallet?.payment, command = c.live?.command;
   const visible = sheet.open && sheet.accountId === c.live?.state.account?.id && c.live.state.authenticated;
+  useEffect(() => { if (visible) void command?.('wallet-reconcile', {}).catch(() => {}); }, [command, visible, sheet.session]);
   const owned = visible && sheet.owned && payment?.id === sheet.owned ? payment : undefined;
   // A payment-mode sheet whose payment is gone (dismissed elsewhere, account changed) has nothing left to show.
   useEffect(() => { if (current === sheet && sheet.open && sheet.mode === 'payment' && !owned) update({ open: false, session: sheet.session }); }, [sheet, owned]);
@@ -202,21 +205,22 @@ function usePayee(c: PalsideController, payment: WalletPayment): { person?: Pers
 }
 
 function Settle({ c, payment, step, onClose, onRestart }: { c: PalsideController; payment: WalletPayment; step: FlowStep; onClose: () => void; onRestart?: () => void }) {
-  const t = useTranslations(), text = useText(), reduced = useReducedMotion();
+  const t = useTranslations(), locale = useLocale(), text = useText(), reduced = useReducedMotion();
   const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [checking, setChecking] = useState(false);
   const payee = usePayee(c, payment), input = payment.input;
   const needsPin = payment.phase === 'password' || payment.passwordRequired;
   const submitted = useRef('');
   async function pay(pin?: string) {
     if (busy) return; setBusy(true);
-    try { await c.live?.command('wallet-confirm', { accountId: payment.order.accountId, paymentId: payment.id, password: pin || undefined }); } catch { /* The payment carries its own error and shakes the cells. */ }
+    try { await c.live?.command('wallet-confirm', { accountId: c.data.self, paymentId: payment.id, password: pin || undefined }); } catch { /* The payment carries its own error and shakes the cells. */ }
     finally { setPassword(''); setBusy(false); }
   }
   // Six digits pay at once, as a payment pad does; with a PIN there is no 付款 button to press as well.
-  useEffect(() => { if (password.length === 6 && submitted.current !== password && !busy) { submitted.current = password; void pay(password); } if (password.length < 6) submitted.current = ''; });
+  useEffect(() => { if (password.length === PIN_LENGTH && submitted.current !== password && !busy) { submitted.current = password; void pay(password); } if (password.length < PIN_LENGTH) submitted.current = ''; });
   // A known cause is named (wrong PIN, balance, expiry); anything else stays the general line.
   const failure = payment.error ? errorMessage({ code: payment.error }) : undefined;
-  const failureText = failure && failure.key !== 'common.error' ? text(failure) : t('extension.wallet.failed');
+  const failureText = payment.error === 'CHAIN_SPONSOR_LIMIT' ? t('extension.wallet.sponsorLimit', { reset: quotaResetText(t, locale) }) : failure && failure.key !== 'common.error' ? text(failure) : t('extension.wallet.failed');
+  const hint = payment.quickPayResetAt && payment.quickPayResetAt > c.now ? t('extension.wallet.smallDailyLimit', { reset: quotaResetText(t, locale, payment.quickPayResetAt) }) : ' ';
   const hero = (muted = false) => <div className={s.hero} data-muted={muted || undefined}>
     {payee.person ? <span className={s.party}><PersonAvatar person={payee.person} size="xl" /><span className={s.badge}><Token view={PALS} size="sm" /></span></span> : <Token view={PALS} size="lg" />}
     <span className={s.heroAmount}><PalsAmount value={payment.order.amount} /></span>
@@ -233,15 +237,15 @@ function Settle({ c, payment, step, onClose, onRestart }: { c: PalsideController
       <motion.div key={payment.error ?? 'pin'} animate={payment.error && !reduced ? { x: [0, -10, 10, -6, 6, -2, 0] } : { x: 0 }} transition={{ duration: .42 }}>
         <PinInput outlined aria-label={t('extension.wallet.password')} value={password} onValueChange={setPassword} autoComplete="off" autoFocus data-autofocus disabled={busy} />
       </motion.div>
-      <p className={s.error} role="alert" data-busy={busy || undefined}><Swap k={busy ? 'busy' : payment.error ?? 'ok'}>{busy ? <Dots /> : payment.error ? failureText : ' '}</Swap></p>
+      <p className={s.error} role="alert" data-busy={busy || undefined}><Swap k={busy ? 'busy' : payment.error ?? 'ok'}>{busy ? <Dots /> : payment.error ? failureText : hint}</Swap></p>
     </div> : <div className={s.foot}>
-      <Swap k={payment.error ?? 'ok'}><p className={s.error} role="alert">{payment.error ? failureText : ' '}</p></Swap>
+      <Swap k={payment.error ?? 'ok'}><p className={s.error} role="alert">{payment.error ? failureText : hint}</p></Swap>
       <Button className={s.primary} variant="primary" size="lg" loading={busy} onClick={() => void pay()}>{t('extension.wallet.pay')}</Button>
     </div>}
   </>;
   if (step === 'busy') return <>
     {hero()}
-    <Stages at={STAGES.indexOf(payment.phase as typeof STAGES[number])} labels={[t('extension.wallet.stageSign'), t('extension.wallet.stageSend'), t('extension.wallet.stageConfirm')]} />
+    <Stages at={STAGES.indexOf(payment.phase as typeof STAGES[number])} labels={[t('extension.wallet.stageSign'), t('extension.wallet.stageSend'), t('extension.wallet.pending')]} />
     <div className={s.foot}><Button className={s.primary} variant="quiet" loading={checking} onClick={() => { setChecking(true); void c.run('wallet-reconcile', {}).finally(() => setChecking(false)); }}>{t('extension.wallet.checkStatus')}</Button></div>
   </>;
   if (step === 'done') return <>

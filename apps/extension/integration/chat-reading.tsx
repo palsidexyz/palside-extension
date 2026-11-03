@@ -1,3 +1,4 @@
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -22,8 +23,8 @@ let serial = 0;
 let finishSend: ((value: unknown) => void) | undefined;
 let dark = false;
 const wait = (ms = 420) => new Promise(resolve => setTimeout(resolve, ms));
-const initialTime = Date.now() - 60_000;
-const message = (id: string, patch: Partial<Message> = {}): Message => ({ id, teamId: 'night', author: 'mia', text: `历史记录 ${id.replace('m', '')} — 保持正在阅读的内容，不跳动。`, timestamp: initialTime + Number(id.replace(/^\D+/, '')) * 1000, time: '12:00', status: 'sent', ...patch });
+const initialTime = Date.now() - MINUTE_MS;
+const message = (id: string, patch: Partial<Message> = {}): Message => ({ id, teamId: 'night', author: 'mia', text: `历史记录 ${id.replace('m', '')} — 保持正在阅读的内容，不跳动。`, timestamp: initialTime + Number(id.replace(/^\D+/, '')) * SECOND_MS, time: '12:00', status: 'sent', ...patch });
 const data = structuredClone(palsideFixtures);
 data.self = `reading-review-${crypto.randomUUID()}`;
 data.people = [...data.people.map(p => ({ ...p, viewing: undefined })), { id: data.self, name: '阅读验收', color: '#ddd' }];
@@ -31,8 +32,8 @@ data.teams = data.teams.slice(0, 2).map(t => ({ ...t, memberIds: [...t.memberIds
 data.messages = [...Array.from({ length: 30 }, (_, i) => message(`m${i}`, i === 18 ? { replyTo: 'm3' } : i === 3 ? { replyTo: 'm1' } : {})), ...Array.from({ length: 15 }, (_, i) => message(`other${i}`, { teamId: 'weekend' }))];
 let state: RuntimeState = {
   revision: 0, ready: true, rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} }, authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
-  account: { bio: '', tags: [], id: data.self, nickname: '阅读验收', avatarId: null, matrixId: '@reading:example.test', revision: 0, acceptTeamInvites: true }, data, toggles: { share: false, interact: false },
-  drafts: {}, preferences: { web: { share: true, interact: true }, current: 'night', notifications: 'off' },
+  account: { bio: '', tags: [], id: data.self, nickname: '阅读验收', avatarId: null, matrixId: '@reading:example.test', revision: 0, acceptTeamInvites: true }, data, 
+  drafts: {}, preferences: { share: false, current: 'night', notifications: 'off', toured: true },
   remoteTeams: [], config: { websiteUrl: '', signupDifficulty: 0 }, invitations: {}, items: { stickies: [] }, history: { night: { missingKeys: 0, loaded: false, loading: false }, weekend: { missingKeys: 0, loaded: true, loading: false } },
 };
 const command: LivePort['command'] = async <T,>(name: string, payload?: Record<string, unknown>) => {
@@ -58,7 +59,7 @@ function updateMessages(messages: Message[]) { state = { ...state, data: { ...st
 function incoming() { updateMessages([...state.data.messages, ...Array.from({ length: 3 }, () => message(`live${++serial}`, { text: `刚刚收到的消息 ${serial}`, timestamp: Date.now() + serial, liveArrival: true }))]); }
 function history() {
   const earliest = Math.min(...state.data.messages.filter(m => m.teamId === 'night').map(m => m.timestamp!));
-  updateMessages([...Array.from({ length: 6 }, (_, i) => message(`history${++serial}`, { timestamp: earliest - (6 - i) * 1000 })), ...state.data.messages]);
+  updateMessages([...Array.from({ length: 6 }, (_, i) => message(`history${++serial}`, { timestamp: earliest - (6 - i) * SECOND_MS })), ...state.data.messages]);
 }
 function list() { const el = host.querySelector<HTMLDivElement>('[aria-label="聊天消息"]'); if (!el) throw Error('聊天列表缺失'); return el; }
 function row(id: string) { const el = list().querySelector<HTMLElement>(`[data-message-id="${id}"]`); if (!el) throw Error(`消息 ${id} 缺失`); return el; }

@@ -26,6 +26,7 @@
     "./spinner": "./src/components/spinner/index.ts",
     "./switch": "./src/components/switch/index.ts",
     "./tooltip": "./src/components/tooltip/index.ts",
+    "./toast": "./src/components/toast/index.ts",
     "./visually-hidden": "./src/components/visually-hidden/index.ts",
     "./hooks/use-anchored-layer": "./src/hooks/use-anchored-layer.ts",
     "./lib/image": "./src/lib/image.ts",
@@ -37,7 +38,8 @@
     "@radix-ui/react-slot": "^1.3.3",
     "clsx": "^2.1.1",
     "lucide-react": "1.50.0",
-    "motion": "14.6.0"
+    "motion": "14.6.0",
+    "sonner": "2.0.8"
   },
   "peerDependencies": {
     "react": "19.2.8",

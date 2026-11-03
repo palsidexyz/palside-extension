@@ -1,3 +1,4 @@
+import { SECOND_MS, DAY_MS } from '@palside/shared/units';
 import React, { useLayoutEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createTranslator } from 'use-intl';
@@ -19,7 +20,6 @@ import { HistoryMore } from '../src/features/palside/chat/history-scope';
 import { AwayDivider, useAway } from '../src/features/palside/chat/away-divider';
 import { WatchStrip } from '../src/features/palside/viewing/watch-strip';
 import { useTopCard } from '../src/features/palside/annotations/reminders';
-import { PageStrip } from '../src/features/palside/viewing/page-strip';
 import { ReactionStage } from '../src/features/palside/annotations/reaction-picker';
 import { StancePoll } from '../src/features/palside/rooms/stance-poll';
 import { DanmakuView, RoomPersonSheet } from '../src/features/palside/rooms/danmaku-view';
@@ -30,12 +30,13 @@ import { InvitationPanel } from '../src/features/palside/teams/invitation-panel'
 import { About } from '../src/features/palside/settings/about';
 import { Onboarding } from '../src/features/palside/account/onboarding';
 import { SocialSession, setSocialUi, useSocialUi, type ReadKey } from '../src/features/palside/annotations/social-state';
-import { pageScopeUrl, viewAsset } from '../src/domain/annotations/social';
+import { viewAsset } from '../src/domain/annotations/social';
 import { viewingKey } from '../src/domain/assets/model';
 import { type Message } from '../src/domain/chat/model';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import type { RoomStance } from '@palside/shared/contracts/rooms';
+import { Toaster, toast } from '@palside/ui/toast';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
 
@@ -86,6 +87,7 @@ chromeHost.chrome.runtime = {
 const wait = (ms = 100) => new Promise(resolve => setTimeout(resolve, ms));
 /** Polls until `ready` holds or the deadline passes; animated mounts settle at their own pace. */
 async function settled(ready: () => boolean, ms = 2000) { const end = Date.now() + ms; while (!ready() && Date.now() < end) await wait(50); return ready(); }
+const noticeShown = (text?: string) => [...host.querySelectorAll('[data-sonner-toast]:not([data-removed="true"]) [data-title]')].some(node => text === undefined || node.textContent === text);
 function assert(value: unknown, name: string): void { if (!value) throw Error(name); checks.push(name); output.textContent = JSON.stringify({ status: 'running', checks, error: null }, null, 2); }
 function query<T extends Element = HTMLElement>(selector: string, within: ParentNode = host): T { const found = within.querySelector<T>(selector); if (!found) throw Error(`Missing element: ${selector}`); return found; }
 function buttons(within: ParentNode = document) { return [...within.querySelectorAll<HTMLButtonElement>('button')].filter(b => b.checkVisibility()); }
@@ -134,7 +136,6 @@ function Surface() {
     case 'away': content = <Away controller={c} />; break;
     case 'watch': content = <WatchStrip c={c} />; break;
     case 'top': content = <Top controller={c} />; break;
-    case 'page': content = <PageStrip c={c} />; break;
     case 'rain': content = <ReactionStage c={c}><span>Conversation</span></ReactionStage>; break;
     case 'poll': content = <StancePoll c={c} roomKey="token:Robinhood:0x020bfc650a365f8bb26819deaabf3e21291018b4" stance={stance} />; break;
     case 'room': content = <>{c.screen === 'chat' && state.data.messages.filter(message => message.ref).map(message => <MessageRef key={message.id} c={c} message={message as Message & { ref: NonNullable<Message['ref']> }} />)}<DanmakuView c={c} /></>; break;
@@ -147,19 +148,20 @@ function Surface() {
     case 'onboarding': content = <Onboarding c={c} />; break;
     default: throw Error(`Unknown surface ${mode}`);
   }
-  return <div data-palside-app style={{ height: '100%', containerType: 'inline-size' }}>{content}{c.personId && <PersonCard key={c.personId} c={c} />}<RoomPersonSheet c={c} /></div>;
+  return <div data-palside-app style={{ height: '100%', containerType: 'inline-size' }}>{content}{c.personId && <PersonCard key={c.personId} c={c} />}<RoomPersonSheet c={c} /><Toaster label="Notices" closeLabel="Dismiss notice" /></div>;
 }
 function render() { root.render(<IntegrationIntl>{mode === 'app' ? <PalsideApp key={generation} data={state.data} sites={demoSites} live={{ state, page, command, openPage }} deliver={async () => {}} /> : <SocialSession key={`${generation}:${state.data.self}`} accountId={state.data.self}><Surface /></SocialSession>}</IntegrationIntl>); }
 async function reset(next: string, configure?: () => void) {
-  root.render(null); await wait(20);
+  // Sonner keeps toasts in module state; each check starts without the previous check's notices.
+  toast.dismiss(); root.render(null); await wait(20);
   mode = next; generation++; calls.length = 0; opened.length = 0; delayOpen = false; page = undefined;
   host.style.width = '400px'; host.style.height = '760px';
   state = {
     revision: 0, ready: true, authenticated: true,
     connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
     account: { bio: '', id: 'you', nickname: '你', avatarId: null, matrixId: '@fixture:example.test', revision: 0, acceptTeamInvites: true, tags: [] },
-    data: structuredClone(palsideFixtures), toggles: { share: false, interact: false }, drafts: {},
-    preferences: { current: 'night', web: { share: true, interact: true }, notifications: 'all', notificationPreview: true },
+    data: structuredClone(palsideFixtures), drafts: {},
+    preferences: { current: 'night', share: false, notifications: 'all', notificationPreview: true, toured: true },
     rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} },
     remoteTeams: [], config: { websiteUrl: 'https://example.test', signupDifficulty: 0 }, invitations: {}, items: { stickies: [] },
     history: { night: { loaded: true, loading: false, missingKeys: 0 } },
@@ -172,16 +174,19 @@ async function test(name: string, run: () => Promise<void>) { try { await run();
 async function headerChecks() {
   for (const count of [0, 1, 2, 3, 4]) {
     await reset('header', () => { state.data.people.forEach((p, i) => { p.presence = i <= count ? i === 1 ? 'away' : 'active' : undefined; }); });
-    const member = buttons(host).find(b => b.getAttribute('aria-label')?.includes(`${count}`) && b.querySelector('span,svg') && b.title);
-    assert(member, `The header exposes ${count} online teammates excluding the current user`);
+    // One line: after the squad name, who is here — online faces (two, then +N) or the member count; it gives way to the name and finally folds into a badge on the avatar.
+    const member = host.querySelector<HTMLButtonElement>('header button[data-kind]');
+    assert(member?.dataset.kind === (count ? 'online' : 'members') && member.getAttribute('aria-label')?.includes(`${count}`), `The header exposes ${count} online teammates excluding the current user`);
     if (!member) throw Error('Online member control missing');
-    assert(await settled(() => member.querySelectorAll('img').length === (count > 3 ? 2 : count)), `The header draws the correct number of faces for ${count} teammates`);
+    assert(await settled(() => member.querySelectorAll('img').length === Math.min(count, 2)), `The header draws the correct number of faces for ${count} teammates`);
     if (count >= 2) assert(member.querySelector('[data-person-avatar]')?.getAttribute('title')?.startsWith('Mia'), 'Active teammates appear before away teammates');
-    if (count === 4) assert(member.textContent?.includes('+2'), 'Four online teammates show two faces and a plus two count');
+    if (count === 4) assert(member.querySelector('[data-person-avatar] ~ :not([data-person-avatar])')?.textContent?.startsWith('+2'), 'Four online teammates show two faces and a plus two count');
     member.click(); await wait(); assert(c.screen === 'members' && c.memberFilter === undefined, 'The header opens the unfiltered member list');
   }
   await reset('header', () => { state.data.teams[0]!.memberIds = ['you']; });
-  await clickKey('extension.copy.inviteShort'); assert(c.screen === 'team', 'A solo team opens its invitation settings from the header');
+  const solo = host.querySelector<HTMLButtonElement>('header button[data-kind=invite]');
+  assert(solo?.textContent?.includes(t('extension.copy.inviteShort')), 'A solo team shows an invite seat after its name');
+  solo?.click(); await wait(); assert(c.screen === 'team', 'A solo team opens its invitation settings from the header');
 }
 
 async function emptyChecks() {
@@ -192,7 +197,8 @@ async function emptyChecks() {
   const opened = await settled(() => Boolean(host.querySelector('#appearance')), 5000);
   assert(opened, opened ? 'Settings opens from the empty team screen' : `Settings opens from the empty team screen (screen ${c.screen})`);
   await reset('app', () => { state.data.teams = []; state.connection.service = 'unavailable'; });
-  assert(host.querySelector('h1[role="status"]')?.textContent && !host.querySelector('svg.lucide-cloud-off') && !host.querySelector('h1 + p'), 'The disconnected empty screen states only its status, without an icon or explanation');
+  const notice = host.querySelector('section [role="alert"], section [role="status"]');
+  assert(notice?.querySelector('p')?.textContent && notice.querySelectorAll('p').length === 1 && !notice.querySelector('svg'), 'The disconnected empty screen states only its status, without an icon or explanation');
   assert(!host.querySelector('[data-message-input]'), 'The disconnected empty screen has no composer');
   await clickKey('extension.copy.reconnect'); assert(recorded('reconnect').length === 1, 'Retry on the disconnected empty screen requests reconnection');
   await clickKey('extension.copy.settings'); assert(host.querySelector('#appearance'), 'The disconnected empty screen retains its settings entrance');
@@ -207,9 +213,9 @@ async function copyChecks() {
   try {
     await reset('onboarding', () => { state.authenticated = false; });
     await clickKey('extension.copy.createAccount'); await clickKey('extension.copy.revealPhrase'); await clickKey('extension.copy.copyPhrase');
-    assert(c.notice === t('extension.copy.copyManual') && fallback === 0, 'Text copy failure currently asks for manual copying without a document copy fallback');
+    assert(await settled(() => noticeShown(t('extension.copy.copyManual'))) && fallback === 0, 'Text copy failure currently asks for manual copying without a document copy fallback');
     document.execCommand = (() => false) as typeof document.execCommand;
-    await reset('invite', () => { state.invitations.night = {suspended: false,  active: true, url: 'https://example.test/invite/fixture', expiresAt: Date.now() + 86400000, password: 'ABC2' }; });
+    await reset('invite', () => { state.invitations.night = {suspended: false,  active: true, url: 'https://example.test/invite/fixture', expiresAt: Date.now() + DAY_MS, password: 'ABC2' }; });
     await clickKey('extension.copy.copyInvite');
     const link = query<HTMLInputElement>('input[readonly]'); link.focus();
     assert(link.value === 'https://example.test/invite/fixture' && link.selectionStart === 0 && link.selectionEnd === link.value.length, 'A failed invitation copy exposes and selects the complete invitation URL');
@@ -345,7 +351,7 @@ async function assetChecks() {
   await reset('asset', () => { state.drafts.night = { revision: 1, updatedAt: Date.now(), value: { text: 'Keep this text', attachment: { kind: 'asset', assetId: 'cashcat', view: state.data.views[0]! } } }; });
   const view = state.data.views[0]!;
   assert(text().includes('Robinhood') && query(`[title="${view.address}"]`).textContent !== view.address && query(`[title="${view.address}"]`).textContent!.includes('…'), 'Token cards currently show the chain and an abbreviated contract with the full contract on hover');
-  assert(query<HTMLAnchorElement>('[data-palside-source]').href === view.url, 'The token card name links to its original source');
+  assert(query<HTMLAnchorElement>('[data-asset-card] a[href]').href === view.url, 'The token card name links to its original source');
   await click(t('extension.dynamic.viewToken', { name: view.name })); assert(c.selectedAsset === view.id && c.screen === 'asset', 'The token details button opens its discussion summary');
   await clickKey('extension.copy.removeCard'); assert(!host.querySelector('[data-asset-card]') && query<HTMLTextAreaElement>('textarea').value === 'Keep this text', 'Removing a draft token card preserves the draft text');
   await reset('asset', () => { state.drafts.night = { revision: 1, updatedAt: Date.now(), value: { text: '', attachment: { kind: 'asset', assetId: 'x', view: state.data.views[2]! } } }; });
@@ -384,7 +390,8 @@ async function watchChecks() {
   await reset('watch');
   const strip = query('[data-watch-strip]');
   const cards = [...strip.querySelectorAll<HTMLElement>(':scope > [data-watch-key]')];
-  assert(cards.length === 2 && Math.abs(cards[0]!.getBoundingClientRect().width - cards[1]!.getBoundingClientRect().width) < 1, 'The viewing strip currently shows two equal width cards');
+  const box = strip.getBoundingClientRect();
+  assert(cards.length === 2 && cards.every(card => { const r = card.getBoundingClientRect(); return r.left >= box.left - 1 && r.right <= box.right + 1; }), 'The viewing strip currently shows two content-width chips inside the row');
   assert(strip.scrollWidth <= strip.clientWidth && !['scroll', 'auto'].includes(getComputedStyle(strip).overflowX), 'The viewing strip has no horizontal scrolling track');
   const own = query('[data-watch-key]:has([data-self])');
   assert(own.querySelectorAll('[data-person-avatar]').length === 2 && own.querySelector('[data-self]') === own.querySelector('[data-person-avatar]')?.parentElement, 'A viewing group caps faces at two and places the current user first');
@@ -397,7 +404,7 @@ async function watchChecks() {
     state.data.views.push({ ...state.data.views[0]!, id: 'other-source', source: 'FOMO', url: 'https://fomo.family/token/fixture' });
     state.data.people.find(p => p.id === 'kai')!.viewing = 'other-source';
   });
-  await click(t('extension.dynamic.openSource', { name: 'CASHCAT' }));
+  await click(t('extension.copy.selectSource'));
   const menu = query('[popover]:popover-open');
   assert(menu.textContent?.includes('GMGN') && menu.textContent?.includes('FOMO') && menu.textContent?.includes('2 人') && menu.textContent?.includes('1 人'), 'A token source menu lists current viewer counts for each source');
 }
@@ -415,7 +422,7 @@ async function reminderChecks() {
   await clickKey('extension.top.go'); assert(opened[0] === state.data.views[0]!.url, 'Following navigates only after the user chooses go');
   page = pageFixture(); await refresh(); assert(!buttons().some(b => b.textContent === t('extension.top.go')), 'Following the current page suppresses the go suggestion');
   c.setPersonId('robin'); await wait(); await clickKey('extension.web.followShort'); assert(social.follow?.personId === 'robin', 'Choosing another teammate replaces the single follow target');
-  state.pokes = [{ id: 'older', teamId: 'night', from: 'mia', view: state.data.views[1]!, at: Date.now() - 1000, count: 1 }, { id: 'newest', teamId: 'night', from: 'kai', view: state.data.views[1]!, at: Date.now(), count: 1 }]; await refresh();
+  state.pokes = [{ id: 'older', teamId: 'night', from: 'mia', view: state.data.views[1]!, at: Date.now() - SECOND_MS, count: 1 }, { id: 'newest', teamId: 'night', from: 'kai', view: state.data.views[1]!, at: Date.now(), count: 1 }]; await refresh();
   assert(query('[data-top]').getAttribute('data-top')?.startsWith('follow'), 'Following takes priority over invitations to view a token');
   state.connection.networkOnline = false; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'connection-network-offline', 'Offline status takes priority over following');
   state.connection.networkOnline = true; state.data.teams[0]!.readonly = true; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'readonly', 'Read only team status takes priority over following');
@@ -433,32 +440,18 @@ async function reminderChecks() {
   setSocialUi({ follow: { teamId: 'night', personId: 'robin' } }); state.preferences.current = 'weekend'; await refresh(); assert(!social.follow, 'Following clears when the current team changes');
 }
 
-async function pageChecks() {
-  await reset('page', () => { page = pageFixture(); for (const id of ['robin', 'mia', 'leo', 'kai']) state.data.people.find(p => p.id === id)!.viewing = 'cashcat'; });
-  const faces = query('[role="img"][tabindex="0"]'); assert(faces.querySelectorAll('[data-person-avatar]').length === 3, 'The current page strip caps teammate faces at three');
-  host.style.width = '350px'; await wait(); assert(getComputedStyle(faces).display === 'none', 'Current page teammate faces hide at three hundred fifty pixels');
-  host.style.width = '351px'; await wait(); assert(getComputedStyle(faces).display !== 'none', 'Current page teammate faces show above three hundred fifty pixels');
-  await click(t('extension.current.detail', { name: 'CASHCAT' })); assert(c.screen === 'asset', 'The current page identity opens its details');
-  await click(t('extension.room.chip', { name: 'CASHCAT', count: 0 })); assert(recorded('room-open').length === 1, 'A token page offers entry to its public room');
-  await clickKey('extension.web.sticky'); assert(document.querySelector('[popover]:popover-open')?.textContent?.includes(t('extension.web.stickyStep1')), 'The sticky note entrance exposes its page interaction guide');
-  await clickKey('extension.web.notesNone'); assert(social.stickies?.url === page!.url, 'The sticky note guide opens notes for the current URL');
-  await reset('page', () => { page = pageFixture(2); }); assert(!buttons(host).some(b => b.getAttribute('aria-label')?.includes('弹幕')), 'An ordinary page has no token room entrance');
-  page!.interactive = false; setSocialUi({ returnTo: { id: 1, origin: pageFixture(), target: pageScopeUrl(page!.url)!, arrived: true } }); await refresh();
-  await click(t('extension.top.back', { name: 'CASHCAT' })); assert(opened[0] === state.data.views[0]!.url && !social.returnTo, 'Returning to the previous token remains available when page interaction is off');
-}
-
 async function roomChecks() {
   await reset('room', () => {
     const key = `token:${viewAsset(state.data.views[0]!)}`;
     state.data.teams[1]!.memberIds.push('alice');
-    state.rooms.current = { key, profile: { name: 'CASHCAT', logo: null, site: 'gmgn' }, count: 3, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], loading: true, hasMore: true, slowUntil: 0, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * 1000 })) };
+    state.rooms.current = { key, profile: { name: 'CASHCAT', logo: null, site: 'gmgn' }, count: 3, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
   });
   state.data.messages = [{ id: 'room-reference', teamId: 'night', author: 'mia', text: '', time: '12:00', status: 'sent', ref: { view: state.data.views[0]!, caption: 'Quoted room text', target: { kind: 'danmaku', id: 'line0', author: 'mia', name: 'Mia', at: Date.now() } } }]; await refresh();
   await click(t('extension.composer.findRef', { caption: 'Quoted room text' }));
   assert(recorded('room-open').length === 1 && c.screen === 'room', 'Clicking a chat room reference opens the referenced token room');
   assert(social.roomLine === 'line0', 'A quoted room target waits until the room finishes loading');
   state.rooms.current!.loading = false; await refresh();
-  assert(recorded('room-find').length === 1 && recorded('room-find')[0]!.payload?.id === 'line0' && !social.roomLine && !host.querySelector('[data-focus="true"]') && c.notice !== '', 'A quoted room line outside the loaded rows is looked up in retained history and reports when it is gone');
+  assert(recorded('room-find').length === 1 && recorded('room-find')[0]!.payload?.id === 'line0' && !social.roomLine && !host.querySelector('[data-focus="true"]') && await settled(() => noticeShown()), 'A quoted room line outside the loaded rows is looked up in retained history and reports when it is gone');
   state.rooms.current!.hasMore = false; await refresh(); setSocialUi({ roomLine: 'line20' }); await wait(180);
   assert(query('[data-room-line="line20"]').getAttribute('data-focus') === 'true' && !social.roomLine, 'A loaded quoted room line receives focus and consumes its target');
   assert(query('[data-room-line="line1"]').getAttribute('data-mate') === 'true' && !query('[data-room-line="line2"]').hasAttribute('data-mate'), 'Room authors in any joined team are marked as teammates');
@@ -479,10 +472,10 @@ async function pollChecks() {
   await reset('poll');
   for (const [votes, expected] of [[{ bull: 2, hold: 1, bear: 1, mine: null }, null], [{ bull: 2, hold: 2, bear: 1, mine: null }, [40, 40, 20]], [{ bull: 2, hold: 2, bear: 2, mine: 'bull' }, [34, 33, 33]]] as const) {
     stance = { ...votes }; await refresh();
-    const poll = query('[role="radiogroup"]'); const labels = [...poll.querySelectorAll('button b')].map(b => b.textContent);
-    if (!expected) assert(labels.every(label => label === '—') && !poll.hasAttribute('data-shares'), 'Four votes hide all percentages');
+    const poll = query('[role="radiogroup"]'), box = poll.closest('[data-stance-poll]')!; const labels = [...poll.querySelectorAll('button b')].map(b => b.textContent);
+    if (!expected) assert(labels.every(label => label === '—') && !box.hasAttribute('data-shares'), 'Four votes hide all percentages');
     else assert(labels.join(',') === expected.map(n => `${n}%`).join(',') && expected.reduce((a, b) => a + b, 0) === 100, 'Five or more votes show integer percentages totaling one hundred');
-    assert(poll.querySelectorAll(':scope > span > span').length === 3 && poll.hasAttribute('data-voted') === Boolean(votes.mine), 'The proportion bar persists and only a cast vote enables selected colors');
+    assert(box.querySelectorAll(':scope > span > span').length === 3 && poll.hasAttribute('data-voted') === Boolean(votes.mine), 'The proportion bar persists and only a cast vote enables selected colors');
     const target = query<HTMLButtonElement>('button[data-stance="bull"]'); target.focus(); await wait(800);
     assert(document.body.textContent?.includes(t('extension.stance.votes', { count: votes.bull + votes.hold + votes.bear })), 'The stance tooltip exposes the total number of votes');
   }
@@ -518,8 +511,8 @@ async function reactionChecks() {
 
 async function settingsChecks() {
   await reset('settings');
-  assert(button(t('extension.copy.editPersonalProfile')) && host.querySelectorAll('input[type="checkbox"]').length === 2, 'Settings currently begins with a profile card and direct sharing and interaction switches');
-  const expected = ['extension.settings.sites', 'extension.settings.interactionOptions', 'extension.settings.notifications', 'extension.shot.shortcut', 'extension.settings.privacy', 'extension.copy.security', 'extension.copy.aboutPalside', 'extension.copy.signOut'];
+  assert(button(t('extension.copy.editPersonalProfile')) && host.querySelectorAll('input[type="checkbox"]').length === 0, 'Settings begins with a profile card and shows 网页 as states, without switches');
+  const expected = ['extension.web.share', 'extension.settings.sites', 'extension.settings.interactionOptions', 'extension.settings.notifications', 'extension.shot.shortcut', 'extension.settings.privacy', 'extension.copy.security', 'extension.copy.aboutPalside', 'extension.copy.signOut'];
   const rendered = buttons(host).map(b => b.textContent ?? '');
   let previous = -1;
   for (const label of expected) { const index = rendered.findIndex(value => value.startsWith(t(label))); assert(index > previous, `Settings places ${t(label)} in its current flat order`); previous = index; }
@@ -555,12 +548,12 @@ async function appearanceChecks() {
 async function privacyChecks() {
   await reset('privacy');
   assert(text().includes(t('extension.web.siteCount', { count: 2 })), 'Privacy displays the current granted website count');
-  for (const feature of ['share', 'token', 'quote', 'signal', 'sticky', 'room', 'shot', 'notify'] as ReadKey[]) {
+  for (const feature of ['share', 'token', 'quote', 'signal', 'sticky', 'room', 'shot', 'presence', 'notify'] as ReadKey[]) {
     await click(t(`extension.privacy.feature_${feature}`)); await wait(200);
     const drawer = query('dialog[open], [role="dialog"][aria-modal="true"]', document);
     if (feature === 'share') assert(drawer.textContent?.includes('不保存，30 秒后失效'), 'The sharing disclosure currently says viewing expires after thirty seconds');
     for (const part of ['line', 'who', 'keep', 'no']) assert(drawer.textContent?.includes(t(`extension.privacy.read.${feature}.${part}`)), `The ${feature} disclosure shows its ${part} explanation`);
-    assert(buttons(drawer).length === 1 && button(t('common.close'), drawer), 'Feature disclosures contain only a close button and no permission management actions');
+    assert(button(t('common.close'), drawer) && buttons(drawer).every(b => [t('common.close'), t('extension.privacy.revoke')].includes(b.getAttribute('aria-label') ?? b.textContent?.trim() ?? '')), 'Feature disclosures offer only close and, for a granted permission, 收回');
     if (feature === 'room') assert(drawer.textContent?.includes(t('extension.privacy.perm_sites')) && !drawer.textContent.includes(t('extension.privacy.perm_tabs')) && !drawer.textContent.includes(t('extension.privacy.perm_active')), 'Room disclosure names only site access');
     await clickKey('common.close'); await wait(200);
   }
@@ -584,7 +577,7 @@ async function run() {
     ['Online teammate header', headerChecks], ['Empty teams and disconnected screen', emptyChecks], ['Copy recovery and diagnostics', copyChecks],
     ['Account onboarding and phrase verification', onboardingChecks], ['Profile tag editing', profileChecks], ['Member cards and filtering', memberChecks],
     ['Message author grouping', chatChecks], ['Current token card presentation', assetChecks], ['Unread and history controls', readingChecks],
-    ['Current viewing strip layout', watchChecks], ['Following and viewing invitations', reminderChecks], ['Current page strip', pageChecks],
+    ['Current viewing strip layout', watchChecks], ['Following and viewing invitations', reminderChecks],
     ['Room references and member cards', roomChecks], ['Vote threshold and proportions', pollChecks], ['Received emoji reactions', reactionChecks],
     ['Current settings hierarchy and notification preview', settingsChecks], ['Browser appearance preferences', appearanceChecks], ['Privacy disclosures and local data', privacyChecks], ['Runtime history and invitation boundaries', runtimeChecks],
   ];

@@ -1,4 +1,5 @@
 .page { display:flex; flex-direction:column; gap:16px; }
+form + .page { margin-top:24px; }
 .hero { display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 0 4px; text-align:center; }
 .hero > strong { margin-top:10px; font-size:var(--ui-type-title); font-weight:600; font-variant-numeric:tabular-nums; }
 .hero > small { color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; }

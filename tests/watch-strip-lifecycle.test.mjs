@@ -43,9 +43,12 @@ async function fixture(t) {
     '@palside/design/motion': { motionPresets: {} },
     '@palside/shared/navigation': {},
     '../ui/primitives': { PersonAvatar: icon, Token: icon },
+    '../rooms/rooms': { openRoom() {}, roomKeyFor: () => undefined, roomsOn: () => false },
     '../annotations/social-state': social,
     '../annotations/reminders': { PokeRow: icon },
     '../assets/chain-identity': {}, '../assets/site-logo': {}, '../settings/site-catalog': {},
+    '../assets/token-name': { TokenName: ({ view }) => view.name, tokenLabel: view => view.name },
+    '../assets/token-data': { liveView: (_c, view) => view },
     '../ui/motion-details': { Count: icon, CountText: icon },
     './watch-groups': load('apps/extension/src/features/palside/viewing/watch-groups.ts'),
     './watch-strip.module.css': { __esModule: true, default: new Proxy({}, { get: (_, key) => key }) },
@@ -54,7 +57,7 @@ async function fixture(t) {
   vm.runInNewContext(code, { exports, URL, document, window, console, ...clock, require(name) { assert.ok(Object.hasOwn(modules, name), name); return modules[name]; } }, { filename });
   const view = { id: 'page', kind: 'website', disclosure: 'page', url: 'https://example.com/destination', name: 'Page', source: 'example.com', color: '#fff', glyph: 'P' };
   const opened = [], notices = [];
-  let c = { toggles: { share: true }, disconnected: false, team: { memberIds: ['self', 'mate'] }, data: { self: 'self', views: [view] }, people: [{ id: 'self', viewing: view.id }], live: { page: { url: 'https://example.com/origin', host: 'example.com', windowId: 1 }, openPage: async (...args) => { opened.push(args); } }, setNotice: value => notices.push(value), setMemberFilter() {}, go() {} };
+  let c = { share: true, disconnected: false, team: { memberIds: ['self', 'mate'] }, data: { self: 'self', views: [view] }, people: [{ id: 'self', viewing: view.id }], live: { page: { url: 'https://example.com/origin', host: 'example.com', windowId: 1 }, openPage: async (...args) => { opened.push(args); } }, setNotice: value => notices.push(value), setMemberFilter() {}, go() {} };
   let top;
   const render = async patch => { c = { ...c, ...patch }; await act(() => root.render(h(exports.WatchStrip, { c, top }))); };
   const advance = async ms => {
@@ -101,10 +104,9 @@ test('strip unmount releases sorting, hold-space and merge timers', async t => {
   assert.ok(f.timers.size > 0); await f.unmount(); assert.equal(f.timers.size, 0);
 });
 
-test('viewing chip uses one opening with an origin snapshot', async t => {
+test('viewing chip uses one opening', async t => {
   const f = await fixture(t);
   await act(() => f.document.querySelector('.target').click());
-  assert.deepEqual(f.opened, [['https://example.com/destination', true]]);
-  assert.equal(f.social.captureSocialUi().snapshot().returnTo.origin.url, 'https://example.com/origin');
+  assert.deepEqual(f.opened, [['https://example.com/destination']]);
   assert.deepEqual(f.notices, []);
 });

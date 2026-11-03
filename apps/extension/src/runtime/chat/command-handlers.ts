@@ -1,3 +1,7 @@
+import { DAY_MS as DAY } from '@palside/shared/units';
+import { CHAT_TEXT_MAX } from '@palside/shared/rules/messages';
+import { graphemeLength } from '@palside/shared/contracts/rules';
+import { truncateChatText } from './text';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { EventType,EventStatus,MsgType } from 'matrix-js-sdk';
 import { requireEncryptedSend,teamSendGuard } from '../account/crypto-identity';
@@ -6,21 +10,22 @@ import type { RevisionedDraft } from '../storage/storage';
 import { validateView } from '../viewing/view-snapshot';
 import { draftAttachmentPatch,emptyDraft,readQuoteRange,type Draft,type Message } from '../../domain/chat/model';
 import type { Command } from '../transport/command-map';
-import { DAY,READ_FLUSH_DELAY,text } from '../composition/state';
+import { READ_FLUSH_DELAY,text } from '../composition/state';
 import type { RuntimeCommands } from '../composition/dispatch';
 import type { HandlerRegistry } from '../composition/handler-registry';
+import { liveMembers } from '../../domain/teams/model.ts';
 
 export async function externalShareCommand(this: RuntimeCommands, command: Extract<Command, { name: "external-share" }>) {
  const p = command.payload ?? {};
     const runtime = this.runtime;
 
       const scope = runtime.auth.scope();
-      const input = text(p.text).slice(0, 4000);
+      const input = truncateChatText(text(p.text));
       const team = runtime.state.remoteTeams.find(t => t.id === p.teamId && t.joined);
       if (runtime.auth.session && p.accountId === runtime.auth.session.account.id && team) {
         const saved = runtime.state.drafts[team.id] ?? { value: emptyDraft, revision: 0 };
         const combined = [saved.value.text, input].filter(Boolean).join('\n');
-        if ([...new Intl.Segmenter().segment(combined)].length > 4000) { runtime.state.pendingShare = input; runtime.state.pendingShareTeamId = team.id; runtime.state.notice = uiMessage('extension.runtime.selectionTooLong'); }
+        if (graphemeLength(combined) > CHAT_TEXT_MAX) { runtime.state.pendingShare = input; runtime.state.pendingShareTeamId = team.id; runtime.state.notice = uiMessage('extension.runtime.selectionTooLong'); }
         else { const next = await scope.wait(runtime.storage.updateDraft<Draft>(runtime.auth.session.account.id, team.id, { text: combined }, saved.revision, emptyDraft)); runtime.state.drafts[team.id] = next; runtime.state.notice = uiMessage('extension.runtime.addedToDraft', { name: team.name }); }
       } else { runtime.state.pendingShare = input; runtime.state.pendingShareTeamId = undefined; }
       runtime.emit(); return;
@@ -36,6 +41,7 @@ export async function historyCommand(this: RuntimeCommands, command: Extract<Com
       runtime.auth.requireConnection();
       const team = runtime.state.remoteTeams.find(t => t.id === teamId); const room = team ? runtime.auth.client?.getRoom(team.roomId) : undefined;
       if (!room || !runtime.auth.client) throw new MessageError(uiMessage('extension.runtime.syncingTeam'));
+      if (runtime.state.history?.[teamId]?.loading) return;
       runtime.state.history ??= {}; runtime.state.history[teamId] = { missingKeys: runtime.timeline.missingEvents.get(teamId)?.size ?? 0, loaded: false, loading: true }; runtime.emit();
       try { await scope.wait(runtime.auth.history(room)); runtime.state.history[teamId]!.loaded = !room.oldState.paginationToken; }
       finally { if (scope.current()) { runtime.state.history[teamId]!.loading = false; runtime.emit(); } }
@@ -164,7 +170,7 @@ export async function editCommand(this: RuntimeCommands, command: Extract<Comman
       const team = runtime.state.remoteTeams.find(t => t.id === teamId && t.joined); const original = runtime.state.data.messages.find(m => m.id === p.id && m.author === id && !m.recalled);
       if (!team || !original || !runtime.auth.client) throw new MessageError(uiMessage('extension.runtime.messageNotEditable'));
       const { client, check } = teamSendGuard(runtime, teamId);
-      const people = team.people.filter(person => team.memberIds.includes(person.id));
+      const people = liveMembers(team);
       await scope.wait(requireEncryptedSend(client, team.roomId, people, check)); check();
       const room = client.getRoom(team.roomId);
       let source = room?.findEventById(original.id);

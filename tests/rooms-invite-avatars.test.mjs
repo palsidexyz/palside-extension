@@ -1,3 +1,4 @@
+import { DAY_MS, MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -8,11 +9,12 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { Api } = await import('../apps/extension/src/runtime/transport/api.ts');
 const { RoomService } = await import('../apps/extension/src/runtime/rooms/rooms.ts');
+const { TokenProfiles } = await import('../apps/extension/src/runtime/viewing/token-profiles.ts');
 const { emptyState } = await import('../apps/extension/src/runtime/composition/state.ts');
 hooks.deregister();
 
 const key = 'token:Solana:So11111111111111111111111111111111111111112';
-const invite = (id = 'invite/one', avatarId = 'team-avatar') => ({ id, team: { id: 'team', name: 'Team', avatarId, memberCount: 2 }, from: { id: 'peer', nickname: 'Peer', avatarId: 'person-avatar' }, createdAt: Date.now(), expiresAt: Date.now() + 86400_000 });
+const invite = (id = 'invite/one', avatarId = 'team-avatar') => ({ id, team: { id: 'team', name: 'Team', avatarId, memberCount: 2 }, from: { id: 'peer', nickname: 'Peer', avatarId: 'person-avatar' }, createdAt: Date.now(), expiresAt: Date.now() + DAY_MS });
 const deferred = () => { let resolve; const promise = new Promise(yes => { resolve = yes; }); return { promise, resolve }; };
 const settle = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 
@@ -30,6 +32,7 @@ function fixture(t) {
       if (['invites.accept', 'invites.ignore'].includes(path)) { pending = []; return { teamId: 'team', ignored: true }; }
       return Api.prototype.request.call(this, path, options);
     }, async roomAvatar(room, account) { people.push({ room, account }); return new Blob(['person']); } },
+    tokens: new TokenProfiles(),
     dispatch: { mutate: path => runtime.api.request(path) },
     async refresh() {},
     emit() { service.prune(); },
@@ -139,8 +142,8 @@ test('avatar failures do not create URLs or retry on every emit, and removed fai
 
 test('invite avatar errors retain server codes and metadata and share the API cooldown', async t => {
   const f = fixture(t);
-  f.response.handler = async () => new Response(JSON.stringify({ error: 'RATE_LIMITED', retryAfterMs: 60_000 }), { status: 429, headers: { 'Retry-After': '60' } });
-  await assert.rejects(f.service.inviteAvatar('invite'), { code: 'RATE_LIMITED', retryAfterMs: 60_000 });
+  f.response.handler = async () => new Response(JSON.stringify({ error: 'RATE_LIMITED', retryAfterMs: MINUTE_MS }), { status: 429, headers: { 'Retry-After': '60' } });
+  await assert.rejects(f.service.inviteAvatar('invite'), { code: 'RATE_LIMITED', retryAfterMs: MINUTE_MS });
   await assert.rejects(f.service.inviteAvatar('invite'), { status: 429 });
   assert.equal(f.calls.length, 1);
 });
@@ -153,7 +156,7 @@ test('temporary avatar failures expire and retry while the invite remains visibl
     const before = f.calls.length;
     await f.invites([invite()]); await settle(); f.runtime.emit(); await settle();
     assert.equal(f.calls.length, before + 1);
-    f.response.handler = async () => new Response('recovered'); now += 60_000;
+    f.response.handler = async () => new Response('recovered'); now += MINUTE_MS;
     f.runtime.emit(); await settle();
     assert.equal(f.calls.length, before + 2); assert.ok(f.runtime.state.rooms.avatars['team:team']);
   }
@@ -174,7 +177,7 @@ test('permanent avatar failures survive time and network recovery within the cre
   for (const status of [403, 404, 410]) {
     await f.invites([]); f.response.handler = async () => new Response('unavailable', { status });
     await f.invites([invite()]); await settle(); const before = f.calls.length;
-    now += 86400_000; f.service.reconnected(); f.runtime.emit(); await settle();
+    now += DAY_MS; f.service.reconnected(); f.runtime.emit(); await settle();
     assert.equal(f.calls.length, before);
   }
 });
@@ -184,7 +187,7 @@ test('a server avatar retry deadline survives network recovery and reconnects', 
   f.response.handler = async () => new Response('busy', { status: 503, headers: { 'Retry-After': '120' } });
   await f.invites([invite()]); await settle(); const before = f.calls.length;
   f.response.handler = async () => new Response('recovered');
-  f.service.reconnected(); f.runtime.emit(); now += 60_000; f.runtime.emit(); await settle();
+  f.service.reconnected(); f.runtime.emit(); now += MINUTE_MS; f.runtime.emit(); await settle();
   assert.equal(f.calls.length, before);
   now += 61_000; f.runtime.emit(); await settle();
   assert.equal(f.calls.length, before + 1); assert.ok(f.runtime.state.rooms.avatars['team:team']);

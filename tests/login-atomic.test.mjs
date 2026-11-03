@@ -40,6 +40,7 @@ function fixture() {
     },
     api: { token: 'retained-token', async request(path, options) {
       requests.push({ path, ...options });
+      if (path === 'system.config') return { ...runtime.state.config };
       if (path === 'accounts.lookup') return { account: session.account };
       if (path === 'chain.config') return { enabled: false, version: 1, deployment: null, dailySponsoredLimit: 0, updatedAt: 1 };
       if (path === 'accounts.create' || path === 'devices.create') return { ...structuredClone(session), account: { ...session.account, id: runtime.auth.pendingIdentity.publicKey } };
@@ -298,6 +299,7 @@ test('Cancellation aborts signup proof of work before request dispatch', { timeo
   await f.runtime.command({ name: 'account-create', payload: {} });
   f.runtime.state.config.signupDifficulty = 32;
   f.runtime.api.request = (endpoint, options) => {
+    if (endpoint === 'system.config') return Promise.resolve({ ...f.runtime.state.config });
     assert.equal(endpoint, 'accounts.create');
     const result = api.request(endpoint, options);
     signing.resolve(options.signal); return result;
@@ -324,7 +326,7 @@ for (const mode of ['create', 'login']) test(`Cancelled ${mode} registration pre
     await f.runtime.command({ name: 'account-create', payload: {} });
     f.runtime.state.config.signupDifficulty = 1;
   } else await f.runtime.command({ name: 'account-login', payload: { words: mnemonic.split(' ') } });
-  f.runtime.api.request = api.request.bind(api);
+  f.runtime.api.request = (endpoint, options) => endpoint === 'system.config' ? Promise.resolve({ ...f.runtime.state.config }) : api.request(endpoint, options);
   const rejected = assert.rejects(f.runtime.command(password), error => error.code === 'RESULT_UNKNOWN');
   const signal = await dispatched.promise;
   await f.runtime.command({ name: 'logout', payload: {} }); await rejected;

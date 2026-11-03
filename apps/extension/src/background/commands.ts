@@ -92,8 +92,10 @@ export function commands(bg: Background) {
     if (command.name === 'room-hot') command = { name: command.name, payload: { ...command.payload, sourceId: `${panelDocument ?? ''}:hot` } };
     if (name === 'logout') { bg.images.clearImageSessions(); bg.policyVersion++; bg.sessionVersion++; bg.pages.clearPages(); }
     const result = await bg.run(command);
-    // Switching 网页互动 changes which pages run the layer; it follows before the reply.
-    if (result.ok && name === 'toggle' && 'interact' in payload) { await bg.pages.registerPageLayer(); await bg.pages.pushPageStatus(); }
+    // 清除本地数据 also drops the icons kept for sites added outside the catalog.
+    if (result.ok && name === 'clear-cache') await bg.siteIcons.clear().catch(() => {});
+    // Enabling or disabling 网页互动 changes which pages run the layer; it follows before the reply.
+    if (result.ok && name === 'preferences' && 'web' in payload) { await bg.pages.registerPageLayer(); await bg.pages.pushPageStatus(); }
     return result;
   }
 

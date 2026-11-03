@@ -1,7 +1,8 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { addBackgroundHost, startWorker } from './helpers/background-host.mjs';
-import { ROOM_REPLAY_COUNT, ROOM_REPLAY_GAP_MS, ROOM_REPLAY_WINDOW_MS } from '../packages/shared/src/contracts/limits.ts';
+import { ROOM_REPLAY_COUNT, ROOM_REPLAY_GAP_MS, ROOM_REPLAY_WINDOW_MS } from '@palside/shared/rules/rooms';
 
 const address = '0x39dbed3a2bd333467115de45665cc57f813c4571', other = '0x49dbed3a2bd333467115de45665cc57f813c4571';
 const url = value => `https://gmgn.ai/eth/token/${value}`;
@@ -12,7 +13,7 @@ const message = (id, patch = {}) => ({ id, key: key(address), text: id, author: 
 function fixture({ messages = [], site = true, saved = {}, state: patch = {} } = {}) {
   const calls = [], opened = [], injected = [], timers = new Map(), stored = { ...saved };
   const controls = { focused: 10, tabs: [{ id: 1, windowId: 10, active: true, url: url(address), status: 'complete' }] };
-  let state = { authenticated: true, account: { id: 'alice' }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, preferences: { current: '', web: { share: true, interact: true }, rooms: {}, notifications: 'off', hiddenStickies: [] }, toggles: { share: false, interact: true }, remoteTeams: [], items: { stickies: [] }, data: { views: [], messages: [], people: [] }, drafts: {}, rooms: { current: { key: key(address), loading: false, messages }, blocked: [], avatars: {} }, ...patch };
+  let state = { authenticated: true, account: { id: 'alice' }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, preferences: { current: '', rooms: {}, notifications: 'off', hiddenStickies: [] }, remoteTeams: [], items: { stickies: [] }, data: { views: [], messages: [], people: [] }, drafts: {}, rooms: { current: { key: key(address), loading: false, messages }, blocked: [], avatars: {} }, ...patch };
   const browser = {
     runtime: { id: 'qa', getURL: path => `chrome-extension://qa${path}`, getContexts: async () => [{}], onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event(), sendMessage: async ({ command }) => { calls.push(command); return command.name === 'snapshot' ? { ok: true, value: state } : { ok: true }; } },
     tabs: { query: async options => controls.tabs.filter(tab => (!options.active || tab.active) && (options.windowId === undefined || tab.windowId === options.windowId)), onActivated: event(), onUpdated: event(), onRemoved: event() },
@@ -41,18 +42,19 @@ function fixture({ messages = [], site = true, saved = {}, state: patch = {} } =
   return { bg, calls, opened, injected, controls, browser, host, timers, stored, primary, panel, page, update, state: () => state, tick, room: messages => update({ rooms: { ...state.rooms, current: { ...state.rooms.current, messages } } }), close: () => { for (const port of pages) port.onDisconnect.emit(); for (const port of panels) port.onDisconnect.emit(); } };
 }
 
-test('room snapshot replays only newest five within the window, every 800ms, then new arrivals', async t => {
+test('room snapshot replays only the newest lines within the window, one per gap, then new arrivals', async t => {
   const now = Date.now();
-  const f = fixture({ messages: [message('expired', { createdAt: now - ROOM_REPLAY_WINDOW_MS }), ...Array.from({ length: 8 }, (_, i) => message(String(i), { createdAt: now - 1000 + i }))] }); t.after(f.close);
+  const f = fixture({ messages: [message('expired', { createdAt: now - ROOM_REPLAY_WINDOW_MS }), ...Array.from({ length: ROOM_REPLAY_COUNT + 5 }, (_, i) => message(String(i), { createdAt: now - 1000 + i }))] }); t.after(f.close);
+  const replayed = Array.from({ length: ROOM_REPLAY_COUNT }, (_, i) => String(i + 5));
   await flush(); const p = f.page(); await flush();
-  assert.deepEqual(p.flights().map(item => item.id), ['3']);
+  assert.deepEqual(p.flights().map(item => item.id), [replayed[0]]);
   assert.equal([...f.timers.keys()].filter(id => id.delay === ROOM_REPLAY_GAP_MS).length, 1);
   f.room([...f.state().rooms.current.messages, message('live', { createdAt: now })]); await flush();
   for (let i = 0; i < ROOM_REPLAY_COUNT; i++) f.tick();
   await flush();
-  assert.deepEqual(p.flights().map(item => item.id), ['3', '4', '5', '6', '7', 'live']);
+  assert.deepEqual(p.flights().map(item => item.id), [...replayed, 'live']);
   f.room([message('older', { createdAt: now - ROOM_REPLAY_WINDOW_MS * 2 }), ...f.state().rooms.current.messages]); await flush();
-  assert.equal(p.flights().length, 6, 'loading older room pages never flies');
+  assert.equal(p.flights().length, ROOM_REPLAY_COUNT + 1, 'loading older room pages never flies');
 });
 
 test('once per tab and token survives reconnect and token switching, expires after ten minutes', async t => {
@@ -73,9 +75,7 @@ test('once per tab and token survives reconnect and token switching, expires aft
 test('all public-room display conditions apply independently of interaction features and team membership', async t => {
   const cases = [
     f => f.update({ preferences: { ...f.state().preferences, rooms: { off: true } } }),
-    f => f.bg.danmaku.saveDanmakuSettings({ enabled: false }),
-    f => f.update({ preferences: { ...f.state().preferences, web: { share: true, interact: false } } }),
-    f => f.update({ toggles: { share: false, interact: false } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true, sticky: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['https://gmgn.ai/*'] }); },
     f => f.primary.port.onDisconnect.emit(),
     f => f.update({ rooms: { ...f.state().rooms, current: { key: key(other), messages: [message('wrong', { key: key(other) })] } } }),
@@ -83,7 +83,7 @@ test('all public-room display conditions apply independently of interaction feat
   ];
   for (const disable of cases) {
     const f = fixture({ messages: [message('a'), message('b')] }); t.after(f.close); await flush();
-    f.update({ preferences: { ...f.state().preferences, interaction: { signal: false, sticky: false } } }); await flush();
+    f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: true, signal: false, sticky: false } } } }); await flush();
     const p = f.page(); await flush(); assert.equal(p.flights().length, 1, 'works with no team and both interaction features off');
     await disable(f); await flush(); f.tick();
     assert.equal(p.flights().length, 1); assert.ok(p.removed().includes('a'));
@@ -116,7 +116,8 @@ test('matching tab sources, non-token pages and click to the correct window room
 test('room-tab follows the most recently focused panel window, emits null on non-token pages, rejects panel forgery', async t => {
   const f = fixture(); t.after(f.close); await flush();
   const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(command => command.payload);
-  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}`, profile: { name: '0x39db…4571', site: 'gmgn' } });
+  // An unnamed token never votes its address placeholder as the public name.
+  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}` });
   f.controls.tabs.push({ ...f.controls.tabs[0], id: 2, windowId: 20, url: url(other) });
   f.panel(20); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${address}`);
   f.controls.focused = 20; f.browser.windows.onFocusChanged.emit(20); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${other}`);
@@ -157,7 +158,7 @@ test('another tab gets its own replay and a missing grant or capture-only admiss
   assert.equal(p.flights().length, 1); assert.ok(p.removed().includes('a'));
 });
 
-const packet = (patch = {}) => ({ id: 'packet', accountId: 'bob', kind: 'room', scope: key(address), status: 'active', count: 5, claimedCount: 1, expiresAt: Date.now() + 60_000, ...patch });
+const packet = (patch = {}) => ({ id: 'packet', accountId: 'bob', kind: 'room', scope: key(address), status: 'active', count: 5, claimedCount: 1, expiresAt: Date.now() + MINUTE_MS, ...patch });
 const payments = p => p.messages.filter(item => item.type === 'room-payments');
 const lastPayment = p => payments(p).at(-1);
 const emptyPayments = { type: 'room-payments', roomKey: null, packets: [] };
@@ -221,9 +222,7 @@ test('room payment timers expire packets without state events', async t => {
 test('room payment projections clear for permission, tab, account, team and display lifecycle changes', async t => {
   const cases = [
     f => f.update({ preferences: { ...f.state().preferences, rooms: { off: true } } }),
-    f => f.bg.danmaku.saveDanmakuSettings({ enabled: false }),
-    f => f.update({ preferences: { ...f.state().preferences, web: { share: true, interact: false } } }),
-    f => f.update({ toggles: { share: false, interact: false } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true, sticky: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['https://gmgn.ai/*'] }); },
     f => f.primary.port.onDisconnect.emit(),
     f => f.update({ authenticated: false }),

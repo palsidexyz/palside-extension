@@ -20,14 +20,13 @@ import { insertPastedText, pastedImage } from './clipboard';
 import { ReactionPicker } from '../annotations/reaction-picker';
 import { StateGlyph } from '../ui/motion-details';
 import { CaptureTool } from '../media/capture-tool';
-import { PageStrip } from '../viewing/page-strip';
-import { InteractToggle, ShareToggle } from '../viewing/page-toggles';
 import { Action, PersonAvatar } from '../ui/primitives';
 import { IMAGE_LIMIT } from '../../../domain/images/image-policy';
 import { readImage } from '../account/read-image';
 import type { PalsideController } from '../app/use-palside';
 import { whenWalletOpen } from '../wallet/closed';
 import s from '../app/palside.module.css';
+import { liveView } from '../assets/token-data';
 
 const TEXT_MAX = 4000;
 
@@ -46,9 +45,13 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
   const latest = useRef(c);
   useEffect(() => { latest.current = c; }, [c]);
   const imageInput = useRef<HTMLInputElement>(null);
-  useLinkCard(c);
+  const card = useLinkCard(c);
+  const [holding, setHolding] = useState(false);
+  const sendLatest = useRef(onSend);
+  useEffect(() => { sendLatest.current = onSend; }, [onSend]);
   const ready = canSend(c.draft);
-  const draftAsset = assetView(c.draft.attachment);
+  const draftSnapshot = assetView(c.draft.attachment);
+  const draftAsset = draftSnapshot && liveView(c, draftSnapshot);
   const edited = c.editing && c.canWrite ? c.currentMessages.find(m => m.id === c.editing && !m.recalled && m.author === c.data.self && m.status === 'sent') : undefined;
   const editInvalid = !edited || characterLength(c.editText) > TEXT_MAX || (!c.editText.trim() && !edited.attachment);
   const { editing, setEditing } = c;
@@ -84,6 +87,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
   }
   function paste(event: ClipboardEvent<HTMLTextAreaElement>) {
     if (edited) return;
+    if (LINK.test(event.clipboardData.getData('text/plain'))) card.pasted();
     const files = [...event.clipboardData.items].filter(item => item.kind === 'file').map(item => item.getAsFile()).filter((file): file is File => Boolean(file));
     if (!files.length) return;
     event.preventDefault();
@@ -109,8 +113,18 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
     takeImage([...event.dataTransfer.files]);
   }
   async function send() {
-    if (c.disconnected || !ready || preparing || c.draftConflict) return;
-    await onSend();
+    if (c.disconnected || !ready || preparing || holding || c.draftConflict) return;
+    // A card still on its way goes out with the message, as it would have after a pause; the wait is short and never blocks sending.
+    if (card.pending()) {
+      setHolding(true);
+      try {
+        await card.settle();
+        for (let frame = 0; frame < 6 && !latest.current.draft.attachment; frame++) await new Promise(resolve => requestAnimationFrame(resolve));
+      } finally { setHolding(false); }
+      const now = latest.current;
+      if (now.disconnected || now.draftConflict || !canSend(now.draft)) return;
+    }
+    await sendLatest.current();
   }
   function keyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -149,7 +163,6 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
     </div>}
     {mention.picker}
     <div className={s.composerWrap}>
-      <PageStrip c={c} />
       <VisuallyHidden role="status">{queue ? t('extension.dynamic.sendPacingStatus', { count: queue.count }) : ''}</VisuallyHidden>
       <div className={s.composer} data-composer-surface data-dragging={dragging || undefined}
         onDragOver={dragOver} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }} onDrop={drop}>
@@ -184,7 +197,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
             onChange={event => { if (edited) { c.setEditText(event.target.value); return; } c.updateDraft({ text: event.target.value }); mention.detect(event.currentTarget); }} />
         </div>
         <div className={s.composerToolbar}>
-          {edited ? <span /> : <div className={s.tools}>
+          {edited ? <span /> : <div className={s.tools} data-tour="tools">
             <ReactionPicker c={c} />
             <Action label={t('extension.copy.image')} disabled={preparing} onClick={() => imageInput.current?.click()}><ImageIcon /></Action>
             <input ref={imageInput} type="file" accept="image/*" hidden onChange={event => { takeImage([...event.target.files ?? []]); event.target.value = ''; }} />
@@ -197,12 +210,11 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
               <StateGlyph state="save"><Check /></StateGlyph>
             </IconButton>
           </div> : <div className={s.tools}>
-            <span className={s.pageToggles}><ShareToggle c={c} /><InteractToggle c={c} /></span>
             {characterLength(c.draft.text) > TEXT_MAX - 200 && <small className={characterLength(c.draft.text) > TEXT_MAX ? s.danger : s.muted}>{characterLength(c.draft.text)}/{TEXT_MAX}</small>}
             <IconButton data-film-action="send" size="sm" className={s.sendButton}
               label={c.disconnected ? t('extension.copy.sendWhenConnected') : t('extension.copy.sendMessage')}
               variant={ready ? 'primary' : 'surface'} disabled={c.disconnected || !ready || preparing || c.draftConflict} onClick={() => void send()}>
-              <StateGlyph state={ready ? 'ready' : 'empty'}>{preparing ? <Spinner className={s.loadingIcon} size={18} /> : <ArrowUp />}</StateGlyph>
+              <StateGlyph state={ready ? 'ready' : 'empty'}>{preparing || holding ? <Spinner className={s.loadingIcon} size={18} /> : <ArrowUp />}</StateGlyph>
             </IconButton>
           </div>}
         </div>
@@ -214,16 +226,36 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
 const LINK = /https?:\/\/[^\s<>"'，。）)]+/i;
 
 /** 链接卡片: the first web address typed or pasted becomes the draft's page card. Removing the card keeps it away for that address;
- * deleting the address takes its card with it. The card is built locally from the address, never by fetching the page. */
+ * deleting the address takes its card with it. The card is built locally from the address, never by fetching the page.
+ * A pasted address is looked up at once, a typed one after a pause; 发送 can wait for a lookup still on its way. */
 function useLinkCard(c: PalsideController) {
-  const { draft, current: teamId, data: { self: accountId } } = c;
-  const url = LINK.exec(draft.text)?.[0];
+  const { current: teamId, data: { self: accountId } } = c;
+  const url = LINK.exec(c.draft.text)?.[0];
   const attachment = c.draft.attachment;
   const auto = c.draft.automaticCard;
   const dismissed = c.draft.dismissedUrls;
   const latest = useRef(c);
   useEffect(() => { latest.current = c; });
   const command = c.live?.command;
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const quick = useRef(false);
+  // One lookup per address at a time; it applies only while that address is still the draft's first link and nothing took the card's place.
+  const lookup = useRef<{ url: string; teamId: string; accountId: string; done: Promise<void> }>(undefined);
+  const wanted = (now: PalsideController, link: string) => LINK.exec(now.draft.text)?.[0] === link && !now.draft.attachment && !now.draft.dismissedUrls?.includes(link);
+  const request = useRef((link: string, team: string, account: string) => {
+    const now = latest.current, run = now.live?.command;
+    if (!run || !mounted.current || now.current !== team || now.data.self !== account || !wanted(now, link)) return;
+    const open = lookup.current;
+    if (open && open.url === link && open.teamId === team && open.accountId === account) return open.done;
+    const done: Promise<void> = run('link-card', { url: link }).then(result => {
+      const after = latest.current;
+      if (!mounted.current || !result?.attachment || after.current !== team || after.data.self !== account || !wanted(after, link)) return;
+      after.updateDraft({ attachment: result.attachment, automaticCard: { url: link, assetId: result.attachment.assetId } });
+    }).catch(() => {}).finally(() => { if (lookup.current?.done === done) lookup.current = undefined; });
+    lookup.current = { url: link, teamId: team, accountId: account, done };
+    return done;
+  });
   useEffect(() => {
     if (auto) {
       const owned = attachment?.kind === 'asset' && attachment.assetId === auto.assetId;
@@ -231,15 +263,25 @@ function useLinkCard(c: PalsideController) {
       if (auto.url !== url) { latest.current.updateDraft({ attachment: undefined, automaticCard: undefined }); return; }
     }
     if (!url || !command || attachment || dismissed?.includes(url)) return;
-    let current = true;
-    const timer = setTimeout(() => {
-      void command('link-card', { url }).then(result => {
-        if (!current || !result?.attachment || latest.current.draft !== draft || latest.current.current !== teamId || latest.current.data.self !== accountId) return;
-        latest.current.updateDraft({ attachment: result.attachment, automaticCard: { url, assetId: result.attachment.assetId } });
-      }).catch(() => {});
-    }, 350);
-    return () => { current = false; clearTimeout(timer); };
-  }, [url, attachment, auto, dismissed, command, draft, teamId, accountId]);
+    const delay = quick.current ? 0 : 350;
+    quick.current = false;
+    const timer = setTimeout(() => { void request.current(url, teamId, accountId); }, delay);
+    return () => clearTimeout(timer);
+  }, [url, attachment, auto, dismissed, command, teamId, accountId]);
+  return {
+    pasted() { quick.current = true; },
+    /** The field's first address has no card yet but would get one. */
+    pending() { const now = latest.current, link = LINK.exec(now.draft.text)?.[0]; return Boolean(link && now.live?.command && wanted(now, link)); },
+    /** Starts or joins the lookup and waits for it, at most 600 ms. */
+    async settle() {
+      const now = latest.current, link = LINK.exec(now.draft.text)?.[0];
+      const done = link ? request.current(link, now.current, now.data.self) : undefined;
+      if (!done) return;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([done, new Promise<void>(resolve => { timer = setTimeout(resolve, 600); })]);
+      clearTimeout(timer);
+    },
+  };
 }
 
 /** @ mentions typed into the field: the query under the caret, the matching teammates and keyboard choice. */

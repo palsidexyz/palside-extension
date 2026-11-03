@@ -229,4 +229,6 @@ export class WalletRuntime {
     this.keys?.hide(owner);
   }
   async offline() { this.hide(); this.controller?.offline(); }
+  /** The device locked: forget the unlocked signing key and any shown private key; the next payment asks for the password. */
+  lock() { this.hide(); this.keys?.lock(); this.controller?.keysLocked(); }
 }

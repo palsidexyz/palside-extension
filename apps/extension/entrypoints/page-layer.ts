@@ -1,3 +1,4 @@
+import { SECOND_MS } from '@palside/shared/units';
 import { defineUnlistedScript } from 'wxt/utils/define-unlisted-script';
 import { browser } from 'wxt/browser';
 import { startPageLayer } from '../src/page-layer';
@@ -15,7 +16,7 @@ export default defineUnlistedScript(() => {
       scope[key] = false;
       // Chrome restarts an idle background on its own; that drop is not a decision to leave the page, so reconnect once
       // the layer had settled. An immediate drop means the background turned the page away.
-      if (reason === 'disconnect' && Date.now() - startedAt > 5_000) setTimeout(() => { if (!scope[key] && browser.runtime?.id) start(); }, 1_000);
+      if (reason === 'disconnect' && Date.now() - startedAt > 5_000) setTimeout(() => { if (!scope[key] && browser.runtime?.id) start(); }, SECOND_MS);
     });
   };
   if (!scope[key]) start();

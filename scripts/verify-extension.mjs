@@ -2,14 +2,15 @@ import { pageMatches, pageScript } from '../apps/extension/src/runtime/browser/p
 import { readFile, access, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { validateExtensionManifest, validatePageLayerRegistration } from "./lib/extension-artifact.mjs";
-import { RELEASE_WEBSITE_ORIGIN } from "../packages/shared/src/extension.ts";
+import { RELEASE_API_ORIGIN, RELEASE_WEBSITE_ORIGIN } from '../packages/shared/src/extension.ts';
 import { verifyThirdPartyLicenses } from './third-party-licenses.mjs';
 import { brandIconSizes, renderBrandPng } from './lib/brand-assets.mjs';
 
 const root = new URL("../apps/extension/.output/chrome-mv3/", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("manifest.json", root)));
 const websiteOrigin = process.env.PALSIDE_RELEASE_BUILD ? RELEASE_WEBSITE_ORIGIN : new URL(process.env.WXT_WEBSITE_URL || "http://localhost:3000").origin;
-const errors = validateExtensionManifest(manifest, websiteOrigin);
+const apiOrigin = process.env.PALSIDE_RELEASE_BUILD ? RELEASE_API_ORIGIN : new URL(process.env.WXT_API_URL || "http://127.0.0.1:8787").origin;
+const errors = validateExtensionManifest(manifest, websiteOrigin, undefined, apiOrigin);
 const brand = await readFile(new URL('../packages/design/assets/brand/palside.svg', import.meta.url), 'utf8');
 try {
   if ((await readFile(new URL('brand/palside.svg', root), 'utf8')) !== brand) errors.push('Bundled brand SVG differs from its master');

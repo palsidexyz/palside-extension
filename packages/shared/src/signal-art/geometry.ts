@@ -1,6 +1,7 @@
 // Adapted from darrenprx/lolPing (MIT), c98806ae96a4dd83ca9c12be224878057f3d3ae7. See LICENSE.
 /** Wheel geometry in CSS pixels. */
-export const WHEEL = { size: 600, innerR: 86, outerR: 188, iconR: 137, iconSize: 48 } as const;
+/** innerR is both the drawn core and the cancel zone: about a third of the wheel, so a short drag already picks. */
+export const WHEEL = { size: 600, innerR: 60, outerR: 188, iconR: 124, iconSize: 48 } as const;
 
 /**
  * Slice under an offset from the wheel centre. Screen coordinates (y down).

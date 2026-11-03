@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { IMAGE_LIMIT } from './image-policy.ts';
 
 export type CaptureSelection = { x: number; y: number; width: number; height: number };
@@ -11,6 +12,10 @@ export type CaptureOp =
   | { kind: 'pen'; points: Array<{ x: number; y: number }>; color: CaptureColor }
   | { kind: 'text'; x: number; y: number; value: string; color: CaptureColor };
 export const MIN_SELECTION = 8;
+export const CAPTURE_IDLE_MS = 2 * MINUTE_MS;
+export const CAPTURE_MAX_MS = 10 * MINUTE_MS;
+export const IMAGE_TEXT_MAX = 500;
+export const IMAGE_PEN_POINTS_MAX = 10_000;
 export const COLORS: CaptureColor[] = ['#FF4D4F', '#FFB020', '#22C55E', '#3B82F6'];
 export function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));

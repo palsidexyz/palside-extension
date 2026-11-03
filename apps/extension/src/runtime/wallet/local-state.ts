@@ -1,5 +1,5 @@
-import { allowsSmallPayment, type WalletPreferences } from '../../domain/wallet/model';
-import type { ChainOrderInput } from '@palside/shared/contracts/chain';
+import { smallPaymentStatus, type WalletPreferences } from '../../domain/wallet/model';
+import type { ChainClientConfig, ChainOrderInput } from '@palside/shared/contracts/chain';
 import { localLocks, type LocalLocks, type LocalSecretStorage } from '../account/local-password';
 
 type Reservation = { amount: string; day: string };
@@ -31,14 +31,14 @@ export class WalletLocalState {
   setPreferences(patch: Partial<WalletPreferences>) { return this.update(state => (state.preferences = { ...state.preferences, ...patch })); }
   private day() { return new Date(this.now()).toISOString().slice(0, 10); }
   private spent(state: WalletLocal) { return Object.values(state.reservations).filter(item => item.day === this.day()).reduce((total, item) => total + BigInt(item.amount), 0n); }
-  canSkip(input: ChainOrderInput, amount: bigint, decimals: number) {
-    return this.update(state => state.preferences.smallPayments && allowsSmallPayment(input, amount, this.spent(state), decimals));
+  smallPayment(input: ChainOrderInput, amount: bigint, decimals: number, config: ChainClientConfig['quickPay']) {
+    return this.update(state => state.preferences.smallPayments ? smallPaymentStatus(input, amount, this.spent(state), decimals, config) : 'password');
   }
-  reserve(id: string, input: ChainOrderInput, amount: bigint, decimals: number): Promise<boolean> {
+  reserve(id: string, input: ChainOrderInput, amount: bigint, decimals: number, config: ChainClientConfig['quickPay']): Promise<boolean> {
     return this.update(state => {
       const existing = state.reservations[id];
       if (existing) return false; // Another window already owns this payment; never sign it twice.
-      if (!state.preferences.smallPayments || !allowsSmallPayment(input, amount, this.spent(state), decimals)) return false;
+      if (!state.preferences.smallPayments || smallPaymentStatus(input, amount, this.spent(state), decimals, config) !== 'allowed') return false;
       for (const [key, value] of Object.entries(state.reservations)) if (value.day !== this.day()) delete state.reservations[key];
       state.reservations[id] = { amount: amount.toString(), day: this.day() };
       return true;

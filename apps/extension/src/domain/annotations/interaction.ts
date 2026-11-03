@@ -1,20 +1,6 @@
 import { normalizeAddress,publicShareUrl,type Network } from '@palside/shared/navigation';
+import { graphemeLength } from '@palside/shared/contracts/rules';
 import { normalizeSiteHost } from '../assets/site-host.ts';
-
-/**
- * 设置 › 网页: 共享在看 (`share`) and 网页互动 (`interact`) are each 启用 or 禁用. Both start 启用. 禁用 hides the composer switch
- * and gives back the feature's Chrome permission. Per account, kept on this device.
- */
-export type WebFeature = 'share' | 'interact';
-export type WebFeatures = Record<WebFeature, boolean>;
-export const defaultWebFeatures: WebFeatures = { share: true, interact: true };
-
-export function readWebFeatures(input: unknown): WebFeatures | undefined {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return;
-  const value = input as Record<string, unknown>;
-  if (typeof value.share !== 'boolean' || typeof value.interact !== 'boolean' || Object.keys(value).length !== 2) return;
-  return { share: value.share, interact: value.interact };
-}
 
 /** Exact public hosts, deduplicated in order; nothing when any entry is not one. */
 export function readHosts(input: unknown, limit = 500): string[] | undefined {
@@ -24,24 +10,52 @@ export function readHosts(input: unknown, limit = 500): string[] | undefined {
   return hosts;
 }
 
-/** The team's page features: one switch each, on every site 网页互动 runs on. 网页弹幕 has its own switch in the 弹幕 box. */
+/** 信号 and 便利贴: the page features drawn from the squad's own data. */
 export type InteractionFeature = 'signal' | 'sticky';
-export type InteractionPrefs = Record<InteractionFeature, boolean>;
 export const interactionFeatures: InteractionFeature[] = ['signal', 'sticky'];
-export const defaultInteraction: InteractionPrefs = { signal: true, sticky: true };
 
-export function readInteraction(input: unknown): InteractionPrefs | undefined {
+/**
+ * 网页互动, one setting per site: whether it runs there, and each of 弹幕, 信号 and 便利贴 on that site. A site Chrome allows with no entry
+ * runs with everything on; switching 网页互动 off keeps Chrome's grant. Per account, kept on this device.
+ */
+export type SiteFeature = 'danmaku' | InteractionFeature;
+export const siteFeatures: SiteFeature[] = ['danmaku', 'signal', 'sticky'];
+export type SiteInteraction = { on: boolean } & Record<SiteFeature, boolean>;
+export type SiteInteractions = Record<string, SiteInteraction>;
+export const defaultSiteInteraction: SiteInteraction = { on: true, danmaku: true, signal: true, sticky: true };
+const SITE_LIMIT = 500;
+
+export function readSiteInteractions(input: unknown): SiteInteractions | undefined {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return;
-  const value = input as Record<string, unknown>;
-  if (Object.keys(value).some(key => !interactionFeatures.includes(key as InteractionFeature))) return;
-  if ([value.signal, value.sticky].some(item => item !== undefined && typeof item !== 'boolean')) return;
-  return { ...defaultInteraction, ...value as Partial<InteractionPrefs> };
+  const entries = Object.entries(input as Record<string, unknown>);
+  if (entries.length > SITE_LIMIT) return;
+  const sites: SiteInteractions = {};
+  for (const [key, item] of entries) {
+    const host = normalizeSiteHost(key);
+    if (!host || !item || typeof item !== 'object' || Array.isArray(item)) return;
+    const value = item as Record<string, unknown>;
+    if (Object.keys(value).some(field => field !== 'on' && !siteFeatures.includes(field as SiteFeature))) return;
+    if (Object.values(value).some(flag => typeof flag !== 'boolean')) return;
+    sites[host] = { ...defaultSiteInteraction, ...value as Partial<SiteInteraction> };
+  }
+  return sites;
 }
 
-/** The feature's switch; without a feature, whether any of them is on, since 网页互动 has nothing to draw otherwise. */
-export function interactionAllows(prefs: InteractionPrefs | undefined, feature?: InteractionFeature) {
-  const value = prefs ?? defaultInteraction;
-  return feature ? value[feature] : interactionFeatures.some(item => value[item]);
+/** The site's setting, the default for a site without one. */
+export function siteInteraction(sites: SiteInteractions | undefined, host: string | undefined): SiteInteraction {
+  const key = normalizeSiteHost(host);
+  return (key && sites?.[key]) || defaultSiteInteraction;
+}
+
+/** 网页互动 runs on the site and, given a feature, that feature is on there; Chrome's grant is checked by the caller. */
+export function siteAllows(sites: SiteInteractions | undefined, host: string | undefined, feature?: SiteFeature) {
+  const value = siteInteraction(sites, host);
+  return Boolean(normalizeSiteHost(host)) && value.on && (!feature || value[feature]);
+}
+
+/** The page layer has something of the squad's own to draw: 信号 or 便利贴 on (弹幕 joins by the open room). */
+export function siteDraws(sites: SiteInteractions | undefined, host: string | undefined) {
+  return interactionFeatures.some(feature => siteAllows(sites, host, feature));
 }
 
 /** 收藏: whole websites and single pages, only for this account on this device. Never synced or shared. */
@@ -61,7 +75,7 @@ export function readFavorites(input: unknown): Favorites | undefined {
     if (!item || typeof item !== 'object') return;
     const page = item as Record<string, unknown>;
     const url = typeof page.url === 'string' ? pageScopeUrl(page.url) : undefined;
-    if (!url || typeof page.title !== 'string' || page.title.length > 200) return;
+    if (!url || typeof page.title !== 'string' || graphemeLength(page.title) > 200) return;
     if (!pages.some(saved => saved.url === url)) pages.push({ url, title: page.title.trim() || new URL(url).hostname });
   }
   if (sites.length > FAVORITE_LIMIT || pages.length > FAVORITE_LIMIT) return;

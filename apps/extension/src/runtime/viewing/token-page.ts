@@ -1,3 +1,4 @@
+import { graphemeLength } from '@palside/shared/contracts/rules';
 import { identifyPage,normalizeAddress,shortAddress,type PageIdentity } from '@palside/shared/navigation';
 import type { SiteProfile } from '@palside/shared/sites';
 
@@ -11,7 +12,7 @@ export type TokenPageReader = (request: TokenPageRequest) => Promise<TokenPageMe
 export function tokenName(value: unknown): string | undefined {
   if (typeof value !== 'string') return;
   const name = value.trim().replace(/\s+/gu, ' ');
-  if (!name || name.length > 64 || !/[\p{L}\p{N}]/u.test(name) || /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>↑↓▲▼↗↘⬆⬇]/u.test(name)) return;
+  if (!name || graphemeLength(name) > 64 || !/[\p{L}\p{N}]/u.test(name) || /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>↑↓▲▼↗↘⬆⬇]/u.test(name)) return;
   if (/^(?:[$€£¥]\s*)?[+-]?[\d,.]+\s*(?:%|[KMBT])?$/iu.test(name)) return;
   return name;
 }
@@ -43,16 +44,13 @@ export function readVisibleToken(input: { href: string; host: string; address: s
   const solana = input.chain === 'Solana';
   if (!(solana ? /^[1-9A-HJ-NP-Za-km-z]{32,44}$/ : /^0x[a-fA-F0-9]{40}$/).test(input.address)) return;
   const same = (value: string) => solana ? value === input.address : value.toLowerCase() === input.address.toLowerCase();
-  const safeName = (value: string | null | undefined) => {
-    const name = value?.trim();
-    return name && name.length <= 64 && /[\p{L}\p{N}]/u.test(name) && !/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069<>↑↓▲▼↗↘⬆⬇]/u.test(name) && !/^(?:[$€£¥]\s*)?[+-]?[\d,.]+\s*(?:%|[KMBT])?$/iu.test(name) ? name : undefined;
-  };
+  const headingText = (value: string | null | undefined) => value?.trim().replace(/\s+/gu, ' ') || undefined;
   // Known title formats contain a public token symbol. Never return the raw title.
   let titleName: string | undefined;
   const title = profile.title;
   if (title && new RegExp(title.match, title.flags).test(document.title)) {
     const symbol = document.title.match(new RegExp(title.name))?.[1];
-    titleName = safeName(title.strip ? symbol?.replace(new RegExp(title.strip, 'gu'), '') : symbol);
+    titleName = headingText(title.strip ? symbol?.replace(new RegExp(title.strip, 'gu'), '') : symbol);
   }
   const visible = (element: Element) => {
     const rect = element.getBoundingClientRect();
@@ -72,11 +70,11 @@ export function readVisibleToken(input: { href: string; host: string; address: s
     for (let depth = 0; root && depth < 5; depth++, root = root.parentElement) {
       if (root === document.body || root === document.documentElement || root.querySelectorAll('*').length > 140) break;
       const headings = [...root.querySelectorAll<HTMLElement>('h1,h2,[data-testid="token-name"],[data-testid="token-symbol"]')].filter(visible);
-      const headingNames = [...new Set(headings.map(heading => safeName(heading.textContent)).filter((name): name is string => Boolean(name)))];
+      const headingNames = [...new Set(headings.map(heading => headingText(heading.textContent)).filter((name): name is string => Boolean(name)))];
       const name = titleName ? headingNames.includes(titleName) ? titleName : undefined : headingNames.length === 1 ? headingNames[0] : undefined;
       // GMGN/FOMO sometimes render the symbol as a small inline label instead of a heading.
       // Compare only short leaf labels within this contract header, never its aggregate text.
-      const inlineName = titleName && [...root.querySelectorAll(profile.inline)].some(element => !element.childElementCount && visible(element) && element.textContent?.trim() === titleName) ? titleName : undefined;
+      const inlineName = titleName && [...root.querySelectorAll(profile.inline)].some(element => !element.childElementCount && visible(element) && headingText(element.textContent) === titleName) ? titleName : undefined;
       const confirmed = name ?? inlineName; if (!confirmed) continue;
       const images = [...root.querySelectorAll<HTMLImageElement>('img')].filter(image => {
         if (!visible(image) || !image.complete || !image.naturalWidth || image.naturalWidth > 2048 || image.naturalHeight > 2048) return false;
@@ -102,7 +100,7 @@ export function readVisibleToken(input: { href: string; host: string; address: s
       const context = canvas.getContext('2d'); if (!context) return result;
       const scale = Math.min(48 / image.naturalWidth, 48 / image.naturalHeight);
       context.drawImage(image, (48 - image.naturalWidth * scale) / 2, (48 - image.naturalHeight * scale) / 2, image.naturalWidth * scale, image.naturalHeight * scale);
-      const png = canvas.toDataURL('image/png'); if (png.length <= 10_690) result.logo = png;
+      result.logo = canvas.toDataURL('image/png');
     } catch { /* Display the public image URL without exporting pixels or requesting host permissions. */ }
   }
   return location.href === input.href && document.visibilityState === 'visible' ? result : undefined;

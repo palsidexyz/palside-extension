@@ -1,7 +1,16 @@
+import { DAY_MS } from '@palside/shared/units';
 import { productionModules } from './helpers/production-module.mjs';
 import { createPatchSliceCache, diffState } from '../apps/extension/src/runtime/transport/state-diff.ts';
 import { teamUnreadCounts } from '../apps/extension/src/domain/chat/unread-mentions.ts';
-import * as contractLimits from '../packages/shared/src/contracts/limits.ts';
+import * as contractLimits0 from '../packages/shared/src/rules/teams.ts';
+import * as contractLimits1 from '../packages/shared/src/rules/retention.ts';
+import * as contractLimits2 from '../packages/shared/src/rules/accounts.ts';
+import * as contractLimits3 from '../packages/shared/src/rules/messages.ts';
+import * as contractLimits4 from '../packages/shared/src/rules/media.ts';
+import * as contractLimits5 from '../packages/shared/src/rules/rooms.ts';
+import * as contractLimits6 from '../packages/shared/src/rules/interactions.ts';
+import * as contractLimits7 from '../packages/shared/src/rules/admin.ts';
+const contractLimits = { ...contractLimits0, ...contractLimits1, ...contractLimits2, ...contractLimits3, ...contractLimits4, ...contractLimits5, ...contractLimits6, ...contractLimits7 };
 import * as contractCommon from '../packages/shared/src/contracts/common.ts';
 import { parseCommand } from '../apps/extension/src/runtime/transport/command-map.ts';
 import test from 'node:test';
@@ -9,7 +18,7 @@ import assert from 'node:assert/strict';
 import * as identity from '../packages/shared/src/identity.ts';
 import * as rooms from '../packages/shared/src/contracts/rooms.ts';
 import { Api, ApiError } from '../apps/extension/src/runtime/transport/api.ts';
-import { deviceKeyPublication, ensureCryptoIdentity, ownDeviceSigned, secretStorageCallbacks, OnlySignedDevicesIsolationMode } from '../apps/extension/src/runtime/account/crypto-identity.ts';
+import { deviceKeyPublication, ensureCryptoIdentity, ownDeviceSigned, secretStorageCallbacks, OnlySignedDevicesIsolationMode, requireEncryptedSend, teamSendGuard } from '../apps/extension/src/runtime/account/crypto-identity.ts';
 import { connectionBlock, connectionStatus, readonlyNotice, sendFailure } from '../apps/extension/src/runtime/transport/connection.ts';
 import { commandError, SERIAL_COMMANDS } from '../apps/extension/src/runtime/composition/commands.ts';
 import { sessionGuard, sessionScope } from '../apps/extension/src/runtime/account/session.ts';
@@ -20,7 +29,6 @@ import { assetView } from '../apps/extension/src/domain/assets/model.ts';
 import { canSend, emptyDraft, readQuoteRange } from '../apps/extension/src/domain/chat/model.ts';
 import { readView, validateView, pageView } from '../apps/extension/src/runtime/viewing/view-snapshot.ts';
 import { messageExpiry } from '../apps/extension/src/runtime/chat/message-expiry.ts';
-import { requireEncryptedSend, teamSendGuard } from '../apps/extension/src/runtime/account/crypto-identity.ts';
 import { installEncryptedRoom } from './helpers/encrypted-room.mjs';
 import { SendPacer, throttleWait, THROTTLE_RETRIES } from '../apps/extension/src/runtime/chat/send-pacer.ts';
 import { publishSendQueue } from '../apps/extension/src/runtime/chat/messages.ts';
@@ -32,7 +40,7 @@ import { notificationTarget } from '../apps/extension/src/runtime/chat/notificat
 import { languageGlobals } from './helpers/language-host.mjs';
 import { resolveTokenMetadata, tokenName } from '../apps/extension/src/runtime/viewing/token-page.ts';
 import { imageSource } from '../apps/extension/src/runtime/media/image-sessions.ts';
-import { defaultWebFeatures, interactionAllows, readFavorites, readHosts, readInteraction, readWebFeatures } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { readFavorites, readHosts } from '../apps/extension/src/domain/annotations/interaction.ts';
 
 const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const pin = '123456';
@@ -49,7 +57,7 @@ function fixture({ stored = new Map(), hasKeys = false, verified = false, ready 
   const context = {
     parseCommand: input => parseCommand(JSON.parse(JSON.stringify(input))), ...languageGlobals, ...contractLimits, ...contractCommon, ...identity, ...social, ...rooms, resolveTokenMetadata, tokenName, imageSource, TextEncoder, uniqueMediaIds, offlineDirectory, retainedViews, pruneTeamItems, notificationTarget, assetView, canSend, emptyDraft, readQuoteRange, readView, validateView, pageView, messageExpiry, publishSendQueue, throttleWait, THROTTLE_RETRIES, readonlyNotice, sendFailure, Api, ApiError, API_URL: 'https://service.test', crypto, Date, Uint8Array, URL, URLSearchParams, Headers, Blob, AbortController, setTimeout, clearTimeout, setInterval: callback => { intervals.push(callback); return intervals.length; },
     deviceKeyPublication, ensureCryptoIdentity, ownDeviceSigned, secretStorageCallbacks, OnlySignedDevicesIsolationMode, connectionBlock, connectionStatus, commandError, SERIAL_COMMANDS, sessionGuard, sessionScope, DeviceCleanup, within,
-    emptyItems, defaultWebFeatures, interactionAllows, readFavorites, readHosts, readInteraction, readWebFeatures, deviceLabel: () => 'Test', usableDirectory: () => undefined,
+    emptyItems, readFavorites, readHosts, deviceLabel: () => 'Test', usableDirectory: () => undefined,
     SendPacer, requireEncryptedSend, teamSendGuard, createPatchSliceCache, diffState, teamUnreadCounts,
     fetch: async (_input, init) => { const keys = JSON.parse(init.body).device_keys; if (keys?.user_id === session.matrix.userId && keys?.device_id === session.matrix.deviceId) server.devicePublished = true; return new Response('{}'); },
     EventType: { RoomMessage: 'm.room.message' }, EventStatus: { NOT_SENT: 'not_sent', SENT: 'sent' }, MsgType: { Text: 'm.text' }, DiagnosticErrors: class { observe() {} record() {} },
@@ -93,6 +101,9 @@ function fixture({ stored = new Map(), hasKeys = false, verified = false, ready 
       clients.push(client); return client;
     },
   };
+  // Logout also asks the background to clear this account's browser-side data; record the requests.
+  context.browserCleanups = [];
+  context.browser = { runtime: { id: "palside-test", sendMessage: async message => { context.browserCleanups.push(message); return { ok: true }; } } };
   context.Runtime = productionModules(context)('apps/extension/src/runtime/composition/core.ts').PalsideService;
   const storage = {
     get: async key => structuredClone(stored.get(key)), rows: async () => [],
@@ -289,7 +300,7 @@ test('a durable ready device resumes without another bootstrap or key check', as
 
 test('startup restores annotation tombstones before stale original and edit cache rows', async () => {
   const f = fixture({ ready: true }); const now = Date.now();
-  const original = { id: '$deleted', teamId: 'team', author: f.session.account.id, asset: 'Ethereum:0x1111111111111111111111111111111111111111', text: 'old', timestamp: now, expiresAt: now + 86_400_000 };
+  const original = { id: '$deleted', teamId: 'team', author: f.session.account.id, asset: 'Ethereum:0x1111111111111111111111111111111111111111', text: 'old', timestamp: now, expiresAt: now + DAY_MS };
   const seen = [];
   f.value.storage.rows = async (_account, kind) => {
     seen.push(kind);
@@ -432,7 +443,7 @@ test('late crypto deletion blocks reopening until it completes and is not duplic
 
 test('ordinary logout preserves isolated preferences and re-login restores them unchanged', async () => {
   const f = activeFixture(); const account = f.session.account.id;
-  const preferences = { web: { share: true, interact: false }, current: 'team', notifications: 'mentions', notificationPreview: false, hiddenStickies: ['sticky'], startedTeams: ['team'] };
+  const preferences = { share: true, siteInteraction: { 'gmgn.ai': { on: false, danmaku: true, signal: true, sticky: true } }, current: 'team', notifications: 'mentions', notificationPreview: false, hiddenStickies: ['sticky'], startedTeams: ['team'] };
   f.stored.set(`${account}:preferences`, preferences); f.stored.set(`${account}:draft:team`, { value: { text: 'secret' } });
   await f.value.command({ name: 'logout' });
   assert.deepEqual(f.stored.get(`${account}:preferences`), preferences);

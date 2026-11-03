@@ -1,7 +1,9 @@
+import { REPORT_THRESHOLD } from '../../rules/admin.ts';
 import Type, { type TSchema } from 'typebox';
-import { strictObject, type Infer } from '../validation.ts';
+import { strictObject, type Infer, decodeContract } from '../validation.ts';
+import { SIGNUP_MODES } from '../../rules/accounts.ts';
 import { chainConfig } from '../chain.ts';
-import { nullable, id, page, adminRef } from './common.ts';
+import { nullable, id, page, adminRef, adminListQuery, targetId } from './common.ts';
 import { accountFields, teamFields, duration } from './moderation.ts';
 
 /** Who caused the event. The server derives it from its own context, never from a request body. */
@@ -37,7 +39,7 @@ export const adminAuditRegistry = {
   'view-private-report': event('首次提供私密举报内容', 'moderation', 'report', strictObject({ surface: Type.Enum(['text', 'image']) })),
   'add-word': event('添加词', 'moderation', 'word', strictObject({ word })),
   'remove-word': event('删除词', 'moderation', 'word', strictObject({ word })),
-  settings: event('修改举报设置', 'config', 'settings', delta(strictObject({ reportThreshold: Type.Integer({ minimum: 1, maximum: 5 }) }))),
+  settings: event('修改注册与举报设置', 'config', 'settings', delta(strictObject({ reportThreshold: Type.Integer({ minimum: REPORT_THRESHOLD.min, maximum: REPORT_THRESHOLD.max }), signupMode: Type.Enum(SIGNUP_MODES) }))),
   'chain-config': event('修改链上配置', 'config', 'chain', delta(chainConfig)),
   'seed-local-development': event('载入演示数据', 'config', 'dataset', strictObject({ seedVersion: Type.Literal(1), rows: Type.Array(strictObject({ table: Type.String(), rows: Type.Array(Type.Record(Type.String(), Type.String())) })) })),
   login: event('登录', 'security', 'operator', none),
@@ -63,8 +65,6 @@ export type AdminAuditEvent = { [A in AdminAuditAction]: {
   actor: AdminAuditActor; caseId?: string | null; batchId?: string | null;
 } }[AdminAuditAction];
 
-import { decodeContract } from '../validation.ts';
-import { adminListQuery, targetId } from './common.ts';
 
 /** Current target identity; availability does not describe the historical event. */
 export const adminAuditRow = strictObject({ id, action: Type.Enum(adminAuditActions), actor: Type.Enum(adminAuditActors), targetType: Type.Enum(adminAuditTargets), targetId: Type.String(), target: strictObject({ availability: Type.Enum(['available', 'deleted', 'expired', 'missing']), entity: nullable(adminRef), name: nullable(Type.String()) }), reason: Type.String(), createdAt: Type.Integer(), caseId: nullable(Type.String()), batchId: nullable(Type.String()) });

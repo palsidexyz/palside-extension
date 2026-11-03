@@ -1,3 +1,4 @@
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import { decodeContract } from '@palside/shared/contracts/validation';
 import { errorMessage,message as uiMessage,MessageError,type TextMessage } from '@palside/i18n';
 import { authorizationHeader,createHttpAuth } from '@palside/shared/identity';
@@ -5,9 +6,12 @@ import { endpointsById,pathFor,type EndpointId,type EndpointById } from '@palsid
 import { errorBody,type ErrorBody } from '@palside/shared/contracts/errors';
 import type { Infer } from '@palside/shared/contracts/validation';
 
+const PROOF_OF_WORK_NOTICE_MS = MINUTE_MS;
+
 export type ApiResult<I extends EndpointId> = Infer<EndpointById<I>['response']['schema']>;
 export type ApiOptions<I extends EndpointId> = {
   params?: Infer<EndpointById<I>['params']>; query?: Infer<EndpointById<I>['query']> & object; body?: unknown;
+  onProofOfWorkSlow?: () => void;
   key?: string; signal?: AbortSignal; secretKey?: Uint8Array; difficulty?: number; token?: string; timeoutMs?: number;
 };
 type ErrorFields<T> = { [K in T extends unknown ? keyof T : never]?: T extends Partial<Record<K, infer V>> ? V : never };
@@ -35,7 +39,7 @@ export async function responseError(response: Response): Promise<ApiError> {
   const date = response.headers.get('Date'), parsedDate = date ? Date.parse(date) : NaN;
   const serverDate = Number.isFinite(parsedDate) ? parsedDate : undefined;
   const header = response.headers.get('Retry-After')?.trim();
-  const delay = header ? /^\d+(?:\.\d+)?$/.test(header) ? Number(header) * 1000 : Math.max(0, Date.parse(header) - (serverDate ?? Date.now())) : undefined;
+  const delay = header ? /^\d+(?:\.\d+)?$/.test(header) ? Number(header) * SECOND_MS : Math.max(0, Date.parse(header) - (serverDate ?? Date.now())) : undefined;
   let body: ClientError;
   try { body = decodeContract(errorBody, result); } catch { body = { error: 'INVALID_RESPONSE' }; }
   return new ApiError(response.status, { ...body, retryAfterMs: body.retryAfterMs ?? (Number.isFinite(delay) ? delay : undefined) }, serverDate);
@@ -56,7 +60,7 @@ export class Api {
   private throttled(route: string, error: unknown) {
     if (error instanceof ApiError && error.status === 429 && error.code !== 'ROOM_SLOW' && error.retryAfterMs) this.cooldowns.set(route, Math.max(this.cooldowns.get(route) ?? 0, Date.now() + error.retryAfterMs));
   }
-  async request<I extends EndpointId>(id: I, { params, query, body, key, signal, secretKey, difficulty, token = this.token, timeoutMs = 20_000 }: ApiOptions<I> = {}): Promise<ApiResult<I>> {
+  async request<I extends EndpointId>(id: I, { params, query, body, key, signal, secretKey, difficulty, onProofOfWorkSlow, token = this.token, timeoutMs = 20_000 }: ApiOptions<I> = {}): Promise<ApiResult<I>> {
     const endpoint = endpointsById[id];
     const path = pathFor(endpoint, (params ?? {}) as Infer<EndpointById<I>['params']>, query);
     const parsed = decodeContract(endpoint.body.schema, body);
@@ -67,10 +71,14 @@ export class Api {
     const method = endpoint.method, route = `${method} ${path.split('?')[0]}`;
     const cooling = this.cooling(route); if (cooling) throw cooling;
     let retried = false;
-    const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
     for (;;) {
       const headers: Record<string, string> = { ...(endpoint.body.kind === 'json' ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(key ? { 'Idempotency-Key': key } : {}) };
-      if (secretKey) headers.Authorization = authorizationHeader(await createHttpAuth({ url: `${this.baseUrl}${path}`, method, body: bytes, secretKey, now: Math.floor((Date.now() + this.clockOffset) / 1000), difficulty, signal: requestSignal }));
+      if (secretKey) {
+        const timer = difficulty && onProofOfWorkSlow ? setTimeout(onProofOfWorkSlow, PROOF_OF_WORK_NOTICE_MS) : undefined;
+        try { headers.Authorization = authorizationHeader(await createHttpAuth({ url: `${this.baseUrl}${path}`, method, body: bytes, secretKey, now: Math.floor((Date.now() + this.clockOffset) / SECOND_MS), difficulty, signal })); }
+        finally { clearTimeout(timer); }
+      }
+      const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
       requestSignal.throwIfAborted();
       let response: Response;
       try { response = await fetch(`${this.baseUrl}${path}`, { method, headers, ...(bytes ? { body: new Uint8Array(bytes) } : {}), signal: requestSignal, credentials: 'omit', cache: 'no-store' }); }

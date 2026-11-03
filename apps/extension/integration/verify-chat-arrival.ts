@@ -1,3 +1,4 @@
+import { DAY_MS } from '@palside/shared/units';
 import { decryptedEvent } from './private-event';
 import { PalsideService } from '../src/runtime/composition/core';
 import { ClientStorage } from '../src/runtime/storage/storage';
@@ -11,7 +12,7 @@ export async function verifyChatArrival(check: (value: unknown, label: string) =
   const storage = new ClientStorage(databaseName);
   const service = new PalsideService(undefined, undefined, storage);
   const session = { account: { id: 'self' }, token: 'synthetic-only' } as RuntimeDevice;
-  const team = remoteTeam({ id: 'team', roomId: '!reading:example.test', memberIds: ['self', 'friend'], periods: [{ joinedAt: Date.now() - 86400000, leftAt: null }], people: [{ bio: '', tags: [], deleted: false, id: 'friend', nickname: 'friend', avatarId: null, matrixId: '@friend:example.test' }] });
+  const team = remoteTeam({ id: 'team', roomId: '!reading:example.test', memberIds: ['self', 'friend'], periods: [{ joinedAt: Date.now() - DAY_MS, leftAt: null }], people: [{ bio: '', tags: [], deleted: false, id: 'friend', nickname: 'friend', avatarId: null, matrixId: '@friend:example.test' }] });
   service.auth.session = session;
   service.state.remoteTeams = [team]; service.state.account = session.account; service.state.data.self = 'self';
   const event = (id: string, content: Record<string, unknown> = { msgtype: 'm.text', body: id }) => decryptedEvent({ event_id: id, room_id: team.roomId, type: 'm.room.message', sender: '@friend:example.test', origin_server_ts: Date.now(), content });

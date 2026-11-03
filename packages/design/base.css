@@ -8,4 +8,4 @@
 html { scrollbar-width: thin; scrollbar-color: gray transparent; }
 
 
-::selection { background-color: var(--ui-accent-soft); color: var(--ui-text-primary); }
+::selection { background-color: var(--ui-accent); color: var(--ui-on-accent); }

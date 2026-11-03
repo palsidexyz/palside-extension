@@ -1,5 +1,5 @@
 import type { CaptureLabels,PageUp } from '../runtime/browser/page-protocol';
-import { type CaptureSelection,type CaptureHandle,type CaptureTool,type CaptureColor,type CaptureOp,MIN_SELECTION,COLORS,clamp,normalizeSelection,resizeSelection,moveSelection,toolbarPlacement,cropRectAtDpr,undoAnnotations,drawOps,captureDimensions } from '../domain/images/drawing.ts';
+import { type CaptureSelection,type CaptureHandle,type CaptureTool,type CaptureColor,type CaptureOp,MIN_SELECTION,CAPTURE_IDLE_MS,CAPTURE_MAX_MS,IMAGE_TEXT_MAX,IMAGE_PEN_POINTS_MAX,COLORS,clamp,normalizeSelection,resizeSelection,moveSelection,toolbarPlacement,cropRectAtDpr,undoAnnotations,drawOps,captureDimensions } from '../domain/images/drawing.ts';
 import { encodeCapture } from '../runtime/media/encode-capture.ts';
 
 function icon(path: string) {
@@ -76,7 +76,15 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
     send(message);
   };
   const cancelCapture = () => finish({ type: 'capture-cancel' });
-  const timeout = options?.timeoutMs === null ? undefined : setTimeout(cancelCapture, options?.timeoutMs ?? 120_000);
+  const deadline = Date.now() + CAPTURE_MAX_MS;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const activity = (event?: Event) => {
+    if (closed || event?.isTrusted === false || options?.timeoutMs === null) return;
+    clearTimeout(timeout);
+    timeout = setTimeout(cancelCapture, Math.max(0, Math.min(options?.timeoutMs ?? CAPTURE_IDLE_MS, deadline - Date.now())));
+  };
+  for (const name of ['pointerdown', 'pointermove', 'pointerup', 'click', 'dblclick', 'wheel', 'input', 'paste', 'change']) editor.addEventListener(name, activity, true);
+  activity();
   window.addEventListener('pagehide', cancelCapture, { once: true });
   const layout = () => {
     if (!selection) return;
@@ -136,7 +144,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
   const commitText = () => {
     if (!text) return;
     const input = text; text = undefined;
-    const value = input.textContent?.trim();
+    const value = input.textContent?.trim().slice(0, IMAGE_TEXT_MAX);
     if (value && selection) ops = [...ops, { kind: 'text', x: parseFloat(input.style.left) - selection.x + 2, y: parseFloat(input.style.top) - selection.y + 18, value, color: input.dataset.color as CaptureColor }];
     input.remove();
     layout();
@@ -160,6 +168,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
     input.addEventListener('blur', event => { if (event.isTrusted === false) return; if (text === input) commitText(); });
   };
   const inside = (point: { x: number; y: number }) => Boolean(selection && point.x >= selection.x && point.x <= selection.x + selection.width && point.y >= selection.y && point.y <= selection.y + selection.height);
+  const penPoints = () => ops.reduce((count, op) => count + (op.kind === 'pen' ? op.points.length : 0), 0);
   const begin = (event: PointerEvent) => {
     if (event.isTrusted === false) return;
     const target = event.target as HTMLElement;
@@ -169,7 +178,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
     const handle = target.dataset.handle as CaptureHandle | undefined;
     if (handle && !ops.length) active = { kind: 'resize', start: point, selection, handle };
     else if (tool === 'text' && inside(point)) { addText(point); return; }
-    else if (tool && inside(point)) { commitText(); active = { kind: 'draw', start: point }; if (tool === 'pen') draft = { kind: 'pen', points: [local(point)], color }; }
+    else if (tool && inside(point)) { if (tool === 'pen' && penPoints() >= IMAGE_PEN_POINTS_MAX) return; commitText(); active = { kind: 'draw', start: point }; if (tool === 'pen') draft = { kind: 'pen', points: [local(point)], color }; }
     else if (!tool && !ops.length && inside(point)) active = { kind: 'move', start: point, selection };
     else return;
     event.preventDefault();
@@ -182,14 +191,17 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
     const dx = point.x - active.start.x, dy = point.y - active.start.y;
     if (active.kind === 'select') {
       const next = normalizeSelection(active.start, point, viewport());
-      if (next.width < MIN_SELECTION && next.height < MIN_SELECTION) return;
+      if (next.width < MIN_SELECTION || next.height < MIN_SELECTION) {
+        selection = undefined; selectionElement.hidden = true; toolbar.hidden = true; editor.dataset.phase = 'select';
+        return;
+      }
       selection = next; layout(); toolbar.hidden = true;
       return;
     }
     if (active.kind === 'move') selection = moveSelection(active.selection!, dx, dy, viewport());
     if (active.kind === 'resize') selection = resizeSelection(active.selection!, active.handle!, dx, dy, viewport());
     if (active.kind === 'draw' && tool) {
-      if (tool === 'pen' && draft?.kind === 'pen') draft = { ...draft, points: [...draft.points, local(point)] };
+      if (tool === 'pen' && draft?.kind === 'pen') { if (draft.points.length + penPoints() < IMAGE_PEN_POINTS_MAX) draft.points.push(local(point)); }
       else draft = shape(tool, local(active.start), local(point));
       render();
       return;
@@ -199,7 +211,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
   const end = (event: PointerEvent) => {
     if (event.isTrusted === false) return;
     if (!active) return;
-    if (active.kind === 'select' && !selection) selection = { x: 0, y: 0, ...viewport() };
+    if (active.kind === 'select' && !selection && Math.abs(event.clientX - active.start.x) < MIN_SELECTION && Math.abs(event.clientY - active.start.y) < MIN_SELECTION) selection = { x: 0, y: 0, ...viewport() };
     if (active.kind === 'draw' && draft) {
       const big = draft.kind === 'pen' ? draft.points.length > 1 : Math.abs((draft as { width: number }).width) > 3 || Math.abs((draft as { height: number }).height) > 3;
       if (big) ops = [...ops, draft];
@@ -267,6 +279,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
   editor.addEventListener('dblclick', event => { if (event.isTrusted === false) return; if (!tool && selection && inside(pointerPoint(event as PointerEvent, editor))) complete(); });
   function keydown(event: KeyboardEvent) {
     if (event.isTrusted === false) return;
+    activity(event);
     if (text) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (tool) selectTool(undefined); else finish({ type: 'capture-cancel' }); }
     if (event.key === 'Enter' && selection) { event.preventDefault(); event.stopPropagation(); complete(); }

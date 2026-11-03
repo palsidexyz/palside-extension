@@ -8,7 +8,8 @@ import { pageScopeUrl } from '../apps/extension/src/domain/annotations/social.ts
 const wait = () => new Promise(resolve => setTimeout(resolve, 30));
 function event() { const listeners = []; return { addListener: fn => listeners.push(fn), emit: (...args) => listeners.map(fn => fn(...args)) }; }
 function fixture({ interact = false, saved = {} } = {}) {
-  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', web: { share: true, interact: true }, hiddenStickies: [] }, toggles: { share: false, interact }, remoteTeams: [{ id: 'one', joined: true }], data: { people: [], messages: [], views: [] }, items: { danmaku: [], stickies: [] }, drafts: {}, signals: [] };
+  const initialSite = { on: interact, danmaku: true, signal: true, sticky: true };
+  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { 'example.com': initialSite }, hiddenStickies: [] }, remoteTeams: [{ id: 'one', joined: true }], data: { people: [], messages: [], views: [] }, items: { danmaku: [], stickies: [] }, drafts: {}, signals: [] };
   const control = { focused: true, queued: 1, tab: { id: 1, windowId: 10, active: true, status: 'complete', url: 'https://example.com/article' } };
   const calls = [], pages = [], panels = [], local = structuredClone(saved), storageReads = [];
   const sender = { id: 'qa', url: 'chrome-extension://qa/sidepanel.html' };
@@ -31,9 +32,9 @@ function fixture({ interact = false, saved = {} } = {}) {
   const update = patch => { state = { ...state, ...patch }; sendState(state); };
   update({});
   const command = (name, payload = {}) => new Promise(resolve => browser.runtime.onMessage.emit({ type: 'palside/command', command: { name, payload } }, sender, resolve));
-  // 网页互动 is one switch: the panel saves it, and the background follows the broadcast state.
-  const toggle = async on => { update({ toggles: { ...state.toggles, interact: on } }); await wait(); await wait(); };
-  const features = async patch => { update({ preferences: { ...state.preferences, interaction: { danmaku: true, signal: true, sticky: true, ...patch } } }); await wait(); };
+  // The site entry controls whether this origin draws; feature switches are scoped to the same host.
+  const toggle = async on => { update({ preferences: { ...state.preferences, siteInteraction: { ...state.preferences.siteInteraction, 'example.com': { ...state.preferences.siteInteraction['example.com'], on } } } }); await wait(); await wait(); };
+  const features = async patch => { update({ preferences: { ...state.preferences, siteInteraction: { ...state.preferences.siteInteraction, 'example.com': { ...state.preferences.siteInteraction['example.com'], ...patch } } } }); await wait(); };
   return { control, calls, pages, panels, local, storageReads, browser, grants, connect, update, command, toggle, features, state: () => state };
 }
 test('signals follow 网页互动 and their own switch; settings persist locally and panel sends cannot bypass host', async () => {
@@ -111,7 +112,7 @@ test('turning 网页互动 off or switching team stops signals on every open pag
   await f.toggle(true);
   const second = f.pages.at(-1);
   assert.notEqual(second, first);
-  f.update({ preferences: { current: 'two', web: { share: true, interact: true }, hiddenStickies: [] }, toggles: { share: false, interact: false }, remoteTeams: [{ id: 'two', joined: true }] }); await wait();
+  f.update({ preferences: { ...f.state().preferences, current: 'two', siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } }, hiddenStickies: [] }, remoteTeams: [{ id: 'two', joined: true }] }); await wait();
   assert.equal(second.messages.at(-1).type, 'off');
   assert.equal(f.panels.filter(m => m.type === 'page').at(-1).status.signalEnabled, false);
 });
@@ -120,7 +121,7 @@ test('permission loss while turning 互动 on prevents injection', async () => {
   let finish;
   const original = f.browser.permissions.contains, gate = new Promise(resolve => { finish = resolve; });
   f.browser.permissions.contains = options => options.origins ? gate.then(() => original(options)) : original(options);
-  f.update({ toggles: { share: false, interact: true } }); await wait();
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: true, danmaku: true, signal: true, sticky: true } } } }); await wait();
   f.grants.clear(); f.browser.permissions.onRemoved.emit({ origins: ['<all_urls>'] });
   f.browser.permissions.contains = original; finish(); await wait(); await wait();
   assert.equal(f.pages.length, 0);

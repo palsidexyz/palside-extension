@@ -21,7 +21,7 @@ function fixture(client) {
   const calls = [];
   const team = { id: 'team', roomId: '!room:test', joined: true, memberIds: ['self', 'peer'], people: [{ id: 'self', matrixId: '@self:test', nickname: 'Self' }, { id: 'peer', matrixId: '@peer:test', nickname: 'Peer' }], retentionDays: 7 };
   const runtime = {
-    state: { authenticated: true, remoteTeams: [team], preferences: { current: 'team', web: { share: true } }, toggles: { share: true }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, data: { teams: [], people: [{ id: 'peer', presence: 'active' }] }, items: { stickies: [] } },
+    state: { authenticated: true, remoteTeams: [team], preferences: { current: 'team', share: true }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, data: { teams: [], people: [{ id: 'peer', presence: 'active' }] }, items: { stickies: [] } },
     auth: { session: { account: { id: 'self' }, matrix: { userId: '@self:test', deviceId: 'SELF' } }, client, requireConnection() {}, scope: () => ({ check() {}, current: () => true, wait: value => value }) },
     api: { async request(path, options) { calls.push({ path, options }); return { selected: true, expiresAt: Date.now() + 30_000, delivered: 1 }; } },
     storage: { cache: async () => [] }, cache: { evictCachedContent() {}, pruneViews() {} }, foreground: async () => true, emit() {},

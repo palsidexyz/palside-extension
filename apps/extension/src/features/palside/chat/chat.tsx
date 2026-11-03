@@ -1,4 +1,5 @@
 'use client';
+import { MINUTE_MS } from '@palside/shared/units';
 import { message as uiMessage } from '@palside/i18n';
 import { Button } from '@palside/ui/button';
 import { useLocale, useTranslations } from 'use-intl';
@@ -14,6 +15,7 @@ import { unreadMentions } from '../../../domain/chat/unread-mentions';
 import { Composer } from './composer';
 import { ReadonlyDraft } from '../feedback/readonly-draft';
 import { ChatHeader } from './chat-header';
+import { panelTabsShown } from '../app/panel-tabs';
 import { MessageItem } from './message-item';
 import { NewTeam, showsNewTeam } from '../teams/new-team';
 import { ReactionStage } from '../annotations/reaction-picker';
@@ -29,7 +31,7 @@ import navigation from './chat-navigation.module.css';
 import s from '../app/palside.module.css';
 
 /** Consecutive messages from one person within five minutes read as one group. */
-const groupWindow = 5 * 60_000;
+const groupWindow = 5 * MINUTE_MS;
 function continues(previous: Message | undefined, message: Message) {
   if (!previous || previous.author !== message.author) return false;
   return previous.timestamp === undefined || message.timestamp === undefined || message.timestamp - previous.timestamp < groupWindow;
@@ -171,7 +173,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     if (!message.recalled || leaving.has(message.id)) previous = message;
   });
   return <div className={s.chat} hidden={c.screen !== 'chat'}><SendFlightContext value={flight}><ReactionStage c={c}>
-    <ChatHeader c={c} onTeam={changeTeam} />
+    {!panelTabsShown(c) && <ChatHeader c={c} onTeam={changeTeam} />}
     <WatchStrip key={c.current} c={c} top={top} />
     <div className={navigation.viewport}>
     <div ref={list} className={`${s.timeline} ${navigation.list}`} aria-label={t('extension.copy.chatMessages')} tabIndex={0}>

@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STICKY_EVENT, emptyItems, readRefTarget, readMessageRefTarget, readTeamEvent, teamEventContent } from '../apps/extension/src/domain/annotations/social.ts';
@@ -19,3 +20,16 @@ test('reference wire parsers reject unproduced variants and preserve quote, addr
 });
 test('persistent marks reject a chart coordinate instead of silently changing its meaning', () => { const content = teamEventContent(asset, { url: 'https://gmgn.ai/token', site: 'gmgn.ai', target, text: 'Watch' }); assert.equal(readTeamEvent(STICKY_EVENT, content), undefined); assert.deepEqual(readTeamEvent(STICKY_EVENT, teamEventContent(asset, { text: 'Watch' })), { kind: 'sticky', asset, text: 'Watch' }); });
 test('sticky expiry is pruned', () => { let items = emptyItems(); items = upsertTeamItem(items, { id: 's', teamId: 'team', author: 'me', asset, text: 'x', timestamp: 1, expiresAt: 10 }); assert.equal(pruneTeamItems(items, 10).stickies.length, 0); });
+
+
+test('quoting a sticky without a caption preserves forty whole graphemes', async () => {
+  const { stickies } = await import('../apps/extension/src/background/stickies.ts');
+  for (const grapheme of ['👨‍👩‍👧‍👦', 'e\u0301', '🇹🇼']) {
+    const sticky = { id: 'note', teamId: 'team', author: 'alice', asset, url: 'https://example.com/', target: { kind: 'quote', exact: grapheme.repeat(41), prefix: '', suffix: '' }, timestamp: Date.now(), expiresAt: Date.now() + MINUTE_MS };
+    const bg = { browser: {}, state: { authenticated: true, account: { id: 'alice' }, preferences: { current: 'team' }, remoteTeams: [{ id: 'team', joined: true }], items: { stickies: [sticky] } }, run: command => command };
+    const command = await stickies(bg).quoteSticky({ stickyId: 'note' });
+    assert.equal(command.payload.caption, grapheme.repeat(40));
+    sticky.caption = 'Own caption';
+    assert.equal((await stickies(bg).quoteSticky({ stickyId: 'note' })).payload.caption, 'Own caption');
+  }
+});

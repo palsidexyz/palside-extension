@@ -33,7 +33,6 @@
         "not-member-at-send": "You were not in the squad when this was sent",
         "account-too-new": "Account is less than 24 hours old",
         "stay-too-short": "Stay here for 30 seconds",
-        "invitation-only": "Claimed automatically when you join",
         "claimed": "Claimed",
         "unavailable": "Red packet ended",
         "disabled": "Onchain features are not available yet"
@@ -51,7 +50,6 @@
       "recoveryFailed": "Failed",
       "recoveryIndexing": "Confirmed onchain · awaiting indexing",
       "recoveryCancelled": "Submission cancelled",
-      "recoveryUnknown": "Result unknown · check original operation",
       "recoveryReserved": "Funds remain reserved. A cancelled or expired submission does not prove that its signature is invalid. Check the original operation.",
       "logoutRecovery": "Back up your recovery phrase first; without it you cannot recover your account or wallet. Signing out clears this device's drafts, caches and keys, but does not cancel submitted transactions. After signing back in with the same account, use Payment recovery to check the original operation before paying again.",
       "settings": "Wallet settings",
@@ -75,7 +73,6 @@
       "signing": "Signing",
       "stageSign": "Sign",
       "stageSend": "Send",
-      "stageConfirm": "On-chain",
       "offline": "Could not connect",
       "empty": "No activity",
       "incoming": "Received",
@@ -84,7 +81,13 @@
       "hide": "Hide amounts",
       "show": "Show amounts",
       "smallPayments": "Small payments without password",
-      "smallLimit": "Up to 250 PALS per payment and 1,000 PALS per day",
+      "smallLimit": "Up to {single} PALS per payment and {daily} PALS per day",
+      "today": "today at {time}",
+      "tomorrow": "tomorrow at {time}",
+      "smallDailyLimit": "Your daily quick-pay allowance is insufficient. It resets {reset}; you can also pay with your PIN.",
+      "sponsorLimit": "Your daily free network fee allowance is used up. It resets {reset}.",
+      "equalAmount": "Shares must be equal. The nearest valid amount is {amount} PALS.",
+      "tipLimit": "Tips are limited to 10,000 PALS each",
       "exportKey": "Export private key",
       "exportWarning": "Your private key controls all funds in this wallet. Keep it safe and never send it to anyone.",
       "exportExpiry": "Hidden automatically after 30 seconds",
@@ -105,9 +108,7 @@
       "byHeat": "Popular",
       "unavailable": "Wallet is temporarily unavailable",
       "invalidAmount": "Enter a valid amount",
-      "expires": "Expires",
       "refunded": "Returned",
-      "invitationPacket": "Invitation packet",
       "transaction": "Transaction hash",
       "details": "Transaction details",
       "sentPacket": "Packet sent",
@@ -134,7 +135,6 @@
       "blessingPlaceholder": "Best wishes",
       "kindRandom": "Lucky",
       "kindEqual": "Equal",
-      "kindInvitation": "Invite",
       "kindRoom": "Danmaku",
       "packetType": "Red packet type",
       "countDown": "Fewer",
@@ -212,7 +212,6 @@
       "reconnect": "Reconnect",
       "removeCard": "Remove card",
       "websiteHome": "Website homepage",
-      "currentPage": "Current page",
       "openPageFailed": "Could not open the page. Try again.",
       "selectSource": "Choose source",
       "sourcePage": "Source page",
@@ -233,6 +232,7 @@
       "imageReadFailed": "Could not read the image",
       "imageProcessFailed": "Could not process the image",
       "image": "Image",
+      "imageExpired": "Image expired",
       "tokenCard": "Token card",
       "reply": "Reply",
       "reportMessage": "Report message",
@@ -244,7 +244,6 @@
       "lobby": "Add a squad",
       "searchMessages": "Search messages",
       "teamMenu": "Squad menu",
-      "sharedItems": "Images, links & tokens",
       "historyUnavailable": "Some earlier messages are unavailable on this device. New messages are not affected.",
       "aboutHistory": "About older messages",
       "markedRead": "Marked as read",
@@ -324,6 +323,7 @@
       "imageQuote": "[Image]",
       "tokenQuote": "[Token card]",
       "closeNotice": "Dismiss notice",
+      "notices": "Notices",
       "report": "Report",
       "deleteAccount": "Delete account",
       "yourNameTitle": "Choose a nickname",
@@ -340,6 +340,7 @@
       "searchPlaceholder": "Search messages, tokens, addresses",
       "searchResults": "Search results",
       "recentMessages": "Recent messages",
+      "historyNotLoaded": "Not loaded yet",
       "noSearchResults": "No matching messages",
       "noSearchableMessages": "No messages to search yet",
       "contentUnavailable": "This content is temporarily unavailable",
@@ -349,7 +350,7 @@
       "exploreWithFriends": "Share viewing and end-to-end encrypted chat for small squads.",
       "version": "Version",
       "interactiveDemo": "Interactive demo",
-      "editTeam": "Edit details",
+      "editTeam": "Squad details",
       "teamTransfer": "Squad captain transfer",
       "transferOffered": "The captain wants to transfer the captain role to you",
       "transferWaiting": "Waiting for the new captain to accept",
@@ -480,7 +481,7 @@
       "permanentDeleteTitle": "Permanently delete your account?",
       "permanentDeleteDescription": "This cannot be undone. This recovery phrase will no longer sign in.",
       "inviteLoadFailed": "Invitation temporarily unavailable",
-      "inviteLifetime": "Valid for 24 hours",
+      "inviteLifetime": "Valid for 7 days",
       "inviteLink": "Invitation link",
       "reading": "Loading…",
       "expired": "Expired",
@@ -559,7 +560,7 @@
       "assetDisclaimerLabel": "About token names and icons",
       "retention1": "24 hours",
       "retention7": "7 days",
-      "retention14": "14 days",
+      "retentionForever": "Forever",
       "retentionShorterTitle": "Shorten retention?",
       "stepPhrase": "Phrase",
       "stepVerify": "Verify",
@@ -593,8 +594,6 @@
       "turnOffInvitePasswordDescription": "Anyone with a valid invite link will be able to join directly.",
       "setInvitePasswordTitle": "Set join code",
       "changeInvitePasswordTitle": "Change join code",
-      "invitePasswordDescription": "People joining by link must enter it. Share it separately from the link. Current members are not affected.",
-      "invitePasswordRule": "4 uppercase letters or digits. 0 O 1 I L are left out to avoid mix-ups.",
       "randomInvitePassword": "Generate",
       "inviteSuspended": "Too many wrong codes. Link switched off.",
       "manualInvitePasswordCopy": "Join code, copy it manually",
@@ -619,7 +618,9 @@
       "teamRideSpaceship": "Spaceship crew",
       "teamRideCamper": "Camper crew",
       "teamRideSkateboard": "Skateboard crew",
-      "tokenGone": "Token unavailable"
+      "tokenGone": "Token unavailable",
+      "unknownToken": "Unknown token",
+      "signupStillPreparing": "Still preparing. You can keep waiting"
     },
     "errors": {
       "ADMIN_JOB_BUSY": "This background task cannot be retried right now",
@@ -654,7 +655,6 @@
       "CHAIN_PACKET_INVALID": "Invalid packet count or amount. Adjust it and try again.",
       "CHAIN_PACKET_UNAVAILABLE": "This red packet cannot be processed right now",
       "CHAIN_PACKET_LIMIT": "This danmaku has reached its red packet limit",
-      "CHAIN_INVITATION_UNAVAILABLE": "An invitation red packet cannot be created right now",
       "CHAIN_EVIDENCE_INVALID": "The onchain transaction does not match this payment",
       "CHAIN_EVIDENCE_REUSED": "This onchain transaction was already used for another payment",
       "CHAIN_CONFIG_CHANGED": "Payment settings changed. Review the payment again.",
@@ -682,6 +682,7 @@
       "RATE_LIMITED": "Too many requests. Try again later.",
       "LOGIN_REQUIRED": "Sign in to continue",
       "ACCOUNT_RESTRICTED": "This account is restricted. Contact us through the feedback channel.",
+      "ACCOUNT_TOO_NEW": "You can recruit 24 hours after signing up",
       "IDENTITY_CHANGED": "Your account or sign-in changed. Sign in again.",
       "INVALID_SEQUENCE": "Invalid sharing state",
       "STALE_VIEWING": "Sharing state has been updated",
@@ -740,9 +741,11 @@
       "AUTH_REPLAYED": "That signature was already used. Try again.",
       "POW_REQUIRED": "The security check did not pass. Try again.",
       "ACCOUNT_EXISTS": "This account already exists",
+      "SIGNUP_PAUSED": "Sign-up is paused. Try again later.",
       "ACCOUNT_NOT_FOUND": "This account does not exist or was deleted",
       "DEVICE_NOT_FOUND": "This device does not exist or was already removed",
       "DEVICE_REVOKED": "This device was signed out. Sign in again.",
+      "DEVICE_LIMIT": "This account is on the maximum number of devices. Remove one from a signed-in device first.",
       "INVALID_RETENTION": "Choose a valid retention period",
       "RATE_LIMITED_SECONDS": "Too many attempts. Try again in {count, plural, one {# second} other {# seconds}}.",
       "RATE_LIMITED_MINUTES": "Too many attempts. Try again in {count, plural, one {# minute} other {# minutes}}.",
@@ -852,6 +855,7 @@
       "encryptionFailedTitle": "Encrypted chat could not start",
       "encryptionFailedDetail": "Encryption on this device is not ready, so messaging is unavailable. Retry, or reopen the side panel if it still fails.",
       "connectingTitle": "Connecting to chat",
+      "serviceConnectingTitle": "Connecting to the service",
       "connectingDetail": "Connecting and syncing messages. You can edit drafts and send them manually when ready.",
       "removedReadonly": "Removed from the squad · Read-only history",
       "dissolvedReadonly": "Squad disbanded · Read-only history",
@@ -881,6 +885,7 @@
       "loginIncomplete": "The last sign-in did not finish. Enter your recovery phrase again.",
       "notPalsideAccount": "This is not a Palside recovery phrase. If it is a wallet phrase, do not enter it anywhere.",
       "invalidMnemonic": "Invalid recovery phrase. Check the spelling and order.",
+      "passwordLockedUntil": "Too many attempts. Try again after {time, date, medium} at {time, time, short}.",
       "wrongPassword": "Incorrect device PIN",
       "identityChanged": "{name}'s encryption identity changed unexpectedly. Someone may be impersonating them. Confirm with them another way.",
       "hiddenMember": "Someone outside the member list is in this chat. Sending has stopped.",
@@ -904,7 +909,6 @@
       "viewImage": "View image {name}",
       "reloadImage": "Reload image {name}",
       "joinTeam": "Join {name}?",
-      "relatedMessages": "Messages about {name}",
       "viewProfile": "View {name}’s profile",
       "profileTitle": "{name}’s profile",
       "transferOffer": "Transfer the captain role to {name}?",
@@ -946,7 +950,7 @@
       "deviceAdded": "Signed in {date}",
       "deviceRemoved": "Removed {name}",
       "openLinkDescription": "You are about to open {host}. Check the domain. Palside will never ask for your recovery phrase or wallet keys.",
-      "retentionShorterDescription": "Messages older than {period} will be deleted immediately and cannot be recovered.",
+      "retentionShorterDescription": "Messages older than {period} expire immediately and no member can view them again.",
       "whichWord": "Which is word {number}?",
       "mentionPerson": "Mention {name}",
       "sendPacingStatus": "{count, plural, one {# message} other {# messages}} queued. They send automatically.",
@@ -998,6 +1002,7 @@
       "historyDetail": "Only while Share viewing is on: the address and title of the foreground tab. Nothing is kept, and page content is never read. Disabling Share viewing hands it back."
     },
     "discussion": {
+      "chat": "Chat",
       "firstShared": "<b>{name}</b> shared first",
       "noDiscussion": "No one has talked about it since you joined",
       "team": "In the squad",
@@ -1016,7 +1021,6 @@
       "syncing": "In sync",
       "open": "Open",
       "ignore": "Dismiss",
-      "back": "Back to {name}",
       "openDetails": "Open {name} details",
       "followTitle": "Following {name}",
       "go": "Go",
@@ -1156,15 +1160,13 @@
     },
     "current": {
       "detail": "{name} details",
-      "viewers": "{names} viewing",
       "share": "Share to chat"
     },
     "sticky": {
       "placeholder": "Write a note",
-      "assetNote": "Write a sticky note for this token",
+      "assetNote": "Write a sticky note",
       "addComment": "Add a note",
       "loadLatest": "Load latest content",
-      "openList": "View sticky notes · {count}",
       "quote": "Quote to chat",
       "saved": "Note saved",
       "viewMark": "View",
@@ -1189,16 +1191,9 @@
     },
     "web": {
       "favorites": "Favorites",
+      "myFavorites": "My favorites",
       "signal": "Signals",
       "sticky": "Sticky notes",
-      "signalStep1": "Hold {key} and drag on the page",
-      "signalStep2": "Pick a slot",
-      "signalStep3": "Release to drop it",
-      "stickyStep1": "Select text on the page",
-      "stickyStep2": "Tap it in the bubble",
-      "stickyStep3": "Teammates see it highlighted",
-      "notesHere": "{count} on this page",
-      "notesNone": "None",
       "notesOn": "Notes on {name}",
       "hiddenNotes": "Hidden notes",
       "showAll": "Show all",
@@ -1238,7 +1233,13 @@
       "more": "More",
       "save": "Save",
       "saved": "Saved",
-      "noFavorites": "No favorites yet"
+      "noFavorites": "No favorites yet",
+      "siteLive": "{name} · Page interaction on",
+      "siteOff": "{name} · Page interaction off",
+      "siteNone": "This page doesn’t support page interaction",
+      "siteAsking": "Waiting for Chrome",
+      "siteLoading": "Reading the site",
+      "pageUnusable": "Page interaction doesn’t work on this page"
     },
     "share": {
       "revoked": "Share viewing is off · Chrome permission was removed",
@@ -1257,8 +1258,6 @@
       "preview": "Show message text",
       "tagToken": "Token",
       "notifyDenied": "Chrome did not allow notifications",
-      "shareHint": "Teammates see the page you’re on",
-      "interactHint": "Danmaku, signals, sticky notes and quotes",
       "aboutFeature": "About {name}",
       "acceptInvites": "Allow invites from danmaku",
       "off": "Off",
@@ -1266,9 +1265,9 @@
       "seeLocal": "Only on this device",
       "groupWeb": "Web",
       "interactionOptions": "Interaction options",
-      "interactOff": "Page interaction is off",
       "roomsOff": "Danmaku is off",
-      "onPages": "Show on pages"
+      "onPages": "Show on pages",
+      "permissionsReadFailed": "Couldn’t read browser permissions"
     },
     "sites": {
       "add": "Add sites",
@@ -1279,6 +1278,7 @@
       "addOne": "Add {name}",
       "addMany": "Add {count, plural, one {# site} other {# sites}}",
       "addCustom": "Add {host}",
+      "tokenTip": "Recognizes token pages: shows the token’s name and icon, and Danmaku follows that token",
       "empty": "No sites yet",
       "allSites": "All sites",
       "tokenData": "Token data",
@@ -1300,33 +1300,20 @@
       "allowedAll": "All sites allowed"
     },
     "toggle": {
-      "shareOff": "Share viewing · Off",
+      "shareOff": "Share the link of the page you’re browsing",
       "shareOn": "Share viewing · On",
-      "shareBlocked": "Share viewing · On · This page can’t be synced",
-      "interactOff": "Page interaction · Off",
-      "interactOn": "Page interaction · On",
-      "interactBlocked": "Page interaction · On · {reason}",
-      "interactNeed": "Page interaction · On · {host} not allowed",
-      "interactNeedHere": "Page interaction · On · This site is not allowed"
+      "shareBlocked": "Share viewing · On · Not this page; resumes on the next"
     },
     "grant": {
-      "unauthorized": "Not allowed",
-      "hostUnauthorized": "{host} · Not allowed",
-      "danmaku": "Danmaku from people watching the same token scrolls over the page",
-      "signal": "Point at a spot on the page",
-      "sticky": "Pin page text right on the page",
       "access": "Read and change your data on {host}",
-      "turnOff": "Turn off Page interaction",
       "allow": "Allow",
-      "turnOffDanmaku": "Turn off page danmaku",
-      "toolbar": "Click the Palside icon in the toolbar"
+      "turnOn": "Turn on"
     },
     "room": {
       "slow": "Send again in {seconds}s",
       "name": "Danmaku",
-      "chip": "{name} danmaku · {count, plural, one {# watching} other {# watching}}",
+      "tab": "{name} danmaku",
       "people": "Watching",
-      "back": "Back to {name}",
       "blocked": "Blocked",
       "blockedNone": "None",
       "noBlocked": "No one is blocked",
@@ -1342,17 +1329,20 @@
       "reportTitle": "Report this danmaku from {name}?",
       "reportDescription": "After 5 reports, it folds for everyone and no longer shows on pages.",
       "placeholder": "Send danmaku",
-      "chipCount": "Danmaku {count}",
       "watching": "{count, plural, one {# watching} other {# watching}}",
       "switch": "Switch",
-      "pageOn": "Show on page · On",
-      "pageOff": "Show on page · Off",
       "pageDanmaku": "Show danmaku on pages",
       "retractTitle": "Unsend this danmaku?",
       "retractDescription": "No one will see it once it is unsent.",
       "speakers": "Recent speakers",
       "noSpeakers": "No one spoke recently",
-      "pagePaused": "Page interaction is off · Open settings"
+      "openOn": "Open on {name}",
+      "noToken": "Open a token page to use danmaku",
+      "otherSite": "Open on another site",
+      "gateTitle": "See this page’s danmaku",
+      "notOnPage": "Danmaku isn’t shown on this page",
+      "pageUnusable": "Danmaku doesn’t work on this page",
+      "joinedNotice": "Danmaku is on: the service sees which token you are in. Turn it off in Settings › Interaction options › Danmaku."
     },
     "stance": {
       "title": "Outlook",
@@ -1363,17 +1353,14 @@
     },
     "hot": {
       "title": "Trending",
+      "tokens": "Trending tokens",
       "chain": "Chain",
       "all": "All",
-      "rising": "Rising · 15 min",
-      "risingHint": "Biggest rise in watchers over 15 minutes, with at least 10 watching",
-      "top": "Most watched",
-      "noneRising": "None yet",
-      "noneTop": "None yet",
       "here": "This page",
       "bull": "{percent}% bullish",
-      "rise": "+{count}",
-      "watchingShort": "watching"
+      "riseLabel": "{count} more viewers in 5 minutes",
+      "watchingShort": "watching",
+      "none": "None yet"
     },
     "invite": {
       "action": "Invite to squad",
@@ -1428,6 +1415,7 @@
       "perm_sites": "Read and change site data",
       "perm_active": "Current tab",
       "perm_notifications": "Display notifications",
+      "perm_idle": "Idle state of this device",
       "revoke_tabs_title": "Revoke “Read your browsing history”?",
       "revoke_tabs": "Share viewing turns off. Turning it on again later won’t make Chrome ask again.",
       "revoke_sites_title": "Revoke site access?",
@@ -1436,6 +1424,8 @@
       "revoke_notifications": "Notifications turn off. Turning them on again later won’t make Chrome ask again.",
       "revoke_active_title": "Current tab",
       "revoke_active": "Comes with the install and cannot be revoked.",
+      "revoke_idle_title": "Idle state of this device",
+      "revoke_idle": "Comes with the install and cannot be revoked.",
       "feature_share": "Share viewing",
       "feature_token": "Token data",
       "feature_quote": "Quote",
@@ -1444,6 +1434,7 @@
       "feature_room": "Danmaku",
       "feature_shot": "Screenshot",
       "feature_notify": "Notifications",
+      "feature_presence": "Online status",
       "read": {
         "share": {
           "line": "While share viewing is on, reads the address, title and site icon of the current tab and sends them to your current squad.",
@@ -1461,30 +1452,30 @@
           "line": "Selection reads up to 200 characters, up to 24 characters on each side, and the URL. Quote adds them to a local draft; sending shares them with your squad.",
           "who": "Your current squad",
           "keep": "Your squad’s retention period",
-          "no": "Inputs, forms"
+          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and anything Palside itself shows on the page"
         },
         "signal": {
-          "line": "When you send a signal, reads the spot you point at; it disappears 5 seconds after teammates see it.",
+          "line": "Sending a signal reads the target position and a few nearby words, labels or link addresses so teammates can find the same spot. Signals disappear 5 seconds after sending.",
           "who": "Your current squad",
           "keep": "Not stored; gone after 5 seconds",
-          "no": "The page image, typed content"
+          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and anything Palside itself shows on the page"
         },
         "sticky": {
           "line": "Selection reads up to 200 characters, up to 24 characters on each side, and the URL. Saving a sticky note sends them encrypted to your squad; page notes appear at the same URL.",
           "who": "Your current squad",
           "keep": "Your squad’s retention period",
-          "no": "Inputs, forms"
+          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and anything Palside itself shows on the page"
         },
         "room": {
           "line": "With the panel connected and danmaku on, participation sends a token key to the service for a lease. Turning danmaku off stops renewal requests; messages you send stay public.",
           "who": "The service sees the token, account and device session; counts and messages are public.",
-          "keep": "Participation leases last 40 seconds in memory and renew while active; the latest 1,000 messages per token have no time expiry.",
+          "keep": "Participation leases stay in memory for 40 seconds and renew while participating. The latest 10000 messages per token have no time expiry. Votes remain until changed, withdrawn or the account is deleted.",
           "no": "Addresses, other tabs, page content"
         },
         "shot": {
           "line": "When you press the screenshot shortcut or tap Screenshot, reads the image of the current tab; it is sent to your squad only after you select an area and confirm.",
           "who": "Your current squad, after you confirm",
-          "keep": "Your squad’s retention period",
+          "keep": "Squad retention, capped at 30 days after sending",
           "no": "Other tabs, the whole screen"
         },
         "notify": {
@@ -1492,11 +1483,17 @@
           "who": "Chrome and your operating system display the alert; the OS may keep a copy.",
           "keep": "Local click records clear on close, click or invalidation; OS notification history may remain.",
           "no": "Page content"
+        },
+        "presence": {
+          "line": "Shows you as active while the side panel is open or you used the keyboard or mouse in the last 5 minutes, otherwise away. Only that one state is reported.",
+          "who": "Your squad members; the business service",
+          "keep": "Held in service memory only; it lapses 40 seconds after the last report",
+          "no": "Pages, keystrokes, other apps"
         }
       }
     },
     "newTeam": {
-      "copied": "Copied · valid for 24 hours"
+      "copied": "Copied · valid for 7 days"
     },
     "reading": {
       "origin": "Start",
@@ -1511,9 +1508,8 @@
     "start": {
       "ownedLimit": "You already own {count} squads",
       "joinedLimit": "You're already in {count} squads",
-      "shuffle": "Show other avatars",
+      "addIntro": "Add intro",
       "creating": "Creating",
-      "or": "or",
       "formerTeams": "Left squads",
       "pasteFailed": "Couldn't read the clipboard. Paste the link instead.",
       "clearLink": "Clear link",
@@ -1532,6 +1528,27 @@
       "dissolvedNotice": "Dissolved {name}",
       "createOrJoin": "Create or join",
       "teamCount": "{count, plural, one {# squad} other {# squads}}"
+    },
+    "header": {
+      "onlyYou": "Just you"
+    },
+    "tour": {
+      "label": "Quick tour",
+      "progress": "Step {current} of {count}",
+      "skip": "Skip",
+      "tabsTitle": "Chat and Danmaku",
+      "chat": "Only your squad can read it; messages are encrypted",
+      "room": "Public talk for each token, open to everyone",
+      "share": "When it’s on, your squad sees the page you’re on at the top. Press again to turn it off.",
+      "site": "Press the site icon and turn on Page interaction to show Danmaku, signals and sticky notes on this site’s pages.",
+      "toolsTitle": "Message tools",
+      "reactions": "Send your squad a burst of emoji",
+      "image": "Send an image",
+      "shot": "Capture the page and mark it up",
+      "packet": "Send PALS red packets to your squad",
+      "inviteTitle": "Invite friends",
+      "invite": "Send friends the invitation link so you can watch together.",
+      "replay": "Replay the tour"
     }
   },
   "website": {
@@ -1565,7 +1582,7 @@
       "recordsLabel": "Wallet records: filter between All, Incoming and Outgoing, and open a claimed red packet to see its amount and transaction",
       "discoverLabel": "Discover squads: browse recruiting squads by intro and size, request to join, and join once the captain approves",
       "encryptionLabel": "End-to-end encryption: messages leave the sender encrypted, stay ciphertext on the server, and open only on members' devices",
-      "hotLabel": "Trending: Rising in 15 minutes and Most viewed, with counts following live viewers",
+      "hotLabel": "Trending: one live danmaku viewer board, showing gains of at least 3 viewers over five minutes",
       "installLabel": "Palside is not yet listed on the Chrome Web Store",
       "keysLabel": "Keys stay on the device: recovery words stay masked locally; only a signature and the public address go out",
       "sitesLabel": "Website access: adding a website asks Chrome for birdeye.so alone; once allowed it appears in the list",
@@ -1615,11 +1632,11 @@
       "inviteCopied": "Invitation link copied",
       "copyAddress": "Copy the full link from your browser's address bar",
       "copyInvite": "Copy invitation link",
-      "sharingPrivacy": "Share viewing shares only the foreground tab, only with the current squad, and only after you turn it on: a token page shows the token, any other site shows only its name. Page cards, quotes and screenshots you share go into the draft first and are sent only when you confirm. Chat, attachments and viewing status are end-to-end encrypted by the client with Matrix.",
+      "sharingPrivacy": "Share viewing shares only the foreground tab, only with the current squad, and only after you turn it on: a token page shows the token, any other page shows its title and link (tracking parameters removed; links carrying sign-in credentials show only the site name). Page cards, quotes and screenshots you share go into the draft first and are sent only when you confirm. Chat, attachments and viewing status are end-to-end encrypted by the client with Matrix.",
       "lookupPrivacy": "Token names and logos are read from the public area of a page only on sites you allowed with Token data on; otherwise a short contract address and a default icon are shown. Receivers check token details locally and may load logos directly from a fixed set of public image hosts; on failure a default icon is shown, never fetched through Palside servers. Image hosts can see the request and connection IP; requests carry no page referrer.",
-      "retentionPrivacy": "Messages are retained for the period the captain chooses (1, 7, 14 or 30 days, 30 days by default), counted from the original send time; drafts are kept for 7 days and unsent messages for 24 hours. Signing out clears local caches, drafts and decryption keys; older history may be unavailable when you sign in again. Screenshot originals and editing are processed locally without being uploaded.",
+      "retentionPrivacy": "Messages are retained for the period the captain chooses (1, 7 or 30 days, or forever, forever by default; images at most 30 days), counted from the original send time; drafts are kept for 7 days and unsent messages for 24 hours. Signing out clears local caches, drafts and decryption keys; older history may be unavailable when you sign in again. Screenshot originals and editing are processed locally without being uploaded.",
       "submissionsHeading": "Content you submit",
-      "submissionsPrivacy": "Reports contain only content you preview and confirm. The operator can read it; the first view of a private report is audited. Recruiting squads publish their name, description, avatar, captain’s nickname and avatar, level and popularity rank. Onchain addresses, amounts and transaction hashes are public and cannot be deleted. The service stores wallet identity bindings, orders and recovery records. Alchemy and RPC services process signed transactions without receiving private keys. Levels and popularity use activity events and daily aggregates, with network address digests isolated by squad and date, without reading encrypted chat content.",
+      "submissionsPrivacy": "Reports contain only content you preview and confirm. The operator can read it; the first view of a private report is audited. Recruiting squads publish their name, description, avatar, captain’s nickname and avatar, level and popularity rank. Onchain addresses, amounts and transaction hashes are public and cannot be deleted. The service stores wallet identity bindings, orders and recovery records. Alchemy and RPC services process signed transactions without receiving private keys. Levels and popularity use activity events and daily aggregates, with network address digests isolated by squad and date, without reading encrypted chat content. Deletion removes wallet bindings and reporter links. Pending chain orders are reconciled before account links are removed, retaining only amounts and transaction hashes. Only the public key and deletion time remain for the account; the same phrase can register again. Activity IP digests retain the last 30 complete UTC days and the current day.",
       "scopeHeading": "Current availability",
       "scopePrivacy": "Palside is not yet listed in the Chrome Web Store. Website demos use sample data separately from the extension services and do not verify security or readiness for release.",
       "permissionsEncryption": "Permissions and encryption",
@@ -1688,7 +1705,7 @@
       },
       "privacy": {
         "question": "Can squad members see what I browse?",
-        "answer": "Share viewing shares only the token or site name of your current tab when you turn it on. It never automatically shares page content, your screen or page actions. Quotes and screenshots are shared only when you select and send them. Turn Share viewing off any time."
+        "answer": "Share viewing shares only the token, or the page title and link, of your current tab when you turn it on; links carrying sign-in credentials share only the site name. It never automatically shares page content, your screen or page actions. Quotes and screenshots are shared only when you select and send them. Turn Share viewing off any time."
       },
       "permissions": {
         "question": "Which browser permissions does Palside need?",
@@ -1719,12 +1736,12 @@
       "permissionsSummary": "No website access at install. Chrome asks for optional permissions the first time you turn on the feature that needs them.",
       "encryptionSummary": "Only authorized squad members decrypt chat, attachments and viewing content.",
       "retention": "Data retention",
-      "retentionSummary": "Messages last 1, 7, 14 or 30 days, as chosen by the captain.",
+      "retentionSummary": "Captains choose 1, 7 or 30 days, or forever, with forever as the default. Images last at most 30 days after sending, then show “Image expired”.",
       "screenshots": "Local screenshots",
       "screenshotsSummary": "Originals and editing stay on your device. Send only when you confirm.",
       "screenshotsDetail": "Cropping and annotation happen on your device. A separate editing window may retain the original in extension background memory. Cancelling, signing out or restarting the background clears it; expired sessions are cleared on later access. Adding to a draft is not sending. A sent image is an ordinary encrypted image message, without the original, layers or cropped-out parts.",
       "metadataDetail": "End-to-end encryption does not hide all metadata. The service still processes necessary account, membership, connection time and IP information. Recruiting profiles and reports you choose to submit are separate from private chat.",
-      "retentionDetail": "Necessary error and anti-abuse records last up to 7 days. Reports last up to 30 days after closure, or 90 days if unresolved. There are no server backups, and copies or screenshots saved by others cannot be forcibly deleted.",
+      "retentionDetail": "Expired content becomes inaccessible immediately; related metadata is cleared within 7 days. Local content cache is capped at 300 MiB; squads you leave remain visible for at most 30 days after leaving. Service logs last up to 7 days. Report evidence lasts at most 90 days while unresolved or 30 days after closure; report and case records are deleted one year after closure. Bans are retained while active and for one year after ending; permanent bans remain. Operator audits last one year, operation deduplication records 7 days, and aggregate counts indefinitely. There are no server backups; copies saved by others cannot be forcibly deleted.",
       "publicSummary": "Recruiting profiles are public. Reports include only what you confirm.",
       "availabilitySummary": "Currently in development and testing; not publicly operated yet.",
       "updated": "Last updated: October 29, 2026",
@@ -1745,7 +1762,7 @@
       "canTitle": "What Palside does",
       "canChat": "Encrypts and decrypts chat on your device",
       "canCapture": "Take screenshots, share pages and quote page content when you ask",
-      "canShare": "Once you turn on Share viewing, sync the token or site name you are viewing with your squad",
+      "canShare": "Once you turn on Share viewing, sync the token, or the page title and link, you are viewing with your squad",
       "canNotify": "Alerts you to new messages with desktop notifications, once you turn them on",
       "lobbyPlaceholder": "Search names or descriptions",
       "unavailableLead": "The service isn't responding right now. Try again in a moment.",
@@ -1787,7 +1804,7 @@
       "dataMessagesTitle": "Messages",
       "dataMessages": "Squad messages are encrypted on your device and the service stores only ciphertext; danmaku is public.",
       "dataBrowsingTitle": "Browsing",
-      "dataBrowsing": "Only while Share viewing is on, the token or site name of your foreground tab is sent encrypted to your squad. No history is kept.",
+      "dataBrowsing": "Only while Share viewing is on, the token, or the page title and link, of your foreground tab is sent encrypted to your squad. No history is kept.",
       "dataPageTitle": "Page content",
       "dataPage": "Text you quote or pin as a sticky note, screenshots you confirm sending, and the public token name and icon on token pages.",
       "dataActionsTitle": "Page actions",
@@ -1795,10 +1812,10 @@
       "dataTransactionsTitle": "Transactions",
       "dataTransactions": "Your wallet’s public address, transfer, red packet and tip orders, and their onchain status. Onchain records are public and cannot be deleted.",
       "dataNetworkTitle": "Network",
-      "dataNetwork": "The service processes your connection IP; anti-abuse records last up to 7 days.",
+      "dataNetwork": "The service processes connection IPs. Necessary error records last up to 7 days; anti-abuse counters stay in memory or for at most one day. Squad activity IP digests retain the last 30 complete UTC days and the current day.",
       "danmakuTitle": "Danmaku",
       "danmakuSummary": "Danmaku is public and not encrypted.",
-      "danmakuDetail": "Everyone watching the same token can see your danmaku, nickname and avatar. The service stores the text, author and token, keeping the latest 1,000 per token. Sentiment results are public. The service knows which tokens’ danmaku you join, but never receives page URLs or builds a browsing history.",
+      "danmakuDetail": "Your danmaku, nickname and avatar are public. The service stores the text, author and token, retaining the latest 10000 lines per token without time expiry. Votes remain until changed, withdrawn or the account is deleted. The service knows which token you participate in, without receiving page URLs or keeping a persistent browsing trail. Trending counts only accounts with danmaku open, not private squad viewing.",
       "thirdPartiesTitle": "Third parties and data use",
       "thirdPartiesSummary": "Data is used only to provide the features on this page.",
       "thirdPartiesDetail": "Palside does not sell user data, use it for advertising, or use it to determine creditworthiness or for lending. Squad chat runs on a Matrix service operated by Palside.",
@@ -1890,7 +1907,7 @@
       "hot": {
         "label": "Hot",
         "title": "Follow where attention goes",
-        "description": "Live viewer counts show which tokens are heating up fastest in the last 15 minutes."
+        "description": "Ranked live by danmaku viewers, with “↑N” for gains of at least 3 viewers over five minutes."
       },
       "discover": {
         "title": "Find traders on your wavelength",
@@ -1963,7 +1980,7 @@
         },
         "packet": {
           "who": "Squad members when sent; amounts and addresses are public on chain",
-          "keep": "24 hours; unclaimed shares go back",
+          "keep": "Claim within 24 hours; unclaimed funds return about 2 hours after the deadline",
           "no": "Page content; never signs unlimited approvals"
         }
       },

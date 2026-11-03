@@ -1,14 +1,13 @@
 'use client';
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
-import { ArrowUpRight, Bell, ChevronRight, Keyboard, KeyRound, Languages, Layers, LogOut, Monitor, ShieldCheck, Wallet } from 'lucide-react';
+import { ArrowUpRight, Bell, ChevronRight, Keyboard, KeyRound, Languages, Layers, LogOut, Monitor, ShieldCheck, SlidersHorizontal, Wallet } from 'lucide-react';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
 import { usePreferences } from './use-preferences';
 import { Switch } from '@palside/ui/switch';
-import { interactionFeatures } from '../../../domain/annotations/interaction';
 import { permissionRemovalPending, requestNotifications, revokeNotifications } from '../../../runtime/browser/permissions';
 import { openShortcuts, shortcutKeys } from '../../../runtime/browser/shortcuts';
-import { addSite } from './access';
+import { setSocialUi } from '../annotations/social-state';
 import { LanguageSetting } from './language-setting';
 import { accountLabel } from '../account/account-label';
 import { Brand } from '../ui/brand';
@@ -25,14 +24,15 @@ import type { PalsideController } from '../app/use-palside';
 import pages from '../app/pages.module.css';
 import { whenWalletOpen } from '../wallet/closed';
 import s from './settings.module.css';
+import privacy from './privacy.module.css';
 
 type Mode = 'off' | 'mentions' | 'all';
 const modes: Mode[] = ['all', 'mentions', 'off'];
 const modeKey = { off: 'extension.settings.notifyOff', mentions: 'extension.settings.notifyMentions', all: 'extension.settings.notifyAll' } as const;
 
 /**
- * 设置: the account first — 资料 and 零钱 in one card. Then 网页, one card: 共享在看 and 网页互动 are switches, each asking Chrome for its
- * permission in the same click, and 网页互动 carries its 网站 and 互动选项 under it. Then 通用 (通知, 截图快捷键, 外观, 语言) and 账号
+ * 设置: the account first — 资料 and 零钱 in one card. Then 网页, one card of states, not switches — those live on the header's keys and
+ * each site's sheet: 共享在看 and whether Chrome allows it (its read sheet takes it back), 网站 with what runs on each, and 互动选项. Then 通用 (通知, 截图快捷键, 外观, 语言) and 账号
  * (隐私与数据, 账号与安全, 关于) — then 退出登录.
  * Every page opens one level down and leads nowhere else, so 返回 always comes back here.
  */
@@ -42,22 +42,12 @@ export function Settings({ c }: { c: PalsideController }) {
   const shortcut = useCaptureShortcut(c);
   const notifications = notifyMode(c, grants.notifications);
   const sites = allowedSites(c, grants);
-  const roomsOn = c.live ? !c.live.state.preferences.rooms?.off : false;
-  const features = [roomsOn ? t('extension.room.name') : '', ...interactionFeatures.filter(id => c.interaction[id]).map(id => t(`extension.web.${id}`))].filter(Boolean);
-  const options = !c.web.interact ? t('extension.settings.off') : features.join(t('extension.access.separator')) || t('extension.access.none');
-  const shareOn = c.web.share && (!c.live || grants.tabs);
-  function setShare(on: boolean) { c.setWeb('share', on); }
-  function setInteract(on: boolean) {
-    c.setWeb('interact', on);
-    // The first time there is no site to act on yet: 添加网站 opens at once. Re-enabling requests remembered sites through Chrome.
-    if (on && c.live && !permissionRemovalPending('sites') && !sites.all && !sites.hosts.length && !c.live.state.preferences.restoreSites?.length) addSite(c);
-  }
   const wallet = c.live?.state.wallet;
   const balance = wallet?.config?.enabled && wallet.availability === 'ready' ? wallet.balance?.balance : undefined;
   // With the chain off, a payment still settling or an order left to recover keeps the wallet reachable until it resolves.
   const pending = !wallet?.config?.enabled && Boolean((wallet?.payment && !['confirmed', 'expired', 'failed'].includes(wallet.payment.phase)) || wallet?.recovery?.items.length);
   return <div className={s.page}>
-    {grants.error && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: grants.retry }}>{t('common.error')}</InlineFeedback>}
+    {grants.error && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: grants.retry }}>{t('extension.settings.permissionsReadFailed')}</InlineFeedback>}
     <SettingGroup>
       <button type="button" className={s.profile} onClick={() => c.go('profile')} aria-label={t('extension.copy.editPersonalProfile')}>
         <PersonAvatar person={c.me} size="lg" />
@@ -67,14 +57,9 @@ export function Settings({ c }: { c: PalsideController }) {
       <SettingItem icon={<Wallet size={16} />} title={t('extension.wallet.title')} value={!wallet?.config?.enabled ? t(pending ? 'extension.wallet.pending' : 'extension.wallet.soon') : balance !== undefined ? <PalsAmount value={balance} hidden={wallet.preferences.hideAmounts} /> : undefined} onClick={() => { if (pending) c.go('wallet'); else whenWalletOpen(c, () => c.go('wallet')); }} />
     </SettingGroup>
     <SettingGroup title={t('extension.settings.groupWeb')}>
-      <SettingControl icon={<ShareIcon size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.web.share')} help={{ label: t('extension.settings.aboutFeature', { name: t('extension.web.share') }), content: t('extension.settings.shareHint') }} checked={shareOn} onChange={event => setShare(event.currentTarget.checked)} />
-      </SettingControl>
-      <SettingControl icon={<Layers size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.settings.interaction')} help={{ label: t('extension.settings.aboutFeature', { name: t('extension.settings.interaction') }), content: t('extension.settings.interactHint') }} checked={c.web.interact} onChange={event => setInteract(event.currentTarget.checked)} />
-      </SettingControl>
-      {c.web.interact && <div className={s.reveal}><SettingItem title={t('extension.settings.sites')} value={sites.all ? t('extension.sites.allSites') : <CountText text={t('extension.web.siteCount', { count: sites.hosts.length })} value={sites.hosts.length} />} onClick={() => c.go('sites')} /></div>}
-      <SettingItem title={t('extension.settings.interactionOptions')} value={options} onClick={() => c.go('interaction')} />
+      <SettingItem icon={<ShareIcon size={16} />} title={t('extension.web.share')} value={<span className={privacy.state} data-on={grants.tabs || undefined}>{t(grants.tabs ? 'extension.privacy.allowed' : 'extension.privacy.notAllowed')}</span>} onClick={() => setSocialUi({ read: 'share' })} />
+      <SettingItem icon={<Layers size={16} />} title={t('extension.settings.sites')} value={sites.all ? t('extension.sites.allSites') : <CountText text={t('extension.web.siteCount', { count: sites.hosts.length })} value={sites.hosts.length} />} onClick={() => c.go('sites')} />
+      <SettingItem icon={<SlidersHorizontal size={16} />} title={t('extension.settings.interactionOptions')} onClick={() => c.go('interaction')} />
     </SettingGroup>
     <SettingGroup title={t('extension.settings.groupGeneral')}>
       {c.live && <SettingItem icon={<Bell size={16} />} title={t('extension.settings.notifications')} value={t(modeKey[notifications])} onClick={() => c.go('notifications')} />}
@@ -132,7 +117,7 @@ export function NotificationSettings({ c }: { c: PalsideController }) {
     intent.track(work);
   }
   return <div className={pages.page}>
-    {grants.error && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: grants.retry }}>{t('common.error')}</InlineFeedback>}
+    {grants.error && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: grants.retry }}>{t('extension.settings.permissionsReadFailed')}</InlineFeedback>}
     <div className={pages.card} role="radiogroup" aria-label={t('extension.settings.notifications')}>
       {modes.map(value => <button key={value} type="button" role="radio" aria-checked={mode === value} className={pages.radioRow} onClick={() => choose(value)}>
         <span className={pages.text}><strong>{t(modeKey[value])}</strong></span>

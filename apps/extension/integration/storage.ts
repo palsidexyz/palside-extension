@@ -1,9 +1,9 @@
+import { DAY_MS as DAY, MIB as MiB } from '@palside/shared/units';
 import { ClientStorage, DraftConflictError, type RevisionedDraft } from '../src/runtime/storage/storage';
 import { autoRun, reviewStatus } from './review-harness';
 
 const button = document.querySelector<HTMLButtonElement>('#run')!;
 const output = document.querySelector<HTMLPreElement>('#result')!;
-const DAY = 86_400_000, MiB = 1024 * 1024;
 function check(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 async function run() {
   button.disabled = true;
@@ -28,21 +28,21 @@ async function run() {
     await first.put('b:protected', 'b', 'protected-fixture', 'other-account');
     await first.put('a:outgoing', 'a', 'outgoing', 'unsent-fixture', now + DAY);
     await first.put('a:report', 'a', 'report', 'report-fixture', now + DAY);
-    await first.cache('a', 'oldest', { payload: 'a'.repeat(40 * MiB) }, now + 30 * DAY);
-    await first.cache('a', 'middle', { payload: 'b'.repeat(40 * MiB) }, now + 30 * DAY);
-    await first.cache('a', 'latest', { payload: 'c'.repeat(30 * MiB) }, now + 30 * DAY);
+    await first.cache('a', 'oldest', { payload: 'a'.repeat(120 * MiB) }, now + 30 * DAY);
+    await first.cache('a', 'middle', { payload: 'b'.repeat(120 * MiB) }, now + 30 * DAY);
+    await first.cache('a', 'latest', { payload: 'c'.repeat(90 * MiB) }, now + 30 * DAY);
     const cache = await first.rows('a', 'cache'); result.retainedCacheBytes = cache.reduce((total, row) => total + (row.bytes ?? 0), 0);
-    check(result.retainedCacheBytes <= 100 * MiB && cache.length === 2 && !cache.some(row => row.key.endsWith(':oldest')), 'Cache did not evict oldest content at 100 MiB');
+    check(result.retainedCacheBytes <= 300 * MiB && cache.length === 2 && !cache.some(row => row.key.endsWith(':oldest')), 'Cache did not evict oldest content at 300 MiB');
     check((await first.get<RevisionedDraft<{ text: string }>>('a:draft:team'))?.value.text === saved.value.text, 'Cache eviction erased draft');
     check(await first.get('a:protected') === 'not-a-real-key', 'Cache eviction erased non-cache records');
-    result.checks.push('110 MiB of synthetic content evicts oldest cache and preserves drafts and non-cache records');
-    const evicted = await first.cache('a', 'media:blob', new Blob([new Uint8Array(40 * MiB)], { type: 'application/octet-stream' }), now + 30 * DAY);
+    result.checks.push('330 MiB of synthetic content evicts oldest cache and preserves drafts and non-cache records');
+    const evicted = await first.cache('a', 'media:blob', new Blob([new Uint8Array(120 * MiB)], { type: 'application/octet-stream' }), now + 30 * DAY);
     check(evicted.includes('a:cache:middle'), 'Binary cache did not share the text cache budget');
     const binary = await second.get<Blob>('a:cache:media:blob');
-    check(binary instanceof Blob && binary.size === 40 * MiB, 'Binary cache did not survive another connection');
+    check(binary instanceof Blob && binary.size === 120 * MiB, 'Binary cache did not survive another connection');
     const combined = await first.rows('a', 'cache'); result.retainedCacheBytes = combined.reduce((total, row) => total + (row.bytes ?? 0), 0);
-    check(result.retainedCacheBytes <= 100 * MiB, 'Binary and metadata exceeded their shared budget');
-    result.checks.push('Binary Blob data and message metadata share the 100 MiB budget and report evicted keys');
+    check(result.retainedCacheBytes <= 300 * MiB, 'Binary and metadata exceeded their shared budget');
+    result.checks.push('Binary Blob data and message metadata share the 300 MiB budget and report evicted keys');
     await first.cleanup(now + 2 * DAY);
     check(!await first.get('a:outgoing') && !await first.get('a:report') && await first.get('a:draft:team'), 'One-day expiry crossed the draft boundary');
     await first.cleanup(now + 8 * DAY); check(!await first.get('a:draft:team'), 'Seven-day draft expiry failed');

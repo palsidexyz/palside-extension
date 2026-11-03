@@ -13,6 +13,8 @@ import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import { openTransfer } from '../wallet/payment-sheet';
 import card from './person-card.module.css';
+import { TokenName } from '../assets/token-name';
+import { liveView } from '../assets/token-data';
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
 
@@ -30,7 +32,8 @@ export function PersonCard({ c }: { c: PalsideController }) {
   const self = person.id === c.data.self;
   const member = c.team.memberIds.includes(person.id);
   const applicant = c.requests.some(request => request.teamId === c.current && request.personId === person.id);
-  const view = member ? c.data.views.find(v => v.id === person.viewing) : undefined;
+  const found = member ? c.data.views.find(v => v.id === person.viewing) : undefined;
+  const view = found && liveView(c, found);
   const role = member ? person.id === c.team.owner ? t('extension.copy.owner') : t('common.member') : applicant ? t('extension.copy.applyTeam') : t('extension.copy.notMember');
   const presence = member && !self && person.presence ? person.presence === 'active' ? t('extension.copy.presenceActive') : t('extension.copy.presenceAway') : undefined;
   const bio = self ? c.live?.state.account?.bio ?? person.bio : person.bio;
@@ -64,7 +67,7 @@ export function PersonCard({ c }: { c: PalsideController }) {
     </div>}
     {view && <button type="button" className={card.watching} onClick={() => { close(); c.selectAsset(view.id); }}>
       <small>{t('extension.web.viewing')}</small>
-      <span className={card.watchingRow}><Token view={view} size="sm" /><b>{view.name}</b><em>{view.source || hostOf(view.url)}</em><ChevronRight size={16} aria-hidden="true" /></span>
+      <span className={card.watchingRow}><Token view={view} size="sm" /><b><TokenName c={c} view={view} /></b><em>{view.source || hostOf(view.url)}</em><ChevronRight size={16} aria-hidden="true" /></span>
     </button>}
     {self ? <div className={card.actions} data-single>
       <button type="button" className={card.action} onClick={() => { close(); c.go('profile'); }}><PenLine size={18} /><span>{t('extension.copy.editProfile')}</span></button>

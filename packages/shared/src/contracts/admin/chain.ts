@@ -3,8 +3,9 @@ import { strictObject, type Infer } from '../validation.ts';
 import { chainConfig, chainDeployment, chainAmount } from '../chain.ts';
 import { nullable, text } from './common.ts';
 
+const day = Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' });
 const count = Type.Integer({ minimum: 0 });
-export const adminChainDraft = strictObject({ ...Type.Omit(chainConfig, ['version', 'updatedAt']).properties, testers: Type.Array(chainConfig.properties.testers.items, { maxItems: 50, uniqueItems: true }) });
+export const adminChainDraft = strictObject(Type.Omit(chainConfig, ['version', 'updatedAt']).properties);
 export const adminChainConfigChange = strictObject({ expectedVersion: chainConfig.properties.version, draft: adminChainDraft, reason: text });
 export const adminChainEnabledChange = strictObject({ expectedVersion: chainConfig.properties.version, enabled: Type.Boolean(), reason: text });
 export const adminChainConfigChangeResult = strictObject({ config: chainConfig });
@@ -13,11 +14,15 @@ export type AdminChainEnabledChange = Infer<typeof adminChainEnabledChange>;
 export const adminRelayStates = ['preparing', 'prepared', 'submitting', 'uncertain', 'submitted', 'included', 'confirmed', 'failed', 'expired', 'cancelled'] as const;
 export const adminChainStatus = strictObject({
   checkedAt: Type.Integer(),
+  supportedChainIds: Type.Array(chainDeployment.properties.chainId, { minItems: 1, uniqueItems: true }),
   config: nullable(chainConfig),
   tasks: nullable(strictObject({ pending: count, submitted: count, complete: count, unfinished: count, attemptedUnfinished: count })),
   sponsorship: nullable(strictObject({
-    day: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), timezone: Type.Literal('Asia/Taipei'), scope: Type.Literal('all-accounts'), basis: Type.Literal('reservation-day'), includesAutomation: Type.Literal(false),
+    day: Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), timezone: Type.Literal('UTC'), scope: Type.Literal('all-accounts'), basis: Type.Literal('reservation-day'), includesAutomation: Type.Literal(false),
     perAccountDailyLimit: nullable(chainConfig.properties.dailySponsoredLimit), quotaCommitted: count,
+    limitAccounts: count, limitRejections: count,
+    distribution: strictObject({ accounts: count, median: Type.Number({ minimum: 0 }), p90: Type.Number({ minimum: 0 }), max: count }),
+    daily: Type.Array(strictObject({ day, sponsoredCount: count, limitAccounts: count, limitRejections: count, gasCostWei: Type.Optional(chainAmount) }), { minItems: 30, maxItems: 30 }),
     byState: strictObject({ preparing: count, prepared: count, submitting: count, uncertain: count, submitted: count, included: count, confirmed: count, failed: count, expired: count, cancelled: count }),
   })),
   failures: Type.Array(strictObject({ section: Type.Enum(['config', 'tasks', 'sponsorship']), reason: Type.Enum(['not-configured', 'read-failed']) })),

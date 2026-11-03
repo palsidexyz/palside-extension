@@ -1,3 +1,4 @@
+import { DAY_MS as day } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -17,7 +18,7 @@ const root=createRoot(document.getElementById('root')!), output=document.getElem
 const result:{checks:string[];error?:string;cleaned?:boolean}={checks:[]};
 const databaseName=`palside-retention-ui-${crypto.randomUUID()}`, storage=new ClientStorage(databaseName);
 const service=new PalsideService(undefined,undefined,storage), {auth,cache}=service;
-const now=Date.now(), day=86400000, teamId='night', imageId='$qa-expiry-image', cardId='$qa-expiry-card', linkId='$qa-expiry-link';
+const now=Date.now(),  teamId='night', imageId='$qa-expiry-image', cardId='$qa-expiry-card', linkId='$qa-expiry-link';
 const session:RuntimeDevice={token:'synthetic-only',storageKey:[],account:{ bio: '', tags: [], id:'you',nickname:'验收成员',matrixId:'@qa:example.test',avatarId:null,revision:1, acceptTeamInvites: true},matrix:{userId:'@qa:example.test',deviceId:'fixture-device'}};
 const imageKey=`${session.account.id}:cache:media:event:${imageId}`;
 let imageUrl='', unsubscribe=()=>{};

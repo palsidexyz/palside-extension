@@ -1,3 +1,5 @@
+import { SECOND_MS } from './units.ts';
+import { PIN_LENGTH } from './rules/accounts.ts';
 import { schnorr } from '@noble/curves/secp256k1.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -10,7 +12,6 @@ import { wordlist } from '@scure/bip39/wordlists/english.js';
 export const ENGLISH_WORDS: readonly string[] = wordlist;
 export const VAULT_ITERATIONS = 600_000;
 /** The device password is a six-digit PIN; it only seals the local copy of the phrase. */
-export const PIN_LENGTH = 6;
 export const isValidPin = (pin: string) => pin.length === PIN_LENGTH && /^[0-9]+$/.test(pin);
 export const HTTP_AUTH_KIND = 27235;
 
@@ -111,7 +112,7 @@ export function leadingZeroBits(idHex: string): number {
 
 type HttpAuthInput = { url: string; method: string; body?: Uint8Array; secretKey: Uint8Array; now?: number; difficulty?: number; signal?: AbortSignal };
 
-function currentSeconds(): number { return Math.floor(Date.now() / 1000); }
+function currentSeconds(): number { return Math.floor(Date.now() / SECOND_MS); }
 
 export async function createHttpAuth(input: HttpAuthInput): Promise<NostrEvent> {
   const method = input.method.toUpperCase();
@@ -121,7 +122,7 @@ export async function createHttpAuth(input: HttpAuthInput): Promise<NostrEvent> 
   input.signal?.throwIfAborted();
   const initialClock = currentSeconds();
   const offset = (input.now ?? initialClock) - initialClock;
-  const now = () => Math.floor(Date.now() / 1000 + offset);
+  const now = () => Math.floor(Date.now() / SECOND_MS + offset);
   const tags: string[][] = [['u', input.url], ['method', method], ['request', bytesToHex(randomBytes(16))]];
   if (body) tags.push(['payload', bytesToHex(sha256(body))]);
   if (difficulty > 0) tags.push(['nonce', '0', String(difficulty)]);

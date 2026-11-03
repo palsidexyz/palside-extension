@@ -5,12 +5,12 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { siteDefinitions, websiteUrl } from '../packages/shared/src/navigation.ts';
 import { normalizeSiteHost } from '../apps/extension/src/domain/assets/site-host.ts';
-import { defaultWebFeatures, readFavorites, readHosts, readInteraction, readWebFeatures } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { defaultSiteInteraction, readFavorites, readHosts, readSiteInteractions, siteAllows, siteDraws } from '../apps/extension/src/domain/annotations/interaction.ts';
 import { startedTeams } from '../apps/extension/src/runtime/teams/onboarding.ts';
 
 const source = ts.createSourceFile('state.ts', readFileSync('apps/extension/src/runtime/composition/state.ts', 'utf8'), ts.ScriptTarget.Latest, true);
 const declarations = source.statements.filter(node => !ts.isImportDeclaration(node)).map(node => node.getText(source).replace(/^export /, '')).join('\n');
-const context = { defaultWebFeatures, readFavorites, readHosts, readInteraction, readWebFeatures, startedTeams };
+const context = { defaultSiteInteraction, readFavorites, readHosts, readSiteInteractions, startedTeams };
 vm.runInNewContext(ts.transpileModule(`${declarations}\nglobalThis.readPreferences = readPreferences; globalThis.readPreferencePatch = readPreferencePatch;`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
 const { readPreferences, readPreferencePatch } = context;
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -37,18 +37,19 @@ test('site settings share URL host exclusions while requiring a DNS host', () =>
   assert.equal(normalizeSiteHost('https://gmgn.ai/page'), undefined);
 });
 
-test('设置 › 网页 starts with 共享在看 and 网页互动 启用, and only exact booleans are accepted', () => {
-  assert.deepEqual(defaultWebFeatures, { share: true, interact: true });
+test('per-site 网页互动 defaults on and accepts only normalized hosts and boolean feature switches', () => {
+  assert.deepEqual(defaultSiteInteraction, { on: true, danmaku: true, signal: true, sticky: true });
   assert.equal(siteDefinitions.some(site => 'defaults' in site || 'quickStart' in site), false, 'the registry presets no site');
-  assert.deepEqual(readWebFeatures({ share: false, interact: true }), { share: false, interact: true });
-  assert.deepEqual(readWebFeatures({ interact: false, share: true }), { share: true, interact: false });
-  for (const value of [undefined, null, [], true, {}, { share: true }, { interact: false }, { share: 1, interact: false }, { share: true, interact: 'no' }, { share: true, interact: false, tabs: true }]) {
-    assert.equal(readWebFeatures(value), undefined, JSON.stringify(value));
+  assert.deepEqual(readSiteInteractions({ 'GMGN.AI.': { on: false, signal: false }, 'birdeye.so': { danmaku: false } }), {
+    'gmgn.ai': { ...defaultSiteInteraction, on: false, signal: false }, 'birdeye.so': { ...defaultSiteInteraction, danmaku: false },
+  });
+  for (const value of [undefined, null, [], true, { 'localhost': { on: false } }, { 'gmgn.ai': { on: 1 } }, { 'gmgn.ai': { danmaku: 'no' } }, { 'gmgn.ai': { share: true } }, Object.fromEntries(Array.from({ length: 501 }, (_, i) => [`s${i}.com`, {}]))]) {
+    assert.equal(readSiteInteractions(value), undefined, 'invalid site settings rejected');
   }
-  const input = { share: true, interact: true };
-  const value = readWebFeatures(input);
-  value.share = false;
-  assert.equal(input.share, true, 'the returned value is a copy');
+  assert.equal(siteAllows(undefined, 'gmgn.ai'), true, 'sites without an entry default on');
+  assert.equal(siteAllows({ 'gmgn.ai': { ...defaultSiteInteraction, on: false } }, 'gmgn.ai'), false);
+  assert.equal(siteAllows({ 'gmgn.ai': { ...defaultSiteInteraction, sticky: false } }, 'gmgn.ai', 'sticky'), false);
+  assert.equal(siteDraws({ 'gmgn.ai': { ...defaultSiteInteraction, signal: false, sticky: false } }, 'gmgn.ai'), false);
 });
 
 test('host lists are exact public hosts, deduplicated in order and bounded', () => {
@@ -60,19 +61,19 @@ test('host lists are exact public hosts, deduplicated in order and bounded', () 
 });
 
 test('restore preserves valid optional preferences and ignores unknown fields', () => {
-  const saved = { current: 'team', notifications: 'mentions', web: { share: false, interact: true }, notificationPreview: false, hiddenStickies: ['sticky'], tokenOff: ['gmgn.ai'], restoreSites: ['birdeye.so'], startedTeams: ['team'] };
+  const saved = { current: 'team', notifications: 'mentions', share: true, siteInteraction: { 'gmgn.ai': { ...defaultSiteInteraction, on: false } }, notificationPreview: false, hiddenStickies: ['sticky'], tokenOff: ['gmgn.ai'], startedTeams: ['team'] };
   assert.deepEqual(plain(readPreferences(saved)), saved);
-  assert.deepEqual(plain(readPreferences({}).web), { share: true, interact: true });
-  assert.deepEqual(plain(readPreferences({ web: { share: false } }).web), { share: true, interact: true }, 'a malformed value falls back to the default');
+  assert.deepEqual(plain(readPreferences({})), { current: '', notifications: 'off', startedTeams: [] });
+  assert.equal(readPreferences({ siteInteraction: { 'gmgn.ai': { on: 'false' } } }).siteInteraction, undefined, 'a malformed value is ignored');
   const restored = readPreferences({ unknownRules: { 'x.com': { share: true, interact: true } }, unknownChoice: true, unknownSites: [{ name: 'Example', domain: 'example.com' }], unknownHosts: ['example.com'], unknownList: ['gmgn.ai'], unknownFlag: false, notificationPreview: 'yes', hiddenStickies: [1], unknownTeams: ['team'], unknownField: false, unknownOption: false, tokenOff: ['https://x.com'], current: 5, notifications: 'invalid' });
-  assert.deepEqual(Object.keys(restored).sort(), ['current', 'notifications', 'startedTeams', 'web']);
+  assert.deepEqual(Object.keys(restored).sort(), ['current', 'notifications', 'startedTeams']);
   assert.equal(restored.notifications, 'off'); assert.equal(restored.current, '');
 });
 
 test('generic preference patches accept optional fields and reject unknown or malformed values', () => {
   assert.deepEqual(plain(readPreferencePatch({ notificationPreview: false, hiddenStickies: ['one', 'one'], notifications: 'all', current: 'one' })), { notificationPreview: false, hiddenStickies: ['one'], notifications: 'all', current: 'one' });
-  assert.deepEqual(plain(readPreferencePatch({ web: { share: false, interact: true }, tokenOff: ['GMGN.ai', 'gmgn.ai'], restoreSites: [] })), { web: { share: false, interact: true }, tokenOff: ['gmgn.ai'], restoreSites: [] });
-  for (const patch of [{ unknownRules: {} }, { unknownChoice: true }, { unknownSites: [] }, { unknownHosts: [] }, { unknownList: [] }, { unknownFlag: false }, { current: false }, { notifications: true }, { notificationPreview: 'true' }, { hiddenStickies: [1] }, { unknownTeams: ['one'] }, { unknownTeams: {} }, { web: { share: true } }, { tokenOff: ['localhost'] }, { restoreSites: 'gmgn.ai' }]) assert.equal(readPreferencePatch(patch), undefined, JSON.stringify(patch));
+  assert.deepEqual(plain(readPreferencePatch({ share: true, siteInteraction: { 'GMGN.ai': { on: false } }, tokenOff: ['GMGN.ai', 'gmgn.ai'] })), { share: true, siteInteraction: { 'gmgn.ai': { ...defaultSiteInteraction, on: false } }, tokenOff: ['gmgn.ai'] });
+  for (const patch of [{ unknownRules: {} }, { unknownChoice: true }, { unknownSites: [] }, { unknownHosts: [] }, { unknownList: [] }, { unknownFlag: false }, { current: false }, { notifications: true }, { notificationPreview: 'true' }, { hiddenStickies: [1] }, { unknownTeams: ['one'] }, { unknownTeams: {} }, { web: { share: true } }, { interaction: {} }, { tokenOff: ['localhost'] }, { siteInteraction: { 'gmgn.ai': { on: 1 } } }]) assert.equal(readPreferencePatch(patch), undefined, JSON.stringify(patch));
   assert.deepEqual(plain(readPreferencePatch({ startedTeams: ['invented'] })), {});
 });
 

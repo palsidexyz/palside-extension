@@ -34,6 +34,7 @@ interface WheelItem {
 export class Wheel {
   private readonly wedges: SVGPathElement[] = [];
   private readonly icons: SVGImageElement[] = [];
+  private aim?: SVGPathElement;
   private items: readonly WheelItem[] = [];
   private hot = -1;
   private ox = 0;
@@ -83,7 +84,14 @@ export class Wheel {
   }
 
   move(x: number, y: number): void {
-    if (this.opened) this.setHot(pickSlice(x - this.ox, y - this.oy, WHEEL.innerR * this.scale));
+    if (!this.opened) return;
+    const dx = x - this.ox, dy = y - this.oy, slice = pickSlice(dx, dy, WHEEL.innerR * this.scale);
+    this.setHot(slice);
+    // Picks go by direction, so the pointer may be far outside the ring; the notch on the core shows where it aims.
+    if (this.aim) {
+      this.aim.setAttribute('opacity', slice >= 0 ? '1' : '0');
+      if (slice >= 0) this.aim.setAttribute('transform', `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90})`);
+    }
   }
 
   /** Closes the wheel. Returns the chosen item's key at the wheel centre, or null when released in the dead zone. */
@@ -102,6 +110,7 @@ export class Wheel {
   private close(): void {
     this.opened = false;
     this.svg.classList.remove('open');
+    this.aim?.setAttribute('opacity', '0');
     this.setHot(-1);
   }
 
@@ -150,9 +159,11 @@ export class Wheel {
     el('circle', { r: innerR + 3, fill: 'none', stroke: '#ae9254', 'stroke-width': 1, opacity: 0.9 }, svg);
     el('circle', { r: innerR, fill: `url(#${id}-core)`, stroke: '#c8aa6e', 'stroke-width': 1.8 }, svg);
     el('circle', { r: innerR - 1.8, fill: 'none', stroke: '#080f10', 'stroke-width': 1, opacity: 0.85 }, svg);
-    el('text', { x: 0, y: 6, 'text-anchor': 'middle', class: 'centerTxt' }, svg).textContent = this.centerLabel;
-    el('text', { x: 6, y: 50, 'text-anchor': 'middle', class: 'backTxt' }, svg).textContent = 'Back';
-    const mouse = el('g', { opacity: 0.55, transform: 'translate(-26,40)' }, svg);
+    const [ax0, ay0] = polar(innerR + 3, -90 - 16), [ax1, ay1] = polar(innerR + 3, -90 + 16);
+    this.aim = el('path', { d: `M${ax0},${ay0} A${innerR + 3},${innerR + 3} 0 0 1 ${ax1},${ay1}`, fill: 'none', stroke: '#e3c98a', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0, class: 'aim' }, svg);
+    el('text', { x: 0, y: 2, 'text-anchor': 'middle', class: 'centerTxt' }, svg).textContent = this.centerLabel;
+    el('text', { x: 6, y: 32, 'text-anchor': 'middle', class: 'backTxt' }, svg).textContent = 'Back';
+    const mouse = el('g', { opacity: 0.55, transform: 'translate(-26,21)' }, svg);
     el('rect', { x: 0, y: 0, width: 11, height: 16, rx: 5.5, fill: 'none', stroke: '#6c7a7c', 'stroke-width': 1.3 }, mouse);
     el('path', { d: 'M5.5,0 V7 H11 V5.5 A5.5,5.5 0 0 0 5.5,0Z', fill: '#6c7a7c' }, mouse);
   }

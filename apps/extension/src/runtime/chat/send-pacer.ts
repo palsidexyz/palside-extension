@@ -1,9 +1,10 @@
-import { CHAT_SEND_BURST,CHAT_SEND_PER_MINUTE } from '@palside/shared/contracts/limits';
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
+import { CHAT_SEND_BURST, CHAT_SEND_PER_MINUTE } from '@palside/shared/rules/messages';
 
 /** At most this many service refusals are absorbed by waiting before a send is shown as failed. */
 export const THROTTLE_RETRIES = 3;
 /** A refusal asking for a longer wait is a quota, not pacing; it fails at once with its own text. */
-export const THROTTLE_MAX_WAIT = 60_000;
+export const THROTTLE_MAX_WAIT = MINUTE_MS;
 
 /**
  * Mirrors the service's per-team chat bucket, so a fast typist queues locally instead of being refused.
@@ -14,7 +15,7 @@ export class SendPacer {
   private readonly interval: number;
   private readonly burst: number;
   private readonly now: () => number;
-  constructor(burst = CHAT_SEND_BURST, perMinute = CHAT_SEND_PER_MINUTE, now = () => Date.now()) { this.burst = burst; this.interval = 60_000 / perMinute; this.now = now; }
+  constructor(burst = CHAT_SEND_BURST, perMinute = CHAT_SEND_PER_MINUTE, now = () => Date.now()) { this.burst = burst; this.interval = MINUTE_MS / perMinute; this.now = now; }
   /** Claims the next slot for `key` and returns the time it may be used. */
   reserve(key: string) {
     const now = this.now();
@@ -32,6 +33,6 @@ export function throttleWait(error: unknown) {
   if (!error || typeof error !== 'object') return;
   const value = error as { httpStatus?: number; status?: number; code?: string; errcode?: string; retryAfterMs?: number; data?: { retry_after_ms?: number } };
   if ((value.httpStatus ?? value.status) !== 429 || value.code === 'UPLOAD_QUOTA') return;
-  const wait = value.retryAfterMs ?? value.data?.retry_after_ms ?? 1000;
+  const wait = value.retryAfterMs ?? value.data?.retry_after_ms ?? SECOND_MS;
   return wait <= THROTTLE_MAX_WAIT ? Math.max(wait, 250) : undefined;
 }

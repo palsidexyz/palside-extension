@@ -1,4 +1,4 @@
-import { RECRUITMENT_TTL_MS, APPLICATION_TTL_MS } from '../packages/shared/src/contracts/limits.ts';
+import { RECRUITMENT_TTL_MS, APPLICATION_TTL_MS } from '@palside/shared/rules/teams';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { publicTeams, isRecruiting, publishRecruitment, requestIsActive } from '../apps/extension/src/domain/teams/lobby-values.ts';

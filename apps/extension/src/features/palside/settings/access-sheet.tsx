@@ -5,17 +5,21 @@ import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Coins, Globe2, KeyRound, Layers, Plus, Scissors, Search, X } from 'lucide-react';
+import { Switch } from '@palside/ui/switch';
 import { Input } from '@palside/ui/field';
-import { interactionFeatures } from '../../../domain/annotations/interaction';
+import { siteInteraction } from '../../../domain/annotations/interaction';
+import { SiteFeatureTiles } from './site-feature-tiles';
 import { requestAllSites, requestSitesAccess } from '../../../runtime/browser/permissions';
 import { normalizeSiteHost } from '../../../domain/assets/site-host';
 import { CountText } from '../ui/motion-details';
-import { addSite, siteRequestId } from './access';
-import { DanmakuIcon, featureIcons } from '../ui/icons';
+import { siteRequestId } from './access';
+import { askSiteAccess, pageSite, pageUnusable, SiteFace, useAsking } from '../viewing/page-key';
+import { ChromeMark, DanmakuIcon } from '../ui/icons';
 import { captureSocialUi, useSocialUi } from '../annotations/social-state';
 import { Sheet } from '@palside/ui/sheet';
 import { SiteLogo } from '../assets/site-logo';
-import { siteCategories, siteCategory, type Site, type SiteCategory } from './site-catalog';
+import { siteCategories, siteCategory, siteOf, siteTags, type Site, type SiteCategory } from './site-catalog';
+import { Tooltip } from '@palside/ui/tooltip';
 import { siteAllowed, useGrants } from './use-grants';
 import type { PalsideController } from '../app/use-palside';
 import s from './access-sheet.module.css';
@@ -25,8 +29,7 @@ function typedHost(query: string) {
   const value = query.trim().toLowerCase();
   if (!value.includes('.')) return;
   try {
-    const host = normalizeSiteHost(/^https?:\/\//.test(value) ? new URL(value).hostname : value.replace(/\/.*$/, ''));
-    return host && /^[a-z0-9.-]+\.[a-z]{2,}$/.test(host) ? host : undefined;
+    return normalizeSiteHost(/^https?:\/\//.test(value) ? new URL(value).hostname : value.replace(/\/.*$/, ''));
   } catch { return; }
 }
 
@@ -76,14 +79,16 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
     && (!request.accountId || request.accountId === c.data.self) && (!request.teamId || request.teamId === c.current)
     && (request.tabId === undefined || request.tabId === c.live?.page?.tabId);
 
-  const all: Site[] = [...c.sites, ...typed.filter(host => !c.sites.some(site => site.domain === host)).map(host => ({ id: host, name: host, domain: host }))];
+  const all: Site[] = [...c.sites, ...typed.filter(host => !c.sites.some(site => site.domain === host)).map(host => siteOf(c, host))];
   const on = (host: string) => siteAllowed(c, grants, host);
   const q = query.trim().toLowerCase();
   const host = typedHost(query);
-  const shown = q ? all.filter(site => `${site.name} ${site.domain}`.toLowerCase().includes(q) || site.domain === host)
-    : filter === 'all' ? all : all.filter(site => siteCategory(site.domain) === filter);
+  // Sites that recognize token pages lead every view, keeping their catalog order; the rest follow in theirs.
+  const shown = (q ? all.filter(site => `${site.name} ${site.domain}`.toLowerCase().includes(q) || site.domain === host)
+    : filter === 'all' ? all : all.filter(site => siteCategory(site.domain) === filter))
+    .map(site => ({ site, token: siteTags(site.domain).token })).sort((a, b) => Number(b.token) - Number(a.token));
   const custom = host && !all.some(site => site.domain === host) ? host : undefined;
-  const open = shown.filter(site => !on(site.domain)).map(site => site.domain);
+  const open = shown.filter(({ site }) => !on(site.domain)).map(({ site }) => site.domain);
   const every = open.length > 0 && open.every(domain => selected.includes(domain));
   const filters = (['all', ...siteCategories] as const).filter(id => id === 'all' || all.some(site => siteCategory(site.domain) === id));
 
@@ -135,13 +140,17 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
         <span className={s.customMark} aria-hidden="true"><Plus size={16} /></span>
         <span className={s.tileText}><span className={s.tileName}>{t('extension.sites.addCustom', { host: custom })}</span></span>
       </button>}
-      {shown.map(site => {
+      {shown.map(({ site, token }) => {
         const done = on(site.domain), picked = !done && selected.includes(site.domain);
-        return <button key={site.domain} type="button" className={s.tile} disabled={done} data-done={done || undefined} aria-pressed={picked} onClick={() => toggle(site.domain)}>
+        const tile = <button key={site.domain} type="button" className={s.tile} disabled={done} data-done={done || undefined} aria-pressed={picked} onClick={() => toggle(site.domain)}>
           <SiteLogo site={site} off={done} />
-          <span className={s.tileText}><span className={s.tileName}>{site.name}</span>{site.name !== site.domain && <span className={s.tileHost}>{site.domain}</span>}</span>
+          <span className={s.tileText}>
+            <span className={s.tileLine}><span className={s.tileName}>{site.name}</span>{token && <span className={s.tag}>{t('extension.settings.tagToken')}</span>}</span>
+            {site.name !== site.domain && <span className={s.tileHost}>{site.domain}</span>}
+          </span>
           <span className={s.mark} aria-hidden="true">{(done || picked) && <Check size={11} strokeWidth={3} />}</span>
         </button>;
+        return token ? <Tooltip key={site.domain} content={t('extension.sites.tokenTip')}>{tile}</Tooltip> : tile;
       })}
     </div>
     {q && !shown.length && !custom && <p className={s.empty}>{t('extension.web.noMatch')}</p>}
@@ -154,52 +163,71 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
 }
 
 /**
- * 网页互动 is on but Chrome does not allow this site: what it would draw here and the permission it needs, then 关闭网页互动
- * or 授权 — Chrome asks in the same click. When Chrome hides which site the tab is, the sheet points at the toolbar icon, which hands
- * the tab to Palside; the same sheet then names the site and offers 授权. 添加网站 stays for typing the address instead.
+ * The 网页互动 sheet, from the left half of the header capsule: the tab's site, Chrome's permission for it, then 网页互动 with the
+ * site's 弹幕, 信号 and 便利贴. Switching 网页互动 on asks Chrome in the same click when the site is not allowed yet; off keeps Chrome's grant.
  */
 export function GrantSheet({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const target = useSocialUi().grant;
-  const open = Boolean(target);
+  const open = Boolean(useSocialUi().grant);
   const session = captureSocialUi();
-  const opening = useRef<object | undefined>(undefined);
-  useLayoutEffect(() => () => { opening.current = undefined; }, []);
   const snapshot = session.snapshot();
   const close = () => { if (session.snapshot() === snapshot) session.set({ grant: undefined }); };
-  const host = c.pageHost;
-  const site = host ? c.sites.find(item => item.domain === host) ?? { id: host, name: host, domain: host } : undefined;
-  const name = site?.name ?? t('extension.web.thisSite');
-  function allow() {
-    if (!host) { close(); addSite(c, { tabId: c.live?.page?.tabId }); return; }
-    // Chrome's prompt must open synchronously from this click.
-    close();
-    const id = {}; opening.current = id;
-    const completion = session.snapshot();
-    const current = () => session.current() && c.ownsAccess() && opening.current === id && session.snapshot() === completion;
-    void requestSitesAccess([host]).then(allowed => { if (!current()) return; if (!allowed) c.setNotice(uiMessage('extension.sites.denied')); }, () => { if (current()) { c.setNotice(uiMessage('extension.sites.denied')); } });
-  }
+  const unusable = pageUnusable(c);
+  const host = unusable ? undefined : c.pageHost;
+  const site = host ? pageSite(c) : undefined;
   return <Sheet open={open} onOpenChange={open => { if (!open) close(); }} boundarySelector="[data-palside-app]" aria-labelledby="grant-sheet-title" className={s.sheet}>
     {open && <div key={host ?? ''} className={s.swap}>
       <header className={s.head}>
-        <SiteLogo site={site} />
-        <h2 id="grant-sheet-title" className={s.title}>{name}<small>{host && host !== name ? t('extension.grant.hostUnauthorized', { host }) : t('extension.grant.unauthorized')}</small></h2>
+        <SiteFace site={site} className={s.headLogo} />
+        <h2 id="grant-sheet-title" className={s.title}>{site?.name ?? t('extension.web.thisPage')}{host && site?.name !== host && <small>{host}</small>}</h2>
         <IconButton size="sm" variant="quiet" className={s.close} label={t('common.close')} onClick={close}><X size={16} /></IconButton>
       </header>
-      <Group title={target === 'danmaku' ? t('extension.room.pageDanmaku') : t('extension.settings.interaction')}>
-        {target === 'danmaku' ? <Fact icon={<DanmakuIcon size={16} />} label={t('extension.room.name')}>{t('extension.grant.danmaku')}</Fact>
-          : interactionFeatures.filter(feature => c.interaction[feature]).map(feature => <Fact key={feature} icon={featureIcons[feature]()} label={t(`extension.web.${feature}`)}>{t(`extension.grant.${feature}`)}</Fact>)}
-      </Group>
-      <Group title={t('extension.access.chrome')}>
-        {host ? <Fact icon={<KeyRound size={16} />}>{t('extension.grant.access', { host })}</Fact>
-          : <Fact icon={<img className={s.toolbarMark} src="/brand/palside.svg" width={16} height={16} alt="" draggable={false} />}>{t('extension.grant.toolbar')}</Fact>}
-      </Group>
-      <div className={s.actions}>
-        <Button size="lg" className={s.soft} onClick={() => { close(); if (target === 'danmaku') void c.live?.command('danmaku-settings', { settings: { enabled: false } }).catch(() => {}); else void c.toggle('interact', false); }}>{target === 'danmaku' ? t('extension.grant.turnOffDanmaku') : t('extension.grant.turnOff')}</Button>
-        <Button variant="surface" size="lg" className={s.primary} onClick={allow}>{host ? t('extension.grant.allow') : t('extension.sites.add')}</Button>
-      </div>
+      {host ? <SiteControls c={c} host={host} /> : <p className={s.note}>{t(unusable ? 'extension.web.pageUnusable' : 'extension.web.siteLoading')}</p>}
     </div>}
   </Sheet>;
+}
+
+/**
+ * 网页互动 for one site: Chrome's permission for it on top, as Chrome words it (已允许 / 未允许, never a switch), then one card — the
+ * 网页互动 switch and, under it, the site's 弹幕, 信号 and 便利贴 as tiles, shown even while it is off.
+ */
+export function SiteControls({ c, host }: { c: PalsideController; host: string }) {
+  const t = useTranslations();
+  const grants = useGrants(c);
+  const waiting = useAsking();
+  const allowed = siteAllowed(c, grants, host);
+  const on = allowed && siteInteraction(c.siteInteraction, host).on;
+  const busy = waiting === host;
+  const session = captureSocialUi();
+  function turn(next: boolean) {
+    if (!next || allowed) { void c.setSite(host, { on: next }); return; }
+    const denied = () => { if (session.current()) c.setNotice(uiMessage('extension.sites.denied')); };
+    // Chrome's prompt must open synchronously from this click.
+    const asking = c.live ? askSiteAccess(host) : c.enableSites([host]);
+    void asking.then(granted => { if (!session.current()) return; if (granted) void c.setSite(host, { on: true }); else denied(); }, denied);
+  }
+  return <>
+    <section className={s.group}>
+      <dl className={s.facts}>
+        <div className={s.chromeRow}>
+          <ChromeMark size={16} />
+          <dd>{t('extension.grant.access', { host })}</dd>
+          <dd><span className={s.state} data-on={allowed || undefined}>{t(allowed ? 'extension.privacy.allowed' : 'extension.privacy.notAllowed')}</span></dd>
+        </div>
+      </dl>
+    </section>
+    <section className={s.group}>
+      <dl className={s.facts}>
+        <SwitchRow icon={<Layers size={16} />} label={t('extension.settings.interaction')} on={on} disabled={busy} onChange={turn} />
+        <div className={s.tilesRow}><dd><SiteFeatureTiles c={c} host={host} live={on} /></dd></div>
+      </dl>
+    </section>
+  </>;
+}
+
+/** A row with its own switch and nothing else to read: icon, name, the switch at the end. */
+function SwitchRow({ icon, label, on, disabled, onChange }: { icon: ReactNode; label: string; on: boolean; disabled?: boolean; onChange: (on: boolean) => void }) {
+  return <div data-switch="">{icon}<dd>{label}</dd><dd data-control=""><Switch hideLabel label={label} checked={on} disabled={disabled} onChange={event => onChange(event.currentTarget.checked)} /></dd></div>;
 }
 
 /**

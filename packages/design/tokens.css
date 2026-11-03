@@ -16,12 +16,12 @@
 :root {
   --ui-canvas: var(--background);
   --ui-border: var(--border);
-  --ui-control-surface: #F4F4F9;
+  --ui-control-surface: #F4F4F4;
   /* Plates behind site logos drawn for the other theme: a near-black mark in dark mode, a near-white one in light mode. */
   --ui-logo-plate-light: var(--ui-control-surface);
-  --ui-logo-plate-dark: #2A2C31;
+  --ui-logo-plate-dark: #2A2A2A;
   --ui-text-primary: var(--foreground);
-  --ui-text-secondary: #686773;
+  --ui-text-secondary: #6B6B6B;
   /* Robin Neon: https://docs.robinhood.com/chain/brand-guidelines/ */
   --ui-accent: #CCFF00;
   --ui-on-accent: #202400;
@@ -65,25 +65,27 @@
   /* Keyboard focus: a 1px secondary-ink outline 2px outside the control. */
   --ui-focus-width: 1px;
   --ui-focus-offset: 2px;
-  --ui-focus-ring: 0 0 0 2px var(--background), 0 0 0 3px #868593;
+  --ui-focus-ring: 0 0 0 2px var(--background), 0 0 0 3px #888888;
 }
 
 /* Control surfaces, elevation and semantic text colors. */
 :root {
-  --ui-control-hover: #FAFAFD;
-  --ui-control-recess: #E7E7EF;
-  --ui-disabled-surface: #ECEDF1;
+  --ui-control-hover: #FAFAFA;
+  --ui-control-recess: #E7E7E7;
+  --ui-disabled-surface: #EDEDED;
   --ui-shadow-floating: 0 4px 12px rgb(0 0 0 / 6%);
-  --ui-border-soft: rgb(70 70 90 / 8%);
+  --ui-border-soft: rgb(0 0 0 / 7%);
   /* Every text field and bordered button shares one visible edge. Containers that
      already use the control surface set --ui-field-surface for their fields. */
-  --ui-border-control: rgb(70 70 90 / 13%);
+  --ui-border-control: rgb(0 0 0 / 12%);
   --ui-ease-feedback: cubic-bezier(.22, 1, .36, 1);
   --ui-ink-muted: var(--ui-text-secondary);
   --ui-ink-accent: #4B5900;
   --ui-ink-success: #287447;
   --ui-ink-warning: #946000;
   --ui-ink-error: #B83B3B;
+  --ui-ink-flame: #F25C05;
+  --ui-ink-flame-core: #FFB300;
   --ui-danger: #D63B3B;
   --ui-on-danger: #FFFFFF;
   --ui-switch-thumb: #FFFFFF;
@@ -112,78 +114,100 @@
 [data-palside-app] {
   color-scheme: light;
   --background: #FFFFFF;
-  --foreground: #303138;
-  --border: #E5E5EB;
+  --foreground: #2B2B2B;
+  --border: #E6E6E6;
   --ui-canvas: var(--background);
   --ui-text-primary: var(--foreground);
   --ui-border: var(--border);
-  --ui-control-surface: #F4F4F7;
+  --ui-control-surface: #F4F4F4;
   --ui-logo-plate-light: var(--ui-control-surface);
-  --ui-logo-plate-dark: #2A2C31;
-  --ui-control-hover: #EBECF0;
-  --ui-control-recess: #E7E8ED;
-  --ui-disabled-surface: #ECEDF1;
-  --ui-text-secondary: #686773;
+  --ui-logo-plate-dark: #2A2A2A;
+  --ui-control-hover: #EBEBEB;
+  --ui-control-recess: #E7E7E7;
+  --ui-disabled-surface: #EDEDED;
+  --ui-text-secondary: #6B6B6B;
   --ui-ink-muted: var(--ui-text-secondary);
   --ui-accent-soft: color-mix(in srgb, var(--ui-accent) 14%, var(--ui-canvas));
   --ui-ink-accent: #4B5900;
-  --ui-border-soft: rgb(70 70 90 / 8%);
-  --ui-border-control: rgb(70 70 90 / 13%);
+  /* Own messages: a pale green apart from the neon, like Telegram; neon stays for actions and mentions. */
+  --ui-bubble-self: #EFFDDE;
+  --ui-bubble-self-ink: var(--ui-text-primary);
+  --ui-bubble-self-mention: color-mix(in srgb, var(--ui-accent) 45%, var(--ui-bubble-self));
+  --ui-bubble-self-mention-ink: var(--ui-text-primary);
+  --ui-border-soft: rgb(0 0 0 / 7%);
+  --ui-border-control: rgb(0 0 0 / 12%);
   /* Ink pill (solid secondary action): hover deepens the ink, never fades it. */
   --ui-solid: var(--ui-text-primary);
   --ui-on-solid: var(--ui-canvas);
-  --ui-solid-hover: #1D1E23;
+  --ui-solid-hover: #1A1A1A;
   --ui-focus-ring: 0 0 0 2px var(--background), 0 0 0 3px var(--ui-ink-muted);
   /* Toast: a dark surface with white text in both themes. */
-  --ui-toast-surface: #303138;
+  --ui-toast-surface: #2B2B2B;
   --ui-toast-text: #FFFFFF;
   --ui-toast-action: rgb(255 255 255 / 12%);
+  /* 共享在看's key, the one control drawn with depth: raised off, latched into the neon when on. */
 }
 [data-palside-app][data-appearance="dark"] {
   color-scheme: dark;
-  --background: #17191C;
-  --foreground: #ECEEF0;
-  --border: #34373D;
-  --ui-control-surface: #23262B;
-  --ui-logo-plate-light: #F4F4F7;
+  --background: #141414;
+  --foreground: #EDEDED;
+  --border: #333333;
+  --ui-control-surface: #1F1F1F;
+  --ui-logo-plate-light: #F4F4F4;
   --ui-logo-plate-dark: var(--ui-control-surface);
-  --ui-control-hover: #2C3036;
-  --ui-control-recess: #1C1F23;
-  --ui-disabled-surface: #262A30;
-  --ui-text-secondary: #9A9EA7;
-  --ui-ink-muted: #AAAFB8;
+  --ui-control-hover: #292929;
+  --ui-control-recess: #191919;
+  --ui-disabled-surface: #242424;
+  --ui-text-secondary: #9E9E9E;
+  --ui-ink-muted: #ADADAD;
   --ui-ink-accent: #D0ED78;
+  /* Neon darkened turns olive: dark selected surfaces stay neutral and own messages take a deep green. */
+  --ui-accent-soft: #2A2A2A;
+  --ui-bubble-self: #2D4419;
+  --ui-bubble-self-ink: #E9F0E4;
+  --ui-bubble-self-mention: rgb(204 255 0 / 18%);
+  --ui-bubble-self-mention-ink: #D9F77A;
   --ui-ink-success: #83D1A0;
   --ui-ink-warning: #E6BA76;
   --ui-ink-error: #F39494;
+  --ui-ink-flame: #FF7A2E;
+  --ui-ink-flame-core: #FFC23D;
   --ui-border-soft: rgb(255 255 255 / 9%);
   --ui-border-control: rgb(255 255 255 / 12%);
   --ui-solid-hover: #FFFFFF;
   --ui-shadow-floating: 0 4px 16px rgb(0 0 0 / 28%);
-  --ui-toast-surface: #34373E;
+  --ui-toast-surface: #333333;
 }
 @media (prefers-color-scheme: dark) {
   [data-palside-app][data-appearance="system"] {
   color-scheme: dark;
-  --background: #17191C;
-  --foreground: #ECEEF0;
-  --border: #34373D;
-  --ui-control-surface: #23262B;
-  --ui-logo-plate-light: #F4F4F7;
+  --background: #141414;
+  --foreground: #EDEDED;
+  --border: #333333;
+  --ui-control-surface: #1F1F1F;
+  --ui-logo-plate-light: #F4F4F4;
   --ui-logo-plate-dark: var(--ui-control-surface);
-  --ui-control-hover: #2C3036;
-  --ui-control-recess: #1C1F23;
-  --ui-disabled-surface: #262A30;
-  --ui-text-secondary: #9A9EA7;
-  --ui-ink-muted: #AAAFB8;
+  --ui-control-hover: #292929;
+  --ui-control-recess: #191919;
+  --ui-disabled-surface: #242424;
+  --ui-text-secondary: #9E9E9E;
+  --ui-ink-muted: #ADADAD;
   --ui-ink-accent: #D0ED78;
+  /* Neon darkened turns olive: dark selected surfaces stay neutral and own messages take a deep green. */
+  --ui-accent-soft: #2A2A2A;
+  --ui-bubble-self: #2D4419;
+  --ui-bubble-self-ink: #E9F0E4;
+  --ui-bubble-self-mention: rgb(204 255 0 / 18%);
+  --ui-bubble-self-mention-ink: #D9F77A;
   --ui-ink-success: #83D1A0;
   --ui-ink-warning: #E6BA76;
   --ui-ink-error: #F39494;
+  --ui-ink-flame: #FF7A2E;
+  --ui-ink-flame-core: #FFC23D;
   --ui-border-soft: rgb(255 255 255 / 9%);
   --ui-border-control: rgb(255 255 255 / 12%);
   --ui-solid-hover: #FFFFFF;
   --ui-shadow-floating: 0 4px 16px rgb(0 0 0 / 28%);
-  --ui-toast-surface: #34373E;
+  --ui-toast-surface: #333333;
   }
 }

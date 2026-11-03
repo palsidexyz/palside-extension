@@ -1,4 +1,5 @@
 'use client';
+import { CHAIN_RULES } from '@palside/shared/rules/wallet';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTranslations } from 'use-intl';
@@ -9,6 +10,7 @@ import { RoomPacketBanner } from './packet';
 import { formatPals } from './amount';
 import { PersonAvatar } from '../ui/primitives';
 import { roomPerson } from '../rooms/rooms';
+import { ROOM_PACKET_AFTER_EXPIRY_MS } from './clock';
 import { parsePals } from '../../../domain/wallet/model';
 import { openPayment, usePaymentRequest } from './payment-sheet';
 import s from './wallet.module.css';
@@ -17,7 +19,7 @@ export function RoomPayments({ c, roomKey }: { c: PalsideController; roomKey: st
   const command = c.live?.command, enabled = c.live?.state.wallet?.config?.enabled;
   const data = c.live?.state.chainRoom?.key === roomKey ? c.live.state.chainRoom : undefined;
   useEffect(() => { if (enabled) void command?.('wallet-room', { key: roomKey }).catch(() => {}); }, [command, enabled, roomKey]);
-  const packets = data?.packets.filter(item => item.expiresAt + 10 * 60_000 > c.now) ?? [];
+  const packets = data?.packets.filter(item => item.expiresAt + ROOM_PACKET_AFTER_EXPIRY_MS > c.now) ?? [];
   if (!enabled || !packets.length) return null;
   return <div className={s.roomPayments}><RoomPacketBanner c={c} packets={packets} /></div>;
 }
@@ -32,11 +34,13 @@ export function TipPayment({ c, messageId, onClose }: { c: PalsideController; me
   const close = () => { requests.cancel(); onClose(); };
   const target = c.live?.state.rooms.current?.messages.find(item => item.id === messageId);
   const author = target && roomPerson(c, target.author, t('common.member'));
-  let value: bigint | undefined; try { value = parsePals(amount, c.live?.state.wallet?.config?.deployment?.decimals ?? 18); } catch { /* The amount is still being entered. */ }
-  const valid = Boolean(value && value > 0n);
+  const decimals = c.live?.state.wallet?.config?.deployment?.decimals ?? 18;
+  let value: bigint | undefined; try { value = parsePals(amount, decimals); } catch { /* The amount is still being entered. */ }
+  const overLimit = !!amount && /^\d+$/.test(amount) && BigInt(amount) > BigInt(CHAIN_RULES.maxTipPals);
+  const valid = Boolean(value && value > 0n && !overLimit);
   async function review() {
     if (busy) return;
-    if (!value || value <= 0n) { setInvalid(count => count + 1); return; }
+    if (!valid || !value) { setInvalid(count => count + 1); return; }
     const request = requests.capture();
     setBusy(true);
     try { const quoted = await c.run('wallet-review', { input: { kind: 'tip', messageId, amount: value.toString() } }); if (!request.isCurrent()) { if (quoted) request.discard(quoted.id); return; } if (quoted) { openPayment(quoted.id); close(); } else setInvalid(count => count + 1); }
@@ -50,8 +54,8 @@ export function TipPayment({ c, messageId, onClose }: { c: PalsideController; me
       <button type="button" role="radio" aria-checked={custom} onClick={() => { setCustom(true); setAmount(''); }}><b>{t('extension.wallet.custom')}</b></button>
     </motion.div>
     <AnimatePresence initial={false}>{custom && <motion.label key="custom" className={s.tipCustom} initial={reduced ? false : { height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ type: 'spring', stiffness: 420, damping: 38 }}>
-      <input inputMode="decimal" autoFocus aria-label={t('extension.wallet.amount')} placeholder="0" value={amount} onChange={event => setAmount(event.target.value)} /><span>PALS</span>
+      <input inputMode="numeric" autoFocus aria-label={t('extension.wallet.amount')} placeholder="0" value={amount} onChange={event => setAmount(event.target.value.replace(/[^\d]/g, ''))} /><span>PALS</span>
     </motion.label>}</AnimatePresence>
-    <Button variant="primary" size="lg" className={s.wide} loading={busy} disabled={!valid} onClick={() => void review()}>{valid ? <span>{t('extension.wallet.tipAmount', { amount: formatPals(value!.toString()) })}</span> : t('extension.wallet.tip')}</Button>
+    <Button variant="primary" size="lg" className={s.wide} loading={busy} disabled={!valid} onClick={() => void review()}>{overLimit ? t('extension.wallet.tipLimit') : valid ? <span>{t('extension.wallet.tipAmount', { amount: formatPals(value!.toString()) })}</span> : t('extension.wallet.tip')}</Button>
   </div></Sheet>;
 }

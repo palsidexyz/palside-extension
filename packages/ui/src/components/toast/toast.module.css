@@ -1,0 +1,13 @@
+.toaster[data-sonner-toaster] { --width: min(356px, calc(100vw - 24px)); font-family: inherit; }
+.toast { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 8px 8px 8px 16px; border-radius: var(--ui-radius-l); corner-shape: var(--ui-corner-shape); background: var(--ui-toast-surface); color: var(--ui-toast-text); box-shadow: var(--ui-shadow-floating); font-size: var(--ui-type-callout); font-weight: 500; line-height: 20px; }
+/* Sonner hides the content of collapsed back toasts only for its own styled toasts; these are unstyled. */
+.toast[data-expanded="false"][data-front="false"] > * { opacity: 0; }
+.content { flex: 1; min-width: 0; }
+.title { overflow-wrap: anywhere; }
+.action, .close { flex: none; display: inline-grid; place-items: center; height: 28px; border: 0; border-radius: var(--ui-radius-pill); background: var(--ui-toast-action); color: var(--ui-toast-text); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.action { padding: 0 10px; font-weight: 600; }
+.close { order: 1; width: 28px; padding: 0; }
+.action:focus-visible, .close:focus-visible { outline: var(--ui-focus-width) solid var(--ui-toast-text); outline-offset: var(--ui-focus-offset); }
+@media (forced-colors: active) {
+  .toast { border: 1px solid CanvasText; }
+}

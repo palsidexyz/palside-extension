@@ -21,6 +21,7 @@ export const overlayStyles = `
     .dm[data-size=sm]{font-size:20px;line-height:26px}
     .dm[data-size=lg]{font-size:28px;line-height:34px}
     .dm[data-mate]{color:var(--pl-dm-mate)}
+    .dm[data-replay]{opacity:calc(var(--dm-opacity,1) * .6)}
     .dm[data-self]{background:var(--pl-dm-self-fill);box-shadow:inset 0 0 0 1px var(--pl-dm-self)}
     .stage[data-theme=light] .dm[data-self]{background:var(--pl-dm-self-fill-light)}
     .dm:hover{background:var(--pl-dm-hover)}

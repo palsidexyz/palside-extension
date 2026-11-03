@@ -11,16 +11,24 @@ import { Tooltip } from '@palside/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent, usePopoverContext } from '@palside/ui/popover';
 import { shortAddress } from '@palside/shared/navigation';
 import { PersonAvatar, Token } from '../ui/primitives';
-import { captureSocialUi, openWithReturn } from '../annotations/social-state';
+import { captureSocialUi } from '../annotations/social-state';
 import { PokeRow, type TopCard } from '../annotations/reminders';
 import type { Person } from '../../../domain/account/model';
 import { ChainLogo } from '../assets/chain-identity';
 import { SiteLogo } from '../assets/site-logo';
 import { siteForUrl } from '../settings/site-catalog';
 import { Count, CountText } from '../ui/motion-details';
+import { openRoom, roomKeyFor, roomsOn } from '../rooms/rooms';
 import { rankedKeys, sourceLabel, watchGroups, type WatchGroup, type WatchSource } from './watch-groups';
 import type { PalsideController } from '../app/use-palside';
 import s from './watch-strip.module.css';
+import { TokenName,tokenLabel } from '../assets/token-name';
+import { liveView } from '../assets/token-data';
+
+/** A website's domain as people say it: the host without www. */
+function siteDomain(input: string) {
+  try { return new URL(input).hostname.replace(/^www\./, ''); } catch { return undefined; }
+}
 
 function linkHint(input: string, home: string) {
   const url = new URL(input);
@@ -45,7 +53,8 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop }: WatchCh
   const signature = group.sources.map(source => source.key).sort().join('|');
   const multiple = group.sources.length > 1;
   const single = group.sources[0];
-  const caption = multiple ? <CountText text={t('extension.dynamic.sourceCount', { count: group.sources.length })} value={group.sources.length} /> : group.view.kind === 'asset' ? single?.view.source : single?.view.disclosure === 'page' ? t('extension.copy.currentPage') : t('extension.copy.websiteHome');
+  // Under the name: a token's source site, a website's own domain — so the two read apart before they are opened.
+  const caption = multiple ? <CountText text={t('extension.dynamic.sourceCount', { count: group.sources.length })} value={group.sources.length} /> : group.view.kind === 'asset' ? single?.view.source : single && siteDomain(single.url);
   useEffect(() => { if (!present) { const focused = menuOpen.current || layerRef.current?.contains(document.activeElement) || anchorRef.current === document.activeElement; close(false); onMenu(false); if (focused) anchorRef.current?.closest('[data-palside-app]')?.querySelector<HTMLTextAreaElement>('[data-message-input]')?.focus({ preventScroll: true }); } }, [present, close, onMenu, layerRef, anchorRef]);
   useEffect(() => () => { if (menuOpen.current) owner.current?.querySelector<HTMLTextAreaElement>('[data-message-input]')?.focus({ preventScroll: true }); onMenu(false); }, [onMenu]);
   async function open(url: string) {
@@ -54,7 +63,7 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop }: WatchCh
     openingRequest.current = true; setOpening(url);
     try {
       if (onOpenPage) await onOpenPage(url);
-      else if (c.live) await openWithReturn(c.live, url);
+      else if (c.live) await c.live.openPage(url);
       else window.open(url, '_blank', 'noopener,noreferrer');
       if (session.current()) close();
     } catch (error) { if (session.current()) c.setNotice(error instanceof Error ? errorMessage(error) : uiMessage('extension.copy.openPageFailed')); }
@@ -69,16 +78,29 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop }: WatchCh
     setMenu(rankedKeys(group.sources).map(key => group.sources.find(source => source.key === key)!));
     layerRef.current?.showPopover();
   }
+  // A token chip has two targets: its name opens the token's 弹幕, the source line under it opens the page.
+  const room = roomsOn(c) && group.view.kind === 'asset' ? roomKeyFor(group.view) : undefined;
+  const viewName = tokenLabel(group.view, t);
+  const roomLabel = t('extension.room.tab', { name: viewName });
+  const sourceHint = multiple ? t('extension.copy.selectSource') : t('extension.dynamic.openSource', { name: (single?.view.source ?? t('extension.copy.sourcePage')) ?? '' });
+  const press = { onPointerDown: () => { pressed.current = signature; }, onPointerCancel: () => { pressed.current = undefined; }, onKeyDown: () => { pressed.current = signature; } };
+  const captionLine = <>{caption}{opening ? <Spinner size={12} className={s.loadingIcon} /> : multiple || menu ? <ChevronDown size={12} /> : <ArrowUpRight size={12} />}</>;
   const rows = menu ? [...menu.map(old => group.sources.find(source => source.key === old.key) ?? { ...old, members: [] }), ...group.sources.filter(source => !menu.some(old => old.key === source.key))] : [];
   return <motion.div layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={reduced ? motionPresets.reduced : motionPresets.reorder} className={s.chip} data-together={group.members.some(member => member.id === c.data.self) || undefined} aria-hidden={!present || undefined} data-watch-key={group.key}>
-    <Tooltip content={group.view.kind === 'asset' ? `${group.view.chain} · ${group.view.name}\n${group.view.address ? shortAddress(group.view.address) : ''}\n${multiple ? t('extension.copy.selectSource') : t('extension.dynamic.openSource', { name: (single?.view.source ?? t('extension.copy.sourcePage')) ?? '' })}` : multiple ? t('extension.copy.selectPage') : single ? linkHint(single.url, t('extension.copy.websiteHome')) : group.view.name}>
-      <button ref={anchorRef} className={s.target} type="button" disabled={!present} aria-busy={Boolean(opening) || undefined} aria-disabled={Boolean(opening) || undefined} aria-label={opening ? t('extension.dynamic.openingPage', { name: (group.view.name) ?? '' }) : t('extension.dynamic.openSource', { name: (group.view.name) ?? '' })} aria-haspopup={multiple || menu ? 'dialog' : undefined} aria-expanded={multiple || menu ? Boolean(menu) : undefined} onPointerDown={() => { pressed.current = signature; }} onPointerCancel={() => { pressed.current = undefined; }} onKeyDown={() => { pressed.current = signature; }} onClick={activate}>
-        <Token view={group.view} size="sm" /><span className={s.text}><strong>{group.view.name}</strong><small>{caption}{opening ? <Spinner size={12} className={s.loadingIcon} /> : multiple || menu ? <ChevronDown size={12} /> : <ArrowUpRight size={12} />}</small></span>
+    {room ? <div className={s.target} data-split>
+      <Token view={group.view} size="sm" />
+      <span className={s.text}>
+        <Tooltip content={roomLabel}><button type="button" className={s.roomName} disabled={!present} aria-label={roomLabel} onClick={() => { if (present) openRoom(c, room); }}><strong><TokenName c={c} view={group.view} /></strong></button></Tooltip>
+        <Tooltip content={sourceHint}><button ref={anchorRef} type="button" className={s.sourceLine} disabled={!present} aria-busy={Boolean(opening) || undefined} aria-disabled={Boolean(opening) || undefined} aria-label={opening ? t('extension.dynamic.openingPage', { name: viewName }) : multiple ? t('extension.copy.selectSource') : t('extension.room.openOn', { name: single?.view.source ?? t('extension.copy.sourcePage') })} aria-haspopup={multiple || menu ? 'dialog' : undefined} aria-expanded={multiple || menu ? Boolean(menu) : undefined} {...press} onClick={activate}>{captionLine}</button></Tooltip>
+      </span>
+    </div> : <Tooltip content={group.view.kind === 'asset' ? `${group.view.chain} · ${viewName}\n${group.view.address ? shortAddress(group.view.address) : ''}\n${sourceHint}` : multiple ? t('extension.copy.selectPage') : single ? linkHint(single.url, t('extension.copy.websiteHome')) : group.view.name}>
+      <button ref={anchorRef} className={s.target} type="button" disabled={!present} aria-busy={Boolean(opening) || undefined} aria-disabled={Boolean(opening) || undefined} aria-label={opening ? t('extension.dynamic.openingPage', { name: viewName }) : t('extension.dynamic.openSource', { name: viewName })} aria-haspopup={multiple || menu ? 'dialog' : undefined} aria-expanded={multiple || menu ? Boolean(menu) : undefined} {...press} onClick={activate}>
+        <Token view={group.view} size="sm" /><span className={s.text}><strong><TokenName c={c} view={group.view} /></strong><small>{captionLine}</small></span>
       </button>
-    </Tooltip>
-    <Tooltip content={t('extension.copy.viewWatchers')}><button className={s.count} disabled={!present || Boolean(onOpenPage)} aria-label={t('extension.dynamic.viewingPeople', { name: (group.view.name) ?? '', count: (group.members.length) ?? '' })} onClick={() => { c.setMemberFilter(group.key); c.go('members'); }}><AvatarStack c={c} members={group.members} pop={pop} /></button></Tooltip>
+    </Tooltip>}
+    <Tooltip content={t('extension.copy.viewWatchers')}><button className={s.count} disabled={!present || Boolean(onOpenPage)} aria-label={t('extension.dynamic.viewingPeople', { name: viewName, count: (group.members.length) ?? '' })} onClick={() => { c.setMemberFilter(group.key); c.go('members'); }}><AvatarStack c={c} members={group.members} pop={pop} /></button></Tooltip>
     {merges.map(merge => <MergeEffect key={merge} />)}
-    <PopoverContent aria-label={t('extension.dynamic.sourcesFor', { name: (group.view.name) ?? '' })} className={s.menu}
+    <PopoverContent aria-label={t('extension.dynamic.sourcesFor', { name: viewName })} className={s.menu}
       onToggle={event => { if (event.target !== event.currentTarget) return; const shown = event.newState === 'open'; menuOpen.current = shown; if (shown) owner.current = anchorRef.current?.closest('[data-palside-app]') ?? null; onMenu(shown); if (!shown) setMenu(null); else layerRef.current?.focus({ preventScroll: true }); }}>
       {group.view.kind === 'asset' && group.view.address && <div className={s.contractRow}><Tooltip content={t('extension.copy.copyContract')}><button type="button" className={s.contract} aria-label={t('extension.dynamic.copyChainContract', { chain: (group.view.chain) ?? '', address: (group.view.address) ?? '' })} onClick={() => { if (group.view.address) void navigator.clipboard.writeText(group.view.address).catch(() => c.setNotice(uiMessage('extension.copy.copyFailed'))); }}>{group.view.chain && <ChainLogo chain={group.view.chain} />}<code>{shortAddress(group.view.address)}</code><Copy size={12} /></button></Tooltip></div>}
       {rows.map(source => { const active = present && source.members.length > 0; const target = <button className={s.sourceTarget} disabled={!active} aria-busy={opening === source.url || undefined} aria-disabled={Boolean(opening) || undefined} onClick={() => { const current = group.sources.find(item => item.key === source.key); if (present && current?.members.length) { void open(current.url); } }}>
@@ -91,7 +113,7 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop }: WatchCh
   </motion.div>;
 }
 
-/** Up to two faces — the user first when they are here too (ringed) — then a +N disc for everyone else. */
+/** Up to two faces — the user first when they are here too — then a +N disc for everyone else. */
 function AvatarStack({ c, members, pop }: { c: PalsideController; members: Person[]; pop: string[] }) {
   const reduced = useReducedMotion();
   const ordered = [...members.filter(member => member.id === c.data.self), ...members.filter(member => member.id !== c.data.self)];
@@ -125,17 +147,17 @@ function useMergeExpiry(merges: { id: string }[], onDone: (id: string) => void) 
   }, []);
 }
 
-/** The top slot under the team header: one 52px row. Usually the 在看 chips in equal columns — two at most, the rest under a +N square;
- *  a 跟看 / 喊你来看 / connection card takes the row instead, and what it covers moves under +N. Same height either way. */
+/** The top slot under the team header: one 44px row. Usually the 在看 chips, each as wide as its content — two at most, the rest under a
+ *  +N square; a 跟看 / 喊你来看 / connection card takes the row instead, and what it covers moves under +N. Same height either way. */
 export function WatchStrip({ c, onOpenPage, top }: { c: PalsideController; onOpenPage?: (url: string) => void; top?: TopCard }) {
   const t = useTranslations();
   const people = c.people.filter(person => c.team.memberIds.includes(person.id));
-  const groups = c.disconnected || c.team.readonly ? [] : watchGroups(people, c.data.views);
+  const groups = c.disconnected || c.team.readonly ? [] : watchGroups(people, c.data.views.map(view => liveView(c, view)));
   const filled = Boolean(top) || groups.length > 0;
   const [holdSpace, setHoldSpace] = useState(filled);
   if (filled && !holdSpace) setHoldSpace(true);
   useEffect(() => { if (filled) return; const timeout = setTimeout(() => setHoldSpace(false), 1200); return () => clearTimeout(timeout); }, [filled]);
-  const retainingSpace = !filled && holdSpace && c.toggles.share;
+  const retainingSpace = !filled && holdSpace && c.share;
   const [order, setOrder] = useState(() => rankedKeys(groups));
   const [hover, setHover] = useState(false); const [focus, setFocus] = useState(false); const [menu, setMenu] = useState(false);
   const latest = useRef(groups); const blocked = useRef(false); const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -173,9 +195,8 @@ export function WatchStrip({ c, onOpenPage, top }: { c: PalsideController; onOpe
   const hidden = top ? keys.filter(key => !top.person || !groups.find(group => group.key === key)!.members.some(member => member.id === top.person)) : keys.slice(shown.length);
   const waiting = top?.waiting ?? [];
   const more = hidden.length + waiting.length;
-  const columns = [...top ? ['minmax(0,1fr)'] : shown.map(() => 'minmax(0,1fr)'), ...more ? ['var(--watch-more)'] : []].join(' ');
-  return <motion.div className={s.region} initial={false} animate={{ height: retainingSpace || filled ? 60 : 0, opacity: filled ? 1 : 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback} inert={!filled} aria-hidden={!filled || undefined}>
-  <div data-watch-strip className={s.strip} style={{ gridTemplateColumns: columns }} aria-label={t('extension.copy.teamViewing')} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} onFocusCapture={() => setFocus(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocus(false); }} data-reduced-motion={Boolean(reduced)}>
+  return <motion.div className={s.region} initial={false} animate={{ height: retainingSpace || filled ? 52 : 0, opacity: filled ? 1 : 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback} inert={!filled} aria-hidden={!filled || undefined}>
+  <div data-watch-strip className={s.strip} aria-label={t('extension.copy.teamViewing')} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} onFocusCapture={() => setFocus(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocus(false); }} data-reduced-motion={Boolean(reduced)}>
     {top ? <motion.div key={top.key} className={s.card} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback}>{top.card}</motion.div>
       : <AnimatePresence initial={false}>{shown.map(chip)}</AnimatePresence>}
     {more > 0 && <Popover boundarySelector="[data-palside-app]" align="start">

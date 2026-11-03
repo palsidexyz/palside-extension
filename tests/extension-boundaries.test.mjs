@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { validateExtensionManifest, extensionCommands, extensionPermissions } from "../scripts/lib/extension-artifact.mjs";
-import { EXTENSION_ID, EXTENSION_PUBLIC_KEY } from "../packages/shared/src/extension.ts";
+import { EXTENSION_ID, EXTENSION_PUBLIC_KEY, RELEASE_API_ORIGIN } from '../packages/shared/src/extension.ts';
+import { extensionPagePolicy } from '../packages/shared/src/extension-policy.ts';
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -160,26 +161,28 @@ test("sidepanel module graph excludes HTTP endpoint tables, error machinery and 
 });
 
 test("artifact requires URL metadata permission and rejects website access or automatic injection", () => {
-  const manifest = { externally_connectable: { matches: ["https://palside.xyz/*"] }, manifest_version: 3, side_panel: { default_path: "sidepanel.html" }, background: { service_worker: "background.js" }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" } };
-  assert.deepEqual(validateExtensionManifest(manifest), []);
-  assert.ok(validateExtensionManifest({ ...manifest, commands: undefined }).length, "the 截图 shortcut is declared");
-  assert.ok(validateExtensionManifest({ ...manifest, commands: { ...extensionCommands, _execute_action: { suggested_key: { default: 'Alt+Shift+P' } } } }).length, "no other shortcut");
-  assert.ok(validateExtensionManifest({ ...manifest, optional_host_permissions: ['https://*/*'] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, content_scripts: [{ matches: ['https://example.com/*'], js: ['page.js'] }] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, host_permissions: ["<all_urls>"] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, host_permissions: ['https://api.example/*'] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, key: EXTENSION_PUBLIC_KEY }).length, "the store rejects a manifest key");
+  const manifest = { externally_connectable: { matches: ["https://palside.xyz/*"] }, manifest_version: 3, side_panel: { default_path: "sidepanel.html" }, background: { service_worker: "background.js" }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) } };
+  assert.deepEqual(validateExtensionManifest(manifest, undefined, true), []);
+  assert.ok(validateExtensionManifest({ ...manifest, commands: undefined }, undefined, true).length, "the 截图 shortcut is declared");
+  assert.ok(validateExtensionManifest({ ...manifest, commands: { ...extensionCommands, _execute_action: { suggested_key: { default: 'Alt+Shift+P' } } } }, undefined, true).length, "no other shortcut");
+  assert.ok(validateExtensionManifest({ ...manifest, optional_host_permissions: ['https://*/*'] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, content_scripts: [{ matches: ['https://example.com/*'], js: ['page.js'] }] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, host_permissions: ["<all_urls>"] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, host_permissions: ['https://api.example/*'] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, key: EXTENSION_PUBLIC_KEY }, undefined, true).length, "the store rejects a manifest key");
+  assert.ok(validateExtensionManifest({ ...manifest, content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" } }, undefined, true).length, "extension pages restrict connections and images");
+  assert.ok(validateExtensionManifest(manifest, undefined, true, 'http://127.0.0.1:8787').length, "the policy names the build's API origin");
   const local = { ...manifest, externally_connectable: { matches: ["http://localhost:3000/*"] } };
   assert.ok(validateExtensionManifest(local, "http://localhost:3000").length, "local builds pin the published ID");
   assert.deepEqual(validateExtensionManifest({ ...local, key: EXTENSION_PUBLIC_KEY }, "http://localhost:3000"), []);
-  assert.ok(validateExtensionManifest({ ...manifest, permissions: ["sidePanel", "tabs"] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['tabs', 'favicon', 'notifications'] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['notifications', 'tabs'] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['notifications'] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['notifications', 'tabs', 'favicon', 'history'] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: [] }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, action: { default_popup: "popup.html" } }).length);
-  assert.ok(validateExtensionManifest({ ...manifest, content_security_policy: { extension_pages: "script-src 'unsafe-eval'" } }).length);
+  assert.ok(validateExtensionManifest({ ...manifest, permissions: ["sidePanel", "tabs"] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['tabs', 'favicon', 'notifications'] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['notifications', 'tabs'] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['notifications'] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: ['notifications', 'tabs', 'favicon', 'history'] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, optional_permissions: [] }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, action: { default_popup: "popup.html" } }, undefined, true).length);
+  assert.ok(validateExtensionManifest({ ...manifest, content_security_policy: { extension_pages: "script-src 'unsafe-eval'" } }, undefined, true).length);
 });
 
 test("activeTab is a required permission and tabs is only optional, asked for 共享在看", async () => {
@@ -190,7 +193,7 @@ test("activeTab is a required permission and tabs is only optional, asked for �
   assert.doesNotMatch(config, /\bpermissions:\s*\[[^\]]*"tabs"/);
   assert.match(config, /optional_permissions:\s*\["notifications", "tabs", "favicon"\]/);
   const manifest = { externally_connectable: { matches: ["https://palside.xyz/*"] }, manifest_version: 3, side_panel: { default_path: "sidepanel.html" }, background: { service_worker: "background.js" }, action: {}, permissions: extensionPermissions.filter(name => name !== "activeTab"), optional_permissions: ["notifications", "tabs", "favicon"], optional_host_permissions: ["<all_urls>"] };
-  assert.ok(validateExtensionManifest(manifest).includes("Unexpected permissions"), "dropping activeTab is rejected");
+  assert.ok(validateExtensionManifest(manifest, undefined, true).includes("Unexpected permissions"), "dropping activeTab is rejected");
 });
 
 test("pinned extension ID is derived from the manifest key", () => {
@@ -199,10 +202,10 @@ test("pinned extension ID is derived from the manifest key", () => {
 });
 
 test('release manifest restricts external messaging to the exact website with no extension ids', () => {
-  const manifest = { manifest_version: 3, side_panel: { default_path: 'sidepanel.html' }, background: { service_worker: 'background.js' }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" }, externally_connectable: { matches: ['https://palside.xyz/*'] } };
-  assert.deepEqual(validateExtensionManifest(manifest), []);
+  const manifest = { manifest_version: 3, side_panel: { default_path: 'sidepanel.html' }, background: { service_worker: 'background.js' }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) }, externally_connectable: { matches: ['https://palside.xyz/*'] } };
+  assert.deepEqual(validateExtensionManifest(manifest, undefined, true), []);
   for (const external of [undefined, {}, { matches: ['https://*/*'] }, { matches: ['https://other.example/*'] }, { matches: ['http://localhost:3000/*'] }, { matches: ['https://palside.xyz/*', 'https://other.example/*'] }, { matches: ['https://palside.xyz/*'], ids: [] }, { matches: ['https://palside.xyz/*'], ids: ['*'] }, { matches: ['https://palside.xyz/*'], accepts_tls_channel_id: true }]) {
-    assert.ok(validateExtensionManifest({ ...manifest, externally_connectable: external }).length, JSON.stringify(external));
+    assert.ok(validateExtensionManifest({ ...manifest, externally_connectable: external }, undefined, true).length, JSON.stringify(external));
   }
 });
 

@@ -1,9 +1,21 @@
 import { siteDefinitions } from '@palside/shared/navigation';
+import type { SiteIcon } from '../../../domain/assets/site-icon';
 import { siteByDomain,siteById,siteCategories as registryCategories,type SiteCategory as RegistryCategory } from '@palside/shared/sites';
 /** `plate`: the logo needs a light plate in dark mode, or a dark one in light mode (see the registry). */
 export type Site = { id: string; name: string; domain: string; logo?: string; plate?: 'light' | 'dark' };
 /** UI consumes the shared registry; internal token/pool capabilities stay out of the settings UI. */
-export const siteCatalog: Site[] = siteDefinitions.map(({ id, name, domain }) => ({ id, name, domain, logo: `/site-logos/${id}.webp`, plate: siteById(id)?.plate }));
+export const siteLogo = (id: string) => `/site-logos/${id}.webp`;
+export const siteCatalog: Site[] = siteDefinitions.map(({ id, name, domain }) => ({ id, name, domain, logo: siteLogo(id), plate: siteById(id)?.plate }));
+/**
+ * Any site by its exact host: the catalog entry, else the host itself with the icon this device kept for it (see the background's
+ * site icons), else no logo — drawn as its first letter.
+ */
+export function siteOf(c: { sites: readonly Site[]; live?: { siteIcons?: Readonly<Record<string, SiteIcon>> } }, host: string): Site {
+  const known = c.sites.find(site => site.domain === host);
+  if (known) return known;
+  const icon = c.live?.siteIcons?.[host];
+  return { id: host, name: host, domain: host, ...(icon ? { logo: icon.src, ...(icon.plate ? { plate: icon.plate } : {}) } : {}) };
+}
 export function siteForUrl(url: string, sites: readonly Site[] = siteCatalog) {
   try { const parsed = new URL(url); return ['https:', 'http:'].includes(parsed.protocol) ? sites.find(site => site.domain === parsed.hostname) : undefined; }
   catch { return undefined; }

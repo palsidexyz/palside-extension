@@ -114,8 +114,8 @@ function renderer() {
   const calls = { tokens: 0, urls: 0, views: 0 };
   const h = (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity).filter(value => value !== false && value != null) });
   const component = execute(sharedSource, 'SharedContent', {
-    h, Fragment: 'Fragment', useTranslations: () => key => key, useId: () => 'tabs', useState: () => [order, value => { order = value; }],
-    s: new Proxy({}, { get: (_, key) => key }), Tabs: 'Tabs', HistoryMore: 'HistoryMore', EmptyState: 'EmptyState', Coins: 'Coins', ImageIcon: 'ImageIcon', AssetCard: 'AssetCard', Button: 'Button', MessageImage: 'MessageImage', ArrowUpRight: 'ArrowUpRight', Link2: 'Link2',
+    h, Fragment: 'Fragment', tokenLabel: view => view.name, liveView: (_c, view) => view, useTranslations: () => key => key, useId: () => 'tabs', useState: () => [order, value => { order = value; }],
+    s: new Proxy({}, { get: (_, key) => key }), Tabs: 'Tabs', HistoryMore: 'HistoryMore', EmptyState: 'EmptyState', Coins: 'Coins', ImageIcon: 'ImageIcon', Token: 'Token', Tooltip: 'Tooltip', IconButton: 'IconButton', Button: 'Button', MessageImage: 'MessageImage', ArrowUpRight: 'ArrowUpRight', Link2: 'Link2',
     sharedTokens: input => { calls.tokens++; return sharedTokens(input); },
     publicShareUrl: value => { calls.urls++; return publicShareUrl(value); },
     assetView: value => { calls.views++; return assetView(value); },
@@ -146,7 +146,7 @@ test('shared categories render current data, attribution and text-before-attachm
   ]);
   const r = renderer();
   let tree = r.render(c);
-  assert.deepEqual(nodes(tree, n => n.type === 'AssetCard').map(n => n.props.view.id), ['token']);
+  assert.deepEqual(nodes(tree, n => n.type === 'Token').map(n => n.props.view.id), ['token']);
   assert.deepEqual(r.calls, { tokens: 1, urls: 0, views: 0 });
   c.sharedCategory = 'images';
   tree = r.render(c);
@@ -179,7 +179,7 @@ test('shared token order survives category switches while newest messages and at
   const c = controller([message('a1', { attachment: card(token), timestamp: 1 }), message('a2', { attachment: card(token), timestamp: 2 }), message('b', { attachment: card(other), timestamp: 3 })]);
   const r = renderer();
   let tree = r.render(c);
-  const ids = value => nodes(value, n => n.type === 'AssetCard').map(n => n.props.view.id);
+  const ids = value => nodes(value, n => n.type === 'Token').map(n => n.props.view.id);
   assert.deepEqual(ids(tree), ['other', 'token']);
   nodes(tree, n => n.type === 'button' && n.children.includes('extension.sharedTokens.discussed'))[0].props.onClick();
   assert.deepEqual(ids(r.render(c)), ['token', 'other']);
@@ -191,6 +191,6 @@ test('shared token order survives category switches while newest messages and at
   assert.deepEqual(ids(tree), ['other']);
   assert.equal(nodes(tree, n => n.type === 'button' && n.children.includes('extension.sharedTokens.discussed'))[0].props['aria-pressed'], true);
   assert.equal(nodes(tree, n => n.type === 'small')[0].children[0], 'extension.copy.teamMembers');
-  nodes(tree, n => n.type === 'Button' && n.children.includes('extension.copy.viewMessage'))[0].props.onClick();
+  nodes(tree, n => n.type === 'IconButton' && n.props.label === 'extension.copy.viewMessage')[0].props.onClick();
   assert.deepEqual(r.jumps, ['new-b']);
 });

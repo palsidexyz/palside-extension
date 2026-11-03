@@ -8,13 +8,13 @@ function event() { const listeners = []; return { addListener(fn) { listeners.pu
 const until = async (check, ms = 1000) => { for (const end = Date.now() + ms; !check() && Date.now() < end;) await new Promise(resolve => setTimeout(resolve, 5)); return check(); };
 function fixture({ site = true, url = 'https://example.com/', imageFetch } = {}) {
   const timers = new Map();
-  const timer = (fn, delay) => { if (delay !== 120_000) return setTimeout(fn, delay); const id = {}; timers.set(id, fn); return id; };
+  const timer = (fn, delay) => { if (delay !== 600_000 && delay !== 15_000) return setTimeout(fn, delay); const id = {}; timers.set(id, fn); return id; };
   const clearTimer = id => { if (!timers.delete(id)) clearTimeout(id); };
   const messages = [];
   const pageMessages = [];
   const imageWindows = []; const closedWindows = []; const commands = []; const opened = [];
   let pagePort;
-  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', web: { share: true, interact: true }, notifications: 'off' }, toggles: { share: false, interact: false }, remoteTeams: [{ id: 'one', joined: true }, { id: 'two', joined: true }], items: { stickies: [] }, data: { views: [], messages: [], people: [] }, drafts: {} };
+  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true }, 'gmgn.ai': { on: false, danmaku: true, signal: true, sticky: true } }, notifications: 'off' }, remoteTeams: [{ id: 'one', joined: true }, { id: 'two', joined: true }], items: { stickies: [] }, data: { views: [], messages: [], people: [] }, drafts: {} };
   const active = { id: 1, windowId: 10, url, active: true, status: 'complete', title: 'Example' };
   const browser = {
     runtime: { id: 'qa', getURL: value => `chrome-extension://qa${value}`, getContexts: async () => [{}], sendMessage: async ({ command, type }) => type === 'palside/image-flush' ? { ok: true } : command.name === 'snapshot' ? { ok: true, value: state } : (commands.push(command), { ok: true }), onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event() },
@@ -132,7 +132,7 @@ test('capture errors distinguish permission loss from a temporary API failure', 
 
 test('capture injection failure is transient even when page interaction is switched off', async () => {
   const f = fixture();
-  f.update({ toggles: { share: false, interact: false } });
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } });
   f.browser.scripting.executeScript = async () => { throw new Error('injection'); };
   assert.equal((await f.command()).text.key, 'extension.runtime.pageActionFailed');
   assert.equal(f.timers.size, 0);
@@ -212,7 +212,7 @@ test('capture requires a valid explicit team and rejects a stale account', async
   for (const payload of [{ teamId: undefined }, { teamId: 'missing' }, { accountId: 'bob' }]) assert.equal((await f.command('capture', payload)).text.key, 'extension.runtime.captureContextChanged');
 });
 
-test('timeout and permission revocation end the whole capture session', async () => {
+test('ten-minute hard timeout and permission revocation end the whole capture session', async () => {
   const f = fixture();
   await f.command();
   f.expire();
@@ -234,9 +234,10 @@ test('page script registration is serialized and unrelated state does not re-reg
   f.browser.scripting.registerContentScripts = async () => { running++; maximum = Math.max(maximum, running); registrations++; await new Promise(resolve => setTimeout(resolve, 5)); running--; };
   const query = f.browser.tabs.query;
   f.browser.tabs.query = options => { if (options?.url) queries++; return query(options); };
+  f.browser.permissions.getAll = async () => ({ origins: ['https://gmgn.ai/*'] });
   f.browser.permissions.contains = async request => request.permissions?.includes('notifications') ? true : request.origins ? true : true;
   f.browser.notifications = { getAll: async () => { notifications++; return {}; } };
-  f.update({ toggles: { share: false, interact: true } });
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true }, 'gmgn.ai': { on: true, danmaku: true, signal: true, sticky: true } } } });
   for (let i = 0; i < 3; i++) f.browser.permissions.onAdded.emit({ origins: ['https://gmgn.ai/*'] });
   for (let i = 0; i < 6; i++) await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(maximum, 1);
@@ -269,7 +270,7 @@ test('page capabilities are pushed after load, tab activation, site switches and
   f.browser.tabs.onUpdated.emit(1, { status: 'complete' }, f.active);
   await flush();
   assert.equal(last().pick.state, 'ready');
-  f.update({ toggles: { share: false, interact: true } });
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: true, danmaku: true, signal: true, sticky: true } } } });
   await flush();
   assert.equal(last().pick.state, 'ready');
   assert.equal(f.messages.filter(message => message.type === 'page').at(-1).status.interactive, true);
@@ -365,4 +366,23 @@ test('offscreen state enters the worker only through revisioned patches', () => 
   assert.equal(f.bg.state, state);
   f.update({ notice: 'accepted' });
   assert.equal(f.bg.state.notice, 'accepted');
+});
+
+
+test('shortcut wait records expire and a replacement shortcut owns its own timer', async () => {
+  const f = fixture({ site: false });
+  f.port.onDisconnect.emit();
+  f.browser.commands.onCommand.emit('capture', f.active);
+  assert.equal(f.timers.size, 1);
+  const first = [...f.timers.keys()][0];
+  f.browser.commands.onCommand.emit('capture', f.active);
+  assert.equal(f.timers.size, 1);
+  assert.equal(f.timers.has(first), false);
+  f.expire();
+  assert.equal(f.timers.size, 0);
+  const panel = { ...f.port, onMessage: event(), onDisconnect: event() };
+  f.browser.runtime.onConnect.emit(panel);
+  panel.onMessage.emit({ type: 'hello', windowId: 10 });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.pageMessages.some(message => message.type === 'capture'), false);
 });

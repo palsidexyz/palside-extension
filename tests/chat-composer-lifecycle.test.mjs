@@ -55,9 +55,10 @@ function linkFixture(initial = { text: 'https://a.test' }) {
   const command = (_, payload) => { const request = deferred(); requests.push({ ...request, payload }); return request.promise; };
   function mount() { h = host(); hook = compile(declarations(composerFile, ['LINK', 'useLinkCard']), 'useLinkCard', h.globals); render(); }
   function update(patch) { patches.push(patch); draft = { ...draft, ...model.draftAttachmentPatch(draft, patch) }; }
-  function render() { h.render(() => hook({ draft, current: 'team', data: { self: 'self' }, live: { command }, updateDraft: update })); }
+  let api;
+  function render() { h.render(() => { api = hook({ draft, current: 'team', data: { self: 'self' }, live: { command }, updateDraft: update }); }); }
   mount();
-  return { requests, patches, render, update, get draft() { return draft; }, replace(value) { draft = value; render(); },
+  return { requests, patches, render, update, get api() { return api; }, get draft() { return draft; }, replace(value) { draft = value; render(); },
     remount() { h.unmount(); mount(); }, unmount() { h.unmount(); },
     async generate(id = 'a') { render(); h.tick(); requests.at(-1).resolve({ attachment: card(id) }); await settle(); render(); },
     tick() { h.tick(); },
@@ -92,6 +93,23 @@ test('dismissed URLs persist for the draft across remounts and reset for a new d
   f.replace(model.emptyDraft); f.update({ text: 'https://a.test' }); await f.generate();
   assert.equal(f.requests.length, 3);
   assert.equal(f.draft.attachment.assetId, 'a');
+});
+
+test('a quick send starts the pending lookup at once, shares it with the pause timer and gives up after its wait', async () => {
+  const f = linkFixture();
+  assert.equal(f.requests.length, 0);
+  assert.equal(f.api.pending(), true);
+  const waiting = f.api.settle();
+  assert.equal(f.requests.length, 1);
+  f.tick();
+  assert.equal(f.requests.length, 1);
+  f.requests[0].resolve({ attachment: card() }); await waiting; f.render();
+  assert.equal(f.draft.attachment.assetId, 'a');
+  assert.equal(f.api.pending(), false);
+  const dismissed = linkFixture({ text: 'https://a.test', dismissedUrls: ['https://a.test'] });
+  assert.equal(dismissed.api.pending(), false);
+  await dismissed.api.settle();
+  assert.equal(dismissed.requests.length, 0);
 });
 
 test('late automatic lookups cannot replace a manual attachment or revive an unmounted draft', async () => {

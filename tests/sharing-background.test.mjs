@@ -3,14 +3,17 @@ import { productionModules } from './helpers/production-module.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTabObserver} from '../apps/extension/src/runtime/browser/tab-observer.ts';
-import {identifyPage} from '../packages/shared/src/navigation.ts';
+import { identifyPage } from '../packages/shared/src/navigation.ts';
 import {readVisibleToken} from '../apps/extension/src/runtime/viewing/token-page.ts';
 const wait=()=>new Promise(resolve=>setTimeout(resolve,35));
 const until=async(ready,ms=1000)=>{const end=Date.now()+ms;while(!ready()&&Date.now()<end)await wait();};
 function event(){const listeners=[];return{addListener:fn=>listeners.push(fn),emit:(...args)=>listeners.map(fn=>fn(...args))};}
+// 网页互动 stays off on the token site, so only the token reads under test call executeScript; a test may set its own sites.
+const off={on:false,danmaku:false,signal:false,sticky:false};
+const quiet={'gmgn.ai':off,'fomo.family':off};
 function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,favicon=true}={}){
  const calls=[]; const controls={focused:true,locked:false,site,favicon,permissionChecks:[],tab:{id:1,windowId:10,active:true,status:'complete',url:'https://x.com/secret-post?tracking=private',title:'PRIVATE TITLE'}};
- let state={connection:{networkOnline:true,service:'ready',messaging:'ready',retrying:false},authenticated:true,account:{id:'alice'},preferences:{current:'one',web:{share:true,interact:true}},toggles:{share:true,interact:false},remoteTeams:[{id:'one',joined:true}],data:{people:[],messages:[],views:[]},items:{danmaku:[],notes:[],stances:[]},drafts:{}};
+ let state={connection:{networkOnline:true,service:'ready',messaging:'ready',retrying:false},authenticated:true,account:{id:'alice'},preferences:{current:'one',share:true,siteInteraction:quiet},remoteTeams:[{id:'one',joined:true}],data:{people:[],messages:[],views:[]},items:{danmaku:[],notes:[],stances:[]},drafts:{}};
  const panelSender={id:'qa',url:'chrome-extension://qa/sidepanel.html',documentId:'panel'};
  const backgroundSender={id:'qa',url:'chrome-extension://qa/offscreen.html'};
  const browser={
@@ -31,7 +34,7 @@ function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,fav
  const sendState=stateSender(browser,backgroundSender);
  const broadcast=()=>sendState(state);
  browser.runtime.onConnect.emit(port);port.onMessage.emit({type:'hello',windowId:10,activity:helloActivity});if(broadcastState)broadcast();
- return{calls,messages,pageMessages,controls,grantedOrigins,browser,port,broadcast,command:(name,payload={})=>new Promise(resolve=>browser.runtime.onMessage.emit({type:'palside/command',command:{name,payload}},panelSender,resolve)),metadata:request=>new Promise(resolve=>browser.runtime.onMessage.emit({type:"palside/token-page",request},backgroundSender,resolve)),update:patch=>{state={...state,...patch};broadcast();},dispose:()=>observer.dispose(),identities:()=>calls.filter(c=>c.name==='page'&&c.payload?.identity),activities:()=>calls.filter(c=>c.name==='page'&&c.payload?.activity)};
+ return{calls,messages,pageMessages,controls,grantedOrigins,browser,port,broadcast,command:(name,payload={})=>new Promise(resolve=>browser.runtime.onMessage.emit({type:'palside/command',command:{name,payload}},panelSender,resolve)),metadata:request=>new Promise(resolve=>browser.runtime.onMessage.emit({type:"palside/token-page",request},backgroundSender,resolve)),update:patch=>{state={...state,...patch,...(patch.preferences?{preferences:{siteInteraction:quiet,...patch.preferences}}:{})};broadcast();},dispose:()=>observer.dispose(),identities:()=>calls.filter(c=>c.name==='page'&&c.payload?.identity),activities:()=>calls.filter(c=>c.name==='page'&&c.payload?.activity)};
 }
 test('worker restart restores observation from the runtime snapshot without claiming fresh device activity',async t=>{
  const f=fixture({broadcastState:false,helloActivity:false});t.after(f.dispose);await until(()=>f.identities().length>=2);
@@ -62,16 +65,16 @@ test('actual worker observes only an eligible foreground URL without any injecti
  assert.equal(f.identities().length,2);assert.equal(f.identities()[0].payload.identity.url,'https://x.com');
  assert.equal(f.identities()[0].payload.title,'PRIVATE TITLE');
  assert.doesNotMatch(JSON.stringify(f.identities()),/secret-post|tracking/);
- const count=f.identities().length;f.update({toggles:{share:false,interact:false}});await wait();assert.equal(f.identities().length,count);
+ const count=f.identities().length;f.update({preferences:{current:'one',share:false}});await wait();assert.equal(f.identities().length,count);
  assert.equal(f.calls.at(-1).payload.clear,true);
 });
 test('automatic observation needs no site grant and no tabs check of its own: the 共享在看 switch alone starts and clears it', async t => {
  const f = fixture(); t.after(f.dispose); await wait();
  assert.equal(f.identities().length, 2);
  assert.equal(f.controls.permissionChecks.includes('tabs'), false);
- f.update({ toggles: { share: false, interact: false } }); await wait(); await wait();
+ f.update({ preferences: { current: 'one', share: false } }); await wait(); await wait();
  assert.equal(f.calls.at(-1).payload.clear, true);
- f.update({ toggles: { share: true, interact: false } }); await wait(); await wait();
+ f.update({ preferences: { current: 'one', share: true } }); await wait(); await wait();
  assert.equal(f.identities().length, 4);
  assert.equal(f.controls.permissionChecks.includes('tabs'), false);
 });
@@ -98,7 +101,7 @@ test('token-data changes during executeScript reject the result, including disab
   let finish,started;const executing=new Promise(resolve=>{started=resolve;});
   f.browser.scripting.executeScript=()=>new Promise(resolve=>{finish=resolve;started();});
   const pending=f.metadata(request);await executing;
-  const preferences={current:'one',web:{share:true,interact:true}};
+  const preferences={current:'one',share:true};
   f.update({preferences:{...preferences,tokenOff:['gmgn.ai']}});
   if(restore)f.update({preferences:{...preferences,tokenOff:[]}});
   finish([{frameId:0,result:{name:'STALE'}}]);
@@ -126,7 +129,7 @@ test('site permission changes reject pending reads and invalidate cached metadat
 test('same-tab same-contract navigation reads each source and each document through the background cache',async t=>{
  const f=fixture({site:true});t.after(f.dispose);const request=tokenRequest(f);let reads=0;
  const {SharingRuntime}=productionModules()('apps/extension/src/runtime/viewing/sharing.ts');
- const runtime={auth:{session:{account:{id:'alice'}},scope:()=>({wait:p=>p})},state:{preferences:{current:'one'}},tokenPage:async input=>(await f.metadata(input)).metadata};
+ const runtime={auth:{session:{account:{id:'alice'}},scope:()=>({wait:p=>p})},state:{preferences:{current:'one'}},tokens:{put(){},get(){}},tokenPage:async input=>(await f.metadata(input)).metadata};
  const sharing=new SharingRuntime(runtime);
  f.browser.scripting.executeScript=async()=>[{frameId:0,result:{name:`SOURCE ${++reads}`}}];
  const read=identity=>sharing.localTokenMetadata(identity,request.context,'share');
@@ -155,7 +158,7 @@ test('failed token reads share a bounded document budget and policy changes star
  f.browser.scripting.executeScript=async()=>{reads++;return[];};
  for(let i=0;i<5;i++)assert.equal((await f.metadata(request)).metadata,undefined);
  assert.equal(reads,3);
- const preferences={current:'one',web:{share:true,interact:true}};
+ const preferences={current:'one',share:true};
  f.update({preferences:{...preferences,tokenOff:['gmgn.ai']}});
  assert.equal((await f.metadata(request)).metadata,undefined);assert.equal(reads,3);
  f.update({preferences:{...preferences,tokenOff:[]}});
@@ -192,9 +195,9 @@ test('共享在看 is independent of 网页互动 and follows every public host'
   const f = fixture(); t.after(f.dispose); await wait();
   const count = f.identities().length;
   f.controls.tab.url = 'https://custom.example.com/page';
-  f.update({ toggles: { share: false, interact: true } });
+  f.update({ preferences: { current: 'one', share: false, siteInteraction: { 'custom.example.com': { on: true } } } });
   await wait(); assert.equal(f.identities().length, count);
-  f.update({ toggles: { share: true, interact: false } });
+  f.update({ preferences: { current: 'one', share: true, siteInteraction: { 'custom.example.com': { on: false } } } });
   await wait(); assert.equal(f.identities().length, count + 2);
   assert.equal(f.identities().at(-1).payload.identity.host, 'custom.example.com');
   f.controls.tab.url = 'https://sub.custom.example.com/page';
@@ -218,9 +221,9 @@ test('token name reads need a registry token profile, site access and 代币数�
   const dex = { ...request, identity: { ...request.identity, host: 'dexscreener.com', url: request.identity.url.replace('gmgn.ai', 'dexscreener.com') } };
   assert.equal((await f.metadata(dex)).metadata, undefined); assert.equal(attempts, 0, 'no registry profile');
   assert.equal((await f.metadata(request)).metadata.name, 'Confirmed'); assert.equal(attempts, 1);
-  f.update({ preferences: { current: 'one', web: { share: true, interact: true }, tokenProfile: false } });
+  f.update({ preferences: { current: 'one', share: true, tokenProfile: false } });
   assert.equal((await f.metadata(request)).metadata.name, 'Confirmed', 'a stray tokenProfile preference changes nothing'); assert.equal(attempts, 2);
-  f.update({ preferences: { current: 'one', web: { share: true, interact: true }, tokenOff: ['gmgn.ai'] } });
+  f.update({ preferences: { current: 'one', share: true, tokenOff: ['gmgn.ai'] } });
   assert.equal((await f.metadata(request)).metadata, undefined, '代币数据 off'); assert.equal(attempts, 2);
 });
 
@@ -228,7 +231,7 @@ test('禁用 共享在看 stops observation even while the switch state is on', 
   const f = fixture(); t.after(f.dispose);
   await wait(); const before = f.identities().length;
   assert.ok(before > 0);
-  f.update({ preferences: { current: 'one', web: { share: false, interact: true } } });
+  f.update({ preferences: { current: 'one', share: false } });
   await wait(); await wait();
   assert.ok(f.calls.some(c => c.name === 'page' && c.payload?.clear), 'clears the viewing state');
   f.controls.tab.url = 'https://x.com/another'; f.browser.tabs.onUpdated.emit(1, { url: f.controls.tab.url }, f.controls.tab);
@@ -236,14 +239,14 @@ test('禁用 共享在看 stops observation even while the switch state is on', 
 });
 test('a 共享在看 switch that replies before its state still claims this device once sharing turns on', async t => {
   const f = fixture(); t.after(f.dispose);
-  await wait(); f.update({ toggles: { share: false, interact: false } }); await wait();
+  await wait(); f.update({ preferences: { current: 'one', share: false } }); await wait();
   const activities = f.activities().length;
   // The runtime replies to the switch first; the state that turns sharing on follows.
   assert.equal((await f.command('toggle', { share: true })).ok, true); await wait();
-  f.update({ toggles: { share: true, interact: false } }); await wait(); await wait();
+  f.update({ preferences: { current: 'one', share: true } }); await wait(); await wait();
   assert.equal(f.activities().length, activities + 1);
   // A later change with no command of this panel behind it claims nothing.
-  f.update({ toggles: { share: false, interact: false } }); await wait(); f.update({ toggles: { share: true, interact: false } }); await wait(); await wait();
+  f.update({ preferences: { current: 'one', share: false } }); await wait(); f.update({ preferences: { current: 'one', share: true } }); await wait(); await wait();
   assert.equal(f.activities().length, activities + 1);
 });
 test('Chrome taking back the tabs permission switches 共享在看 off with a reason, only while it is on', async t => {
@@ -251,7 +254,7 @@ test('Chrome taking back the tabs permission switches 共享在看 off with a re
   const toggles = () => f.calls.filter(c => c.name === 'toggle');
   f.browser.permissions.onRemoved.emit({ permissions: ['tabs'], origins: [] }); await wait();
   assert.deepEqual(toggles().map(c => c.payload), [{ share: false, revoked: true }]);
-  f.update({ toggles: { share: false, interact: false } }); await wait();
+  f.update({ preferences: { current: 'one', share: false } }); await wait();
   f.browser.permissions.onRemoved.emit({ permissions: ['tabs'], origins: [] }); await wait();
   assert.equal(toggles().length, 1);
 });
@@ -306,4 +309,13 @@ test('room view subscriptions belong to their panel document', async t => {
  assert.deepEqual(f.calls.find(c => c.name === 'room-watch')?.payload, { id: 'panel:summary', view });
  await f.command('room-watch', { id: 'summary' });
  assert.deepEqual(f.calls.filter(c => c.name === 'room-watch').at(-1)?.payload, { id: 'panel:summary' });
+});
+
+test('worker replay and initial activity use the same five-minute idle threshold', async () => {
+  const thresholds = [];
+  const f = fixture();
+  f.browser.idle.queryState = async seconds => { thresholds.push(seconds); return 'active'; };
+  f.browser.runtime.onMessage.emit({ type: 'palside/runtime-ready', epoch: 'new-runtime' }, { id: 'qa', url: 'chrome-extension://qa/offscreen.html' }, () => {});
+  await wait(); f.dispose();
+  assert.ok(thresholds.length > 0); assert.ok(thresholds.every(seconds => seconds === 300));
 });

@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 /** A short, bounded memory of failed images avoids repeat requests when cards remount. */
 export class TokenImageFailures {
   private entries = new Map<string, number>();
@@ -12,7 +13,7 @@ export class TokenImageFailures {
   remember(source: string) {
     const now = this.now();
     for (const [key, expires] of this.entries) if (expires <= now) this.entries.delete(key);
-    this.entries.delete(source); this.entries.set(source, now + 60_000);
+    this.entries.delete(source); this.entries.set(source, now + MINUTE_MS);
     while (this.entries.size > 64) this.entries.delete(this.entries.keys().next().value!);
   }
   forget(source: string) { this.entries.delete(source); }

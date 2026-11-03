@@ -10,6 +10,8 @@ import { DiagnosticErrors } from '../diagnostics/diagnostics';
 import { SessionRuntime } from '../account/session-lifecycle';
 import { LocalDataRuntime } from '../media/cache';
 import { SharingRuntime } from '../viewing/sharing';
+import { TokenProfiles } from '../viewing/token-profiles.ts';
+import { viewAsset } from '../../domain/annotations/interaction.ts';
 import { TimelineRuntime } from '../chat/timeline';
 import { SendingRuntime } from '../chat/sending';
 import { TeamInteractions } from '../annotations/interactions';
@@ -31,6 +33,13 @@ export class PalsideService {
   }
   readonly api = new Api(API_URL);
   state = emptyState();
+  readonly tokens = new TokenProfiles(() => this.nameViews());
+  /** A name learned later also replaces the address placeholder in views already shown, such as a teammate's 在看. */
+  private nameViews() {
+    let changed = false;
+    const views = this.state.data.views.map(view => { const named = this.tokens.apply(view); if (named !== view) changed = true; return named; });
+    if (changed) this.state.data = { ...this.state.data, views };
+  }
   listeners = new Set<(state: RuntimeState) => void>();
   diagnosticErrors = new DiagnosticErrors();
   subscribe(listener: (state: RuntimeState) => void) {
@@ -54,7 +63,7 @@ export class PalsideService {
     const read = new Map(this.state.remoteTeams.filter(team => team.joined).map(team => [team.id, new Set(team.preferences.readIds)]));
     const counts = teamUnreadCounts(this.state.data.messages, self, read, now);
     this.unreadDeadline = Infinity;
-    for (const message of this.state.data.messages) if (message.expiresAt !== undefined && message.expiresAt > now) this.unreadDeadline = Math.min(this.unreadDeadline, message.expiresAt);
+    for (const message of this.state.data.messages) if (message.expiresAt && message.expiresAt > now) this.unreadDeadline = Math.min(this.unreadDeadline, message.expiresAt);
     let changed = false;
     const teams = this.state.data.teams.map(team => {
       const { unread, mentions } = counts.get(team.id) ?? { unread: 0, mentions: 0 };
@@ -79,11 +88,28 @@ export class PalsideService {
         own.teamId === this.state.preferences.current && this.sharing.selectedDevice && allowed
         ? { viewId: own.view.id, teamId: own.teamId, expiresAt: own.expiresAt } : undefined;
     }
+    this.projectTokens();
     const patch = diffState(this.emitted, this.state, this.emissionCache);
     if (this.emitted && !Object.keys(patch.set).length && !patch.unset?.length && !patch.entities) return;
     this.state = { ...this.state, revision: this.state.revision + 1 };
     this.emitted = this.state;
     for (const listener of this.listeners) listener(this.state);
+  }
+  private tokenInput = '';
+  /** The token records the panel needs: every token it currently shows, so card, 详情, 弹幕, 热门 and 在看 read one record. */
+  private projectTokens() {
+    const state = this.state, assets: string[] = [];
+    const add = (view: { kind?: string; chain?: string; address?: string } | undefined) => { const asset = viewAsset(view); if (asset) assets.push(asset); };
+    const addKey = (key: string | undefined) => { if (key?.startsWith('token:')) assets.push(key.slice('token:'.length)); };
+    addKey(state.rooms.current?.key); addKey(state.rooms.pinned); addKey(this.rooms.tabKey);
+    for (const view of state.data.views) add(view);
+    for (const message of state.data.messages) { add(message.attachment?.kind === 'asset' ? message.attachment.view : undefined); add(message.ref?.view); }
+    for (const draft of Object.values(state.drafts)) { add(draft.value.attachment?.kind === 'asset' ? draft.value.attachment.view : undefined); add(draft.value.ref?.view); }
+    for (const row of state.rooms.hot?.rows ?? []) addKey(row.key);
+    for (const key of Object.keys(state.rooms.summaries)) addKey(key);
+    const input = `${this.tokens.version}:${assets.join(',')}`;
+    if (input === this.tokenInput) return;
+    this.tokenInput = input; state.tokens = this.tokens.pick(assets);
   }
   private authCommandEpoch = 0;
   async command(input: unknown): Promise<unknown> {

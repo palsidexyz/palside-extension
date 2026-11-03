@@ -1,3 +1,4 @@
+import { expired } from '../../domain/chat/expiry.ts';
 import {
 POKE_DISPLAY,
 type Poke,
@@ -11,7 +12,7 @@ export function upsertTeamItem(items: StickyItems, item: NonNullable<TeamItems['
 }
 
 export function pruneTeamItems(items: StickyItems, now = Date.now(), readable: (teamId: string) => boolean = () => true): StickyItems {
-  return { stickies: (items.stickies ?? []).filter(item => item.expiresAt > now && readable(item.teamId)) };
+  return { stickies: (items.stickies ?? []).filter(item => !expired(item.expiresAt, now) && readable(item.teamId)) };
 }
 
 export function mergePoke(

@@ -1,9 +1,10 @@
+import { DAY_MS as DAY } from '@palside/shared/units';
 import { deviceStates,type PresenceState } from '@palside/shared/contracts/common';
 import type { DeviceState } from '@palside/shared/contracts/presence';
 import { offlineDirectory } from './offline-directory';
 import { ApiError } from '../transport/api';
 import type { Person } from '../../domain/account/model';
-import { DAY,color } from '../composition/state';
+import { color } from '../composition/state';
 import { pruneTeamItems } from '../annotations/team-items';
 import { uniqueMediaIds } from '../teams/teams';
 import { completeTeamStart } from '../teams/onboarding';
@@ -67,7 +68,7 @@ export async function fetchSnapshot(this: SessionRuntime) {
       const levelKey = `${snapshot.account.id}:team-level-events`;
       const levelState = await scope.wait(runtime.storage.get<{ levels: Record<string, number>; events: NonNullable<typeof runtime.state.teamLevelEvents> }>(levelKey)) ?? { levels: {}, events: [] };
       const now = Date.now();
-      levelState.events = levelState.events.filter(event => snapshot.teams.some(team => team.id === event.teamId && team.joined && event.timestamp > now - team.retentionDays * DAY));
+      levelState.events = levelState.events.filter(event => snapshot.teams.some(team => team.id === event.teamId && team.joined && (team.retentionDays === null || event.timestamp > now - team.retentionDays * DAY)));
       for (const team of snapshot.teams) if (team.joined && team.activity) {
         const previous = levelState.levels[team.id], next = team.activity.level;
         if (previous !== undefined && next > previous) levelState.events.push({ id: crypto.randomUUID(), teamId: team.id, from: previous, to: next, timestamp: now });

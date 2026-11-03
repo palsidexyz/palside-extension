@@ -1,12 +1,12 @@
 'use client';
 import { LevelChip } from './team-level';
 import { Chip } from '../ui/chip';
-import { APPLICATION_NOTE_LENGTH, TEAM_MEMBER_LIMIT } from '@palside/shared/contracts/limits';
+import { APPLICATION_NOTE_LENGTH, TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
 
 import { deadlineTime, localeOrEnglish, message as uiMessage } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
 import { Count, CountText } from '../ui/motion-details';
-import { useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronRight, Check, Clock3, Flag, Megaphone, Search, Users } from 'lucide-react';
 import { Button, IconButton } from '@palside/ui/button';
 import { Tooltip } from '@palside/ui/tooltip';
@@ -34,8 +34,10 @@ export function Lobby({ c }: { c: PalsideController & DiscoveryActions }) {
   const setTab = (tab: 'recruiting' | 'applications') => c.updateLobbyFilters({ tab });
   const pendingIds = new Set(c.requests.filter(request => request.personId === c.data.self).map(request => request.teamId));
   const pendingFor = (team: Team) => pendingIds.has(team.id) || Boolean(team.requested);
-  const applications = c.discoveryTeams.filter(team => c.live ? Boolean(team.applicationStatus && (team.applicationExpiresAt ?? 0) > c.now) : pendingFor(team));
-  const teams = tab === 'applications' ? applications : publicTeams(c.discoveryTeams, query, c.now).sort((a, b) => sort === 'heat' ? (a.activity?.rank ?? Number.MAX_SAFE_INTEGER) - (b.activity?.rank ?? Number.MAX_SAFE_INTEGER) || (b.publishedAt ?? 0) - (a.publishedAt ?? 0) : (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
+  const applications = c.live
+    ? c.discoveryTeams.filter(team => team.appliedOrder !== undefined && Boolean(team.applicationStatus && (team.applicationExpiresAt ?? 0) > c.now)).sort((a, b) => a.appliedOrder! - b.appliedOrder!)
+    : c.discoveryTeams.filter(pendingFor);
+  const teams = tab === 'applications' ? applications : c.live ? c.discoveryTeams.filter(team => team.listed && isRecruiting(team, c.now)) : publicTeams(c.discoveryTeams, query, c.now).sort((a, b) => sort === 'heat' ? (a.activity?.rank ?? Number.MAX_SAFE_INTEGER) - (b.activity?.rank ?? Number.MAX_SAFE_INTEGER) || (b.publishedAt ?? 0) - (a.publishedAt ?? 0) : (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
   const open = (team: Team) => { c.setRecruitmentId(team.id); c.go('recruitment'); };
   const state = (team: Team) => pendingFor(team) ? 'pending' : team.joined ? 'joined' : team.applicationStatus === 'rejected' ? 'rejected' : undefined;
   const stateLabel = { pending: t('extension.copy.pendingApproval'), joined: t('extension.copy.joined'), rejected: t('extension.copy.applicationRejected') };
@@ -47,7 +49,7 @@ export function Lobby({ c }: { c: PalsideController & DiscoveryActions }) {
     ]} /></div>
     <div id="lobby-panel" role="tabpanel" aria-labelledby={`lobby-tab-${tab}`} className={s.lobbyPanel}>
     {tab === 'recruiting' && <Input type="search" aria-label={t('extension.copy.searchTeams')} leadingIcon={<Search size={16} />} placeholder={t('extension.copy.searchTeams')} value={query} onChange={event => setQuery(event.target.value)} />}
-    {tab === 'recruiting' && <div className={s.sortRow}><span>{teams.length > 0 && <CountText text={t('extension.start.teamCount', { count: teams.length })} value={teams.length} />}</span><select aria-label={t('extension.wallet.byHeat')} value={sort} onChange={event => setSort(event.target.value as typeof sort)}><option value="heat">{t('extension.wallet.byHeat')}</option><option value="latest">{t('extension.wallet.latest')}</option></select></div>}
+    {tab === 'recruiting' && teams.length > 0 && <div className={s.sortRow}><span>{teams.length > 0 && <CountText text={t('extension.start.teamCount', { count: teams.length })} value={teams.length} />}</span><select aria-label={t('extension.wallet.byHeat')} value={sort} onChange={event => setSort(event.target.value as typeof sort)}><option value="heat">{t('extension.wallet.byHeat')}</option><option value="latest">{t('extension.wallet.latest')}</option></select></div>}
     {tab === 'applications' ? applications.length > 0 && <div className={s.applications}>{applications.map(team => {
       const status = state(team);
       return <button type="button" key={team.id} className={s.applicationRow} aria-label={t('extension.dynamic.viewTeam', { name: team.name ?? '' })} onClick={() => open(team)}>
@@ -66,9 +68,10 @@ export function Lobby({ c }: { c: PalsideController & DiscoveryActions }) {
         <span className={s.badges}><LevelChip level={team.activity?.level ?? 1} />{sort === 'heat' && team.activity?.rank && <Chip>#<Count value={team.activity.rank} /></Chip>}</span>
       </button>;
     })}</div>}
-    {c.lobbyError && <div className={base.empty}><p role="alert">{c.lobbyError}</p><Button loadingLabel={t('common.working')} size="sm" loading={c.lobbyLoading} onClick={() => void c.refreshLobby()}>{t('common.retry')}</Button></div>}
-    {!teams.length && !c.lobbyError && c.lobbyLoading && <div className={base.empty}><p role="status">{t('extension.copy.loadingTeamsEllipsis')}</p></div>}
-    {!teams.length && !c.lobbyError && !c.lobbyLoading && <div className={base.empty}><p>{tab === 'applications' ? t('extension.copy.noApplications') : query.trim() ? t('extension.copy.noTeamsFound') : t('extension.copy.noRecruitment')}</p>{tab === 'recruiting' && query.trim() && <Button onClick={() => setQuery('')}>{t('extension.copy.clearFilter')}</Button>}</div>}
+    {c.lobbyMore[tab === 'applications' ? 'applications' : 'teams'] && teams.length > 0 && <MoreSentinel key={tab} loading={c.lobbyLoadingMore} failed={c.lobbyMoreFailed} onMore={() => void c.loadMoreLobby(tab === 'applications' ? 'applications' : 'teams')} />}
+    {c.lobbyError && <div className={base.empty} data-fill><p role="alert">{c.lobbyError}</p><Button loadingLabel={t('common.working')} size="sm" loading={c.lobbyLoading} onClick={() => void c.refreshLobby()}>{t('common.retry')}</Button></div>}
+    {!teams.length && !c.lobbyError && c.lobbyLoading && <div className={base.empty} data-fill><p role="status">{t('extension.copy.loadingTeamsEllipsis')}</p></div>}
+    {!teams.length && !c.lobbyError && !c.lobbyLoading && <div className={base.empty} data-fill><p>{tab === 'applications' ? t('extension.copy.noApplications') : query.trim() ? t('extension.copy.noTeamsFound') : t('extension.copy.noRecruitment')}</p>{tab === 'recruiting' && query.trim() && <Button onClick={() => setQuery('')}>{t('extension.copy.clearFilter')}</Button>}</div>}
     </div>
   </>;
 }
@@ -122,4 +125,18 @@ export function RecruitmentSettings({ c }: { c: PalsideController }) {
       if (expired) { c.setRecruitment(true); return; }
       c.setConfirmation({ title: uiMessage('extension.copy.publishRecruitmentTitle'), description: uiMessage('extension.copy.publishRecruitmentDescription'), action: uiMessage('extension.copy.publishRecruitment'), confirm: () => c.setRecruitment(true) });
     }} /></SettingControl>;
+}
+
+/** The end of a loaded page: coming into view asks for the next one, and says so while it loads. */
+function MoreSentinel({ loading, failed, onMore }: { loading: boolean; failed: boolean; onMore: () => void }) {
+  const t = useTranslations();
+  const ref = useRef<HTMLDivElement>(null), more = useEffectEvent(onMore);
+  // Observing again after each page also catches a sentinel that is still in view once the page lands.
+  useEffect(() => {
+    const node = ref.current; if (!node || loading || failed) return;
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) more(); }, { rootMargin: '200px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loading, failed]);
+  return <div ref={ref} className={s.more} role="status">{loading ? t('extension.copy.loading') : failed ? <Button size="sm" variant="quiet" onClick={onMore}>{t('common.retry')}</Button> : null}</div>;
 }

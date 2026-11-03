@@ -1,7 +1,11 @@
+import { MINUTE_MS } from '@palside/shared/units';
+import { normalizeSiteHost } from '../assets/site-host.ts';
 import { assetKey,pageScopeUrl,viewAsset } from './interaction.ts';
 import type { Message } from '../chat/model';
 import type { Viewing } from '../assets/model';
-import { ROOM_TEXT_MAX,EVENT_ID_LENGTH } from '@palside/shared/contracts/limits';
+import { ROOM_TEXT_MAX } from '@palside/shared/rules/rooms';
+import { EVENT_ID_LENGTH } from '@palside/shared/rules/messages';
+import { expired } from '../chat/expiry.ts';
 
 export { assetKey, pageScopeUrl, viewAsset };
 /** 便利贴: an encrypted team event kept on the Matrix timeline next to messages, never shown as chat: text pinned to a spot on a token page, or to the token itself. */
@@ -11,7 +15,7 @@ export const POKE_EVENT = 'com.palside.poke';
 
 export const REF_CAPTION_MAX = 40;
 /** A received poke stays as a reminder card for one minute. */
-export const POKE_DISPLAY = 60_000;
+export const POKE_DISPLAY = MINUTE_MS;
 export const STICKY_MAX = 200;
 /** Chain + normalized contract: discussions and stickies group by asset. */
 export type AssetKey = string;
@@ -42,7 +46,6 @@ const plain = (value: unknown, maximum: number) => {
   const text = value.trim();
   return text && !/[\u0000-\u0008\u000b-\u001f\u007f‪-‮⁦-⁩]/u.test(text) && Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)).length <= maximum ? text : undefined;
 };
-const host = (value: unknown) => typeof value === 'string' && /^[a-z0-9.-]{3,100}$/.test(value) ? value : undefined;
 
 /** Builds the encrypted content of a team event; the asset travels as chain and contract. */
 export function teamEventContent(
@@ -65,7 +68,7 @@ export function readTeamEvent(type: string, content: Record<string, unknown>) {
   const asset = content.asset && typeof content.asset === 'object' ? assetKey((content.asset as { chain?: unknown }).chain, (content.asset as { address?: unknown }).address) : undefined;
   if (type === STICKY_EVENT) {
     const text = content.text === '' ? '' : plain(content.text, STICKY_MAX);
-    const site = host(content.site), target = readRefTarget(content.target), caption = readRefCaption(content.caption);
+    const site = normalizeSiteHost(content.site), target = readRefTarget(content.target), caption = readRefCaption(content.caption);
     const url = pageScopeUrl(content.url);
     const eventId = (value: unknown) => typeof value === 'string' && value.length > 0 && value.length <= EVENT_ID_LENGTH ? value : undefined;
     const edits = eventId(content.edits), baseRevision = eventId(content.baseRevision);
@@ -93,7 +96,7 @@ export function resolveStickies(records: readonly StickyRecord[], now = Date.now
   const originals: Sticky[] = [];
   const edits = new Map<string, Map<string, StickyRecord[]>>();
   for (const item of records) {
-    if (item.expiresAt <= now || deleted(item.id, item.teamId) || item.edits && deleted(item.edits, item.teamId)) continue;
+    if (expired(item.expiresAt, now) || deleted(item.id, item.teamId) || item.edits && deleted(item.edits, item.teamId)) continue;
     if (!item.edits) { originals.push({ ...item, revision: item.id }); continue; }
     if (!item.baseRevision) continue;
     const key = JSON.stringify([item.teamId, item.edits]);
@@ -120,7 +123,7 @@ export function resolveStickies(records: readonly StickyRecord[], now = Date.now
 }
 
 export function visibleStickies(items: Pick<TeamItems, 'stickies'>, teamId: string, scope: AssetKey | StickyScope, now = Date.now()): Sticky[] {
-  return items.stickies.filter(item => item.teamId === teamId && item.expiresAt > now && stickyScopeMatches(item, scope));
+  return items.stickies.filter(item => item.teamId === teamId && !expired(item.expiresAt, now) && stickyScopeMatches(item, scope));
 }
 
 /**

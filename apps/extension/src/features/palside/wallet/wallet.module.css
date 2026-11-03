@@ -120,4 +120,4 @@
 .tipCustom { display:flex; align-items:baseline; gap:6px; overflow:hidden; padding:0 16px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .tipCustom input { flex:1; min-width:0; height:56px; border:0; outline:0; background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-title); font-weight:600; font-variant-numeric:tabular-nums; }
 .tipCustom span { color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
-.tipCustom:has(input:focus-visible) { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
+.tipCustom:has(input:focus-visible) { background:var(--ui-control-hover); }

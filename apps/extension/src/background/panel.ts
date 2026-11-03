@@ -5,7 +5,7 @@ import type { Background } from './index.ts';
 import type { Port } from './context.ts';
 
 /**
- * A side panel on the `palside/panel` port: it announces its window in `hello`, receives state, language, danmaku settings and
+ * A side panel on the `palside/panel` port: it announces its window in `hello`, receives state, language, danmaku settings, site icons and
  * page status, and reports activity. A restarted worker takes its first state from the offscreen snapshot.
  */
 export function panel(bg: Background) {
@@ -31,6 +31,7 @@ export function panel(bg: Background) {
       bg.panels.set(port, undefined);
       reportRoomPanels();
       bg.danmaku.sendDanmakuSettings(port);
+      bg.siteIcons.send(port);
       bg.sharing.updateDeviceState();
       void bg.language.refresh().then(value => { if (bg.panels.has(port)) bg.post(port, { type: 'language', state: value }); });
 

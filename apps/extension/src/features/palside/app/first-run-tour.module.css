@@ -1,0 +1,32 @@
+/* The first-run tour: a dimmed panel with one lit control and a bubble pointing at it. */
+.root { display:contents; }
+.layer { position:fixed; inset:0; z-index:10; pointer-events:none; }
+/* Presses outside the bubble do nothing: only 跳过 / 下一步 / Esc end or move the tour. */
+.block { position:fixed; inset:0; pointer-events:auto; }
+.hole { position:fixed; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); box-shadow:0 0 0 200vmax var(--ui-scrim); pointer-events:none; }
+
+.bubble { position:fixed; padding:14px 14px 10px; border:1px solid var(--ui-border-soft); border-radius:var(--ui-radius-popover); corner-shape:var(--ui-corner-shape);
+  background:var(--ui-canvas); color:var(--ui-text-primary); box-shadow:var(--ui-shadow-floating); pointer-events:auto; transform-origin:50% 0; }
+.bubble[data-side="top"] { transform-origin:50% 100%; }
+.arrow { position:absolute; width:18px; height:9px; overflow:visible; }
+.arrow path { fill:var(--ui-canvas); stroke:var(--ui-border-soft); stroke-width:1; }
+.bubble[data-side="bottom"] .arrow { top:-9px; }
+.bubble[data-side="top"] .arrow { bottom:-9px; transform:rotate(180deg); }
+
+.body h2 { margin:0 0 6px; font-size:var(--ui-type-headline); font-weight:600; line-height:1.35; }
+.body p { margin:0; font-size:var(--ui-type-callout); line-height:1.55; color:var(--ui-text-secondary); }
+.pairs { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; margin:0; font-size:var(--ui-type-callout); line-height:1.45; }
+.pairs dt { font-weight:600; }
+.pairs dd { margin:0; color:var(--ui-text-secondary); }
+.tools { display:grid; gap:7px; margin:2px 0 0; padding:0; list-style:none; font-size:var(--ui-type-callout); line-height:1.4; }
+.tools li { display:grid; grid-template-columns:18px auto 1fr; align-items:center; gap:8px; }
+.tools svg { width:17px; height:17px; stroke-width:1.8; }
+.tools b { font-weight:600; }
+.tools span { color:var(--ui-text-secondary); }
+
+.footer { display:flex; align-items:center; gap:4px; margin-top:12px; }
+.dots { display:flex; gap:4px; margin-right:auto; }
+.dots i { width:5px; height:5px; border-radius:var(--ui-radius-pill); background:var(--ui-text-secondary); opacity:.35; transition:width .3s var(--ui-ease-feedback), opacity .3s; }
+.dots i[data-on] { width:14px; opacity:1; background:var(--ui-text-primary); }
+@media (prefers-reduced-motion: reduce) { .dots i { transition:none; } }
+@media (forced-colors: active) { .bubble { border-color:CanvasText; } .hole { outline:2px solid Highlight; } }

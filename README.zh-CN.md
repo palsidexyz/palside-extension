@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://github.com/palsidexyz/palside-extension/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/palsidexyz/palside-extension/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <img alt="Chrome 123+" src="https://img.shields.io/badge/Chrome-123%2B-4285F4?logo=googlechrome&logoColor=white">
+  <img alt="Chrome 130+" src="https://img.shields.io/badge/Chrome-130%2B-4285F4?logo=googlechrome&logoColor=white">
 </p>
 
 ## 能做什么

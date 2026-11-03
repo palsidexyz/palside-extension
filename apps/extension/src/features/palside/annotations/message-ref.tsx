@@ -4,11 +4,10 @@ import { useTranslations } from 'use-intl';
 import { useState } from 'react';
 import { Tooltip } from '@palside/ui/tooltip';
 import { locateFeedback } from './locate-feedback';
-import { viewAsset } from '../../../domain/annotations/social';
 import type { Message } from '../../../domain/chat/model';
 import { composerStyles as s, RefLine } from '../chat/composer-social';
 import { openRoom, roomKeyFor, roomsOn } from '../rooms/rooms';
-import { captureSocialUi, navigateWithReturn, setSocialUi } from './social-state';
+import { captureSocialUi, setSocialUi } from './social-state';
 import { withTargetAccess } from '../settings/access';
 import type { PalsideController } from '../app/use-palside';
 
@@ -27,10 +26,8 @@ export function MessageRef({ c, message }: { c: PalsideController; message: Mess
     withTargetAccess(c, message.ref.view.url, () => {
       if (!session.current() || !c.ownsScreen()) return;
       setBusy(true);
-      const asset = viewAsset(message.ref.view);
-      const destination = target.kind !== 'quote' && asset && c.live?.page?.asset === asset ? c.live.page.url ?? message.ref.view.url : message.ref.view.url;
-      void navigateWithReturn(c.live!, destination, () => c.live!.command('locate-ref', { teamId: c.current, messageId: message.id }))
-        .then(result => { const key = locateFeedback[result]; if (session.current() && key) c.setNotice(uiMessage(key)); }, error => { if (session.current()) c.setNotice(errorMessage(error)); })
+      void c.live!.command('locate-ref', { teamId: c.current, messageId: message.id })
+        .then(({ result }) => { const key = locateFeedback[result]; if (session.current() && key) c.setNotice(uiMessage(key)); }, error => { if (session.current()) c.setNotice(errorMessage(error)); })
         .finally(() => setBusy(false));
     });
   }

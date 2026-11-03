@@ -24,6 +24,14 @@ export function notifications(bg: Background) {
   }
 
   return {
+    async clearAccount(accountId: string) {
+      epoch++;
+      const local = await browser.storage.local.get(null);
+      for (const id of Object.keys(local)) if (id.startsWith(`${PREFIX}${accountId}:`)) {
+        if (await granted()) await browser.notifications.clear(id);
+        await browser.storage.local.remove(id);
+      }
+    },
     /** Notifications exist only under the optional permission, so their listeners attach once it is first available. */
     listenNotifications() {
       if (listening || !browser.notifications?.onClicked) return;

@@ -54,7 +54,6 @@ export async function restoreLocalData(this: SessionRuntime, session: RuntimeDev
     guard();
     runtime.state.preferences = readPreferences(storedPreferences);
     runtime.sharing.persistedPreferences = runtime.state.preferences;
-    await runtime.sharing.restoreToggles(); guard();
     const rows = await runtime.storage.rows<RevisionedDraft<Draft>>(session.account.id, 'draft');
     guard();
     runtime.state.drafts = Object.fromEntries(rows.map(row => [row.key.split(':draft:')[1]!, row.value]));

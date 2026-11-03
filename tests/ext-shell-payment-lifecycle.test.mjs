@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -7,7 +8,10 @@ import ts from 'typescript';
 import { parseHTML } from 'linkedom';
 import React, { act } from 'react';
 import * as walletModel from '../apps/extension/src/domain/wallet/model.ts';
-import { CHAIN_RULES } from '../packages/shared/src/chain/rules.ts';
+import { TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
+import { graphemeLength } from '../packages/shared/src/contracts/rules.ts';
+import { PIN_LENGTH } from '@palside/shared/rules/accounts';
+import { CHAIN_RULES } from '@palside/shared/rules/wallet';
 
 const require = createRequire(import.meta.url), h = React.createElement;
 const { window, document } = parseHTML('<html><body></body></html>');
@@ -30,9 +34,18 @@ function production() {
     'use-intl': { useTranslations: () => translate, useLocale: () => 'en' },
     '@palside/i18n': { errorMessage: error => error.message, clockTime: String, localeOrEnglish: value => value },
     '@palside/shared/navigation': { shortAddress: value => value },
-    '@palside/shared/chain/rules': { CHAIN_RULES },
+    '@palside/shared/rules/wallet': { CHAIN_RULES },
+    '@palside/shared/rules/teams': { TEAM_MEMBER_LIMIT },
+    '@palside/shared/contracts/rules': { graphemeLength },
+    '@palside/shared/rules/accounts': { PIN_LENGTH },
+    '@palside/shared/units': require('@palside/shared/units'),
+    './clock': { ROOM_PACKET_AFTER_EXPIRY_MS: 600_000 },
+    './quota': { quotaResetText: (_t, _locale, at) => `reset:${at ?? 'next'}` },
     '@palside/design/motion': { motionPresets: { feedback: {} } },
     '@palside/ui/button': { Button, IconButton },
+    '@palside/ui/switch': { Switch: ({ help }) => help.content },
+    '../settings/setting-rows': { SettingGroup: pass, SettingControl: pass, SettingItem: () => null, settingRows: {} },
+    '@palside/ui/counter': { Counter: ({ value }) => value },
     '@palside/ui/field': { PinInput: ({ onValueChange, ...props }) => h('input', { ...omit(props, ['outlined']), onInput: event => onValueChange(event.target.value) }) },
     '@palside/ui/sheet': { Sheet: ({ open, children, onOpenChange, ...props }) => open ? h('section', { 'data-sheet': true, 'aria-labelledby': props['aria-labelledby'] }, children, h('button', { 'data-dismiss': true, onClick: () => onOpenChange(false) }, 'Dismiss')) : null },
     '@palside/ui/visually-hidden': { VisuallyHidden: pass },
@@ -43,7 +56,7 @@ function production() {
     '../ui/primitives': { PersonAvatar: () => null, Token: () => null },
     '../ui/text': { useText: () => value => value },
     '../ui/motion-details': { Count: ({ value }) => value, CountText: ({ text }) => text, Dots: () => 'pending', DrawnCheck: () => 'confirmed', Fit: pass, Rise: pass, Step: pass, Swap: pass },
-    './amount': { PalsAmount: ({ value }) => value, formatPals: value => String(Number(value) / 1e18) },
+    './amount': { AnimatedAmount: ({ value }) => value, PalsAmount: ({ value }) => value, formatPals: value => String(Number(value) / 1e18) },
     './recovery-state': { recordLabels: { transfer: 'transfer', tip: 'tip', packet: 'packet' }, recoveryLabel: () => 'review' },
     '@number-flow/react': { __esModule: true, default: ({ value }) => value },
     'lucide-react': new Proxy({}, { get: () => () => null }),
@@ -52,7 +65,7 @@ function production() {
       return motionTags.get(tag);
     } }) },
   };
-  const context = vm.createContext({ console, setTimeout, clearTimeout, Date });
+  const context = vm.createContext({ console, setTimeout, clearTimeout, Date, window, document });
   function load(name) {
     const file = `apps/extension/src/features/palside/wallet/${name}.tsx`;
     const code = ts.transpileModule(readFileSync(file, 'utf8'), { fileName: file, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -64,9 +77,10 @@ function production() {
     }, module, module.exports);
     return module.exports;
   }
+  const amount = modules['./amount'] = load('amount');
   const payment = modules['./payment-sheet'] = load('payment-sheet');
   const packet = modules['./packet'] = load('packet');
-  return { ...payment, ...packet, ...load('room-payments'), ...load('recovery') };
+  return { ...amount, ...payment, ...packet, ...load('room-payments'), ...load('recovery'), ...load('security') };
 }
 const quoted = (id, accountId = 'self', phase = 'review') => ({ id, phase, passwordRequired: false, total: '1000000000000000000', input: { kind: 'transfer', recipient: '0x123', amount: '1000000000000000000' }, order: { id, accountId, kind: 'transfer', amount: '1000000000000000000', recipient: '0x123' } });
 
@@ -77,7 +91,7 @@ async function fixture(t, handler = async () => undefined) {
   let view, sessionKey = 0;
   const c = { data: { self: 'self' }, screen: 'chat', current: 'team', now: Date.now(), people: [{ id: 'self', name: 'Self' }, { id: 'peer', name: 'Peer' }], team: { name: 'Squad', owner: 'self', memberIds: ['self', 'peer'] }, back: () => calls.push(['back']) };
   const command = async (name, payload) => { calls.push([name, structuredClone(payload)]); return handler(name, payload); };
-  c.live = { command, state: { account: { id: 'self' }, authenticated: true, rooms: { current: { key: 'room', messages: [{ id: 'message', author: { id: 'peer', name: 'Peer' }, text: 'hello' }] } }, wallet: { availability: 'ready', config: { enabled: true, deployment: { decimals: 18 } }, balance: { balance: '1000000000000000000000' } } } };
+  c.live = { command, state: { account: { id: 'self' }, authenticated: true, rooms: { current: { key: 'room', messages: [{ id: 'message', author: { id: 'peer', name: 'Peer' }, text: 'hello' }] } }, wallet: { availability: 'ready', config: { enabled: true, deployment: { decimals: 18 }, quickPay: { single: '250', daily: '1000' } }, balance: { balance: '1000000000000000000000' } } } };
   c.run = (...args) => command(...args).catch(() => undefined);
   function Session() {
     components.usePaymentSession(c.live.state.authenticated ? c.live.state.account.id : undefined);
@@ -269,4 +283,98 @@ for (const outcome of ['resolve', 'reject']) test(`old recovery check ${outcome}
   assert.equal(f.container.querySelector('[role="alert"]'), null);
   await settle(checks[1]);
   assert.equal(check().disabled, false);
+});
+
+
+
+test('packet blessing input counts composed emoji as one of 24 graphemes', async t => {
+  const f = await fixture(t);
+  await f.view(() => h(f.components.PacketPage, { c: f.c }));
+  const selector = 'input[placeholder="extension.wallet.blessingPlaceholder"]';
+  const wish = '👨‍👩‍👧‍👦'.repeat(24);
+  await f.input(selector, wish);
+  assert.equal(f.container.querySelector(selector).value, wish);
+  await f.input(selector, wish + '好');
+  assert.equal(f.container.querySelector(selector).value, wish);
+  await f.input(selector, 'e\u0301'.repeat(24));
+  assert.equal(f.container.querySelector(selector).value, 'e\u0301'.repeat(24));
+});
+
+test('tip input keeps only digits and explains the 10000 cap in the existing button', async t => {
+  const f = await fixture(t);
+  await f.view(() => h(f.components.TipPayment, { c: f.c, messageId: 'message', onClose() {} }));
+  await f.click(f.button('extension.wallet.custom'));
+  await f.input('input[placeholder="0"]', 'PALS 1,000.01');
+  assert.equal(f.container.querySelector('input').value, '100001');
+  assert.equal(f.button('extension.wallet.tipLimit').disabled, true);
+  await f.input('input[placeholder="0"]', '9'.repeat(100));
+  assert.equal(f.button('extension.wallet.tipLimit').disabled, true);
+  await f.input('input[placeholder="0"]', '10000');
+  assert.equal(f.button('extension.wallet.tipAmount').disabled, false);
+  await f.click(f.button('extension.wallet.tipAmount'));
+  assert.equal(f.calls.find(([name]) => name === 'wallet-review')[1].input.amount, String(10000n * 10n ** 18n));
+});
+
+test('packet amount rendering preserves large integer and fractional PALS and USD exactly', async t => {
+  const f = await fixture(t);
+  for (const [value, decimals, expected] of [
+    ['900719925474099312345678901234567890', 18, '900719925474099312.34567890123456789'],
+    ['9007199254740993123', 2, '90071992547409931.23'],
+    ['1500000000000000000', 18, '1.5'],
+    ['1234567890000000000', 18, '1.2346'],
+  ]) {
+    await f.view(() => h(f.components.AnimatedAmount, { value, decimals }));
+    assert.equal(f.container.textContent, expected);
+  }
+});
+
+test('opening each payment sheet checks immediately and pending only says waiting for confirmation', async t => {
+  const f = await fixture(t);
+  f.c.live.state.wallet.payment = quoted('pending', 'self', 'pending');
+  for (let i = 1; i <= 2; i++) {
+    await act(async () => f.components.openPayment('pending'));
+    assert.equal(f.calls.filter(([name]) => name === 'wallet-reconcile').length, i);
+    assert.match(f.container.textContent, /extension.wallet.pending/);
+    assert.equal(f.button('extension.wallet.pay'), undefined);
+    await f.click(f.container.querySelector('[aria-label="common.close"]'));
+  }
+  assert.equal(f.calls.some(([name]) => name === 'wallet-confirm' || name === 'wallet-review'), false);
+});
+
+test('payment PIN feedback includes local reset information for both daily quotas', async t => {
+  const f = await fixture(t);
+  const payment = { ...quoted('quota'), passwordRequired: true, quickPayResetAt: Date.now() + HOUR_MS };
+  f.c.live.state.wallet.payment = payment;
+  await act(async () => f.components.openPayment('quota'));
+  assert.match(f.container.textContent, /extension.wallet.smallDailyLimit/);
+  assert.ok(f.container.textContent.includes(`reset:${payment.quickPayResetAt}`));
+  payment.error = 'CHAIN_SPONSOR_LIMIT'; await f.render();
+  assert.match(f.container.textContent, /extension.wallet.sponsorLimit/);
+  assert.match(f.container.textContent, /reset:next/);
+});
+
+
+test('small-payment settings show server limits bounded by client caps', async t => {
+  const f = await fixture(t);
+  f.c.live.state.wallet.preferences = { smallPayments: false };
+  f.c.live.state.wallet.config.quickPay = { single: '25', daily: '75' };
+  await f.view(() => h(f.components.WalletSettings, { c: f.c }));
+  assert.match(f.container.textContent, /"single":"25","daily":"75"/);
+  f.c.live.state.wallet.config.quickPay = { single: '500', daily: '2000' }; await f.render();
+  assert.match(f.container.textContent, /"single":"250","daily":"1000"/);
+});
+
+test('wallet copy has matching language keys and describes the actual packet refund timing', () => {
+  const zh = JSON.parse(readFileSync('packages/i18n/src/zh-CN.json', 'utf8'));
+  const en = JSON.parse(readFileSync('packages/i18n/src/en.json', 'utf8'));
+  assert.deepEqual(Object.keys(zh.extension.wallet).sort(), Object.keys(en.extension.wallet).sort());
+  assert.equal(zh.extension.wallet.pending, '等待确认');
+  assert.ok(JSON.stringify(zh).includes('24 小时内可抢，截止约 2 小时后退回未领部分'));
+  assert.ok(JSON.stringify(en).includes('Claim within 24 hours; unclaimed funds return about 2 hours after the deadline'));
+  for (const locale of [zh, en]) {
+    assert.match(locale.extension.wallet.smallLimit, /\{single\}/);
+    assert.match(locale.extension.wallet.smallLimit, /\{daily\}/);
+    assert.match(locale.extension.wallet.sponsorLimit, /\{reset\}/);
+    assert.match(locale.extension.wallet.smallDailyLimit, /\{reset\}/);
+  }
 });

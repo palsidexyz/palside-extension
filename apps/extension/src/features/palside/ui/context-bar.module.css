@@ -1,11 +1,11 @@
-/* Top slot card: 52px like the 在看 chips, filled, no outline. Accent marks a mode the user is in (跟看) — the only accent in the slot. */
+/* Top slot card: 44px like the 在看 chips, filled, no outline. Accent marks a mode the user is in (跟看) — the only accent in the slot. */
 .bar {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
-  height: 52px;
-  padding: 0 6px 0 10px;
+  height: 44px;
+  padding: 0 6px 0 8px;
   border-radius:var(--ui-radius-l);
   corner-shape:var(--ui-corner-shape);
   background: var(--ui-control-surface);
@@ -47,7 +47,7 @@
   font-weight: 600;
 }
 .bar[data-tone] .action:not(:disabled):hover { background: var(--ui-control-hover); }
-.bar[data-tone=accent] .action:not([data-primary]):not(:disabled):hover { background: color-mix(in srgb, var(--ui-accent) 22%, var(--ui-canvas)); }
+.bar[data-tone=accent] .action:not([data-primary]):not(:disabled):hover { background: color-mix(in srgb, var(--ui-text-primary) 8%, var(--ui-accent-soft)); }
 .bar[data-tone] .action[data-primary] { padding: 0 12px; background: var(--ui-text-primary); color: var(--ui-canvas); }
 .bar[data-tone] .action[data-primary]:not(:disabled):hover { background: color-mix(in srgb, var(--ui-text-primary) 86%, var(--ui-canvas)); }
 

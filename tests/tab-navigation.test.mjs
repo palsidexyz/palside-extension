@@ -63,11 +63,17 @@ test('a failed browser action can be retried and unsupported protocols never cre
   assert.equal(calls.creates.length, 1);
 });
 
-test('ordinary chat links open a new adjacent tab even when the current tab already matches', async () => {
-  const { api, calls } = fixture({ activeUrl: target });
-  await createPageOpener(api)(target, false);
-  assert.equal(calls.creates.length, 1); assert.equal(calls.creates[0].index, 4);
-  assert.equal(calls.updates.length, 0);
+test('ordinary chat links reuse the current matching tab and otherwise open a new adjacent tab', async () => {
+  const url = 'https://example.com/article';
+  const matching = fixture({ activeUrl: url });
+  await createPageOpener(matching.api)(url);
+  assert.deepEqual(matching.calls.creates, []);
+  assert.deepEqual(matching.calls.updates, []);
+  assert.deepEqual(matching.calls.queries, [{ active: true, windowId: 2 }]);
+  const other = fixture();
+  await createPageOpener(other.api)(url);
+  assert.deepEqual(other.calls.creates, [{ url, windowId: 2, active: true, index: 4, openerTabId: 7 }]);
+  assert.deepEqual(other.calls.updates, []);
 });
 
 

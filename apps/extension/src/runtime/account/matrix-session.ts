@@ -13,6 +13,9 @@ import { sessionGuard } from './session';
 import type { SessionRuntime } from './session-lifecycle';
 import { refreshDomains } from './live-sync';
 
+const HISTORY_PAGE_SIZE = 100;
+const HISTORY_PRELOAD_PAGES = 10;
+
 export async function connectRuntimeDevice(this: SessionRuntime, session: RuntimeDevice, identity?: Identity) {
     const runtime = this.runtime;
     const scope = this.scope();
@@ -24,7 +27,7 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     runtime.state.data.people = runtime.state.data.people.map(person => ({ ...person, presence: undefined }));
     const previous = this.client; this.client = undefined; previous?.stopClient(); this.cryptoInitialised = false;
     runtime.state.connection.messaging = 'connecting'; runtime.timeline.readyForLiveEvents = false; this.receiveSince = Date.now();
-    if (this.session?.account.id !== session.account.id) { runtime.rooms.reset(); this.hostEpoch++; runtime.state.toggles = { share: false, interact: false }; }
+    if (this.session?.account.id !== session.account.id) { runtime.rooms.reset(); this.hostEpoch++; }
     this.session = session; runtime.api.token = session.token;
     const guard = sessionGuard(() => scope.current() ? this.session : undefined, session, () => new MessageError(uiMessage('extension.runtime.loginChanged')));
     const status = { initialIssued: false, roomsStarted: false, roomCatchUp: false };
@@ -41,7 +44,7 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     const publication = identity ? deviceKeyPublication(session.matrix.userId, session.matrix.deviceId) : undefined;
     const identityAbort = identity ? new AbortController() : undefined;
     this.identityAbort = identityAbort;
-    const startOptions = { initialSyncLimit: 100, disablePresence: true, pendingEventOrdering: PendingEventOrdering.Detached };
+    const startOptions = { initialSyncLimit: HISTORY_PAGE_SIZE, disablePresence: true, pendingEventOrdering: PendingEventOrdering.Detached };
     const client = createClient({ baseUrl: runtime.api.baseUrl, accessToken: session.token, userId: session.matrix.userId, deviceId: session.matrix.deviceId, cryptoCallbacks: secretStorageCallbacks(() => secretStorageKey), logger: silent, scheduler: new MatrixScheduler(() => -1), fetchFn: (input, init) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       const transactionId = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
@@ -87,7 +90,7 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
       if (data?.error) runtime.diagnosticErrors.record(data.error);
       if (data?.error && 'errcode' in data.error && data.error.errcode === 'M_UNKNOWN_TOKEN') { void this.expireRuntimeDevice(); return; }
       runtime.state.connection.messaging = state === 'PREPARED' || state === 'SYNCING' ? 'ready' : state === 'ERROR' || state === 'RECONNECTING' || state === 'STOPPED' ? 'unavailable' : 'connecting';
-      if (runtime.state.connection.messaging === 'ready') runtime.state.connection.networkOnline = true;
+      if (runtime.state.connection.messaging === 'ready') { runtime.state.connection.networkOnline = true; void this.preloadHistory().catch(() => {}); }
       if (connectionStatus(runtime.state.connection) !== 'connected') { runtime.timeline.readyForLiveEvents = false; this.receiveSince = Date.now(); }
       else runtime.timeline.readyForLiveEvents = true;
       runtime.emit();
@@ -131,15 +134,7 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     if (this.sseOpen) this.scheduleDeviceStateReport(true);
     if (status.roomCatchUp) runtime.rooms.reconnected();
     void runtime.rooms.start().catch(() => {});
-    void (async () => {
-      await new Promise(resolve => setTimeout(resolve, 0)); if (!scope.current()) return;
-      for (const team of runtime.state.remoteTeams.filter(t => t.joined)) {
-        const room = client.getRoom(team.roomId); if (!room) continue;
-        for (let page = 0; page < 10 && room.oldState.paginationToken; page++) {
-          try { await this.history(room); if (!scope.current()) return; } catch { break; }
-        }
-      }
-    })();
+    void this.preloadHistory().catch(() => {});
     } catch (error) {
       liveDispose();
       if (this.liveDispose === liveDispose) { this.liveDispose = undefined; this.sseOpen = false; }
@@ -155,7 +150,8 @@ export function history(this: SessionRuntime, room: Room) {
       if (!client) return;
       const page = { client, events: new Set<MatrixEvent>() }; this.historyPage = page;
       try {
-        await scope.wait(client.scrollback(room, 100)); check();
+        await scope.wait(client.scrollback(room, HISTORY_PAGE_SIZE)); check();
+        this.historyPages.set(room, (this.historyPages.get(room) ?? 0) + 1);
         await runtime.cache.cachePage(async () => {
           for (const event of page.events) {
             if (event.isEncrypted()) await scope.wait(client.decryptEventIfNeeded(event));
@@ -166,3 +162,26 @@ export function history(this: SessionRuntime, room: Room) {
     });
     this.historyQueue = work; return work;
   }
+
+export function preloadHistory(this: SessionRuntime): Promise<void> {
+  const runtime = this.runtime, client = this.client, scope = this.scope();
+  const team = runtime.state.remoteTeams.find(team => team.id === runtime.state.preferences.current && team.joined);
+  const room = team && client?.getRoom(team.roomId);
+  if (!team || !room || !this.cryptoInitialised) return Promise.resolve();
+  const pending = this.historyPreloads.get(room); if (pending) return pending;
+  if (runtime.state.history?.[team.id] && ((this.historyPages.get(room) ?? 0) >= HISTORY_PRELOAD_PAGES || !room.oldState.paginationToken)) return Promise.resolve();
+  const current = () => scope.current() && this.client === client && runtime.state.preferences.current === team.id && runtime.state.remoteTeams.some(row => row.id === team.id && row.joined);
+  const work = (async () => {
+    runtime.state.history ??= {};
+    const status = runtime.state.history[team.id] ??= { missingKeys: this.runtime.timeline.missingEvents.get(team.id)?.size ?? 0, loaded: false, loading: false };
+    if ((this.historyPages.get(room) ?? 0) >= HISTORY_PRELOAD_PAGES || !room.oldState.paginationToken) { status.loaded = !room.oldState.paginationToken; runtime.emit(); return; }
+    status.loading = true; runtime.emit();
+    try {
+      while (current() && (this.historyPages.get(room) ?? 0) < HISTORY_PRELOAD_PAGES && room.oldState.paginationToken) await this.history(room);
+      if (scope.current() && this.client === client) status.loaded = !room.oldState.paginationToken;
+    } finally { if (scope.current() && this.client === client) { status.loading = false; runtime.emit(); } }
+  })();
+  this.historyPreloads.set(room, work);
+  void work.finally(() => { if (this.historyPreloads.get(room) === work) this.historyPreloads.delete(room); }).catch(() => {});
+  return work;
+}

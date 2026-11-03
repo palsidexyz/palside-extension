@@ -7,6 +7,8 @@ import { pageScopeUrl } from '../domain/annotations/interaction.ts';
 import type { Background } from './index.ts';
 import type { Port,Tab } from './context.ts';
 
+const PAGE_CONNECT_MS = 8_000;
+const PAGE_POLL_MS = 50;
 
 /**
  * Page scripts on the `palside/page` port. A page runs while 网页互动 is on for an 已授权网站 (registered for every tab of the
@@ -212,12 +214,12 @@ export function pages(bg: Background) {
   }
 
   /** Waits for this tab's page script to connect after an injection. */
-  async function waitForPort(windowId: number, tabId: number, url: string, alive: () => boolean, timeout = 8000) {
+  async function waitForPort(windowId: number, tabId: number, url: string, alive: () => boolean, timeout = PAGE_CONNECT_MS) {
     const until = Date.now() + timeout;
     while (alive() && Date.now() < until) {
       const port = portFor(tabId, url, windowId);
       if (port) return port;
-      await sleep(50);
+      await sleep(PAGE_POLL_MS);
     }
   }
   /** Connect this window's active page for one action. A page without 互动 is admitted only as a one-off, which never turns its interaction on. */
@@ -294,7 +296,7 @@ export function pages(bg: Background) {
       if (connected && connected.url === url && connected.documentId === info.documentId) return;
       pagePorts.set(port, info);
       if (capture && capture.tabId === tabId && capture.url === url && !capture.page) capture.page = port;
-      const config = await bg.danmaku.pageConfig();
+      const config = await bg.danmaku.pageConfig(info);
       const live = () => valid() && pagePorts.get(port) === info;
       if (!live()) { if (pagePorts.get(port) === info) stopPage(port, info); return; }
       port.postMessage(config);
@@ -387,6 +389,8 @@ export function pages(bg: Background) {
         if (change.status === 'loading') for (const [port, info] of pagePorts) if (info.tabId === tabId) stopPage(port, info);
       }
       if (change.url) for (const [port, info] of pagePorts) if (info.tabId === tabId) resetPage(port, info, change.url);
+      // The page layer connects at document_idle, often before the tab finishes loading; recheck once it has.
+      if (change.status === 'complete' && !change.url) for (const [port, info] of pagePorts) if (info.tabId === tabId) void bg.signals.signalConfig(port, info).catch(() => {});
       if (tab.active && (change.status === 'complete' || change.url && change.status !== 'loading')) void restoreActivePage(tab.windowId).catch(() => {});
       void pushPageStatus();
     },

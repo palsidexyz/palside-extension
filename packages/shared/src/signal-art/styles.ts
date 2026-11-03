@@ -9,6 +9,7 @@ export const signalArtCss = `#pings, #emotes { position: fixed; inset: 0; pointe
 }
 #wheel.open { opacity: 1; transform: scale(1); }
 #wheel .wedge { transition: fill-opacity .08s; }
+#wheel .aim { transition: opacity .08s; }
 #wheel .icon { transition: filter .1s, transform .1s; transform-box: fill-box; transform-origin: center; }
 #wheel .icon.hot { filter: brightness(1.12); transform: scale(1.04); }
 #wheel .centerTxt { font: 600 15px Geist, ui-sans-serif, system-ui, sans-serif; fill: #16b8df; }

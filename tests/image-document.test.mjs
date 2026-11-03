@@ -60,3 +60,15 @@ test('crop and handles clamp to original image boundaries without crossing', () 
   assert.deepEqual(imageCropHandle(crop, 'nw', { x: 400, y: 400 }, 300, 200), { x: 109, y: 99, width: 1, height: 1 });
   assert.deepEqual(imageCropHandle(crop, 'se', { x: 500, y: 400 }, 300, 200), { x: 10, y: 20, width: 290, height: 180 });
 });
+
+
+test('image documents enforce 500 text characters and 10000 total pen points', () => {
+  const document = new ImageDocument(100, 100);
+  const text = { kind: 'text', x: 1, y: 1, color: '#FF4D4F', value: 'x'.repeat(500) };
+  assert.equal(document.add(text), true);
+  assert.equal(document.add({ ...text, value: text.value + 'x' }), false);
+  const pen = { kind: 'pen', color: '#FF4D4F', points: Array.from({ length: 5000 }, () => ({ x: 1, y: 1 })) };
+  assert.equal(document.add(pen), true);
+  assert.equal(document.add(pen), true);
+  assert.equal(document.add({ ...pen, points: [{ x: 1, y: 1 }] }), false);
+});

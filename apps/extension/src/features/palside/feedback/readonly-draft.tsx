@@ -12,6 +12,7 @@ import { Action } from '../ui/primitives';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import h from '../chat/chat-header.module.css';
+import { liveView } from '../assets/token-data';
 
 /** Where the composer was, a read-only team offers the ways onward — another team, or a new one — with any kept draft above them. */
 export function ReadonlyDraft({ c }: { c: PalsideController }) {
@@ -33,7 +34,8 @@ function KeptDraft({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const draft = c.draft;
   if (!c.draftConflict && !draft.text && !draft.attachment && !draft.ref && !draft.replyTo) return null;
-  const view = assetView(draft.attachment);
+  const snapshot = assetView(draft.attachment);
+  const view = snapshot && liveView(c, snapshot);
   const copy = [draft.text, draft.ref?.caption, draft.ref?.view.url, view?.url].filter(Boolean).join('\n');
   function remove() {
     const teamId = c.current;

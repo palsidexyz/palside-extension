@@ -3,7 +3,7 @@
 .avatar { display:flex; justify-content:center; padding:12px 0 8px; }
 .tags { display:flex; flex-direction:column; gap:8px; min-width:0; }
 .box { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-height:40px; padding:6px; border-radius:var(--ui-radius-control); corner-shape:var(--ui-corner-shape); background:var(--ui-field-surface, var(--ui-control-surface)); cursor:text; }
-.box:has(.input:focus-visible) { box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }
+.box:has(.input:focus-visible) { background:var(--ui-control-hover); }
 .box[data-invalid] { box-shadow:inset 0 0 0 1px var(--ui-ink-error); }
 .box[data-disabled] { opacity:.45; }
 .tag { display:inline-flex; align-items:center; gap:2px; height:28px; max-width:100%; padding:0 2px 0 10px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); color:var(--ui-text-primary); font-size:var(--ui-type-callout); line-height:18px; font-weight:500; white-space:nowrap; }

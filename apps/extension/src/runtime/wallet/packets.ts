@@ -1,5 +1,7 @@
+import { nearestEqualPacketTotal } from '../../domain/wallet/model';
 import { toHex, zeroHash } from 'viem';
-import { chainAmount, CHAIN_RULES, palsUnit } from '@palside/shared/chain/rules';
+import { chainAmount, palsUnit } from '@palside/shared/chain/amount';
+import { CHAIN_RULES } from '@palside/shared/rules/wallet';
 import type { ChainOrderInput } from '@palside/shared/contracts/chain';
 
 function randomBelow(max: bigint): bigint {
@@ -10,13 +12,13 @@ function randomBelow(max: bigint): bigint {
   }
 }
 /** Allocate exact integer amounts locally; each random allocation commits an independent salt. */
-export function createPacketInput(input: { kind: 'team' | 'invitation' | 'room'; scope: string; count: number; distribution: 'equal' | 'random'; total: string; blessing?: string }, decimals = 18): Extract<ChainOrderInput, { kind: 'packet' }> {
+export function createPacketInput(input: { kind: 'team' | 'room'; scope: string; count: number; distribution: 'equal' | 'random'; total: string; blessing?: string }, decimals = 18): Extract<ChainOrderInput, { kind: 'packet' }> {
   const total = chainAmount(input.total), minimum = palsUnit(decimals);
   if (!Number.isInteger(input.count) || input.count < 1 || input.count > CHAIN_RULES.maxPacketCount || total < minimum * BigInt(input.count)) throw new Error('INVALID_PACKET_AMOUNT');
-  if (input.kind === 'room' && input.distribution !== 'random' || input.kind === 'invitation' && input.distribution !== 'equal') throw new Error('INVALID_PACKET_DISTRIBUTION');
+  if (input.kind === 'room' && input.distribution !== 'random') throw new Error('INVALID_PACKET_DISTRIBUTION');
   const amounts: bigint[] = [];
   if (input.distribution === 'equal') {
-    if (total % BigInt(input.count) !== 0n) throw new Error('INVALID_PACKET_AMOUNT');
+    if (nearestEqualPacketTotal(total, input.count, decimals) !== total) throw new Error('INVALID_PACKET_AMOUNT');
     amounts.push(...Array.from({ length: input.count }, () => total / BigInt(input.count)));
   } else {
     let left = total;

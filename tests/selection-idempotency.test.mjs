@@ -1,5 +1,6 @@
+import { DAY_MS } from '@palside/shared/units';
 import { productionModules } from './helpers/production-module.mjs';
-import { REACTION_TTL_MS } from '../packages/shared/src/contracts/limits.ts';
+import { REACTION_TTL_MS } from '@palside/shared/rules/interactions';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as social from '../apps/extension/src/domain/annotations/social.ts';
@@ -124,7 +125,7 @@ test('same operation shares in-flight work and completed receipt without adding 
   assert.equal(f.sent.length, 1); assert.equal(f.runtime.state.items.stickies.length, 1);
   const durable = [...f.records.values()][0]; assert.equal(durable.kind, 'selection');
   assert.equal(JSON.stringify(durable).includes('Public text'), false); assert.equal(JSON.stringify(durable).includes('example.com'), false);
-  assert.equal(durable.expiresAt - durable.value.timestamp, 86_400_000);
+  assert.equal(durable.expiresAt - durable.value.timestamp, DAY_MS);
 });
 
 test('a reused operation id cannot change content, even after the runtime restarts', async () => {

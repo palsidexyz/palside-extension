@@ -9,7 +9,7 @@ import { Textarea, Field, CharacterCount } from '@palside/ui/field';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck } from 'lucide-react';
-import { REPORT_REASONS as reasons, REPORT_NOTE_LIMIT as DETAIL_LIMIT } from '@palside/shared/contracts/limits';
+import { REPORT_REASONS as reasons, REPORT_NOTE_LIMIT as DETAIL_LIMIT } from '@palside/shared/rules/reports';
 import { characterLength } from '../../../domain/chat/model';
 import { type Team } from '../../../domain/teams/model';
 import { PersonAvatar } from '../ui/primitives';
@@ -34,7 +34,7 @@ export function Report({ c, target }: { c: PalsideController; target: ReportTarg
   const sent = outcome?.tone === 'success';
   const [key] = useState(() => crypto.randomUUID());
   const reasonLabel = (value: Reason) => ({ spam: t('extension.copy.reportSpam'), harassment: t('extension.copy.reportHarassment'), sexual: t('extension.copy.reportSexual'), illegal: t('extension.copy.reportIllegal'), other: t('extension.copy.reportOther') })[value];
-  const tooLong = characterLength(details) > DETAIL_LIMIT;
+  const tooLong = characterLength(details.trim()) > DETAIL_LIMIT;
   const ready = Boolean(reason) && !tooLong && (reason !== 'other' || Boolean(details.trim()));
   const locked = busy || pending || sent;
   const [title = '', ...rest] = target.preview.split('\n');
@@ -59,7 +59,7 @@ export function Report({ c, target }: { c: PalsideController; target: ReportTarg
       <legend className={r.title}>{t('extension.copy.reportReasonTitle')}</legend>
       <div className={r.reasons}>{reasons.map(value => <label key={value} className={r.reason} data-checked={reason === value || undefined}><input type="radio" name="report-reason" value={value} checked={reason === value} onChange={() => setReason(value)} required />{reasonLabel(value)}</label>)}</div>
     </fieldset>
-    <Field id="report-details" label={t('extension.copy.reportReason')} optional={reason === 'other' ? undefined : t('extension.copy.optional')} counter={<CharacterCount label={t('extension.dynamic.characterCount', { count: characterLength(details), maximum: DETAIL_LIMIT, excess: Math.max(0, characterLength(details) - DETAIL_LIMIT) })} value={details} limit={DETAIL_LIMIT} />}>{props => <Textarea {...props} rows={3} aria-invalid={tooLong} value={details} disabled={locked} placeholder={t('extension.copy.reportDetailsPlaceholder')} onChange={event => setDetails(event.target.value)} />}</Field>
+    <Field id="report-details" label={t('extension.copy.reportReason')} optional={reason === 'other' ? undefined : t('extension.copy.optional')} counter={<CharacterCount label={t('extension.dynamic.characterCount', { count: characterLength(details.trim()), maximum: DETAIL_LIMIT, excess: Math.max(0, characterLength(details.trim()) - DETAIL_LIMIT) })} value={details} limit={DETAIL_LIMIT} />}>{props => <Textarea {...props} rows={3} aria-invalid={tooLong} value={details} disabled={locked} placeholder={t('extension.copy.reportDetailsPlaceholder')} onChange={event => setDetails(event.target.value)} />}</Field>
     {outcome && <InlineFeedback tone={outcome.tone}>{text(outcome.message)}</InlineFeedback>}
     <div className={r.actions}>{sent ? <Button onClick={() => c.go('chat')}>{t('common.back')}</Button> : <><Button onClick={() => c.go('chat')}>{pending ? t('common.back') : t('common.cancel')}</Button><Button loadingLabel={t('common.working')} type="submit" variant="primary" loading={busy} disabled={!ready}>{pending ? t('extension.copy.retryCheck') : t('extension.copy.submitReport')}</Button></>}</div>
   </form>;

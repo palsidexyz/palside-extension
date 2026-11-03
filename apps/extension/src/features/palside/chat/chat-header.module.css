@@ -1,17 +1,89 @@
 .menu { --popover-width:216px; padding:8px; max-width:calc(100vw - 24px); }
-.teamPopup { --popover-width:256px; padding:8px; max-width:calc(100vw - 24px); }
+.teamPopup { --popover-width:256px; padding:6px; max-width:calc(100vw - 24px); }
 .separator { height:1px; border:0; background:none; margin:5px; }
-.teamOption { display:flex; align-items:center; gap:10px; padding:10px 11px; min-height:48px; width:100%; border:0; background:none; color:inherit; text-align:left; font:400 var(--ui-type-callout)/20px var(--font-geist-sans),sans-serif; border-radius:calc(var(--ui-radius-popover) - 8px); corner-shape:var(--ui-corner-shape); cursor:pointer; transition:background .18s,color .18s; }
+.teamOption { display:flex; align-items:center; gap:10px; padding:6px 8px; min-height:40px; width:100%; border:0; background:none; color:inherit; text-align:left; font:400 var(--ui-type-callout)/20px var(--font-geist-sans),sans-serif; border-radius:calc(var(--ui-radius-popover) - 8px); corner-shape:var(--ui-corner-shape); cursor:pointer; transition:background .18s,color .18s; }
 .teamOption:hover { background:var(--ui-control-surface); }
 .teamOption:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
-.teamOption[aria-current="true"] { background:var(--ui-accent-soft); }
+.teamOption[aria-current="true"] { background:var(--ui-control-surface); }
 .teamOptionLabel { flex:1; min-width:0; overflow-wrap:anywhere; }
 .teamOption[aria-current="true"] .teamOptionLabel { font-weight:500; }
 .teamOption > span:last-child:not(.teamOptionLabel) { position:relative; display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; flex:0 0 auto; padding:0 6px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); }
 .teamOption > .mentionBadge:last-child { background:var(--ui-accent); color:var(--ui-on-accent); font-weight:600; }
-.groupLabel { margin:10px 11px 4px; font-size:var(--ui-type-footnote); line-height:16px; font-weight:500; color:var(--ui-text-secondary); }
+.groupLabel { margin:10px 8px 4px; font-size:var(--ui-type-footnote); line-height:16px; font-weight:500; color:var(--ui-text-secondary); }
 .teamOption[data-former] [data-team-avatar] { filter:grayscale(1); opacity:.6; }
 .teamOption[data-former] .teamOptionLabel { display:flex; flex-direction:column; color:var(--ui-text-secondary); }
 .teamOption[data-former] .teamOptionLabel small { font-size:var(--ui-type-caption); line-height:16px; color:var(--ui-ink-muted); }
-.lobby { width:100%; justify-items:start; text-align:left; }
+/* The list ends on a real hairline; the two actions below sit side by side at equal width. */
+.rule { height:1px; border:0; background:var(--ui-border-soft); margin:6px 8px; }
+.teamActions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; padding:0 2px 2px; }
+.teamActions > button { min-width:0; padding-inline:8px; font-size:var(--ui-type-callout); }
 @media (prefers-reduced-motion:reduce) { .teamOption { transition:none; } }
+/* The chat header, with or without 弹幕: one 52px row on one line — the title on the left (32px avatar, the name, then who is here),
+   then 36px controls on one top edge: search or 聊天 | 弹幕, the page capsule and ⋯. The two grey groups stand 8px apart so they never
+   read as one strip; the bare ⋯ sits 4px closer, its own 36px box already holding air. */
+header.bar { height:52px; padding-block:0; padding-inline:16px 8px; gap:6px; container:chatHeader / inline-size; }
+header.bar > :last-child { gap:8px; }
+.bar.bar .tool[data-size] { width:36px; height:36px; }
+.bar.bar .menuButton { margin-left:-4px; }
+/* A name that does not fit is clipped and fades over its last 16px (data-cut, set in chat-header.tsx) instead of an ellipsis, so the
+   unread dot, the chevron or the faces after it stay attached to the last character. */
+.bar.bar [data-header-name] { text-overflow:clip; }
+.bar.bar [data-header-name][data-cut] { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 16px), transparent); }
+/* Narrow panels (Chrome's side panel can be 320px) tighten the tabs so the name keeps at least three characters. */
+@container chatHeader (max-width:360px) {
+  .bar [role=tablist] > button { padding-inline:7px; }
+  .identity.identity { min-width:calc(42px + 3.4em); }
+}
+
+/* The title: the switcher (avatar, name, chevron or @N) and, as its own button beside it, who is here. The two never nest.
+   The avatar's left edge sits on the 16px gutter. */
+.identity.identity { position:relative; display:flex; align-items:center; gap:4px; }
+.identity .squad.squad { flex:0 1 auto; gap:10px; min-width:0; margin:0; padding:0; border-radius:0; background:none; font-size:var(--ui-type-headline); letter-spacing:-.02em; line-height:22px; }
+.squad > [data-team-avatar] { flex:0 0 32px; width:32px; height:32px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); }
+.squad .name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.squad > .name + * { margin-left:-6px; }
+.squad > svg { flex:none; color:var(--ui-text-secondary); transition:color .18s var(--ui-ease-feedback), transform .24s var(--ui-ease-feedback); }
+.squad:hover > svg { color:var(--ui-text-primary); }
+.squad[aria-expanded=true] > svg { transform:rotate(180deg); }
+.squad:focus-visible { outline:none; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); box-shadow:var(--ui-focus-ring); }
+
+/* Who is here, after the name: quiet and in line — a green dot with two online faces and +N, a person glyph with the member count,
+   a dashed seat with 邀请, or 👁 with the watcher count. A soft control-grey ground on hover only. */
+.presence { position:relative; display:inline-flex; align-items:center; justify-content:center; flex:none; gap:4px; height:28px; padding:0 6px; box-sizing:border-box; border:0; border-radius:var(--ui-radius-pill); background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); font-weight:500; font-variant-numeric:tabular-nums; white-space:nowrap; cursor:pointer; animation:presenceIn .3s var(--ui-ease-feedback) both; transition:background-color .18s var(--ui-ease-feedback), color .18s var(--ui-ease-feedback); }
+.presence[data-kind=invite] { gap:5px; padding:0 6px 0 4px; color:var(--ui-text-primary); }
+.presence:hover { background:var(--ui-control-surface); color:var(--ui-text-primary); }
+.presence:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.presence .faces { display:flex; }
+.presence[data-kind=online] .number { display:none; }
+.seat { display:grid; place-items:center; width:20px; height:20px; box-sizing:border-box; border:1.5px dashed color-mix(in srgb, var(--ui-text-secondary) 70%, transparent); border-radius:50%; color:var(--ui-text-secondary); }
+.seat > svg { width:11px; height:11px; stroke-width:2.6; }
+
+/* The name comes first. While it would be cut, who is here gives way one step at a time (data-fit, measured in chat-header.tsx):
+   +N goes, then the green dot, then the second face; the seat drops 邀请. Last, it folds into a 16px badge on the avatar's lower-right
+   corner, ringed in the canvas — green with the online count, grey with the member count, ink with + when you are alone (it opens the
+   invite), ink with the watcher count on 弹幕. */
+.identity[data-fit="1"] .presence .more, .identity:is([data-fit="2"], [data-fit="3"]) .presence :is(.more, .live) { display:none; }
+.identity[data-fit="3"] .presence .faces > :nth-child(2) { display:none; }
+.identity:is([data-fit="2"], [data-fit="3"]) .presence[data-kind=invite] .seatLabel, .identity[data-fit="1"] .presence[data-kind=invite] .seatLabel { display:none; }
+.identity:is([data-fit="2"], [data-fit="3"]) .presence[data-kind=invite] { padding:0 4px; }
+.identity[data-fit="4"] .presence, .identity:is([data-fit="1"], [data-fit="2"], [data-fit="3"]) .presence:is([data-kind=members], [data-kind=watch]) {
+  position:absolute; left:21px; top:calc(50% + 4px); z-index:1; gap:0; min-width:16px; height:16px; padding:0 4px; border-radius:var(--ui-radius-pill); box-shadow:0 0 0 2px var(--ui-canvas); background:var(--ui-solid); color:var(--ui-on-solid); font-size:var(--ui-type-caption); font-weight:600; line-height:16px; }
+.identity[data-fit="4"] .presence[data-kind=online] { background:var(--ui-ink-success); color:var(--ui-canvas); }
+.identity:not([data-fit="0"]) .presence[data-kind=members] { background:var(--ui-text-secondary); color:var(--ui-canvas); }
+.identity[data-fit="4"] .presence[data-kind=invite] { padding:0; }
+.identity[data-fit="4"] .presence:focus-visible, .identity:is([data-fit="1"], [data-fit="2"], [data-fit="3"]) .presence:is([data-kind=members], [data-kind=watch]):focus-visible { box-shadow:0 0 0 2px var(--ui-canvas), var(--ui-focus-ring); }
+.identity[data-fit="4"] .presence :is(.live, .faces, .glyph, .seatLabel), .identity:is([data-fit="1"], [data-fit="2"], [data-fit="3"]) .presence:is([data-kind=members], [data-kind=watch]) .glyph { display:none; }
+.identity[data-fit="4"] .presence[data-kind=online] .number { display:inline; }
+.identity[data-fit="4"] .seat { width:auto; height:auto; border:0; color:inherit; }
+.identity[data-fit="4"] .seat > svg { width:9px; height:9px; stroke-width:3.2; }
+.live { width:5px; height:5px; flex:none; border-radius:50%; background:var(--ui-ink-success); }
+.faces { flex:none; isolation:isolate; align-items:center; }
+.bar .faces > * { --person-size:20px; --person-font:8px; --presence-size:0px; --presence-border:0px; box-shadow:0 0 0 2px var(--ui-canvas); }
+.bar .faces > * + * { margin-left:-7px; }
+.faces > :nth-child(1) { z-index:3; } .faces > :nth-child(2) { z-index:2; }
+.bar .faces > .more { margin-left:-5px; padding:0 5px 0 7px; }
+.more { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 3px; box-sizing:border-box; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-weight:600; font-variant-numeric:tabular-nums; }
+@keyframes presenceIn { from { opacity:0; transform:scale(.6); } }
+.swap { animation:titleIn .24s var(--ui-ease-feedback) both; }
+@keyframes titleIn { from { opacity:0; transform:translateY(4px); } }
+@media (prefers-reduced-motion:reduce) { .swap, .presence { animation:none; } .presence, .squad > svg { transition:none; } }

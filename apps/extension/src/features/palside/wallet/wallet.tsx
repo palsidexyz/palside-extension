@@ -1,4 +1,5 @@
 'use client';
+import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { motion, useReducedMotion } from 'motion/react';
@@ -52,7 +53,7 @@ function AddressChip({ c, address }: { c: PalsideController; address: string }) 
 
 export function WalletHome({ c }: { c: PalsideController }) {
   const t = useTranslations(), wallet = c.live?.state.wallet, command = c.live?.command;
-  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); }, [command]);
+  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); void command?.('wallet-reconcile', {}).catch(() => {}); }, [command]);
   const loading = Boolean(c.live) && (!wallet || wallet.availability === 'loading');
   // Loading never sits there for good: past a few seconds it says the wallet is unavailable and offers another try.
   const [stalled, setStalled] = useState(false), [attempt, setAttempt] = useState(0);
@@ -87,7 +88,7 @@ export function WalletHome({ c }: { c: PalsideController }) {
 }
 function WalletUnlock({ c }: { c: PalsideController }) {
   const t = useTranslations(), [password, setPassword] = useState(''), [busy, setBusy] = useState(false);
-  return <div className={s.page}><h2>{t('extension.wallet.password')}</h2><PinInput outlined value={password} onValueChange={setPassword} aria-label={t('extension.wallet.password')} autoComplete="off" /><Button variant="primary" loading={busy} disabled={password.length !== 6} onClick={() => { if (busy) return; setBusy(true); void c.run('wallet-unlock', { password }).finally(() => { setPassword(''); setBusy(false); }); }}>{t('common.confirm')}</Button></div>;
+  return <div className={s.page}><h2>{t('extension.wallet.password')}</h2><PinInput outlined value={password} onValueChange={setPassword} aria-label={t('extension.wallet.password')} autoComplete="off" /><Button variant="primary" loading={busy} disabled={password.length !== PIN_LENGTH} onClick={() => { if (busy) return; setBusy(true); void c.run('wallet-unlock', { password }).finally(() => { setPassword(''); setBusy(false); }); }}>{t('common.confirm')}</Button></div>;
 }
 export function WalletReceive({ c }: { c: PalsideController }) {
   const t = useTranslations(), command = c.live?.command, address = c.live?.state.wallet?.address;

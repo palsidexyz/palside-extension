@@ -1,4 +1,4 @@
-import { TEAM_NAME_LENGTH,TEAM_DESCRIPTION_LENGTH,TEAM_MEMBER_LIMIT,TEAM_JOINED_LIMIT,TEAM_OWNED_LIMIT,APPLICATION_NOTE_LENGTH,APPLICATION_TTL_MS } from '@palside/shared/contracts/limits';
+import { TEAM_NAME_LENGTH, TEAM_DESCRIPTION_LENGTH, TEAM_MEMBER_LIMIT, TEAM_JOINED_LIMIT, TEAM_OWNED_LIMIT, APPLICATION_NOTE_LENGTH, APPLICATION_TTL_MS } from '@palside/shared/rules/teams';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { isRecruiting,publishRecruitment,requestIsActive } from '../../../domain/teams/lobby-values';
 import { characterLength } from '../../../domain/chat/model';

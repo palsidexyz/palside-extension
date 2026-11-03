@@ -1,4 +1,4 @@
-import { VIEWING_TTL_MS,VIEWING_MESSAGE_LENGTH } from '@palside/shared/contracts/limits';
+import { VIEWING_TTL_MS, VIEWING_CLOCK_SKEW_MS, VIEWING_RENEW_MS, VIEWING_MESSAGE_LENGTH } from '@palside/shared/rules/interactions';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { connectionStatus } from '../transport/connection';
 import type { MatrixEvent } from 'matrix-js-sdk';
@@ -7,6 +7,8 @@ import { trustedDeviceMessages } from './viewing-targets';
 import { teamSendGuard } from '../account/crypto-identity';
 import { resolveTokenMetadata,tokenName,type TokenIdentity,type TokenPageMetadata,type TokenPageContext } from './token-page';
 import { pageView,readView } from './view-snapshot';
+import { assetKey } from '../../domain/annotations/interaction.ts';
+import { siteByDomain } from '@palside/shared/sites';
 import type { Viewing } from '../../domain/assets/model';
 import { identifyPage,publicShareUrl,websiteIdentity } from '@palside/shared/navigation';
 import { pageName } from './page-title';
@@ -37,7 +39,7 @@ export class SharingRuntime {
   ownViewing?: { view: Viewing; teamId: string; expiresAt: number };
   peerViewing = new Map<string, { view: Viewing; teamId: string; expiresAt: number }>();
   peerViewingVersions = new Map<string, number>();
-  async localTokenMetadata(identity: TokenIdentity, context: unknown, purpose: 'viewing' | 'share', signal?: AbortSignal): Promise<TokenPageMetadata | undefined> {
+  async localTokenMetadata(identity: TokenIdentity, context: unknown, purpose: 'viewing' | 'share', signal?: AbortSignal, attempts = 3): Promise<TokenPageMetadata | undefined> {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     const session = runtime.auth.session; const teamId = runtime.state.preferences.current;
@@ -46,7 +48,7 @@ export class SharingRuntime {
     const preferences = runtime.state.preferences;
     const eligible = () => !signal?.aborted && runtime.auth.session === session && runtime.state.preferences.current === teamId &&
       runtime.state.preferences === preferences && !preferences.tokenOff?.includes(identity.host);
-    for (let attempt = 0; attempt < 3 && eligible(); attempt++) {
+    for (let attempt = 0; attempt < attempts && eligible(); attempt++) {
       // The background owns the document-bound cache and read budget; late headers get two bounded retries.
       if (attempt) await scope.wait(new Promise(resolve => setTimeout(resolve, 300)));
       if (!eligible()) return;
@@ -60,9 +62,14 @@ export class SharingRuntime {
         if (!result || !tokenName(result.name)) continue;
         const checked = await scope.wait(readView(pageView(identity, resolveTokenMetadata(identity, result))));
         if (!checked || !eligible()) return;
+        runtime.tokens.put(assetKey(identity.chain, identity.address), { ...checked, site: siteByDomain(identity.host)?.id }, 'page');
         return { name: checked.name, logo: checked.logo };
       } finally { clearTimeout(timer); if (cancel) signal?.removeEventListener('abort', cancel); }
     }
+  }
+  /** A remembered name, unless 代币数据 is off for this site: then the page stays identified by its address. */
+  cachedToken(identity: TokenIdentity) {
+    return this.runtime.state.preferences.tokenOff?.includes(identity.host) ? undefined : this.runtime.tokens.get(assetKey(identity.chain, identity.address));
   }
   async refreshTokenMetadata(identity: TokenIdentity, context: unknown) {
     const runtime = this.runtime;
@@ -96,7 +103,7 @@ export class SharingRuntime {
     }
     if (signal?.aborted) return;
     const local = await this.localTokenMetadata(identity, context, 'share', signal);
-    return pageView(identity, resolveTokenMetadata(identity, local));
+    return pageView(identity, resolveTokenMetadata(identity, local ?? this.cachedToken(identity)));
   }
   clearRemoteViewing() {
     const runtime = this.runtime;
@@ -105,14 +112,14 @@ export class SharingRuntime {
   invalidatePage() {
     const runtime = this.runtime;
     this.pageRequest?.abort(); this.pageRequest = undefined; this.pageObservation++;
-    clearTimeout(this.viewingTimer); this.page = undefined; this.ownViewing = undefined;
+    clearTimeout(this.viewingTimer); this.page = undefined; this.ownViewing = undefined; runtime.state.tokenPending = undefined;
     runtime.state.viewingId = undefined; this.publishedView = '';
   }
-  /** 共享在看 is 启用 and switched on, and the current team is joined and reachable. Every public page qualifies. */
+  /** 共享在看 is on, and the current team is joined and reachable. Every public page qualifies. */
   mayObserve() {
     const runtime = this.runtime;
     const prefs = runtime.state.preferences;
-    return runtime.state.authenticated && prefs.web.share && runtime.state.toggles.share && connectionStatus(runtime.state.connection) === 'connected' &&
+    return runtime.state.authenticated && prefs.share && connectionStatus(runtime.state.connection) === 'connected' &&
       runtime.state.remoteTeams.some(team => team.id === prefs.current && team.joined);
   }
   async consumeViewing(event: MatrixEvent, session: RuntimeDevice) {
@@ -121,7 +128,7 @@ export class SharingRuntime {
     const scope = runtime.auth.scope();
     const content = event.getContent(); const team = runtime.state.remoteTeams.find(t => t.id === content.teamId && t.joined && t.id === runtime.state.preferences.current);
     const person = team?.people.find(p => p.matrixId === event.getSender() && team.memberIds.includes(p.id));
-    if (!person || !team || typeof content.expiresAt !== 'number' || content.expiresAt <= Date.now() || content.expiresAt > Date.now() + 45_000) return;
+    if (!person || !team || typeof content.expiresAt !== 'number' || content.expiresAt <= Date.now() || content.expiresAt > Date.now() + VIEWING_TTL_MS + VIEWING_CLOCK_SKEW_MS) return;
     const version = (this.peerViewingVersions.get(person.id) ?? 0) + 1; this.peerViewingVersions.set(person.id, version);
     const view = await scope.wait(readView(content.view));
     const lease = this.activeViewing.get(person.id);
@@ -137,7 +144,7 @@ export class SharingRuntime {
     if (this.ownViewing && (this.ownViewing.expiresAt <= Date.now() || this.ownViewing.teamId !== runtime.state.preferences.current || !this.page)) this.ownViewing = undefined;
     const deadlines = [...this.peerViewing.values(), ...(this.ownViewing ? [this.ownViewing] : [])].map(entry => entry.expiresAt);
     if (deadlines.length) this.viewingExpiryTimer = setTimeout(() => this.expireViewing(), Math.max(1, Math.min(...deadlines) - Date.now()));
-    const input = JSON.stringify([this.ownViewing, this.page, [...this.peerViewing].map(([id, entry]) => [id, entry.view]), runtime.state.viewingId, runtime.state.preferences.current, runtime.state.toggles.share, this.selectedDevice]);
+    const input = JSON.stringify([this.ownViewing, this.page, [...this.peerViewing].map(([id, entry]) => [id, entry.view]), runtime.state.viewingId, runtime.state.preferences.current, runtime.state.preferences.share, this.selectedDevice]);
     let changed = this.viewingInput !== input;
     this.viewingInput = input;
     let peopleChanged = false;
@@ -157,6 +164,8 @@ export class SharingRuntime {
     const scope = runtime.auth.scope();
     if (!runtime.auth.session || !runtime.auth.client || this.publishing) return;
     if (this.pagePreview) return;
+    // The name is still being read: the page command publishes once it settles.
+    if (this.page?.kind === 'asset' && runtime.state.tokenPending && runtime.state.tokenPending === assetKey(this.page.chain, this.page.address)) return;
     const prefs = runtime.state.preferences; const team = runtime.state.remoteTeams.find(t => t.id === prefs.current && t.joined);
     const page = this.page;
     const allowed = page && this.mayObserve() && this.selectedDevice && Date.now() >= this.pageSince && team;
@@ -169,7 +178,7 @@ export class SharingRuntime {
       return;
     }
     const signature = JSON.stringify([team.id, page]);
-    if (signature === this.publishedView && Date.now() - this.publishedAt < 10_000) return;
+    if (signature === this.publishedView && Date.now() - this.publishedAt < VIEWING_RENEW_MS) return;
     const session = runtime.auth.session; const order = this.viewingOrder; const sequence = ++this.viewingSequence;
     const current = () => runtime.auth.session === session && this.page === page && this.viewingOrder === order && this.mayObserve() && runtime.state.preferences.current === team.id;
     this.publishing = true;
@@ -196,25 +205,6 @@ export class SharingRuntime {
       if (this.page && (this.page !== page || this.viewingOrder !== order) && runtime.auth.session === session) void this.publishViewing().catch(() => {});
     } }
   }
-  private persistedInteract = false;
-  private togglesQueue: Promise<unknown> = Promise.resolve();
-  async restoreToggles() {
-    const runtime = this.runtime, scope = runtime.auth.scope(), session = runtime.auth.session; if (!session) return;
-    const saved = await scope.wait(runtime.storage.get<{ interact?: boolean }>(`${session.account.id}:toggles`));
-    this.persistedInteract = saved?.interact === true;
-    runtime.state.toggles = { ...runtime.state.toggles, interact: this.persistedInteract };
-  }
-  async saveToggles() {
-    const runtime = this.runtime, scope = runtime.auth.scope(), session = runtime.auth.session, submitted = runtime.state.toggles;
-    const work = this.togglesQueue.catch(() => {}).then(async () => {
-      scope.check(); if (!session) return;
-      await scope.wait(runtime.storage.put(`${session.account.id}:toggles`, session.account.id, 'preferences', { interact: submitted.interact }));
-      this.persistedInteract = submitted.interact;
-    });
-    this.togglesQueue = work;
-    try { await scope.wait(work); }
-    catch (error) { if (scope.current() && runtime.state.toggles === submitted) { runtime.state.toggles = { ...submitted, interact: this.persistedInteract }; runtime.emit(); } throw error; }
-  }
   async savePreferences() {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
@@ -227,5 +217,6 @@ export class SharingRuntime {
       if (runtime.auth.session === session) this.persistedPreferences = preferences;
     });
     this.preferencesQueue = write; await scope.wait(write);
+    void runtime.auth.preloadHistory().catch(() => {});
   }
 }

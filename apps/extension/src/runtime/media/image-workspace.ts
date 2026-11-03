@@ -1,6 +1,6 @@
 import type { CaptureLabels,PageUp } from '../browser/page-protocol';
 import { ImageDocument,readImageDocument,fitImageViewport,imagePoint,imageCrop,imageCropHandle,resizeImageViewport,zoomImageViewport,type ImageDocumentSnapshot,type ImagePoint,type ImageViewport } from '../../domain/images/image-document.ts';
-import { captureDimensions,drawOps,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection,type CaptureTool } from '../../domain/images/drawing.ts';
+import { captureDimensions,drawOps,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection,type CaptureTool, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX } from '../../domain/images/drawing.ts';
 import { encodeCapture } from './encode-capture.ts';
 
 export type ImageWorkspaceTool = 'pan' | 'crop' | CaptureTool;
@@ -105,7 +105,7 @@ export function createImageWorkspace(stage: HTMLElement, send: (message: PageUp)
     const at = point(event), start = originalPoint(at);
     if (tool !== 'pan' && (at.x < view.x || at.y < view.y || at.x > view.x + image.naturalWidth * view.scale || at.y > view.y + image.naturalHeight * view.scale)) return;
     if (tool === 'text') {
-      text = document.createElement('textarea'); text.className = 'image-workspace-text'; text.rows = 1; text.maxLength = 500; text.setAttribute('aria-label', labels.text);
+      text = document.createElement('textarea'); text.className = 'image-workspace-text'; text.rows = 1; text.maxLength = IMAGE_TEXT_MAX; text.setAttribute('aria-label', labels.text);
       text.dataset.x = String(start.x); text.dataset.y = String(start.y);
       Object.assign(text.style, { position: 'absolute', width: 'min(240px, 80%)', minHeight: '32px', resize: 'none', background: 'var(--ui-canvas,#fff)', border: '1px solid currentColor', padding: '4px', zIndex: '1', fontFamily: 'inherit' });
       text.addEventListener('input', event => { if (event.isTrusted === false) return; notifyText(); });
@@ -124,7 +124,7 @@ export function createImageWorkspace(stage: HTMLElement, send: (message: PageUp)
     const at = point(event), original = originalPoint(at);
     if (gesture.kind === 'pan') { fitted = false; view = { ...view, x: gesture.origin.x + at.x - gesture.start.x, y: gesture.origin.y + at.y - gesture.start.y }; }
     else if (gesture.kind === 'crop') draftCrop = gesture.handle ? imageCropHandle(gesture.crop!, gesture.handle, original, image.naturalWidth, image.naturalHeight) : imageCrop(gesture.imageStart, original, image.naturalWidth, image.naturalHeight);
-    else if (tool === 'pen' && draft?.kind === 'pen') { if (draft.points.length < 10000 && Math.hypot(original.x - draft.points.at(-1)!.x, original.y - draft.points.at(-1)!.y) > .25 / view.scale) draft.points.push(original); }
+    else if (tool === 'pen' && draft?.kind === 'pen') { if (draft.points.length < IMAGE_PEN_POINTS_MAX && Math.hypot(original.x - draft.points.at(-1)!.x, original.y - draft.points.at(-1)!.y) > .25 / view.scale) draft.points.push(original); }
     else if (tool === 'arrow') draft = { kind: 'arrow', ...gesture.imageStart, width: original.x - gesture.imageStart.x, height: original.y - gesture.imageStart.y, color };
     else if (tool === 'rectangle' || tool === 'mosaic') draft = { kind: tool, ...imageCrop(gesture.imageStart, original, image.naturalWidth, image.naturalHeight), color };
     display();

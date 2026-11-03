@@ -1,7 +1,7 @@
 import Type, { type StaticDecode as Static, type TSchema, type TUndefined } from 'typebox';
 import { decodeContract, ContractDecodeError, strictObject, binaryBody } from './validation.ts';
 import { empty, operationKey } from './common.ts';
-import { JSON_BODY_BYTES } from './limits.ts';
+import { JSON_BODY_BYTES } from '../rules/media.ts';
 import { errors, errorSchemas, sessionErrors, signatureErrors, transportErrors } from './errors.ts';
 import type { ErrorCode } from './errors.ts';
 export const rateLimitNames = ['entry', 'accountCreate', 'deviceCreateIp', 'deviceCreateAccount', 'deviceRemove', 'accountDelete', 'invitePreview', 'publicLobby', 'publicAvatar', 'recruitment', 'application', 'teamCreate', 'teamJoin', 'inviteRegenerate', 'profileEdit', 'avatarUpload', 'report', 'imageUpload', 'snapshot', 'viewing', 'reaction', 'readState', 'mediaRead', 'roomLease', 'roomMessages', 'roomRead', 'roomReport', 'roomBlocks', 'roomSummary', 'roomPeople', 'roomHot', 'roomStance', 'roomRetract', 'teamInviteRead', 'teamInviteOptions', 'teamInviteSend', 'teamInviteAccept', 'teamInviteIgnore', 'teamInviteAvatar', 'teamInvitePermission', 'roomAvatar', 'session'] as const;

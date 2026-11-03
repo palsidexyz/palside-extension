@@ -1,9 +1,10 @@
 'use client';
+import { SECOND_MS } from '@palside/shared/units';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { latestTolerance } from './chat-reading';
 import navigation from './chat-navigation.module.css';
 
-const IDLE_MS = 1000;
+const IDLE_MS = SECOND_MS;
 
 /**
  * The date of the topmost message, shown only while the reader scrolls through history and gone a moment after they

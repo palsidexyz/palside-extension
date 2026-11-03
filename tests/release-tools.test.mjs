@@ -11,7 +11,8 @@ import { packageRelease, sourceDateEpoch } from '../scripts/package-release.mjs'
 import { releaseExtension } from '../scripts/release-extension.mjs';
 import { verifyReproducible } from '../scripts/verify-reproducible.mjs';
 import { extensionCommands, extensionPermissions } from '../scripts/lib/extension-artifact.mjs';
-import { RELEASE_WEBSITE_ORIGIN } from '../packages/shared/src/extension.ts';
+import { RELEASE_API_ORIGIN, RELEASE_WEBSITE_ORIGIN } from '../packages/shared/src/extension.ts';
+import { extensionPagePolicy } from '../packages/shared/src/extension-policy.ts';
 import { verifyInstalled } from '../scripts/verify-installed.mjs';
 import { checkLicenses, isAllowedLicense } from '../scripts/check-licenses.mjs';
 
@@ -27,7 +28,7 @@ const manifest = {
   optional_host_permissions: ['<all_urls>'],
   optional_permissions: ['notifications', 'tabs', 'favicon'],
   externally_connectable: { matches: [`${RELEASE_WEBSITE_ORIGIN}/*`] },
-  content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
+  content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) },
 };
 const run = (script, args) => spawnSync(process.execPath, [fileURLToPath(new URL(`../scripts/${script}`, import.meta.url)), ...args], { encoding: 'utf8' });
 

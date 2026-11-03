@@ -1,10 +1,10 @@
 import type { RefTarget } from '../runtime/browser/page-protocol';
-import { isTradeElement } from './adapters.ts';
+import { privateSelector } from './adapters.ts';
 import { caption,sameAddress,quoteContext,normalizeQuoteWhitespace } from './text.ts';
 
 export type Located = { el?: Element; range: Range };
 export function readable(element: Element | null): element is Element {
-  if (!element || isTradeElement(element)) return false;
+  if (!element || element.closest(privateSelector)) return false;
   for (let node: Element | null = element; node; node = node.parentElement) {
     const style = getComputedStyle(node);
     if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.opacity === '0' || style.contentVisibility === 'hidden') return false;

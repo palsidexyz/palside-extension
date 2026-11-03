@@ -1,9 +1,9 @@
+import { DAY_MS as day, MINUTE_MS } from '@palside/shared/units';
 import { siteCatalog } from '../src/features/palside/settings/site-catalog';
 import type { Dataset } from '../src/runtime/composition/dataset';
 import type { TeamSnapshot } from '@palside/shared/contracts/team-model';
 
 const fixtureNow = Date.now();
-const day = 24 * 60 * 60 * 1000;
 
 /** Local, fictional review data. No account, market, network or encryption assertion. */
 export const palsideFixtures: Dataset = {
@@ -45,7 +45,7 @@ export const palsideFixtures: Dataset = {
   requests: [{ createdAt: fixtureNow, expiresAt: fixtureNow + 7 * day, id: 'a1', personId: 'alice', teamId: 'night', text: '想和大家一起交流新项目。' }, { createdAt: fixtureNow, expiresAt: fixtureNow + 7 * day, id: 'a2', personId: 'ben', teamId: 'night', text: '一起看币，分享资料。' }],
 };
 // Like real messages, every sample carries its send time, a minute apart and oldest first.
-palsideFixtures.messages.forEach((message, index, all) => { message.timestamp ??= fixtureNow - (all.length - index) * 60_000; });
+palsideFixtures.messages.forEach((message, index, all) => { message.timestamp ??= fixtureNow - (all.length - index) * MINUTE_MS; });
 for (const message of palsideFixtures.messages) if (message.attachment?.kind === 'asset') { const view = palsideFixtures.views.find(view => message.attachment?.kind === 'asset' && view.id === message.attachment.assetId); if (view) message.attachment.view = { ...view }; }
 export const demoSites = siteCatalog;
 

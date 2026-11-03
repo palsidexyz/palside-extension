@@ -53,7 +53,7 @@ test('public URL classification normalizes root dots and rejects local and reser
 });
 
 test('query and hash parameters use the same credential-name boundary', () => {
-  const names = ['access_token', 'refreshToken', 'id_token', 'auth', 'authorization', 'jwt', 'session', 'sessionId', 'api_key', 'apiKey', 'secret', 'client_secret', 'password', 'signature', 'credential', 'X-Amz-Credential', 'X-Amz-Signature'];
+  const names = ['access_token', 'refreshToken', 'id_token', 'auth', 'authorization', 'jwt', 'session', 'sessionId', 'api_key', 'apiKey', 'secret', 'client_secret', 'password', 'signature', 'credential', 'X-Amz-Credential', 'X-Amz-Signature', 'code', 'state', 'nonce', 'code_verifier', 'ticket', 'otp', 'SAMLResponse', 'RelayState', 'reset_token', 'magic_link'];
   for (const name of names) {
     for (const suffix of [`?${name}=secret`, `#${name}=secret`, `#/page?x=1&${name}=secret`, `#/page?${name.toUpperCase()}=secret&x=1`]) {
       for (const path of ['https://example.com/article', `https://gmgn.ai/base/token/${address}`]) {

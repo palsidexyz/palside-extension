@@ -15,13 +15,14 @@ const bundle = await rolldown({
     resolveId(source, importer) {
       if (source === 'fixture') return source;
       if (importer?.endsWith('/core.ts') && ['../account/session-lifecycle', '../media/cache', '../viewing/sharing', '../chat/timeline', '../chat/sending', '../annotations/interactions', './dispatch', '../annotations/signal-service', '../storage/storage', './config'].includes(source)) return 'fixture:services.js';
-      if (importer?.endsWith('/hot.tsx') && !['react', 'react/jsx-runtime', './rooms'].includes(source)) return `fixture:${source}.js`;
+      if (importer?.endsWith('/hot.tsx') && !['react', 'react/jsx-runtime', './rooms', '../../../runtime/rooms/token-sites', '@palside/design/motion'].includes(source)) return `fixture:${source}.js`;
     },
     load(id) {
       if (id === 'fixture') return `export { Hot } from './apps/extension/src/features/palside/rooms/hot.tsx'; export { usePanelNavigation } from './apps/extension/src/features/palside/app/use-panel-navigation.ts'; export { RoomService } from './apps/extension/src/runtime/rooms/rooms.ts'; export { Api } from './apps/extension/src/runtime/transport/api.ts'; export { applyPatch } from './apps/extension/src/runtime/transport/state-patch.ts'; export { createPatchSliceCache, diffState } from './apps/extension/src/runtime/transport/state-diff.ts'; export { PalsideService } from './apps/extension/src/runtime/composition/core.ts';`;
       if (id === 'fixture:services.js') return 'export const API_URL = "https://service.test"; export class SessionRuntime {} export class LocalDataRuntime {} export class SharingRuntime {} export class TimelineRuntime {} export class SendingRuntime {} export class TeamInteractions {} export class RuntimeCommands {} export class SignalService {} export class ClientStorage {}';
       if (id === 'fixture:use-intl.js') return 'export const useTranslations = () => key => key;';
-      if (id.startsWith('fixture:')) return 'export default {}; export const InlineFeedback = ({children}) => children, Tooltip = ({children}) => children, Count = null, CountText = null, Token = null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;';
+      if (id === 'fixture:motion/react.js') return 'export const AnimatePresence = ({children}) => children, motion = { div: "div" }, useReducedMotion = () => true;';
+      if (id.startsWith('fixture:')) return 'export default {}; export const Check = null, ChevronDown = null, Flame = null, Layers = () => null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = () => null, InlineFeedback = ({children}) => children, Tooltip = ({children}) => children, Count = null, CountText = null, Token = null, TokenName = ({view}) => view.name, tokenStats = () => undefined, ChainLogo = () => null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;';
     },
   }],
 });
@@ -32,7 +33,7 @@ for (const panels of [1, 2]) for (const remount of [false, true]) test(`React Ho
   const saved = Object.getOwnPropertyDescriptors(globalThis);
   Object.assign(globalThis, { document, window, IS_REACT_ACT_ENVIRONMENT: true });
   const roots = [], errors = [], intervals = new Map();
-  let intervalId = 0, calls = 0;
+  let intervalId = 0; const calls = [];
   t.mock.method(console, 'error', (...args) => errors.push(args.join(' ')));
   t.mock.method(Date, 'now', () => 100000);
   t.after(async () => {
@@ -47,22 +48,22 @@ for (const panels of [1, 2]) for (const remount of [false, true]) test(`React Ho
     React, require,
     fn => { intervals.set(++intervalId, fn); return intervalId; },
     id => intervals.delete(id),
-    async () => { calls++; return new Response(JSON.stringify({ top: [], rising: [], at: Date.now() })); },
+    async (url, options) => { const body = JSON.parse(new TextDecoder().decode(options.body)); calls.push({ path: new URL(url).pathname, open: body.open }); return new Response(JSON.stringify({ subscribed: body.open })); },
   );
   const runtime = new PalsideService();
   runtime.state.data.self = 'one'; runtime.state.account = { id: 'one' };
   runtime.state.connection.networkOnline = true;
-  runtime.auth = { session: { account: { id: 'one' }, token: 'token' }, scope() { const session = this.session; return { current: () => session === this.session }; } };
+  runtime.auth = { session: { account: { id: 'one' }, token: 'token' }, scope() { const session = this.session; return { current: () => session === this.session, check: () => assert.equal(session, this.session) }; } };
   runtime.emissionCache = createPatchSliceCache(); runtime.sharing = { mayObserve: () => false }; runtime.countUnread = () => {}; runtime.listeners = new Set();
   runtime.api = new Api('https://service.test');
   runtime.rooms = new RoomService(runtime);
   const commands = Array.from({ length: panels }, (_, panel) => async (_name, payload) => runtime.rooms.watchHot({ ...payload, sourceId: String(panel) }));
   const cache = createPatchSliceCache(), setters = [];
   let sent, received;
-  function Panel({ panel }) {
+  function Panel({ panel, chain = null }) {
     const [state, setState] = useState(received);
     useEffect(() => { setters.push(setState); return () => setters.splice(setters.indexOf(setState), 1); }, []);
-    return React.createElement(Hot, { c: { data: state.data, live: { state, command: commands[panel] } } });
+    return React.createElement(Hot, { chain, c: { data: state.data, live: { state, command: commands[panel] } } });
   }
   function push(state) {
     const patch = JSON.parse(JSON.stringify(diffState(sent, state, cache))); sent = state;
@@ -73,24 +74,31 @@ for (const panels of [1, 2]) for (const remount of [false, true]) test(`React Ho
   for (let i = 0; i < panels; i++) { const node = document.createElement('div'); document.body.append(node); roots.push(createRoot(node)); }
   await act(() => { roots.forEach((root, panel) => root.render(React.createElement(Panel, { panel }))); });
   for (let i = 0; i < 10; i++) await act(() => { runtime.state.notice = { key: 'test', values: { i } }; runtime.emit(); });
-  assert.equal(calls, 1);
+  assert.deepEqual(calls, [{ path: '/rooms/hot/subscription', open: true }]);
+  assert.deepEqual(runtime.state.rooms.hot, { rows: [], loaded: false });
+  await act(() => runtime.rooms.consume({ type: 'hot', rooms: { rows: [] } }));
+  assert.deepEqual(runtime.state.rooms.hot, { rows: [], loaded: true });
   const revision = runtime.state.revision;
-  await act(() => runtime.rooms.hot());
-  assert.equal(calls, 2); assert.equal(runtime.state.revision, revision);
-  await act(() => { for (const refresh of intervals.values()) refresh(); });
-  assert.equal(calls, 3);
+  await act(() => runtime.rooms.consume({ type: 'hot', rooms: { rows: [] } }));
+  assert.equal(runtime.state.revision, revision);
+  assert.equal(calls.length, 1); assert.equal(intervals.size, 0);
   if (remount) await act(() => { for (const root of roots) root.render(null); });
-  runtime.rooms.reset();
+  calls.length = 0;
+  await act(async () => { runtime.rooms.reset(); });
+  if (!remount) assert.deepEqual(calls, [{ path: '/rooms/hot/subscription', open: false }]);
+  calls.length = 0;
   runtime.auth.session = { account: { id: 'two' }, token: 'two' };
   await act(() => {
     runtime.state.account = { id: 'two' }; runtime.state.data.self = 'two'; runtime.emit();
     if (remount) roots.forEach((root, panel) => root.render(React.createElement(Panel, { panel })));
   });
-  assert.equal(calls, 4);
-  await act(() => document.querySelectorAll('button')[1].click());
-  assert.equal(calls, 5);
+  assert.deepEqual(calls, [{ path: '/rooms/hot/subscription', open: true }]);
+  await act(() => roots[0].render(React.createElement(Panel, { panel: 0, chain: 'Solana' })));
+  assert.equal(calls.length, 1); // Chain filtering is local to each panel.
   await act(() => { for (const root of roots) root.unmount(); });
   roots.length = 0;
+  assert.deepEqual(calls, [{ path: '/rooms/hot/subscription', open: true }, { path: '/rooms/hot/subscription', open: false }]);
+  assert.equal(runtime.state.rooms.hot, undefined);
   assert.deepEqual(errors, []);
   assert.equal(intervals.size, 0);
 });
@@ -129,10 +137,9 @@ for (const change of ['none', 'navigation', 'account', 'team', 'unmount']) test(
   assert.equal(focused, change === 'none' ? 1 : 0);
 });
 
-for (const command of ['locateRef', 'locateSticky']) test(`${command} retains arrival when page tools fail after opening`, async () => {
+for (const command of ['locateRef', 'locateSticky']) test(`${command} reports that it opened the page when page tools fail after opening`, async () => {
   const load = productionModules({ accessStatus: async () => ({ site: true }), visibleStickies: items => items.stickies });
   const { stickies } = load('apps/extension/src/background/stickies.ts');
-  const social = load('apps/extension/src/features/palside/annotations/social-state.ts');
   const origin = 'https://example.test/a', destination = 'https://example.test/b';
   const target = { kind: 'quote', exact: 'quote', prefix: '', suffix: '' };
   let active = { id: 1, url: origin, status: 'complete' }, opens = 0;
@@ -147,28 +154,8 @@ for (const command of ['locateRef', 'locateSticky']) test(`${command} retains ar
     openPage: async url => { opens++; active = { ...active, url }; },
     pages: { openPageTools: async () => { throw Error('page tools unavailable'); } },
   };
-  const end = social.beginSocialSession({ accountId: 'self' });
-  try {
-    const outcome = await social.navigateWithReturn({ page: { url: origin } }, destination, async () => {
-      const reply = await stickies(bg)[command]({ windowId: 1, teamId: 'team', messageId: 'message', stickyId: 'sticky' }, 'chrome-extension://panel');
-      assert.equal(reply.value.opened, true);
-      return reply.value;
-    });
-    assert.equal(opens, 1); assert.equal(outcome, 'unavailable');
-    assert.equal(social.captureSocialUi().snapshot().returnTo.arrived, true);
-    assert.equal(social.captureSocialUi().snapshot().returnTo.origin.url, origin);
-  } finally { end(); }
+  const reply = await stickies(bg)[command]({ windowId: 1, teamId: 'team', messageId: 'message', stickyId: 'sticky' }, 'chrome-extension://panel');
+  assert.equal(reply.value.opened, true);
+  assert.equal(opens, 1); assert.equal(reply.value.result, 'unavailable');
 });
 
-test('locate metadata cannot mark a superseding navigation as arrived', async () => {
-  const social = productionModules()('apps/extension/src/features/palside/annotations/social-state.ts');
-  const end = social.beginSocialSession({ accountId: 'self' });
-  let resolve;
-  try {
-    const opening = social.navigateWithReturn({ page: { url: 'https://example.test/a' } }, 'https://example.test/b', () => new Promise(done => { resolve = done; }));
-    await social.navigateWithReturn({ page: { url: 'https://example.test/a' } }, 'https://example.test/c', async () => {});
-    resolve({ result: 'unavailable', opened: true }); await opening;
-    assert.equal(social.captureSocialUi().snapshot().returnTo.target, 'https://example.test/c');
-    assert.equal(social.captureSocialUi().snapshot().returnTo.arrived, false);
-  } finally { end(); }
-});

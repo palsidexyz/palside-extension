@@ -1,4 +1,4 @@
-import { IMAGE_MIME_TYPES } from '@palside/shared/contracts/limits';
+import { IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
 import { message as uiMessage,type TextMessage } from '@palside/i18n';
 /** Only the files delivered by this paste event are inspected. */
 export function pastedImage(files: File[]): { file?: File; error?: TextMessage } {

@@ -6,7 +6,15 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { parseHTML } from 'linkedom';
 import React, { act } from 'react';
-import * as limits from '../packages/shared/src/contracts/limits.ts';
+import * as limits0 from '../packages/shared/src/rules/teams.ts';
+import * as limits1 from '../packages/shared/src/rules/retention.ts';
+import * as limits2 from '../packages/shared/src/rules/accounts.ts';
+import * as limits3 from '../packages/shared/src/rules/messages.ts';
+import * as limits4 from '../packages/shared/src/rules/media.ts';
+import * as limits5 from '../packages/shared/src/rules/rooms.ts';
+import * as limits6 from '../packages/shared/src/rules/interactions.ts';
+import * as limits7 from '../packages/shared/src/rules/admin.ts';
+const limits = { ...limits0, ...limits1, ...limits2, ...limits3, ...limits4, ...limits5, ...limits6, ...limits7 };
 import { characterLength } from '../apps/extension/src/domain/chat/model.ts';
 import { defaultTeamAvatarOptions } from '../apps/extension/src/features/palside/teams/default-team-avatar.ts';
 
@@ -42,7 +50,15 @@ function production(overrides = {}) {
   const modules = {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => translate, useLocale: () => 'en' },
-    '@palside/shared/contracts/limits': limits,
+    '@palside/shared/units': require('@palside/shared/units'),
+    '@palside/shared/rules/teams': limits,
+    '@palside/shared/rules/accounts': limits,
+    '@palside/shared/rules/retention': limits,
+    '@palside/shared/rules/messages': limits,
+    '@palside/shared/rules/media': limits,
+    '@palside/shared/rules/rooms': limits,
+    '@palside/shared/rules/interactions': limits,
+    '@palside/shared/rules/admin': limits,
     '@palside/shared/contracts/rules': { normalizeInvitePassword: value => value },
     '@palside/i18n': { message, errorMessage: error => error.message, localeOrEnglish: value => value, deadlineTime: String },
     '@palside/ui/button': { Button, IconButton },
@@ -217,18 +233,17 @@ test('creation shares description validation with the button and blocks pending 
   assert.equal(f.calls.find(([name]) => name === 'create')[3], 'data:latest');
 });
 
-for (const choice of ['preset', 'shuffle', 'upload']) {
+for (const choice of ['preset', 'upload']) {
   test(`new ${choice} wins over an earlier image read`, async t => {
     const reads = [];
     const f = await fixture(t, { form: true, readImage: () => { const read = deferred(); reads.push(read); return read.promise; } });
     await f.input('input[aria-label="extension.copy.teamName"]', 'A squad');
     await f.upload({ name: 'first' });
     if (choice === 'preset') await f.dispatch(f.container.querySelector('button[aria-pressed="false"]'), 'click');
-    if (choice === 'shuffle') await f.dispatch(f.container.querySelector('[aria-label="extension.start.shuffle"]'), 'click');
     if (choice === 'upload') { await f.upload({ name: 'second' }); await resolve(reads[1], 'data:second'); }
-    const selected = f.container.querySelector('[data-avatar]').getAttribute('src');
+    const selected = f.container.querySelector('[data-tile][aria-pressed="true"] img').getAttribute('src');
     await resolve(reads[0], 'data:first');
-    assert.equal(f.container.querySelector('[data-avatar]').getAttribute('src'), selected);
+    assert.equal(f.container.querySelector('[data-tile][aria-pressed="true"] img').getAttribute('src'), selected);
     assert.equal(submitButton(f).disabled, false);
     await f.submit(); assert.equal(f.calls.find(([name]) => name === 'create')[3], selected);
   });
@@ -271,5 +286,5 @@ test('superseded preparation cannot clear the latest pending state or report its
   assert.doesNotMatch(f.container.textContent, /Old failure/);
   await resolve(images[1], { blob: { src: 'data:second' } });
   assert.equal(submitButton(f).disabled, false);
-  assert.equal(f.container.querySelector('[data-avatar]').getAttribute('src'), 'data:second');
+  assert.equal(f.container.querySelector('[data-tile][aria-pressed="true"] img').getAttribute('src'), 'data:second');
 });

@@ -1,15 +1,16 @@
+import { DAY_MS as DAY, MINUTE_MS } from '@palside/shared/units';
 import { resolveTokenMetadata,tokenName } from '../viewing/token-page';
 import { message as uiMessage,MessageError } from '@palside/i18n';
-import { messageExpiry } from '../chat/message-expiry';
+import { imageExpiry, messageExpiry } from '../chat/message-expiry';
 import { retainedViews } from '../viewing/view-retention';
 import { POKE_DISPLAY } from '../../domain/annotations/social';
 import type { Message } from '../../domain/chat/model';
 import type { Viewing } from '../../domain/assets/model';
-import { DAY } from '../composition/state';
 import { clearCache } from './local-data';
 import type { CacheEntry } from '../storage/storage';
 import type { RuntimeDevice } from '../account/device';
 import type { PalsideService } from '../composition/core';
+import { expired } from '../../domain/chat/expiry.ts';
 
 export class LocalDataRuntime {
   readonly runtime: PalsideService;
@@ -58,6 +59,8 @@ export class LocalDataRuntime {
       const expiresAt = this.expiresAt(message, this.eventTimes.get(message.id) ?? message.timestamp);
       if (message.expiresAt !== expiresAt) { message.expiresAt = expiresAt; shortened.add(message); changed = true; }
       if (expiresAt <= now) removed.add(message.id);
+      // Images end 30 days after sending even when the text stays: drop the picture, keep the message.
+      else if (message.attachment?.kind === 'image' && message.attachment.src && imageExpiry(message, expiresAt) <= now) { message.attachment = { ...message.attachment, src: '' }; changed = true; }
     }
     // All original deadlines are current before resolving replies, regardless of order.
     const messagesByTeam = new Map<string, Map<string, Message>>();
@@ -72,10 +75,11 @@ export class LocalDataRuntime {
     }
     for (const [id, edit] of runtime.timeline.edits) {
       edit.expiresAt = messageExpiry(edit.expiresAt, edit.timestamp, runtime.state.remoteTeams.find(t => t.id === edit.teamId)?.retentionDays);
-      if (removed.has(id) || edit.expiresAt <= now) runtime.timeline.edits.delete(id);
+      if (removed.has(id) || expired(edit.expiresAt, now)) runtime.timeline.edits.delete(id);
     }
     for (const id of removed) { this.eventTimes.delete(id); runtime.timeline.edits.delete(id); if (!runtime.sending.inFlight.has(id)) runtime.sending.outgoing.delete(id); }
-    if (removed.size) { runtime.state.data.messages = runtime.state.data.messages.filter(message => !removed.has(message.id)); this.pruneMedia(); changed = true; }
+    if (removed.size) runtime.state.data.messages = runtime.state.data.messages.filter(message => !removed.has(message.id));
+    if (changed || removed.size) { this.pruneMedia(); changed = true; }
     const itemExpiries = new Map(runtime.interactions.stickyRecords.map(item => [item.id, item.expiresAt]));
     const retainedStickies = runtime.interactions.stickyRecords.filter(item => {
       const expiresAt = messageExpiry(item.expiresAt, item.timestamp, runtime.state.remoteTeams.find(team => team.id === item.teamId)?.retentionDays);
@@ -117,7 +121,7 @@ export class LocalDataRuntime {
         this.evictCachedContent(evicted);
       }
     }
-    if (now - this.lastCleanup >= 60_000) { this.lastCleanup = now; await scope.wait(runtime.storage.cleanup(now).catch(() => { if (scope.current()) this.lastCleanup = 0; })); }
+    if (now - this.lastCleanup >= MINUTE_MS) { this.lastCleanup = now; await scope.wait(runtime.storage.cleanup(now).catch(() => { if (scope.current()) this.lastCleanup = 0; })); }
   }
   async avatar(id: string | null) {
     const runtime = this.runtime;
@@ -185,6 +189,8 @@ export class LocalDataRuntime {
   upsertView(view: Viewing) {
     const runtime = this.runtime;
     if (view.kind === 'asset' && view.address && !tokenName(view.name)) view = { ...view, name: resolveTokenMetadata({ address: view.address }).name! };
+    // Learn a real name, or fill a placeholder from the memory-only token cache.
+    if (!runtime.tokens.remember(view)) view = runtime.tokens.apply(view);
     const index = runtime.state.data.views.findIndex(v => v.id === view.id);
     if (index < 0) runtime.state.data.views = [...runtime.state.data.views, view];
     else runtime.state.data.views = runtime.state.data.views.map(v => v.id === view.id ? view : v); }

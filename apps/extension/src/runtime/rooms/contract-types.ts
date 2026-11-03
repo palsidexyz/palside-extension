@@ -10,4 +10,4 @@ export type { RoomPerson } from '@palside/shared/contracts/profiles';
 export type { RoomEvent } from '@palside/shared/contracts/events';
 export type RoomSummary = Mutable<ApiResult<'rooms.summary'>>;
 export type RoomPeople = Mutable<ApiResult<'rooms.people'>>;
-export type HotRoom = Mutable<ApiResult<'rooms.hot'>['top'][number]> & { rise?: number };
+export type HotRoom = Mutable<ApiResult<'rooms.hot'>['rows'][number]>;

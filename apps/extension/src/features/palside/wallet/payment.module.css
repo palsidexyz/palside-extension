@@ -21,7 +21,7 @@
 .addressField { display:flex; flex-direction:column; gap:6px; }
 .addressField > span { padding:0 2px; font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); }
 .addressField input { width:100%; min-height:44px; padding:10px 14px; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:400 var(--ui-type-callout)/20px var(--font-geist-mono),monospace; }
-.addressField input:focus-visible { outline:0; box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }
+.addressField input:focus-visible { outline:0; }
 
 .amountBox { display:flex; flex-direction:column; gap:6px; padding:16px 14px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); transition:box-shadow .18s; }
 .amountBox:focus-within { box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }

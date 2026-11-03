@@ -26,6 +26,7 @@ import { focusRanges, offsetRange, selectionOffsets, textRanges } from './text-h
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import refStyles from './composer-social.module.css';
+import { liveView } from '../assets/token-data';
 
 type Props = {
   c: PalsideController;
@@ -97,12 +98,16 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
   const [toggled, setToggled] = useState(false);
   const person = c.people.find(p => p.id === message.author) ?? { id: message.author, name: t('common.member'), color: '#e9edf0' };
   const self = message.author === c.data.self;
-  const asset = assetView(message.attachment);
+  const snapshot = assetView(message.attachment);
+  // The card keeps the message's token identity; its name and icon follow the token's one record.
+  const asset = snapshot && liveView(c, snapshot);
   const original = c.currentMessages.find(m => m.id === message.replyTo);
   const editing = c.editing === message.id;
   const fragment = quotedFragment(original, message.replyRange, message.replyToExpiresAt);
   const jumbo = !editing && !message.ref && !message.replyTo && !message.attachment && emojiOnly(message.text);
-  const long = useLongText(text, Boolean(message.text) && !editing && !jumbo, message.text, message.editedAt);
+  // A message that is only the address its token card came from: one bubble, the address shortened to one line above the card.
+  const linkOnly = !editing && Boolean(asset) && !message.ref && !message.replyTo && LONE_LINK.test(message.text);
+  const long = useLongText(text, Boolean(message.text) && !editing && !jumbo && !linkOnly, message.text, message.editedAt);
   const folded = long && !expanded;
 
   useLayoutEffect(() => {
@@ -171,19 +176,22 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
       {!self && !grouped && <div className={`${s.messageMeta} ${taking ? s.takeOver : ''}`}><strong>{person.name}</strong></div>}
       <div className={s.messageLine}>
         <div ref={stack} className={s.messageStack} data-sending={message.status === 'sending' && !queued} data-queued={queued ? true : undefined} aria-busy={message.status === 'sending'}>
-          {(message.ref || message.replyTo || message.text) && <div ref={bubble} className={`${s.messageBubble} ${jumbo ? s.jumbo : ''}`} data-editing={editing || undefined} data-size={jumbo ? Math.min(characterLength(message.text.replace(/\s+/g, '')), 2) : undefined}>
+          {(message.ref || message.replyTo || message.text) && <div ref={bubble} className={`${s.messageBubble} ${jumbo ? s.jumbo : ''}`} data-link={linkOnly || undefined} data-editing={editing || undefined} data-size={jumbo ? Math.min(characterLength(message.text.replace(/\s+/g, '')), 2) : undefined}>
             {queued?.head && !reduced && !jumbo && <QueueFill key={queued.at} at={queued.at} />}
             {message.ref && <MessageRef c={c} message={{ ...message, ref: message.ref }} />}
             {message.replyTo && <button type="button" className={refStyles.refChip} data-reply-quote onClick={() => original && onQuote(original.id, fragment ? message.replyRange : undefined)}>
               <ReplyLine c={c} original={original} text={quotedText(original, message.replyToExpiresAt, undefined, t)} fragment={fragment} />
             </button>}
-            {message.text && <p ref={text} id={textId} className={s.messageText} data-message-text data-folded={folded || undefined} data-toggled={toggled || undefined}><LinkedText c={c} message={message} /></p>}
+            {linkOnly && asset ? <>
+              <p ref={text} id={textId} className={s.messageLink} data-message-text><a href={message.text.trim()} target="_blank" rel="noreferrer noopener" title={message.text.trim()}>{shortLink(message.text.trim())}</a></p>
+              <AssetCard view={asset} onOpen={() => c.selectAsset(asset.id)} />
+            </> : message.text && <p ref={text} id={textId} className={s.messageText} data-message-text data-folded={folded || undefined} data-toggled={toggled || undefined}><LinkedText c={c} message={message} /></p>}
             {long && !editing && <button type="button" className={s.foldToggle} aria-expanded={expanded} aria-controls={textId} onClick={() => { setToggled(true); if (expanded) collapse(); else setExpanded(true); }}>{expanded ? t('extension.reading.collapse') : t('extension.reading.expand')}</button>}
           </div>}
-          {asset && <AssetCard view={asset} onOpen={() => c.selectAsset(asset.id)} />}
+          {asset && !linkOnly && <AssetCard view={asset} onOpen={() => c.selectAsset(asset.id)} />}
           {/* A token card whose details did not come through still takes its place, so the message never reads as empty. */}
           {message.attachment?.kind === 'asset' && !asset && <div className={s.assetGone}><CircleSlash size={16} aria-hidden="true" />{t('extension.copy.tokenGone')}</div>}
-          {message.attachment?.kind === 'image' && <MessageImage c={c} id={message.id} image={message.attachment} />}
+          {message.attachment?.kind === 'image' && <MessageImage c={c} id={message.id} sentAt={message.timestamp} image={message.attachment} />}
         </div>
         <div className={`${s.messageAside} ${menuStyles.aside}`}>
           {/* The day label above already names the day, so the time here stays a short clock and every bubble gets the same width. */}
@@ -221,6 +229,17 @@ function useLongText(text: RefObject<HTMLElement | null>, enabled: boolean, cont
 function QueueFill({ at }: { at: number }) {
   const [duration] = useState(() => Math.max(0, at - Date.now()));
   return <span className={s.queueFill} aria-hidden="true" style={{ animationDuration: `${duration}ms` }} />;
+}
+
+const LONE_LINK = /^\s*https?:\/\/\S+\s*$/i;
+
+/** An address on one line: host without www, then the path with any long segment cut to its first six and last four characters. */
+function shortLink(input: string) {
+  try {
+    const url = new URL(input);
+    const path = url.pathname.split('/').map(part => part.length > 16 ? `${part.slice(0, 6)}…${part.slice(-4)}` : part).join('/');
+    return `${url.hostname.replace(/^www\./, '')}${path === '/' ? '' : path}`;
+  } catch { return input; }
 }
 
 function LinkedText({ c, message }: { c: PalsideController; message: Message }) {

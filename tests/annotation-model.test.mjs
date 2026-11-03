@@ -117,3 +117,15 @@ test('sticky conflicts and equal timestamps use code-unit event ordering', () =>
     assert.deepEqual(resolveStickies(records, 20).map(item => item.id), ['$i', '$I']);
   }
 });
+
+
+test('sticky site uses the public host normalizer including IDNA top-level domains', () => {
+  const site = new URL('https://例子.中国').hostname;
+  for (const input of [site, '例子.中国', site.toUpperCase()]) {
+    const content = teamEventContent(undefined, { ...base, site: input, url: `https://${site}/article` });
+    assert.equal(readTeamEvent(STICKY_EVENT, content).site, site);
+  }
+  for (const input of ['localhost', '127.0.0.1', 'bad..example', '-bad.example', 'https://example.com']) {
+    assert.equal(readTeamEvent(STICKY_EVENT, teamEventContent(undefined, { ...base, site: input })), undefined);
+  }
+});

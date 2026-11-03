@@ -1,5 +1,5 @@
 import type { CommandName,CommandArgs,CommandPayload,CommandResult } from '../../../runtime/transport/command-map';
-import { type Favorites,type InteractionPrefs,type WebFeature } from '../../../domain/annotations/interaction';
+import { type Favorites,type SiteInteraction } from '../../../domain/annotations/interaction';
 import { type Attachment,type Draft,type Message } from '../../../domain/chat/model';
 import { type Screen } from './panel-model';
 import { type Viewing } from '../../../domain/assets/model';
@@ -12,10 +12,11 @@ export type PanelActions = {
   resolveDraftConflict: (keepLocal: boolean) => Promise<void>;
   run: <N extends CommandName>(...args: CommandArgs<N>) => Promise<CommandResult<N> | undefined>;
   guarded: <N extends CommandName>(name: N, payload: CommandPayload<N>, again: () => unknown) => Promise<CommandResult<N> | undefined>;
-  setInteraction: (patch: Partial<InteractionPrefs>) => Promise<void>;
+  /** 网页互动 for one site: on or off there, and its 弹幕, 信号 and 便利贴. Chrome is asked by the caller, in the click. */
+  setSite: (host: string, patch: Partial<SiteInteraction>) => Promise<void>;
   setFavorites: (update: (old: Favorites) => Favorites) => Promise<void>;
-  setWeb: (feature: WebFeature, on: boolean) => void;
-  toggle: (feature: WebFeature, on: boolean) => Promise<void>;
+  /** 共享在看's key, kept until pressed again. */
+  toggle: (feature: 'share', on: boolean) => Promise<void>;
   enableSites: (hosts: string[]) => Promise<boolean>;
   addedNotice: (hosts: string[]) => TextMessage;
   removeSite: (host: string | "all") => void;

@@ -63,7 +63,8 @@ browser.runtime.onMessage.addListener((message, sender, respond) => {
   const command = message.command as Command | undefined;
   if (!command || typeof command.name !== 'string') return;
   void start().then(() => service.command(command)).then(value => respond({ ok: true, value } satisfies Reply), error => {
-    if (!(error instanceof MessageError)) console.error('[palside]', error);
+    // Only the error's kind and code: messages and causes can carry request details.
+    if (!(error instanceof MessageError)) console.error('[palside]', command.name, error instanceof Error ? error.name : typeof error, typeof error?.code === 'string' ? error.code : '');
     respond({ ok: false, message: 'Action failed', text: errorMessage(error), code: typeof error?.code === 'string' ? error.code : undefined, ...Object.fromEntries(['lockedUntil', 'retryAfterMs', 'remaining'].filter(key => typeof error?.[key] === 'number' && Number.isFinite(error[key])).map(key => [key, error[key]])) } satisfies Reply);
   });
   return true;

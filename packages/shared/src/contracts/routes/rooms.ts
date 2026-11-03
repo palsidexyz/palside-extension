@@ -2,14 +2,16 @@ import Type from 'typebox';
 import { denseArray, strictObject, contractString } from '../validation.ts';
 import { id } from '../common.ts';
 import { person } from '../profiles.ts';
-import { ROOM_TEXT_MAX } from '../limits.ts';
+import { ROOM_TEXT_MAX } from '../../rules/rooms.ts';
 import { endpoint, jsonBody, jsonResponse, binaryResponse } from '../endpoint.ts';
-import { roomKey, roomProfileInput, stance, roomStance, roomSendResult, roomPage, hotRooms, roomLease, roomSummary, roomPeople, keyQuery, messageInput } from '../rooms.ts';
+import { roomKey, roomProfileInput, stance, roomStance, roomSendResult, roomMessage, roomPage, hotRooms, roomLease, roomSummary, roomPeople, keyQuery, messageInput } from '../rooms.ts';
 export const roomEndpoints = [
   endpoint({ id: 'rooms.lease', method: 'POST', path: '/rooms/lease', rateLimits: ['roomLease'], body: jsonBody(strictObject({ key: Type.Union([roomKey, Type.Null()]), profile: Type.Optional(roomProfileInput) })), response: jsonResponse(roomLease), errors: ['TEXT_NOT_ALLOWED'] }),
   endpoint({ id: 'rooms.summary', method: 'GET', path: '/rooms/summary', rateLimits: ['roomSummary'], query: keyQuery, response: jsonResponse(roomSummary) }),
   endpoint({ id: 'rooms.people', method: 'GET', path: '/rooms/people', rateLimits: ['roomPeople'], query: keyQuery, response: jsonResponse(roomPeople) }),
-  endpoint({ id: 'rooms.hot', method: 'GET', path: '/rooms/hot', rateLimits: ['roomHot'], query: strictObject({ chain: Type.Optional(contractString({ pattern: /^[A-Za-z ]{2,24}$/ })) }), response: jsonResponse(hotRooms) }),
+  endpoint({ id: 'rooms.hot', method: 'GET', path: '/rooms/hot', rateLimits: ['roomHot'], response: jsonResponse(hotRooms) }),
+  endpoint({ id: 'rooms.hotSubscription', method: 'POST', path: '/rooms/hot/subscription', rateLimits: ['roomHot'], body: jsonBody(strictObject({ open: Type.Boolean() })), response: jsonResponse(strictObject({ subscribed: Type.Boolean() })) }),
+  endpoint({ id: 'rooms.message', method: 'GET', path: '/rooms/message', rateLimits: ['roomRead'], query: messageInput, response: jsonResponse(roomMessage), errors: ['ROOM_MESSAGE_NOT_FOUND'] }),
   endpoint({ id: 'rooms.stance', method: 'POST', path: '/rooms/stance', rateLimits: ['roomStance'], body: jsonBody(strictObject({ key: roomKey, value: Type.Union([stance, Type.Null()]) })), response: jsonResponse(roomStance) }),
   endpoint({ id: 'rooms.retract', method: 'POST', path: '/rooms/retract', rateLimits: ['roomRetract'], body: jsonBody(messageInput), response: jsonResponse(strictObject({ retracted: Type.Literal(true) })), errors: ['ROOM_MESSAGE_NOT_FOUND', 'ROOM_FORBIDDEN'] }),
   endpoint({ id: 'rooms.messages', method: 'GET', path: '/rooms/messages', rateLimits: ['roomRead'], query: strictObject({ key: roomKey, before: Type.Optional(id) }), response: jsonResponse(roomPage), errors: ['ROOM_MESSAGE_NOT_FOUND'] }),

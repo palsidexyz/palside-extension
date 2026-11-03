@@ -29,7 +29,6 @@ const allowedDuplicates = [
   { keys: ['extension.dynamic.deviceRemoved', 'extension.sites.removed'], reason: 'Different objects: a signed-in device versus an allowed website.' },
   { keys: ['extension.discussion.fewer', 'extension.reading.collapse'], reason: 'Different actions: shorten a discussion list versus collapse one long message.' },
   { keys: ['extension.overlay.medium', 'extension.style.mid'], reason: 'Different settings: Danmaku speed versus density.' },
-  { keys: ['extension.top.back', 'extension.room.back', 'extension.reading.returnTo'], reason: 'Different destinations: a viewed page, squad chat, or a chat reading position.' },
   { keys: ['extension.access.sites', 'extension.privacy.perm_sites'], reason: 'Privacy permission lookup uses the structured perm_<permission> key pattern.' },
   { keys: ['extension.access.none', 'extension.room.blockedNone'], reason: 'Different sets: enabled page-interaction features versus blocked people.' },
   { keys: ['extension.center.sites', 'extension.settings.sites'], reason: 'Different lists: favorite websites versus websites with interaction permission.' },
@@ -40,14 +39,14 @@ const allowedDuplicates = [
   { keys: ['extension.settings.notifications', 'extension.privacy.feature_notify'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern.' },
   { keys: ['extension.sites.tokenData', 'extension.privacy.feature_token'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern.' },
   { keys: ['extension.room.name', 'extension.privacy.feature_room', 'extension.wallet.kindRoom'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern; the red packet kind names the room it is sent into.' },
-  { keys: ['extension.copy.inviteShort', 'extension.wallet.kindInvitation'], reason: 'Different things: the invite action versus the invitation red packet kind.' },
   { keys: ['extension.web.category_custom', 'extension.wallet.custom'], reason: 'Different things: a custom site category versus a custom tip amount.' },
-  { keys: ['extension.hot.noneRising', 'extension.hot.noneTop'], reason: 'Different lists: rising activity versus the top activity ranking.' },
   { keys: ['extension.privacy.perm_active', 'extension.privacy.revoke_active_title'], reason: 'Privacy permission and revocation-title lookups use structured permission keys.' },
+  { keys: ['extension.privacy.perm_idle', 'extension.privacy.revoke_idle_title'], reason: 'Privacy permission and revocation-title lookups use structured permission keys.' },
+  { keys: ['extension.privacy.revoke_active', 'extension.privacy.revoke_idle'], reason: 'Each built-in permission has its own structured revocation lookup; both come with the install.' },
   { keys: ['extension.privacy.feature_quote', 'extension.reading.quote'], reason: 'Privacy feature lookup names page quoting; chat reading labels a quoted message excerpt.' },
   { keys: ['extension.privacy.read.share.who', 'extension.privacy.read.quote.who', 'extension.privacy.read.signal.who', 'extension.privacy.read.sticky.who'], reason: 'Privacy table lookup requires read.<feature>.who for each feature.' },
-  { keys: ['extension.privacy.read.quote.keep', 'extension.privacy.read.sticky.keep', 'extension.privacy.read.shot.keep'], reason: 'Privacy table lookup requires read.<feature>.keep for each feature.' },
-  { keys: ['extension.privacy.read.quote.no', 'extension.privacy.read.sticky.no'], reason: 'Privacy table lookup requires read.<feature>.no for each feature.' },
+  { keys: ['extension.privacy.read.quote.keep', 'extension.privacy.read.sticky.keep'], reason: 'Privacy table lookup requires read.<feature>.keep for each feature; screenshots have a separate image retention cap.' },
+  { keys: ['extension.privacy.read.quote.no', 'extension.privacy.read.signal.no', 'extension.privacy.read.sticky.no'], reason: 'Privacy table lookup requires read.<feature>.no for each feature; quotes, signals and sticky notes share technical exclusions.' },
 ];
 
 function duplicateGroups(website) {

@@ -1,3 +1,4 @@
+import { MIB, DAY_MS } from '@palside/shared/units';
 import test from 'node:test'; import assert from 'node:assert/strict'; import { cacheUsage, clearCache } from '../apps/extension/src/runtime/media/local-data.ts';
 test('cache usage and clear delegate to owned cache only', async()=>{let cleared=0;const s={cacheBytes:async()=>42,clearCache:async()=>{cleared++}};assert.deepEqual(await cacheUsage(s),{bytes:42});assert.deepEqual(await clearCache(s),{bytes:42});assert.equal(cleared,1)});
 
@@ -48,16 +49,16 @@ test('typed account reads use the compound index without reading unrelated paylo
 });
 test('the 501st cache write visits only eviction metadata and preserves protected records', async t => {
   const host = indexedDb(t), storage = new ClientStorage(), expires = Date.now() + 10000;
-  const blob = new Blob([new Uint8Array(200 * 1024)]);
+  const blob = new Blob([new Uint8Array(600 * 1024)]);
   await storage.put('a:draft:t', 'a', 'draft', 'draft'); await storage.put('a:outgoing:m', 'a', 'outgoing', 'unsent');
   for (let i = 0; i < 500; i++) await storage.cache('a', String(i).padStart(3, '0'), blob, expires);
   host.operations.length = 0;
-  const evicted = await storage.cache('b', 'large', new Blob([new Uint8Array(1024 * 1024)]), expires);
+  const evicted = await storage.cache('b', 'large', new Blob([new Uint8Array(3 * MIB)]), expires);
   assert.deepEqual(evicted, []);
   assert.equal(host.operations.filter(op => op.method === 'getAll').length, 0);
   assert.equal(host.operations.filter(op => op.method === 'cursorRow').length, 0);
   host.operations.length = 0;
-  assert.deepEqual(await storage.cache('b', 'pressure', new Blob([new Uint8Array(2 * 1024 * 1024)]), expires), ['a:cache:000', 'a:cache:001', 'a:cache:002', 'a:cache:003']);
+  assert.deepEqual(await storage.cache('b', 'pressure', new Blob([new Uint8Array(6 * MIB)]), expires), ['a:cache:000', 'a:cache:001', 'a:cache:002', 'a:cache:003']);
   assert.ok(host.operations.filter(op => op.method === 'cursorRow').length <= 5);
   assert.equal(await storage.get('a:draft:t'), 'draft'); assert.equal(await storage.get('a:outgoing:m'), 'unsent');
 });
@@ -91,7 +92,7 @@ test('history message pages share one durable cache write and retain reply deadl
   const cache = new LocalDataRuntime(runtime); cache.eventTimes.set(first.id, now); cache.eventTimes.set(reply.id, now + 1);
   await cache.cachePage(async () => { await cache.cacheMessage(reply, now + 1); await cache.cacheMessage(first, now); });
   assert.equal(host.operations.filter(op => op.method === 'transaction' && op.mode === 'readwrite').length, 1);
-  assert.equal((await storage.get('a:cache:$reply')).message.replyToExpiresAt, now + 86400_000);
+  assert.equal((await storage.get('a:cache:$reply')).message.replyToExpiresAt, now + DAY_MS);
   assert.equal((await storage.rows('a', 'cache')).length, 2);
 });
 
@@ -116,7 +117,7 @@ test('history backfill serializes pages, waits for decryption, and discards a re
 
 test('batch eviction preserves timestamp ties, replacements, expiry boundaries and surviving reinsertions', async t => {
   indexedDb(t); t.mock.method(Date, 'now', () => 1000);
-  const storage = new ClientStorage(), blob = new Blob([new Uint8Array(40 * 1024 * 1024)]);
+  const storage = new ClientStorage(), blob = new Blob([new Uint8Array(120 * MIB)]);
   await storage.cacheMany('a', [{ id: 'b', value: blob, expiresAt: 2000 }, { id: 'a', value: blob, expiresAt: 2000 }]);
   assert.deepEqual(await storage.cache('a', 'c', blob, 2000), ['a:cache:a']);
   assert.deepEqual(await storage.cacheMany('a', [{ id: 'd', value: blob, expiresAt: 2000 }, { id: 'b', value: blob, expiresAt: 2000 }]), ['a:cache:c']);

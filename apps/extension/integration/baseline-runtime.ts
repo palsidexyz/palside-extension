@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { MatrixClient, type MatrixEvent } from 'matrix-js-sdk';
 import { PalsideService } from '../src/runtime/composition/core';
 import { ClientStorage } from '../src/runtime/storage/storage';
@@ -59,7 +60,7 @@ export async function verifyRuntimeBoundaries(initial: RuntimeState, check: (val
       Date.now = () => at + 59_999;
       await runtime.cache.expireLocalContent();
       check(runtime.state.pokes?.length === 1, 'A received viewing invitation remains before its sixty second display deadline');
-      Date.now = () => at + 60_000;
+      Date.now = () => at + MINUTE_MS;
       await runtime.cache.expireLocalContent();
       check(runtime.state.pokes?.length === 0 && runtime.state.data.messages.length === 0, 'The display deadline removes viewing invitations without adding chat history');
       await show(runtime.state);

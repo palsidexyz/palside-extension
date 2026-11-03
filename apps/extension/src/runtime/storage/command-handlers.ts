@@ -1,9 +1,10 @@
+import { DAY_MS as DAY } from '@palside/shared/units';
 import { decodeContract } from '@palside/shared/contracts/validation';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { submitReport } from './report-submission';
 import { reportSubmission } from '@palside/shared/contracts/reports';
 import type { Command } from '../transport/command-map';
-import { DAY,text } from '../composition/state';
+import { text } from '../composition/state';
 import type { RuntimeCommands } from '../composition/dispatch';
 import type { HandlerRegistry } from '../composition/handler-registry';
 

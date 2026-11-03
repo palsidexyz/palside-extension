@@ -2,34 +2,49 @@ import { defaultWheel,signalEmotes,signalKinds,type SignalKind,type WheelEntry }
 import { pageScopeUrl,readRefTarget,type RefTarget } from '../../domain/annotations/social.ts';
 
 export const SIGNAL_EVENT = 'com.palside.signal';
+/** How long a signal shows, counted from when this device received it. */
 export const SIGNAL_TTL = 5_000;
+/** Members' clocks disagree; a send time this far from ours is still accepted, and nothing older is. */
+export const SIGNAL_CLOCK_SKEW = 15_000;
 export { defaultWheel, signalEmotes, signalKinds, type SignalEmote, type SignalKind, type WheelEntry } from '@palside/shared/signals';
-export type SignalElementTarget = { kind: 'element'; tag: string; id?: string; role?: string; label?: string; text?: string; href?: string; src?: string; path?: string; x: number; y: number };
-export type SignalTarget = { kind: 'page' } | Extract<RefTarget, { kind: 'quote' }> | SignalElementTarget;
-export const signalPrivateIdentity = /(?:^|[\s_\-/])(?:private|secret|password|trade|trading|balances?|holdings?|positions|orders?|orderbook|portfolio|wallet|account)(?:$|[\s_\-/])|交易|余额|持仓|订单|账户/i;
-const elementTags = new Set(['a', 'img', 'picture', 'svg', 'video', 'canvas', 'div', 'span', 'p', 'section', 'article', 'figure', 'figcaption', 'li', 'td', 'th', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
-/** URLs are identity only: never fetched, and private/authenticated links are rejected. */
+/**
+ * Where a signal points: a few anchors, nearest first. A receiver shows the signal at the first anchor it can find on
+ * its own page, so a missing word falls back to the block around it instead of the page edge. Text compares with
+ * whitespace collapsed; when an exact match fails, a match that reads the same with every digit as 0 counts if it is
+ * the only one, so a ticking price still matches while table rows stay distinct. `nth`/`of` pick one of several
+ * equal matches and only apply when the receiver finds exactly `of` of them. `x`/`y` are the point inside the
+ * anchor's box (0–1); a quote points at its own centre.
+ */
+export type SignalQuoteAnchor = Extract<RefTarget, { kind: 'quote' }> & { nth: number; of: number };
+/** `cls` is the class list, used only when nothing else names the element: members load the same site build. */
+export type SignalElementAnchor = { kind: 'element'; tag: string; id?: string; role?: string; label?: string; text?: string; cls?: string; href?: string; src?: string; nth: number; of: number; x: number; y: number };
+export type SignalChartAnchor = { kind: 'chart'; x: number; y: number };
+export type SignalAnchor = SignalQuoteAnchor | SignalElementAnchor | SignalChartAnchor;
+export type SignalTarget = { kind: 'page' } | { kind: 'spot'; anchors: SignalAnchor[] };
+export const SIGNAL_ANCHORS = 4;
+/** Equal matches an anchor may tell apart by order. In feeds and tables an equal count does not mean the same items,
+ * so an anchor with more matches is skipped for a larger one. */
+export const SIGNAL_MATCHES = 3;
+const elementTags = new Set(['a', 'img', 'picture', 'svg', 'video', 'button', 'form', 'fieldset', 'div', 'span', 'p', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main', 'figure', 'figcaption', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'tr', 'td', 'th', 'label', 'strong', 'em', 'b', 'i', 'small', 'time', 'code', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+/** URLs are identity only and are never fetched. */
 export function signalIdentityUrl(value: unknown): string | undefined {
   if (typeof value !== 'string' || value.length > 2048 || /[\u0000- \u007f]/u.test(value)) return;
-  const normalized = pageScopeUrl(value);
-  if (!normalized) return;
-  const url = new URL(normalized);
-  let path: string;
-  try { path = decodeURIComponent(url.pathname + url.hash); } catch { return; }
-  if (signalPrivateIdentity.test(path.replace(/([a-z])([A-Z])/g, '$1-$2'))) return;
-  return normalized;
+  return pageScopeUrl(value);
 }
-export function readSignalElementTarget(value: unknown): SignalElementTarget | undefined {
+const unit = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+const ordinal = (nth: unknown, of: unknown) => Number.isInteger(nth) && Number.isInteger(of) && (of as number) >= 1 && (of as number) <= SIGNAL_MATCHES && (nth as number) >= 0 && (nth as number) < (of as number);
+export function readSignalElementAnchor(value: unknown): SignalElementAnchor | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return;
   const v = value as Record<string, unknown>;
-  if (v.kind !== 'element' || typeof v.tag !== 'string' || !elementTags.has(v.tag) || typeof v.x !== 'number' || !Number.isFinite(v.x) || v.x < 0 || v.x > 1 || typeof v.y !== 'number' || !Number.isFinite(v.y) || v.y < 0 || v.y > 1) return;
-  const result: SignalElementTarget = { kind: 'element', tag: v.tag, x: v.x, y: v.y };
-  for (const [key, maximum] of [['id', 128], ['role', 32], ['label', 160], ['text', 240], ['path', 256]] as const) {
+  if (v.kind !== 'element' || typeof v.tag !== 'string' || !elementTags.has(v.tag) || !unit(v.x) || !unit(v.y) || !ordinal(v.nth, v.of)) return;
+  const result: SignalElementAnchor = { kind: 'element', tag: v.tag, nth: v.nth as number, of: v.of as number, x: v.x, y: v.y };
+  for (const [key, maximum] of [['id', 128], ['role', 32], ['label', 160], ['text', 240], ['cls', 160]] as const) {
     const item = v[key];
     if (item === undefined) continue;
-    if (typeof item !== 'string' || !item.trim() || item.length > maximum || /[\u0000-\u001f\u007f]/u.test(item) || signalPrivateIdentity.test(item.replace(/([a-z])([A-Z])/g, '$1-$2'))) return;
+    if (typeof item !== 'string' || !item.trim() || item.length > maximum || /[\u0000-\u001f\u007f]/u.test(item)) return;
     if (key === 'id' && !/^[a-zA-Z][a-zA-Z0-9_:.-]*$/.test(item)) return;
-    if (key === 'role' && (!/^[a-z]+$/.test(item) || ['textbox', 'button', 'dialog', 'combobox', 'searchbox', 'spinbutton'].includes(item))) return;
+    if (key === 'cls' && !/^[\w-]+(?: [\w-]+)*$/.test(item)) return;
+    if (key === 'role' && (!/^[a-z]+$/.test(item) || ['textbox', 'combobox', 'searchbox', 'spinbutton'].includes(item))) return;
     result[key] = item;
   }
   for (const key of ['href', 'src'] as const) {
@@ -38,9 +53,24 @@ export function readSignalElementTarget(value: unknown): SignalElementTarget | u
     if (!url || url !== v[key]) return;
     result[key] = url;
   }
-  if (!result.id && !result.label && !result.text && !result.href && !result.src) return;
-  if (result.tag === 'canvas' && !result.id && !result.label) return;
+  if (!result.id && !result.label && !result.text && !result.cls && !result.href && !result.src) return;
   return result;
+}
+function readSignalAnchor(value: unknown): SignalAnchor | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const v = value as Record<string, unknown>;
+  if (v.kind === 'chart') return unit(v.x) && unit(v.y) ? { kind: 'chart', x: v.x, y: v.y } : undefined;
+  if (v.kind === 'element') return readSignalElementAnchor(v);
+  const quote = v.kind === 'quote' ? readRefTarget(v) : undefined;
+  return quote?.kind === 'quote' && ordinal(v.nth, v.of) ? { ...quote, nth: v.nth as number, of: v.of as number } : undefined;
+}
+export function readSignalTarget(value: unknown): SignalTarget | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return;
+  const v = value as Record<string, unknown>;
+  if (v.kind === 'page') return { kind: 'page' };
+  if (v.kind !== 'spot' || !Array.isArray(v.anchors) || !v.anchors.length || v.anchors.length > SIGNAL_ANCHORS) return;
+  const anchors = v.anchors.map(readSignalAnchor);
+  return anchors.every(Boolean) ? { kind: 'spot', anchors: anchors as SignalAnchor[] } : undefined;
 }
 export type SignalPayload = { id: string; teamId: string; url: string; sentAt: number; kind: SignalKind; target: SignalTarget; emote?: string };
 export type ReceivedSignal = SignalPayload & { personId: string; at: number };
@@ -75,10 +105,9 @@ export function normalizeSignalSettings(value: unknown): SignalSettings {
 export function readSignal(value: unknown, now = Date.now()): SignalPayload | undefined {
   if (!value || typeof value !== 'object') return;
   const v = value as Record<string, unknown>;
-  if (typeof v.id !== 'string' || !/^[a-zA-Z0-9-]{16,64}$/.test(v.id) || typeof v.teamId !== 'string' || !v.teamId || v.teamId.length > 200 || typeof v.url !== 'string' || v.url.length > 4096 || pageScopeUrl(v.url) !== v.url || typeof v.sentAt !== 'number' || !Number.isFinite(v.sentAt) || now - v.sentAt > SIGNAL_TTL || v.sentAt > now + 1_000 || !signalKinds.includes(v.kind as SignalKind)) return;
-  const raw = v.target as Record<string, unknown> | undefined;
-  const target = raw?.kind === 'page' ? { kind: 'page' as const } : raw?.kind === 'element' ? readSignalElementTarget(raw) : readRefTarget(raw);
-  if (!target || target.kind !== 'page' && target.kind !== 'quote' && target.kind !== 'element') return;
+  if (typeof v.id !== 'string' || !/^[a-zA-Z0-9-]{16,64}$/.test(v.id) || typeof v.teamId !== 'string' || !v.teamId || v.teamId.length > 200 || typeof v.url !== 'string' || v.url.length > 4096 || pageScopeUrl(v.url) !== v.url || typeof v.sentAt !== 'number' || !Number.isFinite(v.sentAt) || Math.abs(now - v.sentAt) > SIGNAL_CLOCK_SKEW || !signalKinds.includes(v.kind as SignalKind)) return;
+  const target = readSignalTarget(v.target);
+  if (!target) return;
   if (v.emote !== undefined && (typeof v.emote !== 'string' || !(signalEmotes as readonly string[]).includes(v.emote))) return;
   return { id: v.id, teamId: v.teamId, url: v.url, sentAt: v.sentAt, kind: v.kind as SignalKind, target, ...(v.emote !== undefined ? { emote: v.emote as string } : {}) };
 }

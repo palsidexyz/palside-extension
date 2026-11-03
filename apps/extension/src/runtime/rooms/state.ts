@@ -1,6 +1,6 @@
 import type { HotRooms,RoomKey,RoomMessage,RoomPeople,RoomPerson,RoomProfile,RoomStance,RoomSummary,TeamInvite } from './contract-types';
 /** The live room of `RoomState.leased`: kept fresh by events while a panel is open. */
-export type RoomView = { key: RoomKey; profile: RoomProfile | null; count: number; stance: RoomStance; faces: RoomPerson[]; messages: RoomMessage[]; hasMore: boolean; loading: boolean; slowUntil: number };
+export type RoomView = { key: RoomKey; profile: RoomProfile | null; count: number; stance: RoomStance; faces: RoomPerson[]; messages: RoomMessage[]; hasMore: boolean; loading: boolean; slowUntil: number; slowMs: number };
 export type RoomState = {
   /** The 弹幕 view's token while it is open (`room-open` … `room-close`). */
   pinned?: RoomKey;
@@ -9,8 +9,8 @@ export type RoomState = {
   current?: RoomView;
   /** `room-summary` results for 代币详情, by key. */
   summaries: Record<RoomKey, RoomSummary & { at: number }>;
-  /** `room-hot` results by chain; the empty key includes all chains. */
-  hot?: Record<string, HotRooms>;
+  /** One live ranking; chain filters are local. */
+  hot?: HotRooms & { loaded: boolean };
   /** The last `room-people` result. */
   people?: RoomPeople & { key: RoomKey };
   blocked: RoomPerson[];

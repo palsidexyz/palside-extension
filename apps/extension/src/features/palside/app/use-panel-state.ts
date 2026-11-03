@@ -5,18 +5,20 @@ import { useLocale,useTranslations } from 'use-intl';
 import { useTextState,useText } from '../ui/text';
 import { usePreferences } from '../settings/use-preferences';
 import { normalizeSiteHost } from '../../../domain/assets/site-host';
-import { defaultInteraction,emptyFavorites,readFavorites,readInteraction } from '../../../domain/annotations/interaction';
+import { emptyFavorites,readFavorites,readSiteInteractions } from '../../../domain/annotations/interaction';
 import { connectionStatus } from '../../../runtime/transport/connection';
 import type { ReportTarget } from '../feedback/report';
 import type { PublicTeam } from '@palside/shared/contracts/team-model';
 import { lobbyWithMembership,requestIsActive } from '../../../domain/teams/lobby-values';
 import { useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState } from 'react';
+import { toast } from '@palside/ui/toast';
 import { emptyDraft,type Draft } from '../../../domain/chat/model';
 import { type Screen } from './panel-model';
 import { type Team } from '../../../domain/teams/model';
 import { type Viewing } from '../../../domain/assets/model';
 import type { PalsideProps } from './panel-props';
 import { walletDeadlines } from '../wallet/clock';
+import { imageExpiry } from '../../../runtime/chat/message-expiry';
 const signedOutScreens: Screen[] = ['welcome', 'new-account', 'confirm-phrase', 'restore'];
 const noTeam: Team = { id: '', name: '', description: '', owner: '', memberIds: [], joined: false, published: false, muted: false, unread: 0 };
 /** An invite being joined from the join sheet; `blocked` when this account may not join it, with nothing about the team shown. */
@@ -36,7 +38,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
   const initialTeam: Team = data.teams[0] ?? noTeam;
 
   const initialView = data.views[0];
-  const { localPeople, setPeople, localTeams, setTeams, localMessages, setMessages, localAllRequests, setRequests, localCurrent, setCurrent, localInteraction, setLocalInteraction, localFavorites, setLocalFavorites, localDrafts, setDrafts, localWeb, setLocalWeb, localToggles, setLocalToggles, localSites, setLocalSites, localTokenOff, setLocalTokenOff, localOffline, setOffline, localViewingId, setViewingId } = adapter?.data ?? livePanelData({ data, scenario, initialTeam });
+  const { localPeople, setPeople, localTeams, setTeams, localMessages, setMessages, localAllRequests, setRequests, localCurrent, setCurrent, localSiteInteraction, setLocalSiteInteraction, localFavorites, setLocalFavorites, localDrafts, setDrafts, localShare, setLocalShare, localSites, setLocalSites, localTokenOff, setLocalTokenOff, localOffline, setOffline, localViewingId, setViewingId } = adapter?.data ?? livePanelData({ data, scenario, initialTeam });
 
   const sourceTeams = live ? data.teams : localTeams;
 
@@ -68,7 +70,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
 
   useEffect(() => {
     const financial = walletDeadlines(live?.state, now);
-    const deadlines = [...teams, ...discoveryTeams].flatMap(t => [t.recruitmentExpiresAt, t.applicationRetryAt, t.applicationExpiresAt]).concat(allRequests.map(r => r.expiresAt), Object.values(live?.state.invitations ?? {}).map(invite => invite.expiresAt ?? undefined), live?.state.publishedViewing?.expiresAt, financial)
+    const deadlines = [...teams, ...discoveryTeams].flatMap(t => [t.recruitmentExpiresAt, t.applicationRetryAt, t.applicationExpiresAt]).concat(allRequests.map(r => r.expiresAt), (live?.state.data.messages ?? []).map(message => message.attachment?.kind === 'image' && message.attachment.src ? imageExpiry(message, Infinity) : undefined), Object.values(live?.state.invitations ?? {}).map(invite => invite.expiresAt ?? undefined), live?.state.publishedViewing?.expiresAt, financial)
       .filter((time): time is number => typeof time === 'number' && time > now);
     const refresh = () => setNow(Date.now());
     const timer = deadlines.length ? setTimeout(refresh, Math.min(2_147_483_647, Math.max(1, Math.min(...deadlines) - Date.now()))) : undefined;
@@ -140,7 +142,6 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
 
   const [recruitmentId, setRecruitmentId] = useState<string>();
 
-  const [assetFilter, setAssetFilter] = useState<string>();
 
   const [phrase, setPhrase] = useState<string[]>([]);
 
@@ -161,14 +162,24 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
     setEditTextValue(text);
   }, []);
 
-  const [notice, setNoticeValue] = useState<{ text: TextValue; undo?: () => void }>({ text: '' });
+  const localToasts = useRef(new Set<string>());
 
-  /** A one-line notice; with `undo` it carries 撤销 for the change it reports. */
-  function setNotice(text: TextValue, undo?: () => void) { setNoticeValue({ text, undo }); }
+  /** A one-line notice; with `undo` it carries 撤销 for the change it reports. An empty value clears this panel's own notices. */
+  const undoLabel = t('extension.sites.undo');
+  const toastText = useRef({ text, undoLabel });
+  useLayoutEffect(() => { toastText.current = { text, undoLabel }; });
+  const setNotice = useCallback((value: TextValue, undo?: () => void) => {
+    const toasts = localToasts.current;
+    if (!value) { toasts.forEach(id => toast.dismiss(id)); toasts.clear(); return; }
+    const id = toastText.current.text(value);
+    const forget = () => { toasts.delete(id); };
+    toasts.add(id);
+    toast(id, { id, duration: undo ? 6000 : 4500, action: undo ? { label: toastText.current.undoLabel, onClick: undo } : undefined, onDismiss: forget, onAutoClose: forget });
+  }, []);
 
   const [confirmation, setConfirmation] = useState<{ title: TextValue; description: TextValue; confirm: () => void | Promise<void>; action?: TextValue; danger?: boolean }>();
 
-  const [sharedCategory, setSharedCategory] = useState<'assets' | 'images' | 'links'>('assets');
+  const [sharedCategory, setSharedCategory] = useState<'messages' | 'assets' | 'images' | 'links'>('messages');
 
   const [reportTarget, setReportTarget] = useState<ReportTarget>();
 
@@ -226,9 +237,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
   // The preview has no tab: it acts on the site of the page being shared.
   const pageHost = live ? activeHost(live.page?.url) : activeHost(viewing?.url);
 
-  const web = live ? preferences.values.web! : localWeb;
-
-  const toggles = live ? live.state.toggles : localToggles;
+  const share = live ? Boolean(live.state.preferences.share) : localShare;
 
   const tokenOff = live ? live.state.preferences.tokenOff ?? [] : localTokenOff;
 
@@ -237,7 +246,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
     const self = person.id === data.self;
     const expiredOwn = live?.state.publishedViewing?.viewId === person.viewing && (live?.state.publishedViewing?.expiresAt ?? Infinity) <= now;
     // The preview shares the page it shows while 共享在看 is on.
-    const viewId = self && !live ? web.share && toggles.share && team.joined && !team.readonly ? viewing?.id : undefined : person.viewing;
+    const viewId = self && !live ? share && team.joined && !team.readonly ? viewing?.id : undefined : person.viewing;
     return { ...person, name: person.deleted ? t('common.deletedMember') : person.name || t(self ? 'common.self' : 'common.member'), presence: visible ? person.presence : undefined, viewing: visible && !(self && expiredOwn) ? viewId : undefined };
   });
 
@@ -255,7 +264,6 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
 
   if (!openTeam && handledTeam) setHandledTeam(undefined);
 
-  useEffect(() => { if (!notice.text) return; const timer = setTimeout(() => setNoticeValue({ text: '' }), notice.undo ? 6000 : 4500); return () => clearTimeout(timer); }, [notice]);
 
   // Owners hear once that wrong join passwords switched a link off; replacing the link clears it.
   const remoteTeams = live?.state.remoteTeams;
@@ -269,16 +277,16 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
       announcedSuspensions.current.add(team.id);
       setNotice(uiMessage('extension.dynamic.inviteSuspendedNotice', { name: team.name }));
     }
-  }, [remoteTeams]);
+  }, [remoteTeams, setNotice]);
 
-  const interaction = live ? readInteraction(preferences.values.interaction) ?? defaultInteraction : localInteraction;
+  const siteInteraction = live ? readSiteInteractions(preferences.values.siteInteraction) ?? {} : localSiteInteraction;
 
   const favorites = live ? readFavorites(preferences.values.favorites) ?? emptyFavorites : localFavorites;
 
 
   /** 网站详情: the site the page shows. */
   const [siteHost, setSiteHost] = useState('');
-  return { view: { ownsScreen, ownsAccess, editSessionId, locale, data, setPeople, setTeams, setMessages, teams, discoveryTeams, messages, now, requests, current, screen, drafts, localSites, setOffline, setViewingId, connection, disconnected, viewingId, selectedAsset, selectedView, personId, setPersonId, memberFilter, setMemberFilter, selectingOwner, setSelectingOwner, query, setQuery, lobbyLoading, lobbyError, recruitmentId, setRecruitmentId, assetFilter, setAssetFilter, phrase, editing, setEditing, editText, setEditText, confirmation, setConfirmation, sharedCategory, setSharedCategory, reportTarget, setReportTarget, image, setImage, inviteSuspended, inviteActive, inviteVersion, invitePassword, joinPrompt, setJoinPrompt, copied, setCopied, authBusy, working, flow, objectUrls, team, draft, draftConflict, viewing, currentMessages, canWrite, pageHost, web, toggles, tokenOff, people, me, interaction, favorites, siteHost, setNotice, setInviteActive, setInviteVersion, live, scenario, sites }, text, t, preferences, setRequests, setCurrent, localScreen, setScreen, origins, setLocalInteraction, setLocalFavorites, setKeptTeams, setDrafts, setOptimisticDrafts, draftConflicts, setDraftConflicts, draftQueue, blockedDrafts, draftVersions, resolvingDrafts, draftRevisions, setLocalWeb, setLocalToggles, setLocalSites, setLocalTokenOff, setSelectedAsset, setSelectedView, setLobbyLoading, setLobbyError, setPhrase, editSession, editRevision, setEditRevision, notice, setInvitations, setAuthBusy, setWorking, setFlow, returnFocus, pending, mounted, openTeam, authenticated, setSiteHost, deliver };
+  return { view: { ownsScreen, ownsAccess, editSessionId, locale, data, setPeople, setTeams, setMessages, teams, discoveryTeams, messages, now, requests, current, screen, drafts, localSites, setOffline, setViewingId, connection, disconnected, viewingId, selectedAsset, selectedView, personId, setPersonId, memberFilter, setMemberFilter, selectingOwner, setSelectingOwner, query, setQuery, lobbyLoading, lobbyError, recruitmentId, setRecruitmentId, phrase, editing, setEditing, editText, setEditText, confirmation, setConfirmation, sharedCategory, setSharedCategory, reportTarget, setReportTarget, image, setImage, inviteSuspended, inviteActive, inviteVersion, invitePassword, joinPrompt, setJoinPrompt, copied, setCopied, authBusy, working, flow, objectUrls, team, draft, draftConflict, viewing, currentMessages, canWrite, pageHost, share, tokenOff, people, me, siteInteraction, favorites, siteHost, setNotice, setInviteActive, setInviteVersion, live, scenario, sites }, text, t, preferences, setRequests, setCurrent, localScreen, setScreen, origins, setLocalSiteInteraction, setLocalFavorites, setKeptTeams, setDrafts, setOptimisticDrafts, draftConflicts, setDraftConflicts, draftQueue, blockedDrafts, draftVersions, resolvingDrafts, draftRevisions, setLocalShare, setLocalSites, setLocalTokenOff, setSelectedAsset, setSelectedView, setLobbyLoading, setLobbyError, setPhrase, editSession, editRevision, setEditRevision, setInvitations, setAuthBusy, setWorking, setFlow, returnFocus, pending, mounted, openTeam, authenticated, setSiteHost, deliver };
 }
 export type PanelState = ReturnType<typeof usePanelState>;
 

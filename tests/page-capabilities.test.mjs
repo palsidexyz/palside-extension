@@ -57,7 +57,7 @@ test('an exact site grant readies interaction; only activeTab or all_urls readie
   assert.deepEqual(page('https://chromewebstore.google.com/detail/a', { site: false, active: true }).capture, { state: 'blocked', reason: 'store' });
 });
 
-test('the 网页互动 switch never blocks explicit page capabilities', () => {
+test('per-site drawing preferences never block explicit page capabilities', () => {
   const value = page('https://example.com', granted);
   assert.equal(value.pick.state, 'ready');
   assert.equal(value.danmaku.state, 'ready');
@@ -67,7 +67,7 @@ test('the 网页互动 switch never blocks explicit page capabilities', () => {
 });
 
 test('pageStatus includes capabilities for ordinary pages, with no stale port fallback after tab closure', () => {
-  const state = { preferences: { web: { share: true, interact: true } }, toggles: { share: false, interact: false } };
+  const state = { preferences: { siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } };
   const status = pageStatus(10, { id: 1, url: 'https://example.com', status: 'complete' }, [], granted, state);
   assert.equal(status.host, 'example.com');
   assert.equal(status.capabilities.pick.state, 'ready');

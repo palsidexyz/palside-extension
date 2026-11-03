@@ -4,6 +4,7 @@ import { OnlySignedDevicesIsolationMode } from 'matrix-js-sdk/lib/crypto-api/ind
 import type { MatrixClient } from 'matrix-js-sdk';
 import type { UIAuthCallback } from 'matrix-js-sdk/lib/interactive-auth.js';
 import type { PalsideService } from '../composition/core';
+import { liveMembers } from '../../domain/teams/model.ts';
 
 /** Capture business membership and the SDK session before any asynchronous preparation. */
 export function teamSendGuard(runtime: PalsideService, teamId: string, requireCurrent = false) {
@@ -20,7 +21,7 @@ export function teamSendGuard(runtime: PalsideService, teamId: string, requireCu
     if (!latest || !latest.memberIds.includes(session.account.id) || membership(latest) !== snapshot || runtime.state.data.teams.find(item => item.id === teamId)?.readonly || requireCurrent && runtime.state.preferences.current !== teamId) throw new MessageError(uiMessage('extension.runtime.teamUnavailable'));
   };
   check();
-  return { check, session, client, team, users: team.people.filter(person => !person.deleted && team.memberIds.includes(person.id)).map(person => person.matrixId) };
+  return { check, session, client, team, users: liveMembers(team).map(person => person.matrixId) };
 }
 
 /** Every room event must pass this check immediately before send/resend, including retries. */

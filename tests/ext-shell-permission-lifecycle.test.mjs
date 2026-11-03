@@ -54,8 +54,14 @@ function fixture() {
     revokeSiteAccess: async () => true, revokeAllSitesKeepingHosts: async () => true,
     permissionRemovalPending: () => false,
     normalizeSiteHost: host => host, siteCategories: [], siteCategory: () => undefined,
+    siteOf: (_c, host) => ({ id: host, name: host, domain: host }),
     siteTags: () => ({}), interactionFeatures: [],
+    readSiteInteractions: value => value && typeof value === 'object' ? value : undefined,
+    siteInteraction: (sites, host) => sites?.[host] ?? { on: true, danmaku: true, signal: true, sticky: true },
+    pageSite: c => c.pageHost ? { id: c.pageHost, name: c.pageHost, domain: c.pageHost } : undefined, roomsOn: () => true, shownStickyCount: () => 0,
+    pageUnusable: () => false, shareShown: () => true, useShare: () => ({ state: 'off', enabled: true, set() {} }),
   };
+  api.askSiteAccess = host => api.requestSitesAccess([host]);
   const modules = new Map();
   const real = {
     './use-preferences': 'settings/use-preferences.ts', './use-grants': 'settings/use-grants.ts',
@@ -93,8 +99,8 @@ function fixture() {
   let owns = true;
   const c = {
     data: { self: 'alice' }, current: 'team', sites: [], localSites: [], ownsAccess: () => owns,
-    setNotice: (...args) => notices.push(args), interaction: {},
-    live: { state: { account: { id: 'alice' }, preferences: { notifications: 'off', web: { share: true, interact: true }, restoreSites: ['example.com'] } }, page: { tabId: 1, url: 'https://example.com' },
+    setNotice: (...args) => notices.push(args), siteInteraction: {},
+    live: { state: { account: { id: 'alice' }, preferences: { notifications: 'off', share: true } }, page: { tabId: 1, url: 'https://example.com' },
       command: async (name, patch) => { calls.push([name, plain(patch)]); Object.assign(c.live.state.preferences, patch); } },
   };
   const social = load('annotations/social-state.ts');
@@ -138,53 +144,27 @@ test('choosing Off cancels a pending notification choice and revokes after the p
   assert.equal(f.calls.filter(([name]) => name === 'preferences').length, 1);
 });
 
-test('rapid web edits merge pending flags even before a snapshot arrives', async () => {
+test('rapid per-site edits merge pending feature flags before a snapshot arrives', async () => {
   const f = fixture(), writes = [];
   f.c.live.command = (name, patch) => { const gate = deferred(); writes.push({ name, patch: plain(patch), ...gate }); return gate.promise; };
   const { actions } = pageActions(f);
-  actions.setWeb('share', false); actions.setWeb('interact', false);
-  assert.deepEqual(writes[1].patch.web, { share: false, interact: false });
+  actions.setSite('example.com', { signal: false }); actions.setSite('example.com', { sticky: false });
+  assert.deepEqual(writes[1].patch.siteInteraction, { 'example.com': { on: true, danmaku: true, signal: false, sticky: false } });
   writes[0].resolve(); writes[1].resolve(); await drain();
-  assert.deepEqual(f.calls.slice(0, 2), [['revokeTabs'], ['revokeAllSites']]);
-  writes[2].resolve(); await drain();
+  assert.equal(f.calls.length, 0);
 });
 
-test('a newer enable intent cancels a queued revoke and preserves synchronous prompting', async () => {
-  const f = fixture(), gate = deferred();
-  f.c.live.command = async (name, patch) => { f.calls.push([name, plain(patch)]); if (f.calls.length === 1) await gate.promise; Object.assign(f.c.live.state.preferences, patch); };
+test('per-site interaction changes only that host and do not request Chrome access', async () => {
+  const f = fixture();
   const { actions } = pageActions(f);
-  actions.setWeb('interact', false); actions.setWeb('interact', true);
-  assert.equal(f.requests.length, 1);
-  gate.resolve(); f.requests[0].resolve(true); await drain();
-  assert.equal(f.calls.some(([name]) => name === 'revokeAllSites'), false);
-  assert.deepEqual(plain(f.c.live.state.preferences.restoreSites), []);
-});
-
-test('denied site restoration retains the remembered hosts and does not enable interaction', async () => {
-  const f = fixture(); f.c.live.state.preferences.web.interact = false;
-  const { actions } = pageActions(f); actions.setWeb('interact', true);
-  assert.deepEqual(plain(f.requests[0].hosts), ['example.com']);
-  f.requests[0].resolve(false); await drain();
-  assert.equal(f.c.live.state.preferences.web.interact, false);
-  assert.deepEqual(f.c.live.state.preferences.restoreSites, ['example.com']);
-  assert.equal(f.notices[0][0], 'extension.sites.denied');
-});
-
-test('enabling during revocation fails visibly and retains hosts for the next click', async () => {
-  const f = fixture(), gate = deferred(); let removing = false;
-  f.api.permissionRemovalPending = () => removing;
-  f.api.revokeAllSites = async () => { removing = true; await gate.promise; removing = false; return ['second.com']; };
-  const { actions } = pageActions(f); actions.setWeb('interact', false); await drain(); actions.setWeb('interact', true);
-  assert.equal(f.requests.length, 0); assert.equal(f.notices[0][0], 'common.error');
-  gate.resolve(); await drain();
-  assert.deepEqual(plain(f.c.live.state.preferences.restoreSites), ['example.com', 'second.com']);
-  actions.setWeb('interact', true); f.requests[0].resolve(true); await drain();
-  assert.equal(f.c.live.state.preferences.web.interact, true); assert.deepEqual(plain(f.c.live.state.preferences.restoreSites), []);
+  await actions.setSite('example.com', { on: false });
+  assert.deepEqual(f.calls, [['preferences', { siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } }, accountId: 'alice' }]]);
+  assert.equal(f.requests.length, 0);
 });
 
 test('unmount invalidates queued preference writes and permission side effects', async () => {
   const f = fixture(), gate = deferred(); f.c.live.command = () => gate.promise;
-  const { actions, hook, preferences } = pageActions(f); actions.setWeb('share', false); hook.unmount(); gate.resolve(); await drain();
+  const { actions, hook, preferences } = pageActions(f); actions.setSite('example.com', { signal: false }); hook.unmount(); gate.resolve(); await drain();
   assert.deepEqual(f.calls, []); assert.equal(preferences.current(), false);
 });
 
@@ -265,28 +245,20 @@ test('runtime preferences reject missing and mismatched account IDs before apply
   assert.equal(runtime.state.preferences, preferences);
 });
 
-for (const kind of ['GrantSheet', 'AllSitesSheet']) test(`${kind} preserves click-time closure and ignores a replacement sheet`, async () => {
+test('AllSitesSheet preserves click-time closure and ignores a replacement sheet', async () => {
   const f = fixture(), api = f.load('settings/access-sheet.tsx');
   f.c.pageHost = 'example.com';
-  const field = kind === 'GrantSheet' ? 'grant' : 'allSites';
-  const value = kind === 'GrantSheet' ? 'interact' : true;
-  f.social.setSocialUi({ [field]: value });
-  const hook = f.mount(api[kind]); let tree = hook.render({ c: f.c });
-  nodes(tree, node => node.type === 'Button' && node.props.variant === 'surface')[0].props.onClick();
+  const field = 'allSites';
+  f.social.setSocialUi({ [field]: true });
+  const hook = f.mount(api.AllSitesSheet); let tree = hook.render({ c: f.c });
+  const click = () => nodes(tree, node => node.type === 'Button' && node.props.variant === 'surface')[0].props.onClick();
+  click();
   assert.equal(f.requests.length, 1); assert.equal(f.social.captureSocialUi().snapshot()[field], undefined);
-  f.social.setSocialUi({ [field]: value }); tree = hook.render({ c: f.c });
+  f.social.setSocialUi({ [field]: true }); tree = hook.render({ c: f.c });
   f.requests[0].resolve(false); await drain();
-  assert.equal(f.social.captureSocialUi().snapshot()[field], value); assert.deepEqual(f.notices, []);
-  nodes(tree, node => node.type === 'Button' && node.props.variant === 'surface')[0].props.onClick();
+  assert.equal(f.social.captureSocialUi().snapshot()[field], true); assert.deepEqual(f.notices, []);
+  click();
   f.requests[1].resolve(false); await drain(); assert.equal(f.notices[0][0], 'extension.sites.denied');
-});
-
-test('web permission completion from a replaced account cannot save or show notices', async () => {
-  const f = fixture(), { hook, actions } = pageActions(f);
-  actions.setWeb('interact', true);
-  f.c.live = { ...f.c.live, state: { ...f.c.live.state, account: { id: 'bob' } } };
-  hook.render(f.c.live); f.requests[0].resolve(true); await drain();
-  assert.deepEqual(f.calls, []); assert.deepEqual(f.notices, []);
 });
 
 async function privacy(f) {

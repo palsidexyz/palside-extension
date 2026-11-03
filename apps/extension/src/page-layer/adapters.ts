@@ -5,8 +5,7 @@ export type SiteAdapter = {
   chart?: () => Element | undefined;
 };
 
-export const privateSelector = 'input,textarea,select,button,form,fieldset,option,[contenteditable],[role="textbox"],[role="button"],[role="dialog"],script,style,noscript,template,canvas,iframe,[hidden],[inert],[aria-hidden="true"],palside-page-layer,[data-trade-panel],[data-private],[autocomplete]';
-const sensitive = /(?:^|[\s_-])(?:trade|trading|balances?|holdings?|positions|orders?|orderbook|portfolio|wallet|account)(?:$|[\s_-])|交易|余额|持仓|订单|账户/i;
+export const privateSelector = 'input,textarea,select,[contenteditable],[role="textbox"],script,style,noscript,template,canvas,iframe,[hidden],[inert],[aria-hidden="true"],palside-page-layer';
 
 const generic: SiteAdapter = { host: '*' };
 
@@ -31,13 +30,4 @@ export const adapters: readonly SiteAdapter[] = sites.flatMap(site => site.layou
 /** Return a registered adapter or the generic address adapter. */
 export function adapterFor(host = location.hostname) {
   return adapters.find(adapter => adapter.host === host) ?? { ...generic, host };
-}
-
-/** Check the generic sensitive regions. */
-export function isTradeElement(element: Element) {
-  if (element.closest(privateSelector)) return true;
-  for (let node: Element | null = element; node; node = node.parentElement) {
-    if (['id', 'class', 'aria-label', 'data-testid'].some(name => sensitive.test((node!.getAttribute(name) ?? '').replace(/([a-z])([A-Z])/g, '$1-$2')))) return true;
-  }
-  return false;
 }

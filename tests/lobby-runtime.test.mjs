@@ -1,18 +1,22 @@
+import { DAY_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
+import { APPLICATION_COOLDOWN_MS } from '@palside/shared/rules/teams';
 
 const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && context.parentURL?.includes('/runtime/')) return next(specifier + '.ts', context);
   return next(specifier, context);
 } });
-const { lobbyCommand } = await import('../apps/extension/src/runtime/teams/command-handlers.ts');
+const { lobbyCommand, lobbyMoreCommand } = await import('../apps/extension/src/runtime/teams/command-handlers.ts');
 const { Api } = await import('../apps/extension/src/runtime/transport/api.ts');
 hooks.deregister();
 
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
-const team = (id, patch = {}) => ({ id, name: id, description: '', avatarId: null, ownerName: 'Owner', memberCount: 2, publishedAt: 1, recruitmentExpiresAt: Date.now() + 86_400_000, node: 'test', joined: false, ...patch });
-const result = (...teams) => ({ teams, applications: [] });
+const team = (id, patch = {}) => ({ id, name: id, description: '', avatarId: null, ownerName: 'Owner', memberCount: 2, publishedAt: 1, recruitmentExpiresAt: Date.now() + DAY_MS, node: 'test', joined: false, ...patch });
+const result = (...teams) => ({ teams, next: null });
+const noApplications = { applications: [], next: null };
+const done = { hasMore: { teams: false, applications: false } };
 function fixture(request) {
   let emits = 0;
   const runtime = {
@@ -22,19 +26,20 @@ function fixture(request) {
       const check = () => { if (!current()) throw Error('scope changed'); };
       return { current, check, async wait(work) { const value = await work; check(); return value; } };
     } },
-    api: { request }, cache: { avatar: async id => id ? `blob:${id}` : undefined },
+    api: { request: (id, options) => id === 'teams.applications' ? Promise.resolve(noApplications) : request(id, options) }, cache: { avatar: async id => id ? `blob:${id}` : undefined },
     state: { lobbyTeams: [] }, emit: () => { emits++; },
   };
   const commands = { runtime };
-  return { runtime, run: payload => lobbyCommand.call(commands, { name: 'lobby', ...(payload === undefined ? {} : { payload }) }), emits: () => emits };
+  return { runtime, run: payload => lobbyCommand.call(commands, { name: 'lobby', ...(payload === undefined ? {} : { payload }) }), more: list => lobbyMoreCommand.call(commands, { name: 'lobby-more', payload: { list } }), emits: () => emits };
 }
 
 test('lobby sends search and sort through the real API contract and defaults existing callers to heat', async t => {
   const calls = [];
-  t.mock.method(globalThis, 'fetch', async url => { calls.push(new URL(url)); return Response.json(result(team('a', { activity: { level: 1, rank: 1, isNew: false } }))); });
+  t.mock.method(globalThis, 'fetch', async url => { calls.push(new URL(url)); return Response.json(new URL(url).pathname === '/lobby/applications' ? noApplications : result(team('a', { activity: { level: 1, rank: 1, isNew: false } }))); });
   const f = fixture(); f.runtime.api = new Api('https://api.test');
-  for (const payload of [undefined, {}, { q: '小队 & %_', sort: 'latest' }, { q: '' }, { sort: 'heat' }]) await f.run(payload);
-  assert.deepEqual(calls.map(url => [url.pathname, url.searchParams.get('q'), url.searchParams.get('sort')]), [
+  for (const payload of [undefined, {}, { q: '小队 & %_', sort: 'latest' }, { q: '' }, { sort: 'heat' }]) assert.deepEqual(await f.run(payload), done);
+  assert.equal(calls.filter(url => url.pathname === '/lobby/applications').length, 5);
+  assert.deepEqual(calls.filter(url => url.pathname === '/lobby').map(url => [url.pathname, url.searchParams.get('q'), url.searchParams.get('sort')]), [
     ['/lobby', '', 'heat'], ['/lobby', '', 'heat'], ['/lobby', '小队 & %_', 'latest'], ['/lobby', '', 'heat'], ['/lobby', '', 'heat'],
   ]);
   assert.deepEqual(f.runtime.state.lobbyTeams[0].activity, { level: 1, rank: 1, isNew: false });
@@ -45,12 +50,12 @@ test('lobby keeps server order, activity and application state without duplicati
   const onlyApplication = team('closed', { activity: { level: 1, rank: null, isNew: true }, recruitmentExpiresAt: null });
   delete onlyApplication.joined;
   const response = result(team('first'), team('applied', { activity, avatarId: 'avatar', owner: { id: 'owner', avatarId: 'portrait' } }));
-  response.applications = [
+  const applications = { applications: [
     { teamId: 'applied', team: team('applied', { name: 'old snapshot' }), status: 'pending', expiresAt: 123 },
     { teamId: 'closed', team: onlyApplication, status: 'rejected', expiresAt: 456, rejectedAt: 100 },
-  ];
-  const f = fixture(async () => response);
-  assert.equal(await f.run(), response);
+  ], next: null };
+  const f = fixture(async () => response); f.runtime.api.request = async id => id === 'teams.applications' ? applications : response;
+  assert.deepEqual(await f.run(), done);
   const teams = f.runtime.state.lobbyTeams;
   assert.deepEqual(teams.map(row => row.id), ['first', 'applied', 'closed']);
   assert.equal(teams[1].name, 'applied');
@@ -60,7 +65,7 @@ test('lobby keeps server order, activity and application state without duplicati
   assert.equal(teams[1].avatar, 'blob:avatar');
   assert.equal(teams[1].ownerAvatar, 'blob:portrait');
   assert.equal(teams[2].applicationStatus, 'rejected');
-  assert.equal(teams[2].applicationRetryAt, 100 + 86_400_000);
+  assert.equal(teams[2].applicationRetryAt, 100 + APPLICATION_COOLDOWN_MS);
   assert.equal(teams[2].published, false);
   assert.deepEqual(teams[2].activity, onlyApplication.activity);
   assert.equal(teams[0].activity, undefined);
@@ -138,4 +143,82 @@ test('lobby requests are isolated per runtime and cannot publish across sessions
   assert.equal(first.emits(), 1);
   first.runtime.auth.session = undefined;
   await assert.rejects(first.run());
+});
+
+test('lobby-more appends the next page of each list with the current search and stops at the end', async () => {
+  const calls = [];
+  const f = fixture(async () => {});
+  f.runtime.api.request = async (id, options) => {
+    calls.push([id, options.query]);
+    if (id === 'teams.applications') return options.query.after ? { applications: [{ teamId: 'later', team: team('later'), status: 'pending', expiresAt: 9 }], next: null } : { applications: [], next: 'apps-1' };
+    return options.query.after ? { teams: [team('b'), team('c')], next: null } : { teams: [team('a'), team('b')], next: 'teams-1' };
+  };
+  assert.deepEqual(await f.run({ q: 'x', sort: 'latest' }), { hasMore: { teams: true, applications: true } });
+  assert.deepEqual(await f.more('teams'), { hasMore: { teams: false, applications: true } });
+  assert.deepEqual(f.runtime.state.lobbyTeams.map(row => row.id), ['a', 'b', 'c']);
+  assert.deepEqual(await f.more('applications'), done);
+  assert.deepEqual(f.runtime.state.lobbyTeams.map(row => [row.id, row.requested]), [['a', false], ['b', false], ['c', false], ['later', true]]);
+  assert.deepEqual(await f.more('teams'), done);
+  assert.deepEqual(calls, [
+    ['teams.lobby', { q: 'x', sort: 'latest' }], ['teams.applications', {}],
+    ['teams.lobby', { q: 'x', sort: 'latest', after: 'teams-1' }], ['teams.applications', { after: 'apps-1' }],
+  ]);
+});
+
+test('concurrent lobby-more calls share one request and a new search discards an older page', async () => {
+  const page = deferred(); let pages = 0, query = 'old';
+  const f = fixture(async () => {});
+  f.runtime.api.request = async (id, options) => {
+    if (id === 'teams.applications') return noApplications;
+    if (options.query.after) { pages++; return page.promise; }
+    return { teams: [team(options.query.q)], next: 'more' };
+  };
+  assert.equal(await f.more('teams'), undefined);
+  await f.run({ q: query });
+  const first = f.more('teams'), second = f.more('teams');
+  query = 'new'; await f.run({ q: query });
+  page.resolve({ teams: [team('stale')], next: null });
+  assert.equal(await first, undefined); assert.equal(await second, undefined);
+  assert.equal(pages, 1);
+  assert.deepEqual(f.runtime.state.lobbyTeams.map(row => row.id), ['new']);
+});
+
+test('recruiting rows retain application status and cooldown before their application page is loaded', async () => {
+  const f = fixture(async () => result(
+    team('pending', { application: 'pending', applicationExpiresAt: 200 }),
+    team('rejected', { application: 'rejected', applicationExpiresAt: 300, applicationRejectedAt: 0 }),
+  ));
+  await f.run();
+  assert.equal(f.runtime.state.lobbyTeams[0].requested, true);
+  assert.equal(f.runtime.state.lobbyTeams[0].applicationExpiresAt, 200);
+  assert.equal(f.runtime.state.lobbyTeams[1].applicationStatus, 'rejected');
+  assert.equal(f.runtime.state.lobbyTeams[1].applicationRetryAt, APPLICATION_COOLDOWN_MS);
+});
+
+test('a page awaiting avatars cannot return stale paging state after a new search', async () => {
+  const avatar = deferred(), started = deferred();
+  const f = fixture(async (_id, { query }) => query.after ? { teams: [team('later', { avatarId: 'slow' })], next: 'more' } : { teams: [team(query.q)], next: query.q === 'old' ? 'more' : null });
+  f.runtime.cache.avatar = async id => { if (id === 'slow') { started.resolve(); return avatar.promise; } };
+  await f.run({ q: 'old' });
+  const pending = f.more('teams');
+  await started.promise;
+  await f.run({ q: 'new' });
+  avatar.resolve('blob:slow');
+  assert.equal(await pending, undefined);
+  assert.deepEqual(f.runtime.state.lobbyTeams.map(row => row.id), ['new']);
+});
+
+test('a failed load-more keeps its cursor and can be retried', async () => {
+  let fail = true;
+  const f = fixture(async (_id, { query }) => {
+    if (!query.after) return { teams: [team('first')], next: 'more' };
+    if (fail) throw Error('offline');
+    return result(team('second'));
+  });
+  await f.run();
+  await assert.rejects(f.more('teams'), /offline/);
+  assert.deepEqual(f.runtime.state.lobbyTeams.map(row => row.id), ['first']);
+  fail = false;
+  assert.deepEqual(await f.more('teams'), done);
+  assert.deepEqual(f.runtime.state.lobbyTeams.map(row => row.id), ['first', 'second']);
 });

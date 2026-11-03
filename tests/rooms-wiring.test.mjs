@@ -46,7 +46,9 @@ test('panel bridge emits validated open-room keys, unsubscribes, ignores disconn
   Object.assign(browserHost, browser);
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { addEventListener() {}, removeEventListener() {} } });
-  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'window', descriptor); else delete globalThis.window; });
+  const page = Object.assign(new EventTarget(), { visibilityState: 'visible' }), documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: page });
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'window', descriptor); else delete globalThis.window; if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor); else delete globalThis.document; });
   const unsubscribe = bridge.onOpenRoom(value => received.push(value));
   const stop = bridge.observeState({ onDisconnect() {}, onState() {}, onError() {}, onLanguage() {}, onPage() {}, onCaptured() {}, onDanmaku() {} });
   await Promise.resolve(); ports[0].receive({ type: 'open-room', key }); ports[0].receive({ type: 'open-room', key: 'page:example.com' }); assert.deepEqual(received, [key]);
@@ -128,7 +130,6 @@ for (const encrypted of [false, true]) {
   });
   test(`private viewing requires SDK encryption: encrypted=${encrypted}`, async t => {
     const { runtime } = privateFixture(), sharing = new SharingRuntime(runtime);
-    runtime.state.toggles = { share: false, interact: false };
     t.after(() => clearTimeout(sharing.viewingExpiryTimer));
     const expiresAt = Date.now() + 30_000;
     sharing.activeViewing.set('peer', { teamId: 'team', order: 1, sequence: 1, expiresAt });
@@ -140,6 +141,7 @@ for (const encrypted of [false, true]) {
 }
 test('private timeline rejects failed decryption and keeps missing-key status', async () => {
   const { runtime, timeline, writes } = privateFixture();
+  runtime.state.history = { team: { missingKeys: 0, loaded: true, loading: false } };
   await timeline.consume(await privateEvent('m.room.message', { msgtype: 'm.text', body: 'private body' }, { failure: true }));
   assert.equal(runtime.state.data.messages.length, 0);
   assert.equal(writes.length, 0);
@@ -173,8 +175,8 @@ test('Hot subscriptions bind to their panel document and replay after the port r
   const { commands } = await import('../apps/extension/src/background/commands.ts');
   const routed = [];
   const host = commands({ run: async command => { routed.push(command); return { ok: true }; }, sharing: {} });
-  await host.panelCommand({ name: 'room-hot', payload: { chain: null, sourceId: 'other' } }, 'chrome-extension://test/sidepanel.html', 'document');
-  assert.deepEqual(routed, [{ name: 'room-hot', payload: { chain: null, sourceId: 'document:hot' } }]);
+  await host.panelCommand({ name: 'room-hot', payload: { open: true, sourceId: 'other' } }, 'chrome-extension://test/sidepanel.html', 'document');
+  assert.deepEqual(routed, [{ name: 'room-hot', payload: { open: true, sourceId: 'document:hot' } }]);
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const calls = [], ports = [];
   Object.assign(browserHost, { runtime: {
@@ -183,17 +185,19 @@ test('Hot subscriptions bind to their panel document and replay after the port r
   }, windows: { async getCurrent() { return { id: 1 }; } } });
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { addEventListener() {}, removeEventListener() {} } });
-  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'window', descriptor); else delete globalThis.window; });
-  await bridge.command('room-hot', { chain: 'Solana' });
+  const page = Object.assign(new EventTarget(), { visibilityState: 'visible' }), documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: page });
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'window', descriptor); else delete globalThis.window; if (documentDescriptor) Object.defineProperty(globalThis, 'document', documentDescriptor); else delete globalThis.document; });
+  await bridge.command('room-hot', { open: true });
   await bridge.command('room-watch', { id: 'summary', view: key });
   await bridge.command('room-watch', { id: 'people', view: key });
   const stop = bridge.observeState({ onState() {}, onError() {}, onLanguage() {}, onDisconnect() {}, onPage() {}, onCaptured() {}, onDanmaku() {} });
   try {
     await Promise.resolve(); await Promise.resolve(); calls.length = 0;
     ports.at(-1).closed(); t.mock.timers.tick(500); await Promise.resolve(); await Promise.resolve();
-    assert.deepEqual(calls, [{ name: 'room-hot', payload: { chain: 'Solana' } }, { name: 'room-watch', payload: { id: 'summary', view: key } }, { name: 'room-watch', payload: { id: 'people', view: key } }]);
-    await bridge.command('room-hot', {}); await bridge.command('room-watch', { id: 'summary' }); await bridge.command('room-watch', { id: 'people' }); calls.length = 0;
+    assert.deepEqual(calls, [{ name: 'room-hot', payload: { open: true } }, { name: 'room-watch', payload: { id: 'summary', view: key } }, { name: 'room-watch', payload: { id: 'people', view: key } }]);
+    await bridge.command('room-hot', { open: false }); await bridge.command('room-watch', { id: 'summary' }); await bridge.command('room-watch', { id: 'people' }); calls.length = 0;
     ports.at(-1).closed(); t.mock.timers.tick(500); await Promise.resolve(); await Promise.resolve();
     assert.deepEqual(calls, []);
-  } finally { stop(); await bridge.command('room-hot', {}); await bridge.command('room-watch', { id: 'summary' }); await bridge.command('room-watch', { id: 'people' }); }
+  } finally { stop(); await bridge.command('room-hot', { open: false }); await bridge.command('room-watch', { id: 'summary' }); await bridge.command('room-watch', { id: 'people' }); }
 });

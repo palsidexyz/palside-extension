@@ -1,10 +1,11 @@
+const BRIDGE_TEXT_LENGTH = 8192;
 import { parseCommand } from '../runtime/transport/command-map.ts';
 import { MessageError,errorMessage,message as uiMessage,translator } from '@palside/i18n';
 import type { Browser,browser as extensionBrowser } from 'wxt/browser';
 import { createLanguageController } from '../runtime/transport/language.ts';
-import { interactionAllows,type InteractionFeature } from '../domain/annotations/interaction.ts';
+import { siteAllows, siteDraws, type InteractionFeature, pageScopeUrl } from '../domain/annotations/interaction.ts';
 import type { CaptureLabels,PageLabels,PagePerson } from '../runtime/browser/page-protocol.ts';
-import { pageScopeUrl } from '../domain/annotations/interaction.ts';
+import { pageUrlHost } from '../runtime/browser/page-layer-host.ts';
 import type { Command } from '../runtime/transport/command-map';
 import type { Reply } from '../runtime/transport/reply';
 import type { RuntimeState } from '../runtime/composition/runtime-state';
@@ -22,15 +23,16 @@ export type BackgroundEnv = {
   setTimeout?: typeof setTimeout;
   clearTimeout?: typeof clearTimeout;
   createTabObserver?: typeof createTabObserver;
-  openPage?: (url: string, reuse?: boolean) => Promise<void>;
+  openPage?: (url: string) => Promise<void>;
 };
 
 /** Shared worker state and the small helpers every part of the background uses. */
 export function createContext(env: BackgroundEnv) {
   const { browser } = env;
   const fetcher = env.fetch ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
-  const setTimer = env.setTimeout ?? setTimeout;
-  const clearTimer = env.clearTimeout ?? clearTimeout;
+  // Timers are called as methods of the context; the worker globals reject any other receiver.
+  const setTimer = env.setTimeout ?? setTimeout.bind(globalThis);
+  const clearTimer = env.clearTimeout ?? clearTimeout.bind(globalThis);
   /** Side panels by port, with the window each one announced in `hello`. */
   const panels = new Map<Port, number | undefined>();
   let creating: Promise<void> | undefined;
@@ -48,7 +50,7 @@ export function createContext(env: BackgroundEnv) {
   async function ensureRuntime() {
     creating ??= (async () => {
       const contexts = await browser.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT' as Browser.runtime.ContextType], documentUrls: [browser.runtime.getURL('/offscreen.html')] });
-      if (!contexts.length) await browser.offscreen.createDocument({ url: '/offscreen.html', reasons: ['BLOBS' as Browser.offscreen.Reason], justification: 'Decrypt image attachments and share local Blob URLs from one encryption runtime across side panels.' });
+      if (!contexts.length) await browser.offscreen.createDocument({ url: '/offscreen.html', reasons: ['BLOBS' as Browser.offscreen.Reason], justification: 'Hosts Palside\'s single end-to-end encryption runtime: Matrix crypto (WebAssembly and its IndexedDB key store), local wallet signing, and decrypted image attachments served as Blob URLs to every open side panel.' });
     })().finally(() => { creating = undefined; });
     await creating;
   }
@@ -106,7 +108,7 @@ export function createContext(env: BackgroundEnv) {
         const response = await fetcher(browser.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32` as '/'));
         if (!response.ok) return;
         const value = await responseUrl(response);
-        if (value.length > 8 * 1024) return;
+        if (value.length > BRIDGE_TEXT_LENGTH) return;
         favicons.set(origin, value);
         while (favicons.size > 32) favicons.delete(favicons.keys().next().value!);
         return value;
@@ -181,15 +183,15 @@ export function createContext(env: BackgroundEnv) {
       const state = ctx.state;
       return Boolean(state?.authenticated && state.remoteTeams.some(team => team.joined && team.id === state.preferences.current));
     },
-    /** 网页互动's feature switches, from this account's preferences. */
-    allows(feature?: InteractionFeature) { return interactionAllows(ctx.state?.preferences.interaction, feature); },
+    /** 网页互动 is on for the page's site with this feature on, from this account's preferences. */
+    allows(feature: InteractionFeature, url: string | undefined) { return siteAllows(ctx.state?.preferences.siteInteraction, pageUrlHost(url), feature); },
     /**
-     * 网页互动 runs on a page while it is 启用 with a feature on and switched on, for the current joined team, in a window whose
-     * panel is open. Chrome's grant for the site is checked where a page is injected or admitted.
+     * 网页互动 runs on a page while its site has 信号 or 便利贴 on, for the current joined team, in a window whose panel is open.
+     * Chrome's grant for the site is checked where a page is injected or admitted.
      */
     interactivePage(info: { url?: string; windowId?: number }) {
       const state = ctx.state;
-      return Boolean(state?.preferences.web.interact && state.toggles.interact && ctx.allows() && ctx.teamAvailable() && pageScopeUrl(info.url)
+      return Boolean(state && siteDraws(state.preferences.siteInteraction, pageUrlHost(info.url)) && ctx.teamAvailable() && pageScopeUrl(info.url)
         && info.windowId !== undefined && [...panels.values()].includes(info.windowId));
     },
     async pageLabels(): Promise<PageLabels & { capture: CaptureLabels }> {

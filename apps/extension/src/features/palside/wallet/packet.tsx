@@ -3,21 +3,22 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import { clockTime, errorMessage, localeOrEnglish } from '@palside/i18n';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import NumberFlow from '@number-flow/react';
 import { Crown, Minus, Plus, X } from 'lucide-react';
 import { motionPresets } from '@palside/design/motion';
 import { Button, IconButton } from '@palside/ui/button';
 import { Sheet } from '@palside/ui/sheet';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
-import { CHAIN_RULES } from '@palside/shared/chain/rules';
+import { TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
+import { graphemeLength } from '@palside/shared/contracts/rules';
+import { CHAIN_RULES } from '@palside/shared/rules/wallet';
 import type { ApiResult } from '../../../runtime/transport/api';
-import { parsePals } from '../../../domain/wallet/model';
+import { nearestEqualPacketTotal, parsePals } from '../../../domain/wallet/model';
 import { personFor } from '../../../domain/account/model';
 import type { PalsideController } from '../app/use-palside';
 import { PersonAvatar } from '../ui/primitives';
 import { Count, CountText, Dots, DrawnCheck, Rise, Swap } from '../ui/motion-details';
-import { formatPals } from './amount';
+import { AnimatedAmount, formatPals } from './amount';
 import { openPayment, usePaymentRequest } from './payment-sheet';
 import { useText } from '../ui/text';
 import s from './wallet.module.css';
@@ -25,7 +26,6 @@ import p from './packet.module.css';
 
 type Detail = ApiResult<'chain.packet'>;
 type Packet = Detail['packet'];
-const pals = (value: string) => Number(formatPals(value));
 
 /** The packet itself as a small drawing: a red envelope, a lighter flap and a gold seal. Flat, no gradient. */
 export function Envelope({ size = 'md' }: { size?: 'xs' | 'sm' | 'md' | 'lg' }) {
@@ -34,7 +34,7 @@ export function Envelope({ size = 'md' }: { size?: 'xs' | 'sm' | 'md' | 'lg' }) 
 
 function kindLabel(t: ReturnType<typeof useTranslations>, detail: Detail) {
   const { kind } = detail.packet;
-  return t(kind === 'invitation' ? 'extension.wallet.kindInvitation' : kind === 'room' ? 'extension.wallet.kindRoom' : detail.distribution === 'random' ? 'extension.wallet.kindRandom' : 'extension.wallet.kindEqual');
+  return t(kind === 'room' ? 'extension.wallet.kindRoom' : detail.distribution === 'random' ? 'extension.wallet.kindRandom' : 'extension.wallet.kindEqual');
 }
 const ended = (packet: Packet, now: number) => packet.status === 'exhausted' || packet.status === 'refunded' || packet.expiresAt <= now;
 const openable = (detail: Detail, now: number) => detail.eligibility === 'eligible' && detail.packet.status === 'active' && detail.packet.expiresAt > now;
@@ -76,7 +76,7 @@ function PacketEnvelope({ c, packet, detail, onClose, onOpened, feedback }: { c:
   const t = useTranslations(), text = useText(), reduced = useReducedMotion();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<EnvelopeState>('idle'), [note, setNote] = useState<string>();
-  const sender = personFor(c.people, packet.accountId, t('common.member'));
+  const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
   const canOpen = detail ? openable(detail, c.now) : undefined;
   const closed = !detail || canOpen ? undefined : detail.packet.status === 'exhausted' ? t('extension.wallet.lost') : detail.packet.expiresAt <= c.now ? t('extension.wallet.packetExpired') : t(`extension.wallet.eligibility.${detail.eligibility}`);
   useEffect(() => { const dialog = dialogRef.current; if (dialog && !dialog.open) dialog.showModal(); }, []);
@@ -130,9 +130,9 @@ function ShareState({ claim, delay }: { claim: NonNullable<Detail['myClaim']>; d
 /** What I got rolls up from zero, then says whether it is already in 零钱; below, who got what, in the order they grabbed. */
 function PacketResult({ c, detail, onClose }: { c: PalsideController; detail: Detail; onClose: () => void }) {
   const t = useTranslations(), locale = useLocale(), reduced = useReducedMotion(), { packet } = detail;
-  const [shown, setShown] = useState(0);
-  const mine = packet.accountId === c.data.self, claim = detail.myClaim && detail.myClaim.status !== 'failed' ? detail.myClaim : undefined, got = claim ? pals(claim.amount) : undefined;
-  const sender = personFor(c.people, packet.accountId, t('common.member'));
+  const [shown, setShown] = useState('0');
+  const mine = packet.accountId === c.data.self, claim = detail.myClaim && detail.myClaim.status !== 'failed' ? detail.myClaim : undefined, got = claim?.amount;
+  const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
   useEffect(() => { if (got === undefined) return; const timer = setTimeout(() => setShown(got), reduced ? 0 : 260); return () => clearTimeout(timer); }, [got, reduced]);
   const status = packet.status === 'refunded' ? t('extension.wallet.refunded') : packet.status === 'exhausted' ? t('extension.wallet.gone') : packet.expiresAt <= c.now ? t('extension.wallet.packetExpired')
     : mine ? t('extension.wallet.closesAt', { time: new Date(packet.expiresAt).toLocaleString([], { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : t(`extension.wallet.eligibility.${detail.eligibility}`);
@@ -142,15 +142,15 @@ function PacketResult({ c, detail, onClose }: { c: PalsideController; detail: De
       <span className={p.from} id="packet-detail-title"><PersonAvatar person={sender} size="xs" />{mine ? t('extension.wallet.packetMine') : t('extension.wallet.packetFrom', { name: sender.name })}</span>
       <small>{detail.blessing || t('extension.wallet.blessingPlaceholder')}</small>
       {claim && got !== undefined ? <>
-        <span className={p.amount}><NumberFlow value={shown} locales="en-US" format={{ minimumFractionDigits: 2, maximumFractionDigits: 4 }} /><small>PALS</small></span>
+        <span className={p.amount}><AnimatedAmount value={shown} minimumFractionDigits={2} /><small>PALS</small></span>
         <ShareState claim={claim} delay={reduced ? 0 : .9} />
       </> : <p className={s.note}>{detail.myClaim?.status === 'failed' ? t('extension.wallet.settleFailed') : status}</p>}
     </div>
     <section className={p.claims}>
       <header><span><CountText text={t('extension.wallet.claimedOf', { claimed: packet.claimedCount, count: packet.count })} value={packet.claimedCount} /></span><span>{formatPals(packet.claimedAmount)}/{formatPals(packet.amount)} PALS</span></header>
-      {detail.claims.map((item, index) => <motion.div key={item.accountId} className={p.claim} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...motionPresets.feedback, delay: .05 * index + .2 }}>
-        <PersonAvatar person={personFor(c.people, item.accountId, t('common.member'))} size="sm" />
-        <span className={p.claimWho}><strong>{item.accountId === c.data.self ? t('common.self') : personFor(c.people, item.accountId, t('common.member')).name}</strong>
+      {detail.claims.map((item, index) => <motion.div key={item.accountId ?? `deleted:${index}`} className={p.claim} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...motionPresets.feedback, delay: .05 * index + .2 }}>
+        <PersonAvatar person={personFor(c.people, item.accountId, t('common.member'), t('common.deletedMember'))} size="sm" />
+        <span className={p.claimWho}><strong>{item.accountId === c.data.self ? t('common.self') : personFor(c.people, item.accountId, t('common.member'), t('common.deletedMember')).name}</strong>
           <small>{clockTime(item.claimedAt, localeOrEnglish(locale))}{item.status === 'issued' && <> · {t('extension.wallet.settling')}</>}</small></span>
         <span><b>{formatPals(item.amount)}</b>{item.best && <small className={p.best}><Crown />{t('extension.wallet.best')}</small>}</span>
       </motion.div>)}
@@ -200,39 +200,36 @@ function Stepper({ value, max, onChange }: { value: number; max: number; onChang
  * 发红包: the type on top, the three inputs as one grouped list (count, amount with its token pill, wish), and the total
  * set large in the space between the list and the button — the one number you are about to send.
  */
-export function PacketPage({ c, invitation = false }: { c: PalsideController; invitation?: boolean }) {
-  const t = useTranslations(), reduced = useReducedMotion(), wallet = c.live?.state.wallet, room = invitation ? undefined : c.live?.state.rooms.pinned;
-  const requests = usePaymentRequest(c, JSON.stringify([c.screen, c.current, room, invitation]));
-  const owner = c.team.owner === c.data.self, command = c.live?.command, teamId = c.current;
-  const [kind, setKind] = useState<'team' | 'invitation' | 'room'>(invitation ? 'invitation' : room ? 'room' : 'team');
-  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); if (invitation) void command?.('wallet-team', { teamId }).catch(() => {}); }, [command, invitation, teamId]);
-  const existing = invitation && c.live?.state.chainTeam?.teamId === teamId ? c.live.state.chainTeam.packets.filter(item => item.packet.kind === 'invitation' && item.packet.status === 'active') : [];
+export function PacketPage({ c }: { c: PalsideController }) {
+  const t = useTranslations(), reduced = useReducedMotion(), wallet = c.live?.state.wallet, room = c.live?.state.rooms.pinned;
+  const requests = usePaymentRequest(c, JSON.stringify([c.screen, c.current, room]));
+  const command = c.live?.command, kind = room ? 'room' : 'team';
+  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); }, [command]);
   // Like a group packet: one share per member at most, the sender included; the service rejects more, so the stepper never offers them.
-  const mates = Math.max(0, c.team.memberIds.length - 1), teamMax = Math.min(30, c.team.memberIds.length);
-  const [distribution, setDistribution] = useState<'equal' | 'random'>('random'), [count, setCount] = useState(room ? 20 : Math.max(1, Math.min(5, invitation ? 30 - c.team.memberIds.length : teamMax)));
+  const mates = Math.max(0, c.team.memberIds.length - 1), teamMax = Math.min(TEAM_MEMBER_LIMIT, c.team.memberIds.length);
+  const [distribution, setDistribution] = useState<'equal' | 'random'>('random'), [picked, setCount] = useState(room ? 20 : Math.max(1, Math.min(5, teamMax)));
   const [amount, setAmount] = useState(''), [blessing, setBlessing] = useState(''), [busy, setBusy] = useState(false), [invalid, setInvalid] = useState(false);
+  const max = kind === 'team' ? Math.max(1, teamMax) : CHAIN_RULES.maxPacketCount;
+  const count = Math.min(max, Math.max(1, picked));
   const decimals = wallet?.config?.deployment?.decimals ?? 18, noMates = kind === 'team' && mates === 0;
   const each = kind === 'team' && distribution === 'equal';
   let total: bigint | undefined; try { total = amount ? parsePals(amount, decimals) * (each ? BigInt(count) : 1n) : undefined; } catch { total = undefined; }
+  const nearest = total !== undefined && count > 0 && each ? nearestEqualPacketTotal(total, count, decimals) : total;
   const balance = wallet?.balance?.balance;
-  const error = noMates ? t('extension.wallet.noTeammates') : amount && total === undefined || invalid ? t('extension.wallet.invalidAmount') : total !== undefined && balance !== undefined && total > BigInt(balance) ? t('extension.wallet.insufficient') : undefined;
-  const totalValue = total === undefined ? 0 : pals(total.toString());
-  const usd = wallet?.price && total !== undefined && BigInt(wallet.price.denominator) > 0n ? Number(total * BigInt(wallet.price.numerator) * 100n / (10n ** BigInt(decimals) * BigInt(wallet.price.denominator))) / 100 : undefined;
-  const max = kind === 'team' ? Math.max(1, teamMax) : kind === 'invitation' ? Math.max(1, 30 - c.team.memberIds.length) : CHAIN_RULES.maxPacketCount;
+  const error = noMates ? t('extension.wallet.noTeammates') : amount && total === undefined || invalid ? t('extension.wallet.invalidAmount') : nearest !== total && nearest !== undefined ? t('extension.wallet.equalAmount', { amount: formatPals(each ? (nearest / BigInt(count)).toString() : nearest.toString(), decimals) }) : total !== undefined && balance !== undefined && total > BigInt(balance) ? t('extension.wallet.insufficient') : undefined;
+  const usd = wallet?.price && total !== undefined && BigInt(wallet.price.denominator) > 0n ? (total * BigInt(wallet.price.numerator) * 100n / (10n ** BigInt(decimals) * BigInt(wallet.price.denominator))).toString() : undefined;
   async function review() {
     if (busy || !total || error) return;
     const request = requests.capture();
     setBusy(true); setInvalid(false);
-    try { const quoted = await c.run('wallet-packet-review', { kind, scope: kind === 'room' ? room! : c.current, count, distribution: kind === 'room' ? 'random' : kind === 'invitation' ? 'equal' : distribution, total: total.toString(), blessing }); if (!request.isCurrent()) { if (quoted) request.discard(quoted.id); return; } if (quoted) { setBusy(false); openPayment(quoted.id, () => { if (request.isMounted()) c.back(); }); } else setInvalid(true); }
+    try { const quoted = await c.run('wallet-packet-review', { kind, scope: kind === 'room' ? room! : c.current, count, distribution: kind === 'room' ? 'random' : distribution, total: total.toString(), blessing }); if (!request.isCurrent()) { if (quoted) request.discard(quoted.id); return; } if (quoted) { setBusy(false); openPayment(quoted.id, () => { if (request.isMounted()) c.back(); }); } else setInvalid(true); }
     catch { if (request.isCurrent()) setInvalid(true); } finally { if (request.isCurrent()) setBusy(false); }
   }
-  const types = room ? [] : kind === 'invitation' || owner ? (['random', 'equal', 'invitation'] as const) : (['random', 'equal'] as const);
+  const types = room ? [] : (['random', 'equal'] as const);
   return <div className={`${s.page} ${p.form}`}>
-    {existing.map(item => <PacketCard key={item.packet.id} c={c} detail={item} />)}
     {types.length > 0 && <div className={s.segment} role="radiogroup" aria-label={t('extension.wallet.packetType')}>{types.map(value => {
-      const checked = value === 'invitation' ? kind === 'invitation' : kind === 'team' && distribution === value;
-      return <button key={value} type="button" role="radio" aria-checked={checked} onClick={() => { if (value === 'invitation') { setKind('invitation'); setCount(Math.max(1, Math.min(count, 30 - c.team.memberIds.length))); } else { setKind('team'); setDistribution(value); setCount(Math.max(1, Math.min(count, teamMax))); } }}>
-        {t(value === 'invitation' ? 'extension.wallet.invitationPacket' : value === 'random' ? 'extension.wallet.random' : 'extension.wallet.equal')}</button>;
+      return <button key={value} type="button" role="radio" aria-checked={distribution === value} onClick={() => setDistribution(value)}>
+        {t(value === 'random' ? 'extension.wallet.random' : 'extension.wallet.equal')}</button>;
     })}</div>}
     <motion.div className={p.rows} animate={error && !reduced ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }} transition={{ duration: .36 }}>
       <div className={p.row}><span>{t('extension.wallet.count')}</span><Stepper value={count} max={max} onChange={setCount} /></div>
@@ -241,12 +238,12 @@ export function PacketPage({ c, invitation = false }: { c: PalsideController; in
         <input className={p.rowAmount} inputMode="decimal" placeholder="0" value={amount} onChange={event => { setAmount(event.target.value.replace(/[^\d.]/g, '')); setInvalid(false); }} />
         <span className={p.pill}>PALS</span>
       </label>
-      <label className={p.row}><span>{t('extension.wallet.blessing')}</span><input className={p.rowText} placeholder={t('extension.wallet.blessingPlaceholder')} maxLength={96} value={blessing} onChange={event => setBlessing(event.target.value)} /></label>
+      <label className={p.row}><span>{t('extension.wallet.blessing')}</span><input className={p.rowText} placeholder={t('extension.wallet.blessingPlaceholder')} value={blessing} onChange={event => { if (graphemeLength(event.target.value) <= CHAIN_RULES.blessingLength) setBlessing(event.target.value); }} /></label>
     </motion.div>
     <div className={p.totalArea}>
-      <span className={p.totalBig}><NumberFlow value={totalValue} locales="en-US" format={{ maximumFractionDigits: 4 }} /><small>PALS</small></span>
+      <span className={p.totalBig}><AnimatedAmount value={(total ?? 0n).toString()} decimals={decimals} /><small>PALS</small></span>
       <span className={p.totalSub}><Swap k={error ?? 'ok'}>{error ? <span data-error>{error}</span>
-        : <>{usd !== undefined && <><NumberFlow value={usd} prefix="≈ $" locales="en-US" format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} /><span className={p.dot}>·</span></>}{balance !== undefined && t('extension.wallet.available', { amount: formatPals(balance) })}</>}</Swap></span>
+        : <>{usd !== undefined && <><AnimatedAmount value={usd} decimals={2} prefix="≈ $" minimumFractionDigits={2} maximumFractionDigits={2} /><span className={p.dot}>·</span></>}{balance !== undefined && t('extension.wallet.available', { amount: formatPals(balance) })}</>}</Swap></span>
     </div>
     <div className={`${s.bottom} ${p.submit}`}><Button variant="primary" size="lg" loading={busy} disabled={!wallet?.config?.enabled || !total || Boolean(error)} onClick={() => void review()}>{t('extension.wallet.createPacket')}</Button></div>
   </div>;
@@ -273,7 +270,7 @@ export function RoomPacketBanner({ c, packets }: { c: PalsideController; packets
   if (!current) return null;
   const mine = current.accountId === c.data.self, left = current.count - current.claimedCount;
   const picked = list.find(packet => packet.id === selected);
-  const sender = personFor(c.people, current.accountId, t('common.member'));
+  const sender = personFor(c.people, current.accountId, t('common.member'), t('common.deletedMember'));
   return <>
     <motion.div className={p.banner} initial={reduced ? false : { height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} transition={reduced ? motionPresets.reduced : motionPresets.expand}>
       <div className={p.bannerIn} data-state={left === 0 ? 'gone' : undefined}>

@@ -66,5 +66,7 @@ export class WalletKeys {
     this.exposureGeneration++; this.exposureOwner = undefined;
     clearTimeout(this.timer); this.timer = undefined; this.exported = undefined;
   }
-  dispose() { this.generation++; this.hide(); this.account = undefined; }
+  /** Forget the signing account; payments ask for the password again. */
+  lock() { this.generation++; this.hide(); this.account = undefined; }
+  dispose() { this.lock(); }
 }

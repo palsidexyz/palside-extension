@@ -21,7 +21,7 @@ contract ConservationHandler is Test {
             tokens[i] = new MockPALS(address(this));
             uint256 share = (i + 1) * 1 ether;
             tokens[i].approve(address(packets), 100 * share);
-            packetIds[i] = packets.createPacket(tokens[i], bytes32(i + 1), PalsideRedPacket.Kind.Invitation, 100 * share, 100, share, 0);
+            packetIds[i] = packets.createPacket(tokens[i], bytes32(i + 1), PalsideRedPacket.Kind.Team, 100 * share, 100, share, 0);
         }
     }
 

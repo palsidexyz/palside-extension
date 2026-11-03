@@ -2,12 +2,16 @@
 import { useTranslations } from 'use-intl';
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { RotateCcw } from 'lucide-react';
+import { ImageOff, RotateCcw } from 'lucide-react';
 import type { Attachment } from '../../../domain/chat/model';
 import type { PalsideController } from '../app/use-palside';
+import { imageExpiry } from '../../../runtime/chat/message-expiry';
 import s from '../feedback/edge-states.module.css';
 
-export function MessageImage({ c, id, image, compact = false }: { c: PalsideController; id: string; image: Extract<Attachment, { kind: 'image' }>; compact?: boolean }) {
+/** A chat image; past its 30-day limit it stays in place as 图片已过期, with nothing to retry. */
+export function MessageImage({ c, id, sentAt, image, compact = false }: { c: PalsideController; id: string; sentAt?: number; image: Extract<Attachment, { kind: 'image' }>; compact?: boolean }) {
+  const t = useTranslations();
+  if (imageExpiry({ timestamp: sentAt }, Infinity) <= c.now) return <div className={s.image} data-state="expired" data-compact={compact}><ImageOff size={15} aria-hidden="true" /><span>{t('extension.copy.imageExpired')}</span></div>;
   return <ImageContent key={image.src} c={c} id={id} image={image} compact={compact} />;
 }
 function ImageContent({ c, id, image, compact }: { c: PalsideController; id: string; image: Extract<Attachment, { kind: 'image' }>; compact: boolean }) {

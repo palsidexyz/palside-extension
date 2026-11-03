@@ -8,7 +8,7 @@ export function recoveryLabel(item: WalletRecovery['items'][number]) {
   if (item.relay?.state === 'included' || item.relay?.state === 'confirmed') return 'recoveryIndexing';
   if (item.relay?.state === 'cancelled') return 'recoveryCancelled';
   if (item.relay?.state === 'expired') return 'expired';
-  if (item.relay && ['submitting', 'uncertain', 'submitted'].includes(item.relay.state)) return 'recoveryUnknown';
+  if (item.relay && ['submitting', 'uncertain', 'submitted'].includes(item.relay.state)) return 'pending';
   if (item.order.status === 'submitted') return 'pending';
   if (item.order.status === 'expired') return 'expired';
   return item.canResume ? 'review' : 'pending';

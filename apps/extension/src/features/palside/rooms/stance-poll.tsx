@@ -2,7 +2,7 @@
 import { stances } from '@palside/shared/contracts/rules';
 import { useTranslations } from 'use-intl';
 import { Count } from '../ui/motion-details';
-import { ROOM_STANCE_MIN_VOTES } from '@palside/shared/contracts/limits';
+import { ROOM_STANCE_MIN_VOTES } from '@palside/shared/rules/rooms';
 import type { RoomStance, Stance } from '../../../runtime/rooms/contract-types';
 import { Tooltip } from '@palside/ui/tooltip';
 import { StanceIcon } from '../ui/icons';
@@ -20,23 +20,25 @@ export function stanceShares(stance: Pick<RoomStance, Stance>): Record<Stance, n
 }
 
 /**
- * 看法: one vote per account per token, shown the same in the 弹幕 view and 代币详情. One segmented track of three equal choices
- * with the shares as a hairline along its foot; your vote wears its colour. Choosing your vote again withdraws it.
+ * 看法: one vote per account per token, shown the same in the 弹幕 view and 代币详情. One segmented track of three equal choices,
+ * your vote wearing its colour, with the shares as one 4px bar under the track. Choosing your vote again withdraws it.
+ * Without a room yet it shows the three choices with — and an even grey bar, nothing to vote on.
  */
-export function StancePoll({ c, roomKey, stance }: { c: PalsideController; roomKey: string; stance: RoomStance }) {
+export function StancePoll({ c, roomKey, stance }: { c: PalsideController; roomKey?: string; stance?: RoomStance }) {
   const t = useTranslations();
-  const shares = stanceShares(stance);
-  const votes = total(stance);
-  const disabled = !c.live || c.disconnected;
-  const choose = (value: Stance) => { if (!disabled) void c.run('room-stance', { key: roomKey, value: stance.mine === value ? null : value }); };
-  return <Tooltip content={t('extension.stance.votes', { count: votes })}>
-    <div className={d.poll} data-voted={stance.mine ? '' : undefined} data-shares={shares ? '' : undefined} role="radiogroup" aria-label={t('extension.stance.title')}>
-      {stances.map(value => <button key={value} type="button" role="radio" aria-checked={stance.mine === value} data-stance={value} disabled={disabled} onClick={() => choose(value)}>
-        <StanceIcon value={value} size={14} /><span>{t(`extension.stance.${value}`)}</span><b>{shares ? <><Count value={shares[value]} />%</> : '—'}</b>
-      </button>)}
-      <span className={d.pollBar} aria-hidden="true">{stances.map(value => <span key={value} data-stance={value} style={{ flexGrow: shares ? shares[value] : 1 }} />)}</span>
-    </div>
-  </Tooltip>;
+  const shares = stance && stanceShares(stance);
+  const votes = stance ? total(stance) : 0;
+  const disabled = !c.live || c.disconnected || !roomKey || !stance;
+  const choose = (value: Stance) => { if (!disabled && stance && roomKey) void c.run('room-stance', { key: roomKey, value: stance.mine === value ? null : value }); };
+  const poll = <div className={d.poll} data-voted={stance?.mine ? '' : undefined} role="radiogroup" aria-label={t('extension.stance.title')}>
+    {stances.map(value => <button key={value} type="button" role="radio" aria-checked={stance?.mine === value} data-stance={value} disabled={disabled} onClick={() => choose(value)}>
+      <StanceIcon value={value} size={14} /><span>{t(`extension.stance.${value}`)}</span><b>{shares ? <><Count value={shares[value]} />%</> : '—'}</b>
+    </button>)}
+  </div>;
+  return <div className={d.stance} data-stance-poll="" data-shares={shares ? '' : undefined}>
+    {stance ? <Tooltip content={t('extension.stance.votes', { count: votes })}>{poll}</Tooltip> : poll}
+    <span className={d.pollBar} aria-hidden="true">{stances.map(value => <span key={value} data-stance={value} style={{ flexGrow: shares ? shares[value] : 1 }} />)}</span>
+  </div>;
 }
 
 /** The small 看法 bar of a 热门 row: the three shares, or an even grey bar below the vote threshold. */

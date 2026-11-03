@@ -59,3 +59,11 @@ test('fake media clock advances while playing and stops while paused', async () 
     globalThis.requestAnimationFrame = previous;
   }
 });
+
+
+test('quote captions preserve composed graphemes at the title limit', () => {
+  for (const grapheme of ['👨‍👩‍👧‍👦', 'e\u0301', '🇹🇼']) {
+    assert.equal(caption({ kind: 'quote', exact: grapheme.repeat(31), prefix: '', suffix: '' }), `“${grapheme.repeat(31)}”`);
+    assert.equal(caption({ kind: 'quote', exact: grapheme.repeat(32), prefix: '', suffix: '' }), `“${grapheme.repeat(30)}…”`);
+  }
+});

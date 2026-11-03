@@ -1,3 +1,4 @@
+import { DAY_MS } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
 import { connectionStatus } from '../src/runtime/transport/connection';
 import React from 'react';
@@ -44,7 +45,7 @@ async function run() {
     const directory = await storage.get<{people: {presence?:'active'|'away'}[]}>(`${session.account.id}:cache:directory`);
     check(directory && !directory.people.some(p=>p.presence!==undefined),'Successful snapshot saves display metadata without presence');
     await storage.updateDraft(session.account.id,team.id,{text:'关闭服务后仍保留的草稿'},0,{text:''});
-    await storage.cache(session.account.id,'$offline-message',{message:{id:'$offline-message',teamId:team.id,author:session.account.id,text:'这是本机已保存的消息',time:'12:00',status:'sent'},views:[],timestamp:now},now+86400000);
+    await storage.cache(session.account.id,'$offline-message',{message:{id:'$offline-message',teamId:team.id,author:session.account.id,text:'这是本机已保存的消息',time:'12:00',status:'sent'},views:[],timestamp:now},now+DAY_MS);
     let rejectNetwork!: (reason: unknown)=>void;
     const network = new Promise<never>((_,reject)=>{rejectNetwork=reject;});
     second.api.request = async <T,>() => await network as T;

@@ -21,7 +21,7 @@ function Review() {
     connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
     account: { bio: '', tags: [], id: 'you', nickname: '你', avatarId: null, matrixId: '@fixture:test', revision: 0, acceptTeamInvites: true },
     data: palsideFixtures, viewingId: palsideFixtures.views[0]?.id, reactions: [],
-    preferences: { web: { share: true, interact: true }, current: 'night', notifications: 'off' },
+    preferences: { web: { share: true, interact: true }, current: 'night', notifications: 'off', toured: true },
   }));
   function receive(personId: string, emoji: ReactionEmoji, count = 1, teamId = state.preferences.current) {
     setState(old => ({ ...old, reactions: [...(old.reactions ?? []), { id: crypto.randomUUID(), teamId, personId, emoji, count, at: Date.now() }].slice(-24) }));

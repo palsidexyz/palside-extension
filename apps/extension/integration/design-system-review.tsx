@@ -56,7 +56,7 @@ function Review() {
             <header><h3>{index === 0 ? '紧凑清晰' : '舒展留白'}</h3><span>{index === 0 ? '紧凑间距，清晰分组' : '更多滚动，更多留白'}</span></header>
             <div className={s.preview} style={{width: Number(width)}} data-density={density}>
               <h4>{t('extension.settings.privacy')}</h4><p className={s.groupTitle}>{t('extension.settings.groupWeb')}</p><div className={s.card}>
-                <div className={s.row}><span className={s.icon}><Globe size={16} /></span><Switch label={t('extension.web.share')} help={{ label: t('extension.settings.aboutFeature', { name: t('extension.web.share') }), content: t('extension.settings.shareHint') }} defaultChecked /></div>
+                <div className={s.row}><span className={s.icon}><Globe size={16} /></span><Switch label={t('extension.web.share')} help={{ label: t('extension.settings.aboutFeature', { name: t('extension.web.share') }), content: t('extension.toggle.shareOff') }} defaultChecked /></div>
                 <div className={s.row}><span className={s.icon}><Bell size={16} /></span><Switch label={t('extension.settings.preview')} /></div>
                 <button className={s.row} onClick={() => setChoice(density)}><span className={s.icon}><ShieldCheck size={16} /></span><span className={s.rowText}><strong>{t('extension.copy.security')}</strong><small>{t('extension.copy.recoveryPhrase')}</small></span><ChevronRight size={16} /></button>
               </div>

@@ -1,3 +1,4 @@
+import { MINUTE_MS, DAY_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
@@ -11,11 +12,14 @@ const hooks = registerHooks({
     if (specifier === 'matrix-js-sdk') return stub(`export const createClient = options => globalThis.syncClient(options); export const EventType = {}, EventStatus = ${JSON.stringify(EventStatus)}, MsgType = {}, PendingEventOrdering = { Detached: 'detached' }, ClientEvent = { Sync: 'sync', ToDeviceEvent: 'device' }, RoomEvent = { Timeline: 'timeline' }, MatrixEventEvent = { Decrypted: 'decrypted' }; export class MatrixScheduler {}`);
     if (specifier === 'react' && context.parentURL?.endsWith('/features/palside/rooms/rooms.ts')) return stub(`export const useEffect = fn => globalThis.hotEffects.push(fn), useLayoutEffect = useEffect, useState = value => [typeof value === 'function' ? value() : value, () => {}], useSyncExternalStore = (_subscribe, snapshot) => snapshot();`);
     if (context.parentURL?.endsWith('/hot.tsx')) {
-      if (specifier === 'react') return stub(`export const useEffect = fn => globalThis.hotEffects.push(fn), useId = () => globalThis.hotSource, useState = value => [typeof value === 'function' ? value() : value, () => {}];`);
+      if (specifier === 'react') return stub(`export const useEffect = fn => globalThis.hotEffects.push(fn), useId = () => globalThis.hotSource, useLayoutEffect = useEffect, useMemo = fn => fn(), useRef = value => ({ current: value }), useState = value => [typeof value === 'function' ? value() : value, () => {}];`);
       if (specifier === 'react/jsx-runtime') return stub('export const jsx = () => null, jsxs = jsx, Fragment = "fragment";');
       if (specifier === 'use-intl') return stub('export const useTranslations = () => key => key;');
+      if (specifier === 'motion/react') return stub('export const AnimatePresence = null, motion = { div: null }, useReducedMotion = () => true;');
       if (specifier.endsWith('.css')) return stub('export default {};');
-      if (specifier !== './rooms' && !specifier.startsWith('@palside/shared/')) return stub('export const InlineFeedback = null, Count = null, CountText = null, Tooltip = null, Token = null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;');
+      if (specifier === '../assets/token-name') return stub('export const TokenName = () => null, tokenLabel = view => view.name;');
+      if (specifier === '../assets/token-data') return stub('export const tokenStats = () => undefined, liveView = (_c, view) => view;');
+      if (!['./rooms', '../../../runtime/rooms/token-sites', '@palside/design/motion'].includes(specifier) && !specifier.startsWith('@palside/shared/')) return stub('export const Check = null, ChevronDown = null, Flame = null, Layers = null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = null, InlineFeedback = null, Count = null, CountText = null, Tooltip = null, Token = null, ChainLogo = null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;');
     }
     try { return next(specifier, context); } catch (error) {
       if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && context.parentURL?.includes('/apps/extension/')) return next(`${specifier}.ts`, context);
@@ -78,10 +82,11 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
     const values = {
       '/me': { ...server, serverTime: Date.now() },
       '/rooms/blocks': { people: [] }, '/team-invites': { invites: [] }, '/presence': { ok: true },
-      '/rooms/hot': { top: [], rising: [], at: Date.now() },
+      '/rooms/hot/subscription': { subscribed: body.open },
       '/chain/wallet': null,
-      '/chain/config': { enabled: false, version: 1, deployment: null, dailySponsoredLimit: 0, updatedAt: Date.now() },
-      '/rooms/lease': { key: body.key, count: 1, slowUntil: 0 },
+      '/chain/recovery': { items: [], nextCursor: null },
+      '/chain/config': { enabled: false, version: 1, deployment: null, dailySponsoredLimit: 0, quickPay: { single: '250', daily: '1000' }, minimumLiquidity: '0', updatedAt: Date.now() },
+      '/rooms/lease': { key: body.key, count: 1, slowUntil: 0, slowMs: 5000 },
       '/rooms/summary': { key, profile: null, count: roomServer.count, faces: [], stance: { bull: 0, hold: 0, bear: 0, mine: null } },
       '/rooms/messages': { messages: [], hasMore: false },
     };
@@ -91,7 +96,7 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
     return new Response(value, { headers: { 'content-type': 'application/json' } });
   });
   const runtime = {
-    state: emptyState(), api: new Api('https://service.test'), emit() {}, initialise: async () => {},
+    state: emptyState(), api: new Api('https://service.test'), emit() {}, initialise: async () => {}, tokens: { clear() {}, put() {}, get() {}, apply: view => view, remember: () => false },
     storage: { get: async () => { if (gates.has('storage')) await gates.get('storage'); }, rows: async () => [], remove: async () => {}, put: async () => {}, cache: async () => [] },
     sharing: { restoreToggles: async () => {}, savePreferences: async () => {}, peerViewing: new Map() },
     cache: { expireLocalContent: async () => {}, evictCachedContent() {}, pruneMedia() {}, eventTimes: new Map(), preparedViews: new Map(), expiresAt: message => message.expiresAt, cacheMessage: async message => { cachedMessages.push(message); } },
@@ -110,7 +115,7 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
   const event = async (name, data) => { streams.at(-1).enqueue(new TextEncoder().encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)); await drain(); };
   const mount = source => {
     globalThis.hotEffects = []; globalThis.hotSource = source;
-    Hot({ c: { data: runtime.state.data, live: { state: runtime.state, command: (name, payload) => runtime.dispatch.execute({ name, payload: { ...payload, sourceId: `${source}:` } }) } } });
+    Hot({ chain: null, c: { data: runtime.state.data, live: { state: runtime.state, command: (name, payload) => runtime.dispatch.execute({ name, payload: { ...payload, sourceId: `${source}:` } }) } } });
     const cleanup = globalThis.hotEffects.map(fn => fn()); return () => cleanup.forEach(fn => fn?.());
   };
   t.after(async () => { runtime.auth.liveDispose?.(); runtime.rooms.reset(); runtime.wallet.reset(); await drain(); delete globalThis.syncClient; delete globalThis.hotEffects; delete globalThis.hotSource; });
@@ -148,53 +153,54 @@ test('SSE refresh and invite events read only their available contract domains',
   assert.deepEqual(invites, { 'GET /team-invites': 1 }); assert.deepEqual(unsupported, {});
 });
 
-test('two Hot panels share thirty-second polls for sixty seconds and stop after unmount', async t => {
+test('two Hot panels share one live subscription without polling and unsubscribe after unmount', async t => {
   const f = fixture(t); const first = f.mount('one'); await drain(); const second = f.mount('two'); await drain();
   await f.advance(30_000); await f.advance(30_000);
-  const shown = f.mark('two Hot panels, 60 s'); first(); second(); await drain(); await f.advance(60_000);
-  const hidden = f.mark('no Hot panels, 60 s');
-  assert.deepEqual(shown, { 'GET /rooms/hot': 3 }); assert.deepEqual(hidden, {});
+  const shown = f.mark('two Hot panels, 60 s'); first(); await drain(); assert.deepEqual(f.calls, []);
+  second(); await drain();
+  assert.deepEqual(f.mark('last Hot panel closes'), { 'POST /rooms/hot/subscription': 1 });
+  await f.advance(MINUTE_MS);
+  assert.deepEqual(shown, { 'POST /rooms/hot/subscription': 1 }); assert.deepEqual(f.mark('no Hot panels, 60 s'), {});
 });
 
-test('Hot subscriptions await their shared initial read and propagate its failure', async t => {
+test('Hot subscriptions await their shared acknowledgement and propagate its failure', async t => {
   const f = fixture(t); let reject;
-  f.gates.set('/rooms/hot', new Promise((_, fail) => { reject = fail; }));
+  f.gates.set('/rooms/hot/subscription', new Promise((_, fail) => { reject = fail; }));
   let settled = 0;
-  const watch = sourceId => f.runtime.rooms.watchHot({ sourceId, chain: 'Solana' }).finally(() => { settled++; });
-  const first = assert.rejects(watch('one:hot'), /SERVICE_UNAVAILABLE/);
-  const second = assert.rejects(watch('two:hot'), /SERVICE_UNAVAILABLE/);
+  const watch = sourceId => f.runtime.rooms.watchHot({ sourceId, open: true }).finally(() => { settled++; });
+  const first = assert.rejects(watch('one:hot'), error => error.code === 'RESULT_UNKNOWN');
+  const second = assert.rejects(watch('two:hot'), error => error.code === 'RESULT_UNKNOWN');
   await drain();
   assert.equal(settled, 0);
-  assert.equal(f.calls.filter(path => path === 'GET /rooms/hot').length, 1);
+  assert.deepEqual(f.calls, ['POST /rooms/hot/subscription']);
   reject(Error('unreachable')); await Promise.all([first, second]);
   assert.equal(settled, 2);
-  assert.equal(f.runtime.state.rooms.hot, undefined);
+  assert.deepEqual(f.runtime.state.rooms.hot, { rows: [], loaded: false });
 });
 
-test('Hot Retry refreshes the failed chain while another panel keeps its poll', async t => {
+test('Hot Retry reopens a failed shared subscription and other panels reuse it', async t => {
   const f = fixture(t); let reject;
-  f.gates.set('/rooms/hot', new Promise((_, fail) => { reject = fail; }));
-  const first = assert.rejects(f.runtime.rooms.watchHot({ sourceId: 'one:hot', chain: 'Solana' }), /SERVICE_UNAVAILABLE/);
-  const second = assert.rejects(f.runtime.rooms.watchHot({ sourceId: 'two:hot', chain: 'Solana' }), /SERVICE_UNAVAILABLE/);
+  f.gates.set('/rooms/hot/subscription', new Promise((_, fail) => { reject = fail; }));
+  const first = assert.rejects(f.runtime.rooms.watchHot({ sourceId: 'one:hot', open: true }), error => error.code === 'RESULT_UNKNOWN');
+  const second = assert.rejects(f.runtime.rooms.watchHot({ sourceId: 'two:hot', open: true }), error => error.code === 'RESULT_UNKNOWN');
   reject(Error('unreachable')); await Promise.all([first, second]);
-  f.gates.delete('/rooms/hot');
-  await f.runtime.rooms.watchHot({ sourceId: 'other:hot', chain: 'Ethereum' });
-  await f.advance(30_000);
-  f.calls.length = 0;
-  await f.runtime.rooms.watchHot({ sourceId: 'one:hot' });
-  await f.runtime.rooms.watchHot({ sourceId: 'one:hot', chain: 'Solana' });
-  assert.deepEqual(f.calls, ['GET /rooms/hot']);
-  assert.ok(f.runtime.state.rooms.hot.Solana);
-  assert.ok(f.runtime.state.rooms.hot.Ethereum);
-  f.calls.length = 0;
-  await f.advance(30_000);
-  assert.deepEqual(f.calls, ['GET /rooms/hot', 'GET /rooms/hot']);
+  f.gates.delete('/rooms/hot/subscription'); f.calls.length = 0;
+  await f.runtime.rooms.watchHot({ sourceId: 'one:hot', open: false });
+  await f.runtime.rooms.watchHot({ sourceId: 'one:hot', open: true });
+  await f.runtime.rooms.watchHot({ sourceId: 'other:hot', open: true });
+  assert.deepEqual(f.calls, ['POST /rooms/hot/subscription']);
+  assert.deepEqual(f.runtime.state.rooms.hot, { rows: [], loaded: false });
+  f.runtime.rooms.consume({ type: 'hot', rooms: { rows: [] } });
+  assert.deepEqual(f.runtime.state.rooms.hot, { rows: [], loaded: true });
+  f.calls.length = 0; await f.advance(MINUTE_MS); assert.deepEqual(f.calls, []);
 });
 
-test('Hot to chat to Hot starts a fresh read and keeps just one active poll', async t => {
+test('Hot to chat to Hot renews the subscription without starting a poll', async t => {
   const f = fixture(t); const leave = f.mount('one'); await drain(); await f.advance(10_000); leave(); await drain();
-  await f.advance(60_000); const leaveAgain = f.mount('one'); await drain(); await f.advance(30_000); leaveAgain();
-  assert.deepEqual(f.mark('Hot → chat → Hot'), { 'GET /rooms/hot': 3 });
+  assert.equal(f.runtime.state.rooms.hot, undefined);
+  await f.advance(MINUTE_MS); const leaveAgain = f.mount('one'); await drain(); await f.advance(30_000);
+  assert.deepEqual(f.mark('Hot → chat → Hot'), { 'POST /rooms/hot/subscription': 3 });
+  leaveAgain(); await drain(); assert.deepEqual(f.mark('Hot closes'), { 'POST /rooms/hot/subscription': 1 });
 });
 
 test('concurrent refresh invalidations merge their domains into one follow-up', async t => {
@@ -217,11 +223,13 @@ test('SSE calibration, disconnect fallback and room renewal keep their deadlines
   assert.equal(f.calls.filter(path => path === 'GET /team-invites').length, 1);
 });
 
-test('panel disconnect drops only its Hot subscription and the last panel stops polling', async t => {
+test('panel disconnect drops only its Hot subscription and the last panel unsubscribes', async t => {
   const f = fixture(t); f.mount('one'); await drain(); f.mount('two'); await drain(); f.calls.length = 0;
   await f.runtime.dispatch.execute({ name: 'visible-drop', payload: { panel: 'one' } }); await f.advance(30_000);
-  assert.equal(f.calls.length, 1);
-  await f.runtime.dispatch.execute({ name: 'visible-drop', payload: { panel: 'two' } }); f.calls.length = 0; await f.advance(60_000);
+  assert.deepEqual(f.calls, []); assert.ok(f.runtime.state.rooms.hot);
+  await f.runtime.dispatch.execute({ name: 'visible-drop', payload: { panel: 'two' } }); await drain();
+  assert.deepEqual(f.calls, ['POST /rooms/hot/subscription']); assert.equal(f.runtime.state.rooms.hot, undefined);
+  f.calls.length = 0; await f.advance(MINUTE_MS);
   assert.deepEqual(f.calls, []);
 });
 
@@ -231,11 +239,11 @@ test('a first SSE open after the initial load catches up every domain once', asy
   assert.ok(f.runtime.state.data.people.every(person => person.presence === undefined));
   release(); await drain(); await f.advance(0); const opened = f.mark('delayed first SSE open');
   assert.equal(initial['GET /me'], 1); assert.equal(initial['GET /rooms/blocks'], 1); assert.equal(initial['GET /team-invites'], 1);
-  assert.deepEqual(opened, { 'GET /chain/config': 1, 'GET /chain/recovery': 1, 'GET /chain/wallet': 1, 'GET /me': 1, 'GET /rooms/blocks': 1, 'GET /team-invites': 1, 'POST /me': 1 });
+  assert.deepEqual(opened, { 'GET /chain/config': 1, 'GET /chain/recovery': 1, 'GET /chain/wallet': 1, 'GET /me': 1, 'GET /rooms/blocks': 1, 'GET /team-invites': 1, 'POST /me': 1, 'POST /rooms/hot/subscription': 1 });
   assert.equal(f.runtime.state.wallet.availability, 'closed');
   f.calls.length = 0;
   f.streams.at(-1).close(); await drain(); await f.advance(1000); await f.advance(0);
-  assert.deepEqual(f.mark('wallet catch-up on SSE reconnect'), { 'GET /chain/config': 1, 'GET /events': 1, 'GET /me': 1, 'GET /rooms/blocks': 1, 'GET /team-invites': 1, 'POST /me': 1 });
+  assert.deepEqual(f.mark('wallet catch-up on SSE reconnect'), { 'GET /chain/config': 1, 'GET /events': 1, 'GET /me': 1, 'GET /rooms/blocks': 1, 'GET /team-invites': 1, 'POST /me': 1, 'POST /rooms/hot/subscription': 1 });
   assert.equal(f.runtime.state.data.people.find(person => person.id === 'self').presence, 'active');
 });
 
@@ -318,7 +326,7 @@ for (const stage of ['storage', 'crypto', 'matrix']) {
     assert.equal(f.runtime.auth.sseOpen, true); assert.equal(f.eventSignals[0].aborted, false);
     reject(Error('unreachable')); await connecting;
     assert.equal(f.eventSignals[0].aborted, true); assert.equal(f.runtime.auth.liveDispose, undefined); assert.equal(f.runtime.auth.sseOpen, false);
-    await f.advance(60_000); assert.equal(f.eventSignals.length, 1);
+    await f.advance(MINUTE_MS); assert.equal(f.eventSignals.length, 1);
   });
 }
 
@@ -386,7 +394,7 @@ for (const mode of ['fresh sign-in', 'restored device']) {
     const message = f.runtime.state.data.messages.find(message => message.id === '$initial');
     assert.ok(message, 'initial-sync event is consumed');
     assert.equal(message.teamId, 'team'); assert.equal(message.author, 'peer'); assert.equal(message.text, 'Initial sync message');
-    assert.equal(message.expiresAt, initialEvent.getTs() + initialTeam.retentionDays * 86_400_000);
+    assert.equal(message.expiresAt, initialEvent.getTs() + initialTeam.retentionDays * DAY_MS);
     assert.equal(f.cachedMessages.length, 1); assert.equal(f.cachedMessages[0].id, '$initial');
   });
 }

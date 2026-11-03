@@ -1,6 +1,6 @@
 import { strictObject } from '../validation.ts';
 import { id, count } from '../common.ts';
-import { REACTION_MESSAGE_LENGTH } from '../limits.ts';
+import { REACTION_MESSAGE_LENGTH } from '../../rules/interactions.ts';
 import { endpoint, jsonBody, jsonResponse } from '../endpoint.ts';
 import { boundedMessages, viewingInput, viewingResult } from '../viewing.ts';
 export const viewingEndpoints = [

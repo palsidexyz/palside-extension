@@ -1,3 +1,4 @@
+import { MINUTE_MS, HOUR_MS, DAY_MS, WEEK_MS } from './packages/shared/src/units.ts';
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
@@ -17,6 +18,16 @@ const eslintConfig = defineConfig([
     ];
   }),
   ...nextTs,
+  {
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    ignores: ["packages/shared/src/units.ts", "**/generated/**"],
+    rules: {
+      "no-restricted-syntax": ["error", ...[MINUTE_MS, HOUR_MS, DAY_MS, WEEK_MS].map(value => ({
+        selector: `Literal[value=${value}][raw=/^[0-9]/]`,
+        message: "Import time units from packages/shared/src/units.ts instead of writing raw unit literals.",
+      }))],
+    },
+  },
   {
     files: ["**/*.{js,mjs,cjs}"],
     rules: { "no-undef": "error" },

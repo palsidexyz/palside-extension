@@ -7,7 +7,7 @@ import { foundry } from 'viem/chains';
 import { mockPalsAbi, redPacketAbi } from '../../packages/shared/src/chain/generated.ts';
 import { contractsRoot, localDeployment, requireArtifacts } from './tools.mjs';
 
-const rpc = new URL(process.env.PALSIDE_CHAIN_RPC ?? 'http://127.0.0.1:8545');
+const rpc = new URL(process.env.PALSIDE_CHAIN_RPC_URL ?? 'http://127.0.0.1:8545');
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(rpc.hostname) || rpc.protocol !== 'http:') throw new Error('Local anvil RPC only');
 requireArtifacts();
 const deployment = localDeployment();

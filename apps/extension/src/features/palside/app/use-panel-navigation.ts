@@ -9,7 +9,7 @@ import type { PanelActions } from './panel-actions';
 const signedOutScreens: Screen[] = ['welcome', 'new-account', 'confirm-phrase', 'restore'];
 
 /** Where 返回 leads when a screen was opened directly, not from another panel screen. */
-const parents: Partial<Record<Screen, Screen>> = { wallet: 'settings', 'wallet-receive': 'wallet', 'wallet-records': 'wallet', 'wallet-settings': 'wallet', 'wallet-packet': 'chat', 'wallet-invitation': 'team', 'team-level': 'team', profile: 'settings', privacy: 'settings', security: 'settings', about: 'settings', interaction: 'settings', sites: 'settings', site: 'sites', notifications: 'settings', 'delete-account': 'security', recruitment: 'lobby', 'former-teams': 'chat', requests: 'team', 'team-profile': 'team', 'room-people': 'room', blocked: 'interaction' };
+const parents: Partial<Record<Screen, Screen>> = { wallet: 'settings', 'wallet-receive': 'wallet', 'wallet-records': 'wallet', 'wallet-settings': 'wallet', 'wallet-packet': 'chat', profile: 'settings', privacy: 'settings', security: 'settings', about: 'settings', interaction: 'settings', sites: 'settings', site: 'sites', notifications: 'settings', 'delete-account': 'security', recruitment: 'lobby', 'former-teams': 'chat', requests: 'team', 'team-profile': 'team', 'room-people': 'room', blocked: 'interaction' };
 
 export function usePanelNavigation(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'go' | 'back' | 'openNotification' | 'openInvitation' | 'openSite' | 'selectAsset'> {
   const { view: { setSelectingOwner, screen, live, data, current, ownsScreen, setNotice }, returnFocus: returnFocusRef, localScreen, setPhrase, origins: originsRef, setScreen, setSiteHost, setSelectedAsset, setSelectedView } = state;

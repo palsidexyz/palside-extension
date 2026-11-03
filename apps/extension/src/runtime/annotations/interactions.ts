@@ -1,8 +1,9 @@
-import { REACTION_TTL_MS } from '@palside/shared/contracts/limits';
+import { DAY_MS } from '@palside/shared/units';
+import { REACTION_TTL_MS } from '@palside/shared/rules/interactions';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { messageExpiry } from '../chat/message-expiry';
 import type { MatrixEvent,TimelineEvents } from 'matrix-js-sdk';
-import { sharingWork } from '../viewing/sharing-work';
+import { sharingWork, PING_ENCRYPTION_WAIT_MS } from '../viewing/sharing-work';
 import { trustedDeviceMessages } from '../viewing/viewing-targets';
 import { requireEncryptedSend,teamSendGuard } from '../account/crypto-identity';
 import { readView } from '../viewing/view-snapshot';
@@ -13,11 +14,13 @@ import { text } from '../composition/state';
 import { mergePoke,upsertTeamItem } from './team-items';
 import { commandError } from '../composition/commands';
 import type { PalsideService } from '../composition/core';
+import { expired } from '../../domain/chat/expiry.ts';
+import { liveMembers } from '../../domain/teams/model.ts';
 
 type TeamEventResult = { id: string; revision?: string; existing?: boolean };
 export type AnnotationDeletion = { id: string; teamId: string; expiresAt: number; status: 'pending' | 'committed'; baseRevision?: string; transactionId?: string; records?: string[] };
 type SelectionReceipt = { fingerprint: string; timestamp: number; expiresAt: number; transactionId: string; eventId?: string; completed?: boolean; admitted?: boolean; result?: TeamEventResult };
-const selectionLifetime = 86_400_000;
+const SELECTION_LIFETIME_MS = DAY_MS;
 const operationPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
@@ -52,7 +55,7 @@ export class TeamInteractions {
     void next.finally(() => { if (this.stickyChanges.get(key) === next) this.stickyChanges.delete(key); }).catch(() => {});
     return next;
   }
-  private sticky(teamId: string, id: unknown) { return this.runtime.state.items.stickies?.find(item => item.teamId === teamId && item.id === id && item.expiresAt > Date.now()); }
+  private sticky(teamId: string, id: unknown) { return this.runtime.state.items.stickies?.find(item => item.teamId === teamId && item.id === id && !expired(item.expiresAt, Date.now())); }
   private stickyPayload(teamId: string, payload: Record<string, unknown>) {
     if (payload.edits === undefined) return payload;
     const original = this.sticky(teamId, payload.edits);
@@ -66,7 +69,7 @@ export class TeamInteractions {
     if (!isReactionEmoji(emoji) || !Number.isSafeInteger(count) || count < 1) throw new MessageError(uiMessage('common.error'));
     const cryptoApi = client.getCrypto(); if (!cryptoApi) throw new MessageError(uiMessage('extension.runtime.reactionNotReady'));
     const others = users.filter(userId => userId !== session.matrix.userId);
-    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, others, session.matrix, 'com.palside.reaction', { id: crypto.randomUUID(), teamId, emoji, count: Math.min(count, REACTION_MAX_COUNT), sentAt: Date.now() }, check), 6_000));
+    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, others, session.matrix, 'com.palside.reaction', { id: crypto.randomUUID(), teamId, emoji, count: Math.min(count, REACTION_MAX_COUNT), sentAt: Date.now() }, check), PING_ENCRYPTION_WAIT_MS));
     check();
     if (!Object.keys(messages).length) return { delivered: 0 };
     const result = await scope.wait(runtime.api.request('viewing.react', { body: { teamId, messages } }));
@@ -143,7 +146,7 @@ export class TeamInteractions {
       if (receipt && receipt.expiresAt <= Date.now()) throw commandError('SELECTION_OPERATION_EXPIRED', 'extension.runtime.outgoingExpired');
       if (!receipt) {
         const timestamp = Date.now();
-        receipt = { fingerprint, timestamp, expiresAt: timestamp + selectionLifetime, transactionId };
+        receipt = { fingerprint, timestamp, expiresAt: timestamp + SELECTION_LIFETIME_MS, transactionId };
         // Persist only a digest and receipt metadata, never a second plaintext copy of the selected content.
         await scope.wait(runtime.storage.put(key, session.account.id, 'selection', receipt, receipt.expiresAt));
       }
@@ -164,7 +167,7 @@ export class TeamInteractions {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     const { session, client, team, check } = teamSendGuard(runtime, teamId);
-    const people = team.people.filter(person => !person.deleted && team.memberIds.includes(person.id));
+    const people = liveMembers(team);
     const asset = text(payload.asset) || undefined;
     const count = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text(payload.text).trim())).length;
     if (count > STICKY_MAX) throw new MessageError(uiMessage('extension.runtime.stickyTooLong', { count }));
@@ -177,7 +180,7 @@ export class TeamInteractions {
     if (payload.target !== undefined && readRefTarget(payload.target)?.kind !== 'quote') throw new MessageError(uiMessage('common.error'));
     if (payload.edits === undefined && !operation?.receipt.eventId) {
       const targetKey = stickyTargetKey({ url: typeof payload.url === 'string' ? payload.url : undefined, target: readRefTarget(payload.target) });
-      const existing = targetKey && runtime.state.items.stickies?.find(item => item.teamId === teamId && item.author === session.account.id && item.expiresAt > Date.now() && stickyTargetKey(item) === targetKey);
+      const existing = targetKey && runtime.state.items.stickies?.find(item => item.teamId === teamId && item.author === session.account.id && !expired(item.expiresAt, Date.now()) && stickyTargetKey(item) === targetKey);
       if (existing) return { id: existing.id, revision: existing.revision ?? existing.id, existing: true };
     }
     const fields = {
@@ -232,7 +235,7 @@ export class TeamInteractions {
         const original = this.sticky(teamId, id);
         if (!original || original.author !== session.account.id) throw commandError('ANNOTATION_UNAVAILABLE', 'extension.runtime.messageUnavailable');
         if (baseRevision !== (original.revision ?? original.id)) throw commandError('ANNOTATION_CONFLICT', 'extension.runtime.annotationChanged');
-        receipt = { id, teamId, baseRevision: String(baseRevision), transactionId: `annotation-delete-${await scope.wait(digest(JSON.stringify([session.account.id, teamId, id, baseRevision])))}`, status: 'pending', expiresAt: Math.max(original.expiresAt, Date.now() + selectionLifetime), records: this.stickyRecords.filter(item => item.teamId === teamId && item.author === session.account.id && (item.id === id || item.edits === id)).map(item => item.id) };
+        receipt = { id, teamId, baseRevision: String(baseRevision), transactionId: `annotation-delete-${await scope.wait(digest(JSON.stringify([session.account.id, teamId, id, baseRevision])))}`, status: 'pending', expiresAt: Math.max(original.expiresAt, Date.now() + SELECTION_LIFETIME_MS), records: this.stickyRecords.filter(item => item.teamId === teamId && item.author === session.account.id && (item.id === id || item.edits === id)).map(item => item.id) };
         await scope.wait(runtime.storage.put(key, session.account.id, 'annotation-deletion', receipt, receipt.expiresAt));
       }
       this.annotationDeletions.set(id, receipt);
@@ -259,7 +262,7 @@ export class TeamInteractions {
     const eligibility = teamSendGuard(runtime, teamId, true);
     const { session, team, client } = eligibility;
     const viewing = runtime.sharing.ownViewing;
-    const target = team.people.find(person => !person.deleted && person.id === accountId && team.memberIds.includes(person.id));
+    const target = liveMembers(team).find(person => person.id === accountId);
     const check = () => {
       eligibility.check();
       if (!viewing || runtime.sharing.ownViewing !== viewing || viewing.teamId !== teamId || viewing.expiresAt <= Date.now()) throw commandError('POKE_NEEDS_SHARING', 'extension.member.needSharing');
@@ -267,7 +270,7 @@ export class TeamInteractions {
     };
     check();
     const cryptoApi = client.getCrypto(); if (!cryptoApi) throw new MessageError(uiMessage('extension.runtime.reactionNotReady'));
-    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, [target!.matrixId], session.matrix, POKE_EVENT, { id: crypto.randomUUID(), teamId, view: viewing!.view, sentAt: Date.now() }, check), 6_000));
+    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, [target!.matrixId], session.matrix, POKE_EVENT, { id: crypto.randomUUID(), teamId, view: viewing!.view, sentAt: Date.now() }, check), PING_ENCRYPTION_WAIT_MS));
     check();
     if (!Object.keys(messages).length) return { delivered: 0 };
     const result = await scope.wait(runtime.api.request('viewing.react', { body: { teamId, messages } }));

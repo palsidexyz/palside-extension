@@ -9,7 +9,7 @@ function element(tag = 'p', properties = {}) {
     get parentNode() { return this.parentElement; },
     get firstChild() { return this.children[0] ?? null; },
     get nextSibling() { return this.parentElement?.children[this.parentElement.children.indexOf(this) + 1] ?? null; },
-    private: ['form', 'input', 'button', 'textarea', 'select', 'canvas', 'iframe'].includes(tag),
+    private: ['input', 'textarea', 'select', 'canvas', 'iframe'].includes(tag),
     contains(item) { return item === this || this.children.some(child => child === item || child.contains?.(item)); },
     getAttribute(name) { return this.attributes?.[name] ?? null; },
     closest(selector) { return (selector === 'palside-page-layer' ? tag === selector : this.private) ? this : this.parentElement?.closest(selector) ?? null; },
@@ -155,7 +155,7 @@ test('native selections spanning sibling blocks restore from the same actual DOM
     node(mount(), 'alpha '); node(mount(), 'beta');
     assert.equal(locate(picked.target), undefined, 'actual whitespace is never removed to bridge words');
     document.body.children = [];
-    node(mount(), 'alpha'); node(mount('button'), 'secret', true); node(mount(), 'beta');
+    node(mount(), 'alpha'); node(mount('input'), 'secret', true); node(mount(), 'beta');
     assert.equal(locate(picked.target), undefined, 'excluded content remains a hard boundary across blocks');
   } finally { env.restore(); }
 });
@@ -174,10 +174,10 @@ test('selection preserves whitespace and excludes unrelated hidden siblings befo
   } finally { env.restore(); }
 });
 
-test('form, button, editable or hidden contents reject a selected block before reading its descendants', () => {
+test('input, editable or hidden contents reject a selected block before reading its descendants', () => {
   const env = fixture();
   try {
-    for (const tag of ['form', 'button', 'input', 'textarea', 'select', 'div']) {
+    for (const tag of ['input', 'textarea', 'select', 'div']) {
       const p = element(); const privateNode = element(tag, { private: true, parentElement: p }); p.children.push(privateNode);
       const secret = node(privateNode, 'do not read', true);
       assert.equal(selectionTarget(selection(secret, secret, p, [privateNode, secret])).item, undefined);
@@ -224,9 +224,8 @@ test('selection reports overlong and private ranges explicitly and counts Unicod
     const p = mount(); const text = node(p, '🌏'.repeat(200));
     assert.equal(selectionTarget(selection(text, text, p, [text])).item.target.exact, '🌏'.repeat(200));
     for (const name of ['trade-history', 'wallet-balance', 'positions', 'orders']) {
-      const privateNode = mount('div', { attributes: { class: name } }); const secret = node(privateNode, 'do not read', true);
-      assert.deepEqual(selectionTarget(selection(secret, secret, privateNode, [secret])), { reason: 'unavailable' });
-      assert.equal(secret.reads, 0);
+      const region = mount('div', { attributes: { class: name } }); const text = node(region, 'public text');
+      assert.equal(selectionTarget(selection(text, text, region, [text])).item.target.exact, 'public text');
     }
   } finally { env.restore(); }
 });
@@ -326,7 +325,7 @@ test('ambiguous quotes are not guessed and excluded subtrees never bridge a matc
     assert.equal(locate({ kind: 'quote', exact: 'duplicate', prefix: '', suffix: '' }), undefined);
     document.body.children = [];
     const p = mount(); node(p, 'hello');
-    node(mount('button', {}, p), 'secret', true);
+    node(mount('input', {}, p), 'secret', true);
     node(p, 'world');
     assert.equal(locate({ kind: 'quote', exact: 'helloworld', prefix: '', suffix: '' }), undefined);
   } finally { env.restore(); }
@@ -358,21 +357,17 @@ test('fresh pages locate full and abbreviated addresses, including split nodes a
   } finally { env.restore(); }
 });
 
-test('local search rejects private, hidden and sensitive-region text before reading it', () => {
+test('local search rejects excluded and hidden text before reading it', () => {
   const env = fixture();
-  const panel = element('section', { attributes: { class: 'trade-panel' } });
   try {
     const target = { kind: 'quote', exact: 'known target', prefix: '', suffix: '' };
-    for (const tag of ['form', 'input', 'textarea', 'select', 'button', 'iframe']) node(mount(tag), target.exact, true);
+    for (const tag of ['input', 'textarea', 'select', 'iframe']) node(mount(tag), target.exact, true);
     node(mount('div', { private: true }), target.exact, true);
-    node(mount('div', { attributes: { class: 'wallet-balance' } }), target.exact, true);
     for (const computedStyle of [{ display: 'none' }, { visibility: 'hidden' }, { opacity: '0' }, { contentVisibility: 'hidden' }]) node(mount('div', { computedStyle }), target.exact, true);
-    panel.parentElement = document.body; document.body.children.push(panel);
-    node(panel, target.exact, true);
     const visible = node(mount(), target.exact);
     assert.equal(locate(target).range.startContainer, visible);
     const address = '0x1234567890abcdef1234567890abcdef12345678';
-    node(mount('button'), address, true);
+    node(mount('input'), address, true);
     const publicAddress = node(mount(), address);
     assert.equal(locate({ kind: 'address', text: address }).range.startContainer, publicAddress);
   } finally { env.restore(); }

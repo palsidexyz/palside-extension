@@ -1,3 +1,4 @@
+import { DEVICE_IDLE_SECONDS } from '@palside/shared/rules/accounts';
 import { pageTeam } from '../runtime/browser/page-layer-host.ts';
 import { applyPatch,type StatePatch } from '../runtime/transport/state-patch.ts';
 import type { RuntimeState } from '../runtime/composition/runtime-state';
@@ -21,7 +22,7 @@ export function stateSync(bg: Background) {
       await bg.run({ name: 'room-panels', payload: { connected: false } });
       if (version !== replayVersion) return;
       await bg.roomTab.refresh();
-      const idle = await bg.browser.idle.queryState(60);
+      const idle = await bg.browser.idle.queryState(DEVICE_IDLE_SECONDS);
       if (version !== replayVersion) return;
       await bg.run({ name: 'device-state', payload: { state: bg.panels.size > 0 || idle === 'active' ? 'active' : 'away' } });
       if (version !== replayVersion) return;
@@ -47,10 +48,9 @@ export function stateSync(bg: Background) {
     if (sharingBefore !== bg.sharing.observationPolicy()?.key) bg.sharing.sharingPolicyChanged();
 
     const contextChanged = pageTeam(previous) !== pageTeam(next) || previous?.authenticated !== next.authenticated || previous?.account?.id !== next.account?.id || previous?.preferences.current !== next.preferences.current;
-    const interactionChanged = JSON.stringify(previous?.preferences.interaction ?? null) !== JSON.stringify(next.preferences.interaction ?? null);
-    const interacting = (state: RuntimeState | undefined) => Boolean(state?.preferences.web.interact && state.toggles.interact);
-    const roomChanged = previous?.preferences.rooms?.off !== next.preferences.rooms?.off || previous?.preferences.web.interact !== next.preferences.web.interact || previous?.rooms?.current?.key !== next.rooms?.current?.key;
-    const policyChanged = contextChanged || interactionChanged || roomChanged || interacting(previous) !== interacting(next);
+    const interactionChanged = JSON.stringify(previous?.preferences.siteInteraction ?? null) !== JSON.stringify(next.preferences.siteInteraction ?? null);
+    const roomChanged = previous?.preferences.rooms?.off !== next.preferences.rooms?.off || previous?.rooms?.current?.key !== next.rooms?.current?.key;
+    const policyChanged = contextChanged || interactionChanged || roomChanged;
     if ((interactionChanged || roomChanged) && !contextChanged) {
       void bg.danmaku.broadcastDanmakuSettings().then(bg.signals.broadcastSignals).then(() => { for (const [port, info] of bg.pages.pagePorts) void bg.stickies.pushStickies(port, info); }).catch(() => {});
     }
@@ -62,7 +62,7 @@ export function stateSync(bg: Background) {
     if (policyChanged || previous?.signals !== next.signals) void bg.signals.routeSignals(previous, next).catch(() => {});
     if (policyChanged || pageChanged) void bg.pages.pushPageStatus();
     bg.notifications.notificationState(previous, next);
-    if (contextChanged || pageChanged) void bg.roomTab.refresh();
+    if (contextChanged || pageChanged || previous?.tokens !== next.tokens) void bg.roomTab.refresh();
   }
 
   return {

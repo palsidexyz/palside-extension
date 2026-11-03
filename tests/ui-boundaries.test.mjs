@@ -8,7 +8,7 @@ import ts from "typescript";
 const root = fileURLToPath(new URL("../packages/ui/", import.meta.url));
 const source = join(root, "src");
 // Runtime dependencies allowed by docs/components/conventions.md.
-const allowed = ["react", "react-dom", "@palside/design", "motion", "lucide-react", "@radix-ui/react-slot", "clsx", "@number-flow/react"];
+const allowed = ["react", "react-dom", "@palside/design", "motion", "lucide-react", "@radix-ui/react-slot", "clsx", "@number-flow/react", "sonner"];
 
 async function files(dir) {
   const entries = await readdir(dir, { withFileTypes: true });

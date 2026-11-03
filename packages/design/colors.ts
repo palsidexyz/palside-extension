@@ -6,18 +6,18 @@ export const productColors = {
   accent: '#CCFF00', // --ui-accent
   onAccent: '#202400', // --ui-on-accent
   canvas: '#FFFFFF', // --background
-  text: '#303138', // --foreground
-  border: '#E5E5EB', // --border
-  controlSurface: '#F4F4F7', // --ui-control-surface
-  controlRecess: '#E7E8ED', // --ui-control-recess
-  solidHover: '#1D1E23', // --ui-solid-hover
+  text: '#2B2B2B', // --foreground
+  border: '#E6E6E6', // --border
+  controlSurface: '#F4F4F4', // --ui-control-surface
+  controlRecess: '#E7E7E7', // --ui-control-recess
+  solidHover: '#1A1A1A', // --ui-solid-hover
   error: '#B83B3B', // --ui-ink-error
-  darkCanvas: '#17191C', // --background, dark
-  darkText: '#ECEEF0', // --foreground, dark
-  darkTextSecondary: '#9A9EA7', // --ui-text-secondary, dark
+  darkCanvas: '#141414', // --background, dark
+  darkText: '#EDEDED', // --foreground, dark
+  darkTextSecondary: '#9E9E9E', // --ui-text-secondary, dark
   darkInkAccent: '#D0ED78', // --ui-ink-accent, dark
   inkAccent: '#4B5900', // --ui-ink-accent
-  textSecondary: '#686773', // --ui-text-secondary
+  textSecondary: '#6B6B6B', // --ui-text-secondary
   signalInk: '#E8E2CF', // --signal-ink
   signalDeep: '#0D1A19', // --signal-deep
   signalMuted: '#8F9A98', // --signal-muted

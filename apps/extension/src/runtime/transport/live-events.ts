@@ -1,3 +1,4 @@
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import { decodeContract } from '@palside/shared/contracts/validation';
 import type { EventPayload } from '@palside/shared/contracts/events';
 import type { PresenceState } from '@palside/shared/contracts/common';
@@ -17,9 +18,12 @@ type LiveEventsOptions = {
   onChain?: (event: ChainEvent) => void;
   onBanned?: (ban: { expiresAt: number | null }) => void;
   onState?: (open: boolean) => void;
+  onUnauthorized?: () => void;
 };
 
 type SseEvent = { event: string; data: string };
+
+const HEARTBEAT_MS = MINUTE_MS;
 
 export function parseSseEvents(buffer: string): { events: SseEvent[]; remainder: string } {
   const events: SseEvent[] = [];
@@ -45,8 +49,7 @@ export function connectLiveEvents(options: LiveEventsOptions): () => void {
   let stopped = false;
   let controller: AbortController | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
-  let delay = 1000;
-  const heartbeatMs = 60_000;
+  let delay = SECOND_MS;
   const retry = (wait: number) => {
     const chunk = Math.min(wait, 2_147_483_647);
     retryTimer = setTimeout(() => { if (!stopped) { if (wait > chunk) retry(wait - chunk); else void connect(); } }, chunk);
@@ -66,7 +69,7 @@ export function connectLiveEvents(options: LiveEventsOptions): () => void {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return await Promise.race([work, new Promise<never>((_, reject) => {
-          timer = setTimeout(() => { connection.abort(); reject(new Error('events heartbeat expired')); }, heartbeatMs);
+          timer = setTimeout(() => { connection.abort(); reject(new Error('events heartbeat expired')); }, HEARTBEAT_MS);
         })]);
       } finally { clearTimeout(timer); }
     };
@@ -80,7 +83,7 @@ export function connectLiveEvents(options: LiveEventsOptions): () => void {
       if (stopped) return;
       if (!response.ok) throw await alive(responseError(response));
       if (!response.body) throw new Error(`events ${response.status}`);
-      delay = 1000;
+      delay = SECOND_MS;
       options.onState?.(true);
       reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -107,14 +110,17 @@ export function connectLiveEvents(options: LiveEventsOptions): () => void {
       }
       if (!stopped) options.onState?.(false);
     } catch (error) {
-      if (error instanceof ApiError) { serverDelay = error.retryAfterMs ?? 0; if (error.status === 401) delay = 30_000; }
       if (!stopped) options.onState?.(false);
+      if (error instanceof ApiError) {
+        serverDelay = error.retryAfterMs ?? 0;
+        if (error.status === 401 && !stopped) { stopped = true; options.onUnauthorized?.(); }
+      }
     } finally {
       connection.abort();
       void reader?.cancel().catch(() => {});
       controller = undefined;
       if (!stopped) {
-        retry(Math.max(delay, serverDelay) + Math.floor(Math.random() * Math.min(delay, 1000)));
+        retry(Math.max(delay, serverDelay) + Math.floor(Math.random() * Math.min(delay, SECOND_MS)));
         delay = Math.min(delay * 2, 30_000);
       }
     }

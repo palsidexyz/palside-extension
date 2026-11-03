@@ -30,6 +30,7 @@ async function fixture(t) {
   const passthrough = ({ children }) => children;
   const Button = ({ children, onClick, disabled, leadingIcon, ...props }) => h('button', { onClick, disabled, 'aria-label': props['aria-label'] }, leadingIcon, children);
   const modules = {
+    '@palside/shared/rules/accounts': require('@palside/shared/rules/accounts'),
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => key => key },
     '@palside/i18n': { message: key => key, errorMessage: error => error.message },
@@ -122,7 +123,7 @@ for (const page of ['WalletHome', 'WalletReceive']) test(`${page} waits for clip
 
 test('every stalled-wallet retry gets a fresh six-second deadline', async t => {
   const f = await fixture(t); let requests = 0;
-  const request = () => { requests++; return new Promise(() => {}); };
+  const request = name => { if (name === 'wallet-refresh') requests++; return new Promise(() => {}); };
   const c = { live: { command: request, state: { wallet: { availability: 'loading' } } }, run: request };
   await f.render(f.WalletHome, c);
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -149,4 +150,10 @@ test('receive retry clears its error immediately and can recover after repeated 
   await act(async () => requests[2].resolve({ uri: 'ethereum:address' }));
   assert.equal(f.document.querySelector('output').textContent, 'ethereum:address');
   assert.equal(f.document.querySelector('[role="alert"]'), null);
+});
+
+test('opening the wallet checks the original payment immediately alongside refreshing the balance', async t => {
+  const f = await fixture(t), calls = [];
+  await f.render(f.WalletHome, { live: { command: async name => { calls.push(name); }, state: { wallet: { address: 'address', availability: 'ready', preferences: {} } } } });
+  assert.deepEqual(calls, ['wallet-refresh', 'wallet-reconcile']);
 });

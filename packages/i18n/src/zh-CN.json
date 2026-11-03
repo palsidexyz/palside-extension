@@ -33,7 +33,6 @@
         "not-member-at-send": "发出时你还不在小队",
         "account-too-new": "账号注册未满 24 小时",
         "stay-too-short": "停留未满 30 秒",
-        "invitation-only": "加入小队后自动领取",
         "claimed": "已领取",
         "unavailable": "红包已结束",
         "disabled": "链上功能暂未开放"
@@ -51,7 +50,6 @@
       "recoveryFailed": "已失败",
       "recoveryIndexing": "链上已确认 · 等待索引",
       "recoveryCancelled": "已取消提交",
-      "recoveryUnknown": "结果未明 · 请查询原操作",
       "recoveryReserved": "资金仍被预留。提交已取消或过期，不代表签名已无法执行，请继续查询原操作。",
       "logoutRecovery": "请先备份助记词，没有助记词将无法恢复账号和零钱。退出会清除本机草稿、缓存与密钥，但不会取消已提交的交易。使用同一账号重新登录后，请在“付款恢复”中查询原操作，再决定是否重新付款。",
       "settings": "零钱设置",
@@ -75,7 +73,6 @@
       "signing": "正在签名",
       "stageSign": "签名",
       "stageSend": "发送",
-      "stageConfirm": "上链",
       "offline": "暂时无法连接",
       "empty": "暂无记录",
       "incoming": "收入",
@@ -84,7 +81,13 @@
       "hide": "隐藏金额",
       "show": "显示金额",
       "smallPayments": "小额免密",
-      "smallLimit": "单笔不超过 250 PALS，每天不超过 1,000 PALS",
+      "smallLimit": "单笔不超过 {single} PALS，每天不超过 {daily} PALS",
+      "today": "今天 {time}",
+      "tomorrow": "明天 {time}",
+      "smallDailyLimit": "今日免密额度不足，{reset} 后可再用，也可输入密码付款",
+      "sponsorLimit": "今日免费网络费次数已用完，{reset} 后可再用",
+      "equalAmount": "金额需能平均分配，最接近的可用金额为 {amount} PALS",
+      "tipLimit": "单次打赏最多 10,000 PALS",
       "exportKey": "导出私钥",
       "exportWarning": "私钥可控制全部零钱。请妥善保存，不要发送给他人。",
       "exportExpiry": "30 秒后自动隐藏",
@@ -105,9 +108,7 @@
       "byHeat": "按热度",
       "unavailable": "暂时无法使用零钱",
       "invalidAmount": "请输入有效金额",
-      "expires": "有效期至",
       "refunded": "已退回",
-      "invitationPacket": "邀请红包",
       "transaction": "交易哈希",
       "details": "交易详情",
       "sentPacket": "发红包",
@@ -134,7 +135,6 @@
       "blessingPlaceholder": "恭喜发财，大吉大利",
       "kindRandom": "拼手气",
       "kindEqual": "普通",
-      "kindInvitation": "邀请",
       "kindRoom": "弹幕",
       "packetType": "红包类型",
       "countDown": "减少",
@@ -212,7 +212,6 @@
       "reconnect": "重新连接",
       "removeCard": "移除卡片",
       "websiteHome": "网站首页",
-      "currentPage": "当前网页",
       "openPageFailed": "无法打开页面，请重试。",
       "selectSource": "选择来源",
       "sourcePage": "来源页面",
@@ -233,6 +232,7 @@
       "imageReadFailed": "无法读取图片",
       "imageProcessFailed": "无法处理图片",
       "image": "图片",
+      "imageExpired": "图片已过期",
       "tokenCard": "代币卡片",
       "reply": "回复",
       "reportMessage": "举报消息",
@@ -244,7 +244,6 @@
       "lobby": "添加小队",
       "searchMessages": "搜索消息",
       "teamMenu": "小队菜单",
-      "sharedItems": "图片/链接/代币",
       "historyUnavailable": "这台设备无法查看部分旧消息，新消息不受影响。",
       "aboutHistory": "关于旧消息",
       "markedRead": "已标为已读",
@@ -324,6 +323,7 @@
       "imageQuote": "[图片]",
       "tokenQuote": "[代币卡片]",
       "closeNotice": "关闭提示",
+      "notices": "提示",
       "report": "举报",
       "deleteAccount": "注销账号",
       "yourNameTitle": "设置昵称",
@@ -340,6 +340,7 @@
       "searchPlaceholder": "搜索消息、代币、地址",
       "searchResults": "搜索结果",
       "recentMessages": "最近消息",
+      "historyNotLoaded": "尚未加载",
       "noSearchResults": "没有找到相关消息",
       "noSearchableMessages": "还没有可搜索的消息",
       "contentUnavailable": "暂时无法查看此内容",
@@ -349,7 +350,7 @@
       "exploreWithFriends": "小队共享在看与端到端加密聊天。",
       "version": "当前版本",
       "interactiveDemo": "交互演示",
-      "editTeam": "编辑资料",
+      "editTeam": "小队资料",
       "teamTransfer": "小队转让",
       "transferOffered": "队长想把队长身份转让给你",
       "transferWaiting": "等待对方接受转让",
@@ -480,7 +481,7 @@
       "permanentDeleteTitle": "永久注销账号？",
       "permanentDeleteDescription": "此操作无法撤销，该助记词将无法再登录。",
       "inviteLoadFailed": "暂时无法读取邀请",
-      "inviteLifetime": "24 小时内有效",
+      "inviteLifetime": "7 天内有效",
       "inviteLink": "邀请链接",
       "reading": "正在读取…",
       "expired": "已失效",
@@ -559,7 +560,7 @@
       "assetDisclaimerLabel": "关于代币名称和图标",
       "retention1": "24 小时",
       "retention7": "7 天",
-      "retention14": "14 天",
+      "retentionForever": "永久",
       "retentionShorterTitle": "缩短保留期限？",
       "stepPhrase": "助记词",
       "stepVerify": "验证",
@@ -593,8 +594,6 @@
       "turnOffInvitePasswordDescription": "关闭后，持有有效邀请链接的人可以直接加入。",
       "setInvitePasswordTitle": "设置入队口令",
       "changeInvitePasswordTitle": "修改入队口令",
-      "invitePasswordDescription": "通过邀请链接加入时需要输入。请与链接分开告知对方；已加入的成员不受影响。",
-      "invitePasswordRule": "4 位大写字母或数字，不含易混的 0 O 1 I L",
       "randomInvitePassword": "随机生成",
       "inviteSuspended": "口令错误次数过多，链接已停用",
       "manualInvitePasswordCopy": "入队口令，请手动复制",
@@ -619,7 +618,9 @@
       "teamRideSpaceship": "飞船小队",
       "teamRideCamper": "露营小队",
       "teamRideSkateboard": "滑板小队",
-      "tokenGone": "代币不可用"
+      "tokenGone": "代币不可用",
+      "unknownToken": "未识别代币",
+      "signupStillPreparing": "仍在准备，可以继续等待"
     },
     "errors": {
       "ADMIN_JOB_BUSY": "暂时无法重试此后台任务",
@@ -654,7 +655,6 @@
       "CHAIN_PACKET_INVALID": "红包个数或金额无效，请调整后再发",
       "CHAIN_PACKET_UNAVAILABLE": "暂时无法处理此红包",
       "CHAIN_PACKET_LIMIT": "当前弹幕的红包数量已达上限",
-      "CHAIN_INVITATION_UNAVAILABLE": "暂时无法创建入队红包",
       "CHAIN_EVIDENCE_INVALID": "链上交易与此次付款不符",
       "CHAIN_EVIDENCE_REUSED": "此链上交易已用于其他付款",
       "CHAIN_CONFIG_CHANGED": "付款设置已变化，请重新核对。",
@@ -683,6 +683,7 @@
       "RATE_LIMITED": "请求过于频繁，请稍后重试。",
       "LOGIN_REQUIRED": "请先登录",
       "ACCOUNT_RESTRICTED": "此账号已受限，请通过反馈渠道联系我们。",
+      "ACCOUNT_TOO_NEW": "注册满 24 小时后才能发布招募",
       "IDENTITY_CHANGED": "账号或登录关联已变化，请重新登录。",
       "INVALID_SEQUENCE": "共享状态无效",
       "STALE_VIEWING": "共享状态已被更新",
@@ -741,9 +742,11 @@
       "AUTH_REPLAYED": "签名已被使用，请重试。",
       "POW_REQUIRED": "安全校验未通过，请重试。",
       "ACCOUNT_EXISTS": "账号已存在",
+      "SIGNUP_PAUSED": "注册暂时关闭，请稍后再试。",
       "ACCOUNT_NOT_FOUND": "账号不存在或已注销",
       "DEVICE_NOT_FOUND": "设备不存在或已移除",
       "DEVICE_REVOKED": "这台设备已退出登录，请重新登录。",
+      "DEVICE_LIMIT": "登录设备已达上限，请先在已登录的设备上移除一台。",
       "INVALID_RETENTION": "请选择有效的保留期限",
       "RATE_LIMITED_SECONDS": "操作过于频繁，请 {count} 秒后重试。",
       "RATE_LIMITED_MINUTES": "操作过于频繁，请 {count} 分钟后重试。",
@@ -852,6 +855,7 @@
       "encryptionFailedTitle": "加密聊天无法启动",
       "encryptionFailedDetail": "本机加密模块未能就绪，暂时无法收发消息。请重试；如仍失败，请重新打开侧栏。",
       "connectingTitle": "正在连接聊天服务",
+      "serviceConnectingTitle": "正在连接服务",
       "connectingDetail": "正在建立连接并同步消息。草稿可继续编辑，就绪后需手动发送。",
       "removedReadonly": "已被移出小队 · 历史只读",
       "dissolvedReadonly": "小队已解散 · 历史只读",
@@ -881,6 +885,7 @@
       "loginIncomplete": "上次登录未完成，请重新输入助记词。",
       "notPalsideAccount": "这不是 Palside 账号的助记词。如果这是钱包助记词，请勿在任何地方输入。",
       "invalidMnemonic": "助记词无效，请检查拼写和顺序。",
+      "passwordLockedUntil": "密码错误次数过多，{time, date, medium} {time, time, short} 后可再试",
       "wrongPassword": "本机密码不正确",
       "identityChanged": "{name} 的加密身份发生异常变化，可能有人冒充。请通过其他渠道与对方确认。",
       "hiddenMember": "聊天中出现了不在成员列表中的用户，已停止发送消息。",
@@ -904,7 +909,6 @@
       "viewImage": "查看图片 {name}",
       "reloadImage": "重新加载图片 {name}",
       "joinTeam": "加入{name}？",
-      "relatedMessages": "{name} 相关消息",
       "viewProfile": "查看 {name} 的资料",
       "profileTitle": "{name} 的资料",
       "transferOffer": "把队长身份转让给 {name}？",
@@ -946,7 +950,7 @@
       "deviceAdded": "{date} 登录",
       "deviceRemoved": "已移除 {name}",
       "openLinkDescription": "即将打开 {host}，请核对域名。Palside 不会向你索要助记词或钱包私钥。",
-      "retentionShorterDescription": "超过 {period} 的消息会立即删除，无法恢复。",
+      "retentionShorterDescription": "超过 {period} 的消息会立即到期，所有成员都无法再查看。",
       "whichWord": "第 {number} 个单词是？",
       "mentionPerson": "提及 {name}",
       "sendPacingStatus": "{count} 条消息排队中，将自动依次发出。",
@@ -1000,9 +1004,8 @@
     "room": {
       "slow": "{seconds} 秒后可再发",
       "name": "弹幕",
-      "chip": "{name} 弹幕 · {count} 人在看",
+      "tab": "{name} 弹幕",
       "people": "在看的人",
-      "back": "回到 {name}",
       "blocked": "已屏蔽",
       "blockedNone": "无",
       "noBlocked": "没有屏蔽任何人",
@@ -1018,19 +1021,23 @@
       "reportTitle": "举报 {name} 的弹幕？",
       "reportDescription": "5 人举报后，这条弹幕对所有人折叠，也不再出现在网页上。",
       "placeholder": "发弹幕",
-      "chipCount": "弹幕 {count}",
       "watching": "{count} 人在看",
       "switch": "切换",
-      "pageOn": "在网页上显示 · 开",
-      "pageOff": "在网页上显示 · 关",
       "pageDanmaku": "在网页上显示弹幕",
       "retractTitle": "撤回这条弹幕？",
       "retractDescription": "撤回后所有人都看不到这条弹幕。",
       "speakers": "最近发言",
       "noSpeakers": "最近没人发言",
-      "pagePaused": "网页互动已关闭 · 点按前往设置"
+      "openOn": "在 {name} 打开",
+      "noToken": "打开代币页面使用弹幕",
+      "otherSite": "换个网站打开",
+      "gateTitle": "查看这个网页的弹幕",
+      "notOnPage": "网页上不显示弹幕",
+      "pageUnusable": "这个网页不能用弹幕",
+      "joinedNotice": "弹幕已开启：服务端可见你所在的代币，可在“设置 › 互动选项 › 弹幕”关闭。"
     },
     "discussion": {
+      "chat": "聊天",
       "firstShared": "<b>{name}</b> 最早分享",
       "noDiscussion": "你加入后还没人聊过",
       "team": "小队里",
@@ -1049,7 +1056,6 @@
       "syncing": "同步中",
       "open": "打开",
       "ignore": "忽略",
-      "back": "回到 {name}",
       "openDetails": "打开 {name} 详情",
       "followTitle": "跟看 {name}",
       "go": "前往",
@@ -1189,15 +1195,13 @@
     },
     "current": {
       "detail": "{name} 详情",
-      "viewers": "{names} 在看",
       "share": "发到聊天"
     },
     "sticky": {
       "placeholder": "写下内容",
-      "assetNote": "给这个代币写便利贴",
+      "assetNote": "写便利贴",
       "addComment": "添加内容",
       "loadLatest": "加载最新内容",
-      "openList": "查看便利贴 · {count}",
       "quote": "引用到聊天",
       "saved": "已贴上",
       "viewMark": "查看",
@@ -1222,16 +1226,9 @@
     },
     "web": {
       "favorites": "收藏",
+      "myFavorites": "我的收藏",
       "signal": "信号",
       "sticky": "便利贴",
-      "signalStep1": "按住 {key} 在网页上拖",
-      "signalStep2": "划到一格",
-      "signalStep3": "松开，落在那里",
-      "stickyStep1": "在网页上选中文字",
-      "stickyStep2": "点浮条上的按钮",
-      "stickyStep3": "队友打开这页看到高亮",
-      "notesHere": "本页 {count} 条",
-      "notesNone": "暂无",
       "notesOn": "{name} 的便利贴",
       "hiddenNotes": "已隐藏的便利贴",
       "showAll": "全部显示",
@@ -1271,7 +1268,13 @@
       "more": "更多",
       "save": "收藏",
       "saved": "已收藏",
-      "noFavorites": "还没有收藏"
+      "noFavorites": "还没有收藏",
+      "siteLive": "{name} · 网页互动已开启",
+      "siteOff": "{name} · 网页互动已关闭",
+      "siteNone": "这个页面不支持网页互动",
+      "siteAsking": "等待 Chrome 确认",
+      "siteLoading": "正在读取网站",
+      "pageUnusable": "这个网页不能用网页互动"
     },
     "share": {
       "revoked": "共享在看已关闭 · Chrome 权限已被移除",
@@ -1290,8 +1293,6 @@
       "preview": "显示内容",
       "tagToken": "代币",
       "notifyDenied": "Chrome 未允许通知",
-      "shareHint": "队友能看到你在看的网页",
-      "interactHint": "弹幕、信号、便利贴和引用",
       "aboutFeature": "关于{name}",
       "acceptInvites": "允许弹幕用户邀请我",
       "off": "关",
@@ -1299,9 +1300,9 @@
       "seeLocal": "只在本机",
       "groupWeb": "网页",
       "interactionOptions": "互动选项",
-      "interactOff": "网页互动已关闭",
       "roomsOff": "弹幕已关闭",
-      "onPages": "在网页上显示"
+      "onPages": "在网页上显示",
+      "permissionsReadFailed": "无法读取浏览器权限"
     },
     "sites": {
       "add": "添加网站",
@@ -1312,6 +1313,7 @@
       "addOne": "添加 {name}",
       "addMany": "添加 {count} 个网站",
       "addCustom": "添加 {host}",
+      "tokenTip": "能识别代币页：自动显示代币名称和图标，弹幕跟随该代币",
       "empty": "还没有网站",
       "allSites": "所有网站",
       "tokenData": "代币数据",
@@ -1333,26 +1335,14 @@
       "allowedAll": "已允许所有网站"
     },
     "toggle": {
-      "shareOff": "共享在看 · 已关闭",
+      "shareOff": "共享当前浏览网页的链接",
       "shareOn": "共享在看 · 已开启",
-      "shareBlocked": "共享在看 · 已开启 · 此页面不能同步",
-      "interactOff": "网页互动 · 已关闭",
-      "interactOn": "网页互动 · 已开启",
-      "interactBlocked": "网页互动 · 已开启 · {reason}",
-      "interactNeed": "网页互动 · 已开启 · {host} 未授权",
-      "interactNeedHere": "网页互动 · 已开启 · 此网站未授权"
+      "shareBlocked": "共享在看 · 已开启 · 此页不共享，换页后继续"
     },
     "grant": {
-      "unauthorized": "未授权",
-      "hostUnauthorized": "{host} · 未授权",
-      "danmaku": "看同一代币的人发的弹幕在网页上滚动",
-      "signal": "在网页上指出位置",
-      "sticky": "把网页文字贴在网页上",
       "access": "读取和更改您在 {host} 上的数据",
-      "turnOff": "关闭网页互动",
       "allow": "授权",
-      "turnOffDanmaku": "关闭网页弹幕",
-      "toolbar": "点工具栏上的 Palside 图标"
+      "turnOn": "开启"
     },
     "stance": {
       "title": "看法",
@@ -1363,17 +1353,14 @@
     },
     "hot": {
       "title": "热门",
+      "tokens": "热门代币",
       "chain": "链",
       "all": "全部",
-      "rising": "15 分钟上升",
-      "risingHint": "15 分钟内在看人数增加最多，至少 10 人在看",
-      "top": "在看最多",
-      "noneRising": "暂无",
-      "noneTop": "暂无",
       "here": "本页",
       "bull": "看多 {percent}%",
-      "rise": "+{count}",
-      "watchingShort": "人在看"
+      "riseLabel": "5 分钟内增加 {count} 人",
+      "watchingShort": "人在看",
+      "none": "暂无"
     },
     "invite": {
       "action": "邀请进小队",
@@ -1428,6 +1415,7 @@
       "perm_sites": "读取和更改网站数据",
       "perm_active": "当前标签页",
       "perm_notifications": "显示通知",
+      "perm_idle": "设备空闲状态",
       "revoke_tabs_title": "收回「读取您的浏览记录」？",
       "revoke_tabs": "共享在看会关闭。之后再打开共享在看，Chrome 不会再询问。",
       "revoke_sites_title": "收回网站授权？",
@@ -1436,6 +1424,8 @@
       "revoke_notifications": "通知会改为关闭。之后再打开通知，Chrome 不会再询问。",
       "revoke_active_title": "当前标签页",
       "revoke_active": "安装时自带，不能收回。",
+      "revoke_idle_title": "设备空闲状态",
+      "revoke_idle": "安装时自带，不能收回。",
       "feature_share": "共享在看",
       "feature_token": "代币数据",
       "feature_quote": "引用",
@@ -1444,6 +1434,7 @@
       "feature_room": "弹幕",
       "feature_shot": "截图",
       "feature_notify": "通知",
+      "feature_presence": "在线状态",
       "read": {
         "share": {
           "line": "共享在看开启时，读取当前标签页的网址、标题和网站图标，发给当前小队。",
@@ -1461,30 +1452,30 @@
           "line": "选字时读取最多 200 字、前后各最多 24 字及网址。引用先放入本机草稿，发送后才分享给当前小队。",
           "who": "当前小队成员",
           "keep": "按小队的保留期限",
-          "no": "输入框、表单"
+          "no": "输入框、可编辑区、下拉框、隐藏内容、画布、嵌入页面和 Palside 自己显示在网页上的内容"
         },
         "signal": {
-          "line": "你发信号时，读取指向的位置，队友看到后 5 秒消失。",
+          "line": "你发信号时，读取指向的位置及附近的少量文字、标签或链接地址，供队友定位到同一处；信号发送后 5 秒消失。",
           "who": "当前小队成员",
           "keep": "不保存，5 秒后消失",
-          "no": "页面画面、输入内容"
+          "no": "输入框、可编辑区、下拉框、隐藏内容、画布、嵌入页面和 Palside 自己显示在网页上的内容"
         },
         "sticky": {
           "line": "选字时读取最多 200 字、前后各最多 24 字及网址。保存便利贴时加密发给当前小队；网页便利贴在同一网址显示。",
           "who": "当前小队成员",
           "keep": "按小队的保留期限",
-          "no": "输入框、表单"
+          "no": "输入框、可编辑区、下拉框、隐藏内容、画布、嵌入页面和 Palside 自己显示在网页上的内容"
         },
         "room": {
           "line": "侧栏连接且弹幕开启时，参与会向服务提交代币标识并维持租约。关闭弹幕后不再发送续期请求；主动发送的消息仍公开保留。",
           "who": "服务可见代币、账号和设备会话；人数与消息公开。",
-          "keep": "参与租约在内存保留 40 秒，参与期间续期；每个代币最近 1000 条消息不按时间到期。",
+          "keep": "参与租约在内存保留 40 秒，参与期间续期；每个代币最近 10000 条消息不按时间到期。看法保存至改票、撤回或注销。",
           "no": "网址、其他标签页、网页内容"
         },
         "shot": {
           "line": "你按截图快捷键或点截图时，读取当前标签页的画面；框选并确认发送后才发给小队。",
           "who": "你确认发送后，当前小队成员",
-          "keep": "按小队的保留期限",
+          "keep": "按小队期限保存，发送后最长 30 天",
           "no": "其他标签页、整个屏幕"
         },
         "notify": {
@@ -1492,11 +1483,17 @@
           "who": "Chrome 与操作系统展示提醒；系统可能保留副本。",
           "keep": "本机点击记录随关闭、点击或失效清理；系统通知历史可能保留。",
           "no": "网页内容"
+        },
+        "presence": {
+          "line": "侧栏打开或最近 5 分钟内有键鼠操作时显示为活跃，否则为离开；只上报这一个状态。",
+          "who": "你所在小队的成员；业务服务",
+          "keep": "只存于服务内存，最后一次上报 40 秒后失效",
+          "no": "网页、按键内容、其他应用"
         }
       }
     },
     "newTeam": {
-      "copied": "已复制 · 24 小时有效"
+      "copied": "已复制 · 7 天有效"
     },
     "reading": {
       "origin": "原处",
@@ -1511,9 +1508,8 @@
     "start": {
       "ownedLimit": "已拥有 {count} 个小队",
       "joinedLimit": "已加入 {count} 个小队",
-      "shuffle": "换一组头像",
+      "addIntro": "添加介绍",
       "creating": "正在创建",
-      "or": "或",
       "formerTeams": "已离开的小队",
       "pasteFailed": "无法读取剪贴板，请手动粘贴",
       "clearLink": "清除链接",
@@ -1532,6 +1528,27 @@
       "dissolvedNotice": "已解散 {name}",
       "createOrJoin": "创建或加入",
       "teamCount": "{count} 个小队"
+    },
+    "header": {
+      "onlyYou": "只有你"
+    },
+    "tour": {
+      "label": "新手引导",
+      "progress": "第 {current} 步，共 {count} 步",
+      "skip": "跳过",
+      "tabsTitle": "聊天和弹幕",
+      "chat": "只有小队成员能看，消息加密",
+      "room": "每个代币的公开讨论，所有人可见",
+      "share": "打开后，队友能在顶部看到你正在看的网页；再点一次关闭。",
+      "site": "点网站图标，打开“网页互动”，弹幕、信号和便利贴就会出现在这个网站的网页上。",
+      "toolsTitle": "输入框工具",
+      "reactions": "给小队发一阵表情雨",
+      "image": "发送图片",
+      "shot": "截取网页并标注",
+      "packet": "给队友发 PALS 红包",
+      "inviteTitle": "邀请朋友",
+      "invite": "把邀请链接发给朋友，加入后一起看。",
+      "replay": "重看引导"
     }
   },
   "website": {
@@ -1565,7 +1582,7 @@
       "recordsLabel": "零钱记录：在全部、收入、支出之间筛选，点开一笔领取红包查看金额与交易",
       "discoverLabel": "发现小队：按简介和人数浏览公开招募的小队，申请加入，队长批准后加入",
       "encryptionLabel": "端到端加密：消息离开发送者时已加密，经过服务器时保持密文，只在成员设备上解密",
-      "hotLabel": "热门：15 分钟上升与在看最多两组列表，人数随在看的人实时变化",
+      "hotLabel": "热门：按弹幕在看人数实时排序，五分钟增加至少 3 人时显示上升人数",
       "installLabel": "Palside 尚未上架 Chrome 应用商店",
       "keysLabel": "钥匙不出设备：助记词遮蔽并留在本机，发出去的只有签名和公开地址",
       "sitesLabel": "网站授权：添加网站时 Chrome 只为 birdeye.so 一个网站申请权限，允许后出现在列表里",
@@ -1615,11 +1632,11 @@
       "inviteCopied": "邀请链接已复制",
       "copyAddress": "请复制浏览器地址栏中的完整链接",
       "copyInvite": "复制邀请链接",
-      "sharingPrivacy": "共享在看只在你开启后、只向当前小队同步前台标签：代币页显示代币，其他网站只显示站名。主动分享的网页卡片、引用和截图先进入草稿，由你确认发送。聊天、附件和在看状态由客户端使用 Matrix 端到端加密。",
+      "sharingPrivacy": "共享在看只在你开启后、只向当前小队同步前台标签：代币页显示代币，其他网页显示标题和链接（去掉追踪参数；带登录凭证的链接只显示站名）。主动分享的网页卡片、引用和截图先进入草稿，由你确认发送。聊天、附件和在看状态由客户端使用 Matrix 端到端加密。",
       "lookupPrivacy": "代币名称和 Logo 只在你已授权、且开启了代币数据的网站上，从页面公开区域读取；否则显示合约缩写和默认图标。接收端在本地校验代币资料，并可直接加载限定公开图床中的 Logo；加载失败使用默认图标，不由 Palside 服务器代取。图床可见图片请求和连接 IP，图片请求不附带页面来源地址。",
-      "retentionPrivacy": "消息从原始发送起，按队长设定的期限保留（1、7、14 或 30 天，默认 30 天）；草稿保留 7 天，未发送消息保留 24 小时。退出登录会清除本机缓存、草稿和解密密钥，重新登录可能无法查看旧历史。截图原图与编辑过程在本机处理，不上传。",
+      "retentionPrivacy": "消息从原始发送起，按队长设定的期限保留（1、7 或 30 天，或永久，默认永久；图片最长 30 天）；草稿保留 7 天，未发送消息保留 24 小时。退出登录会清除本机缓存、草稿和解密密钥，重新登录可能无法查看旧历史。截图原图与编辑过程在本机处理，不上传。",
       "submissionsHeading": "用户主动提交",
-      "submissionsPrivacy": "举报只包含你预览并确认的内容，审核人员可以查看；首次查看私密举报内容会记录审计。招募期间会公开小队名称、简介、头像、队长昵称和头像，以及等级与热度名次。链上交易的地址、金额和交易哈希公开且无法删除；服务保存钱包身份绑定、订单和恢复记录，Alchemy 与 RPC 服务处理签名交易，但不会收到私钥。等级与热度只统计活动事件及日聚合数据，网络地址使用按小队和日期隔离的摘要，不读取加密聊天正文。",
+      "submissionsPrivacy": "举报只包含你预览并确认的内容，审核人员可以查看；首次查看私密举报内容会记录审计。招募期间会公开小队名称、简介、头像、队长昵称和头像，以及等级与热度名次。链上交易的地址、金额和交易哈希公开且无法删除；服务保存钱包身份绑定、订单和恢复记录，Alchemy 与 RPC 服务处理签名交易，但不会收到私钥。等级与热度只统计活动事件及日聚合数据，网络地址使用按小队和日期隔离的摘要，不读取加密聊天正文。 注销删除钱包绑定和举报人关联；未完成链上订单先对账，完成后去掉账号关联，只留金额和交易哈希。账号只保留公钥和注销时间，同一助记词可重新注册。活动 IP 摘要保留最近 30 个完整 UTC 日和当日。",
       "scopeHeading": "当前交付范围",
       "scopePrivacy": "Palside 尚未上架 Chrome 应用商店。网页演示使用样例数据，与真实扩展服务分开，不作为安全或上线验收证明。",
       "permissionsEncryption": "权限与加密",
@@ -1688,7 +1705,7 @@
       },
       "privacy": {
         "question": "队友能看到我在浏览什么吗？",
-        "answer": "开启共享在看后，只分享当前标签页的代币或网站名称，不会自动分享网页内容、屏幕或页面操作。引用与截图仅在你主动选择并发送后分享。共享在看可随时关闭。"
+        "answer": "开启共享在看后，只分享当前标签页的代币，或网页标题和链接；带登录凭证的链接只分享站名。不会自动分享网页内容、屏幕或页面操作。引用与截图仅在你主动选择并发送后分享。共享在看可随时关闭。"
       },
       "permissions": {
         "question": "Palside 需要哪些浏览器权限？",
@@ -1719,12 +1736,12 @@
       "permissionsSummary": "安装时不申请任何网站权限，可选权限在你第一次开启对应功能时由 Chrome 询问。",
       "encryptionSummary": "聊天、附件与在看内容由获准的小队成员解密。",
       "retention": "数据保留",
-      "retentionSummary": "消息保留 1、7、14 或 30 天，由队长选择。",
+      "retentionSummary": "消息保留 1、7 或 30 天，或永久，由队长选择，默认永久；图片从发送起最长 30 天，之后显示“图片已过期”。",
       "screenshots": "本地截图处理",
       "screenshotsSummary": "原图与编辑留在本机，确认发送后才分享成图。",
       "screenshotsDetail": "裁剪与标注在你的设备上完成。大窗编辑会话可能在扩展后台内存暂留原图，取消、退出账号或后台重启会清除；过期会话在后续访问时清理。加入草稿不等于发送。主动发送后的成图按普通加密图片消息处理，不附原图、图层或被裁剪内容。",
       "metadataDetail": "端到端加密不隐藏所有元数据。服务仍处理必要的账号、成员关系、连接时间与 IP 信息；招募资料及你主动确认的举报内容不属于私密聊天。",
-      "retentionDetail": "必要错误与防滥用记录最多保留 7 天。举报结案后最多保留 30 天，未结案最多 90 天。不提供服务器备份；无法强制收回其他成员已保存的截图或副本。",
+      "retentionDetail": "到期后立即停止访问，相关元数据最多 7 天内清除。本机内容缓存最多 300 MiB，离队小队最多保留至离队后 30 天。运行日志最多 7 天。举报证据未结案最多 90 天、结案后最多 30 天；举报记录与案件结案满 1 年删除。处罚生效期间保留，结束满 1 年删除；永久封禁一直保留。运营审计保留 1 年，运营幂等记录 7 天，纯计数统计永久保存。不提供服务器备份；无法强制收回其他成员保存的副本。",
       "publicSummary": "招募资料公开展示；举报只提交你确认的内容。",
       "availabilitySummary": "目前处于开发验收阶段，尚未公开运营。",
       "updated": "最后更新：2026 年 10 月 29 日",
@@ -1745,7 +1762,7 @@
       "canTitle": "Palside 会做的事",
       "canChat": "在你的设备上加密和解密聊天",
       "canCapture": "在你操作时截图、分享网页和引用网页内容",
-      "canShare": "你开启共享在看后，向小队同步正在看的代币或站名",
+      "canShare": "你开启共享在看后，向小队同步正在看的代币，或网页标题和链接",
       "canNotify": "你开启后，用桌面通知提醒新消息",
       "lobbyPlaceholder": "搜索小队名称或简介",
       "unavailableLead": "服务暂时没有响应，请稍后重试。",
@@ -1787,7 +1804,7 @@
       "dataMessagesTitle": "聊天消息",
       "dataMessages": "小队消息在你的设备上加密，服务端只保存密文；弹幕公开。",
       "dataBrowsingTitle": "浏览信息",
-      "dataBrowsing": "只在你开启共享在看时，把前台标签的代币或站名加密发给小队，不保存历史。",
+      "dataBrowsing": "只在你开启共享在看时，把前台标签的代币或网页标题和链接加密发给小队，不保存历史。",
       "dataPageTitle": "网页内容",
       "dataPage": "你选中引用或贴成便利贴的文字、你确认发送的截图、代币页上公开的名称和图标。",
       "dataActionsTitle": "网页操作",
@@ -1795,10 +1812,10 @@
       "dataTransactionsTitle": "交易信息",
       "dataTransactions": "零钱的公开地址、转账、红包、打赏订单和链上状态。链上记录公开且无法删除。",
       "dataNetworkTitle": "网络信息",
-      "dataNetwork": "服务端处理连接 IP，防滥用记录最多保留 7 天。",
+      "dataNetwork": "服务端处理连接 IP；必要错误记录最多 7 天，防滥用计数在内存或最多 1 天。小队活动 IP 摘要保留最近 30 个完整 UTC 日和当日。",
       "danmakuTitle": "弹幕",
       "danmakuSummary": "弹幕是公开内容，不加密。",
-      "danmakuDetail": "你发的弹幕、昵称和头像，所有看同一代币的人都能看到；服务端保存弹幕正文、作者和代币，每个代币保留最近 1000 条。看法的结果公开。服务端知道你参与了哪些代币的弹幕，但不接收页面网址，也不形成浏览记录。",
+      "danmakuDetail": "你发的弹幕、昵称和头像公开可见。服务端保存正文、作者与代币，每个代币保留最近 10000 条，不按时间到期；看法保存至改票、撤回或注销。服务端知道你参与哪个代币的弹幕，不接收页面网址，不形成持久浏览轨迹。热门只统计开着弹幕的账号，不统计小队共享在看。",
       "thirdPartiesTitle": "第三方服务与数据用途",
       "thirdPartiesSummary": "数据只用于提供本页所述的功能。",
       "thirdPartiesDetail": "Palside 不出售用户数据，不用于广告，也不用于判断信用或发放贷款。小队聊天使用 Palside 自己运营的 Matrix 服务。",
@@ -1890,7 +1907,7 @@
       "hot": {
         "label": "热门",
         "title": "追踪注意力流向",
-        "description": "基于实时在看人数，识别 15 分钟内升温最快的代币。"
+        "description": "按弹幕在看人数实时排序，五分钟增加至少 3 人时显示“↑N”。"
       },
       "discover": {
         "title": "找到同频的交易者",
@@ -1963,7 +1980,7 @@
         },
         "packet": {
           "who": "发出时的小队成员；金额和地址链上公开",
-          "keep": "24 小时有效，未领部分退回",
+          "keep": "24 小时内可抢，截止约 2 小时后退回未领部分",
           "no": "网页内容；从不签无限授权"
         }
       },

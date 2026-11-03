@@ -1,8 +1,9 @@
+import { DAY_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { teamUnreadCounts, unreadMentions } from '../apps/extension/src/domain/chat/unread-mentions.ts';
 
-const now = 20 * 86_400_000;
+const now = 20 * DAY_MS;
 const message = (id, patch = {}) => ({ id, teamId: 'team', author: 'friend', status: 'sent', text: '', time: '12:00', timestamp: now - 10, expiresAt: now + 100, ...patch });
 
 test('unread mentions exclude own, read, recalled, removed, expired and unsent messages', () => {

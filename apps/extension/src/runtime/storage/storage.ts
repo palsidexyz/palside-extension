@@ -1,8 +1,9 @@
+import { MIB, DAY_MS } from '@palside/shared/units';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 /** IndexedDB transactions own all durable client writes; UI state is not the store. */
 export type StoredRow<T = unknown> = { key: string; account: string; kind: string; value: T; updatedAt: number; expiresAt?: number; bytes?: number };
 export type CacheEntry = { id: string; value: unknown; expiresAt: number };
-const CACHE_BYTES = 100 * 1024 * 1024;
+const CACHE_BYTES = 300 * MIB;
 const sizeOf = (value: unknown) => value instanceof Blob ? value.size : new TextEncoder().encode(JSON.stringify(value)).length;
 export type RevisionedDraft<T> = { revision: number; value: T; updatedAt: number };
 export class DraftConflictError<T> extends MessageError {
@@ -118,7 +119,7 @@ export class ClientStorage {
         const current = row && (!row.expiresAt || row.expiresAt > Date.now()) ? row.value : { revision: 0, value: empty, updatedAt: 0 };
         if (current.revision !== expectedRevision) { fail(new DraftConflictError(current)); return; }
         const now = Date.now(); const next = { revision: current.revision + 1, value: { ...current.value, ...patch }, updatedAt: now };
-        store.put({ key, account, kind: 'draft', value: next, updatedAt: now, expiresAt: now + 7 * 86_400_000 } satisfies StoredRow<RevisionedDraft<T>>); done(next);
+        store.put({ key, account, kind: 'draft', value: next, updatedAt: now, expiresAt: now + 7 * DAY_MS } satisfies StoredRow<RevisionedDraft<T>>); done(next);
       };
     });
   }
@@ -129,7 +130,7 @@ export class ClientStorage {
         const row = request.result as StoredRow<RevisionedDraft<object>> | undefined;
         if (row?.value.revision === revision) {
           const now = Date.now();
-          store.put({ key, account, kind: 'draft', value: { revision: revision + 1, value: empty, updatedAt: now }, updatedAt: now, expiresAt: now + 7 * 86_400_000 });
+          store.put({ key, account, kind: 'draft', value: { revision: revision + 1, value: empty, updatedAt: now }, updatedAt: now, expiresAt: now + 7 * DAY_MS });
           done(true);
         } else done(false);
       };

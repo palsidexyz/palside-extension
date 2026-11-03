@@ -1,30 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultInteraction, interactionAllows, readFavorites, readInteraction } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { defaultSiteInteraction, siteAllows, siteDraws, siteInteraction, readFavorites, readSiteInteractions } from '../apps/extension/src/domain/annotations/interaction.ts';
 
-test('网页互动 preferences fill missing features and reject anything else', () => {
-  assert.deepEqual(readInteraction({}), defaultInteraction);
-  assert.deepEqual(readInteraction({ signal: false }), { signal: false, sticky: true });
-  assert.equal(readInteraction({ unknownField: 'yes' }), undefined);
-  assert.equal(readInteraction({ unknownField: false }), undefined, 'unknown fields are rejected');
-  assert.equal(readInteraction({ unknownField: true, signal: true, sticky: true }), undefined);
-  assert.equal(readInteraction({ danmaku: true }), undefined, 'public room display is not an interaction feature');
-  assert.equal(readInteraction({ sticky: 'no' }), undefined);
-  assert.equal(readInteraction({ ping: true }), undefined);
-  assert.equal(readInteraction([]), undefined);
+test('per-site interaction preferences fill defaults, normalize hosts, and reject invalid settings', () => {
+  assert.deepEqual(readSiteInteractions({}), {});
+  assert.deepEqual(readSiteInteractions({ 'GMGN.ai': { signal: false } }), { 'gmgn.ai': { ...defaultSiteInteraction, signal: false } });
+  for (const input of [null, [], { 'localhost': { on: true } }, { 'example.com': { unknown: true } }, { 'example.com': { danmaku: 'yes' } }]) assert.equal(readSiteInteractions(input), undefined);
 });
 
-test('互动选项: each feature has its own switch, and 网页互动 has something to draw only while one is on', () => {
-  const off = { signal: false, sticky: false };
-  assert.equal(interactionAllows(off), false);
-  for (const feature of ['signal', 'sticky']) {
-    assert.equal(interactionAllows(off, feature), false, feature);
-    assert.equal(interactionAllows({ ...off, [feature]: true }, feature), true, feature);
-    assert.equal(interactionAllows({ ...off, [feature]: true }), true, feature);
-  }
-  assert.equal(interactionAllows({ signal: true, sticky: false }, 'sticky'), false);
-  assert.equal(interactionAllows(undefined), true);
-  assert.equal(interactionAllows(undefined, 'signal'), true);
+test('site interaction controls each page feature and draws only squad annotations', () => {
+  const sites = { 'example.com': { ...defaultSiteInteraction, on: false }, 'gmgn.ai': { ...defaultSiteInteraction, signal: false, sticky: false } };
+  assert.deepEqual(siteInteraction(sites, 'missing.example'), defaultSiteInteraction);
+  assert.equal(siteAllows(undefined, 'example.com'), true);
+  assert.equal(siteAllows(sites, 'example.com'), false);
+  assert.equal(siteDraws(sites, 'example.com'), false);
+  assert.equal(siteDraws(sites, 'gmgn.ai'), false);
+  assert.equal(siteAllows(sites, 'gmgn.ai', 'danmaku'), true);
+  assert.equal(siteDraws(undefined, 'missing.example'), true);
 });
 
 test('favorites keep exact hosts and page scopes, deduplicated and bounded', () => {
@@ -36,4 +28,13 @@ test('favorites keep exact hosts and page scopes, deduplicated and bounded', () 
   assert.equal(readFavorites({ sites: [], pages: [{ url: 'chrome://settings', title: 'x' }] }), undefined);
   assert.equal(readFavorites({ sites: Array.from({ length: 201 }, (_, i) => `s${i}.example.com`), pages: [] }), undefined);
   assert.equal(readFavorites({ sites: [], pages: [], extra: 1 }), undefined);
+});
+
+
+test('favorite titles count graphemes including composed emoji and combining marks', () => {
+  for (const grapheme of ['👨‍👩‍👧‍👦', 'e\u0301', '🇹🇼']) {
+    const title = grapheme.repeat(200);
+    assert.equal(readFavorites({ sites: [], pages: [{ url: 'https://example.com/', title }] }).pages[0].title, title);
+    assert.equal(readFavorites({ sites: [], pages: [{ url: 'https://example.com/', title: title + grapheme }] }), undefined);
+  }
 });

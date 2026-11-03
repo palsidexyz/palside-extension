@@ -1,5 +1,6 @@
-export function deviceLabel(navigatorLike: { userAgentData?: { platform?: string }; platform?: string } = globalThis.navigator): string {
-  const value = navigatorLike.userAgentData?.platform || navigatorLike.platform || '';
-  const platform = /mac/i.test(value) ? 'macOS' : /win/i.test(value) ? 'Windows' : /cros|chrome ?os/i.test(value) ? 'ChromeOS' : /linux/i.test(value) ? 'Linux' : '';
+import { browserPlatform, type PlatformNavigator } from '../browser/platform.ts';
+
+export function deviceLabel(navigatorLike: PlatformNavigator | undefined = globalThis.navigator): string {
+  const platform = browserPlatform(navigatorLike);
   return platform ? `${platform} · Chrome` : 'Chrome';
 }

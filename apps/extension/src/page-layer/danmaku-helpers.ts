@@ -1,3 +1,4 @@
+import { SECOND_MS } from '@palside/shared/units';
 import type { DanmakuArea } from '../runtime/browser/page-protocol';
 export type { DanmakuArea, DanmakuSpeed, DanmakuSize, DanmakuSettings } from '../runtime/browser/page-protocol';
 
@@ -19,7 +20,7 @@ export function createMediaClock(): MediaClock {
       frame = 0;
       return;
     }
-    if (!clock.paused) clock.currentTime += Math.max(0, now - previous) / 1000 * clock.playbackRate;
+    if (!clock.paused) clock.currentTime += Math.max(0, now - previous) / SECOND_MS * clock.playbackRate;
     previous = now;
     frame = requestAnimationFrame(tick);
   };

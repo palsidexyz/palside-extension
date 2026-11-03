@@ -1,8 +1,8 @@
 'use client';
-import { message as uiMessage } from '@palside/i18n';
+import { errorMessage, message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useState } from 'react';
-import { Check, ClipboardCopy, Code, FileText, Globe, ShieldCheck, Tag } from 'lucide-react';
+import { Check, ClipboardCopy, Code, FileText, Globe, ShieldCheck, Signpost, Tag } from 'lucide-react';
 import { browser } from 'wxt/browser';
 import { PUBLIC_LINKS } from '@palside/shared/public-links';
 import { Brand } from '../ui/brand';
@@ -38,6 +38,16 @@ export function About({ c }: { c: PalsideController }) {
       c.setNotice(uiMessage('extension.copy.copyFailed'));
     }
   }
+  // 重看引导 clears the saved flag and returns to the chat, where the tour starts again.
+  async function replayTour() {
+    if (!live) return;
+    try {
+      await live.command('preferences', { accountId: c.data.self, toured: false });
+      c.go('chat');
+    } catch (error) {
+      c.setNotice(error instanceof Error ? errorMessage(error) : uiMessage('common.error'));
+    }
+  }
   const links = [['', t('extension.copy.aboutWebsite'), <Globe key="" size={16} />], ['/privacy', t('extension.copy.aboutPrivacy'), <ShieldCheck key="" size={16} />], ['/terms', t('extension.copy.aboutTerms'), <FileText key="" size={16} />]] as const;
   return <>
     <div className={s.aboutHero}><Brand /><p>{t('extension.copy.exploreWithFriends')}</p></div>
@@ -46,6 +56,7 @@ export function About({ c }: { c: PalsideController }) {
     </SettingGroup>
     {live && <SettingGroup>
       <SettingItem icon={copied ? <Check size={16} /> : <ClipboardCopy size={16} />} title={copied ? t('extension.copy.copied') : t('extension.center.diagnostics')} end={null} onClick={() => void copyDiagnostics()} />
+      <SettingItem icon={<Signpost size={16} />} title={t('extension.tour.replay')} onClick={() => void replayTour()} />
     </SettingGroup>}
     <SettingGroup>
       {website && links.map(([path, label, icon]) => <SettingItem key={path} icon={icon} title={label} href={`${website}${path}`} />)}

@@ -52,7 +52,7 @@ test('IPC validates known commands and their payloads before dispatch', async ()
 test('lobby IPC accepts optional search and discovery sort with the HTTP query constraints', async () => {
   const { parseCommand } = await import('../apps/extension/src/runtime/transport/command-map.ts');
   const { endpointsById } = await import('../packages/shared/src/contracts/endpoints.ts');
-  const { LOBBY_SEARCH_LENGTH } = await import('../packages/shared/src/contracts/limits.ts');
+  const { LOBBY_SEARCH_LENGTH } = await import('../packages/shared/src/rules/teams.ts');
   assert.deepEqual(parseCommand({ name: 'lobby' }), { name: 'lobby', payload: {} });
   for (const payload of [{}, { q: '' }, { sort: 'heat' }, { q: '小队 & %_', sort: 'latest' }, { q: 'x'.repeat(LOBBY_SEARCH_LENGTH) }]) {
     assert.deepEqual(parseCommand({ name: 'lobby', payload }).payload, decodeContract(endpointsById['teams.lobby'].query, payload));

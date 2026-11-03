@@ -15,17 +15,19 @@
     "./contracts/*": "./src/contracts/*.ts",
     "./chain/*": "./src/chain/*.ts",
     "./team-activity": "./src/team-activity.ts",
-    "./team-activity-rules": "./src/team-activity-rules.ts",
     "./navigation": "./src/navigation.ts",
     "./sites": "./src/sites/index.ts",
     "./identity": "./src/identity.ts",
     "./extension": "./src/extension.ts",
+    "./extension-policy": "./src/extension-policy.ts",
     "./public-links": "./src/public-links.ts",
     "./team-avatars": "./src/team-avatars.ts",
     "./person-avatars": "./src/person-avatars.ts",
     "./signals": "./src/signals.ts",
     "./signal-art": "./src/signal-art/index.ts",
-    "./models/*": "./src/models/*.ts"
+    "./models/*": "./src/models/*.ts",
+    "./units": "./src/units.ts",
+    "./rules/*": "./src/rules/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

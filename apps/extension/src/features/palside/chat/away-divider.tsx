@@ -8,6 +8,9 @@ import { CountText } from '../ui/motion-details';
 import { Token } from '../ui/primitives';
 import type { PalsideController } from '../app/use-palside';
 import s from './away-divider.module.css';
+import { expired } from '../../../domain/chat/expiry.ts';
+import { tokenLabel } from '../assets/token-name';
+import { liveView } from '../assets/token-data';
 
 type Away = { teamId: string; first?: string; views: Viewing[] };
 
@@ -18,8 +21,8 @@ export function useAway(c: PalsideController): Away {
     if (!c.team.unread) return { teamId: c.current, views: [] };
     const ids = c.live?.state.remoteTeams.find(team => team.id === c.current)?.preferences.readIds ?? [];
     const read = new Set(ids);
-    const unread = c.currentMessages.filter(message => !message.recalled && message.status === 'sent' && message.author !== self && !read.has(message.id) && (message.expiresAt === undefined || message.expiresAt > c.now));
-    const views = [...new Map(unread.map(message => assetView(message.attachment)).filter(view => view?.kind === 'asset').map(view => [viewAsset(view) ?? view!.id, view!])).values()];
+    const unread = c.currentMessages.filter(message => !message.recalled && message.status === 'sent' && message.author !== self && !read.has(message.id) && !expired(message.expiresAt, c.now));
+    const views = [...new Map(unread.map(message => { const view = assetView(message.attachment); return view && liveView(c, view); }).filter(view => view?.kind === 'asset').map(view => [viewAsset(view) ?? view!.id, view!])).values()];
     return { teamId: c.current, first: views.length ? unread[0]?.id : undefined, views };
   };
   const [away, setAway] = useState(compute);
@@ -32,6 +35,6 @@ export function AwayDivider({ c, views }: { c: PalsideController; views: Viewing
   const t = useTranslations();
   return <div className={s.divider} role="separator">
     <span><CountText text={t('extension.top.awayTitle', { count: views.length })} value={views.length} /></span>
-    <span className={s.tokens}>{views.slice(0, 3).map(view => <Tooltip key={view.id} content={view.name}><button type="button" className={s.token} aria-label={t('extension.top.openDetails', { name: view.name })} onClick={() => c.selectAsset(view.id)}><Token view={view} size="sm" /></button></Tooltip>)}{views.length > 3 && <small>+{views.length - 3}</small>}</span>
+    <span className={s.tokens}>{views.slice(0, 3).map(view => <Tooltip key={view.id} content={tokenLabel(view, t)}><button type="button" className={s.token} aria-label={t('extension.top.openDetails', { name: tokenLabel(view, t) })} onClick={() => c.selectAsset(view.id)}><Token view={view} size="sm" /></button></Tooltip>)}{views.length > 3 && <small>+{views.length - 3}</small>}</span>
   </div>;
 }

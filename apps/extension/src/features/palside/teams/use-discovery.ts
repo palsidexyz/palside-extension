@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PanelState } from '../app/use-panel-state';
 
 type LobbyFilters = { query: string; sort: 'heat' | 'latest'; tab: 'recruiting' | 'applications' };
+type LobbyList = 'teams' | 'applications';
+const noMore = { teams: false, applications: false };
 
 export function useDiscovery(state: PanelState) {
   const { view: { live }, setLobbyLoading, setLobbyError } = state;
@@ -12,13 +14,22 @@ export function useDiscovery(state: PanelState) {
   const request = useRef({ version: 0 });
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const active = useRef(true);
+  // Pages of 50 load as the list scrolls; a new search or sort starts again from the first page.
+  const [lobbyMore, setLobbyMore] = useState<Record<LobbyList, boolean>>(noMore);
+  const [lobbyLoadingMore, setLobbyLoadingMore] = useState(false);
+  // A failed page waits for an explicit retry instead of re-requesting while the sentinel stays in view.
+  const [lobbyMoreFailed, setLobbyMoreFailed] = useState(false);
+  const loadingMore = useRef(false);
   const refreshLobby = useCallback(async () => {
     clearTimeout(timer.current);
     if (!command || !active.current) return;
     const version = ++request.current.version;
     const { query, sort, tab } = filters.current;
     setLobbyLoading(true); setLobbyError('');
-    try { await command('lobby', { q: tab === 'applications' ? '' : query, sort }); }
+    try {
+      const paging = await command('lobby', { q: tab === 'applications' ? '' : query, sort });
+      if (active.current && version === request.current.version) { setLobbyMore(paging?.hasMore ?? noMore); setLobbyMoreFailed(false); }
+    }
     catch (failure) { if (active.current && version === request.current.version) setLobbyError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.teamsUnavailable')); }
     finally { if (active.current && version === request.current.version) setLobbyLoading(false); }
   }, [command, setLobbyLoading, setLobbyError]);
@@ -38,7 +49,17 @@ export function useDiscovery(state: PanelState) {
       timer.current = setTimeout(() => { void refreshLobby(); }, filters.current.query ? 200 : 0);
     }
   }
-  return { refreshLobby, lobbyFilters, updateLobbyFilters };
+  const loadMoreLobby = useCallback(async (list: LobbyList) => {
+    if (!command || loadingMore.current || !lobbyMore[list]) return;
+    const version = request.current.version;
+    loadingMore.current = true; setLobbyLoadingMore(true);
+    try {
+      const paging = await command('lobby-more', { list });
+      if (active.current && version === request.current.version) { setLobbyMore(paging?.hasMore ?? noMore); setLobbyMoreFailed(false); }
+    } catch { if (active.current && version === request.current.version) setLobbyMoreFailed(true); }
+    finally { loadingMore.current = false; if (active.current) setLobbyLoadingMore(false); }
+  }, [command, lobbyMore]);
+  return { refreshLobby, lobbyFilters, updateLobbyFilters, lobbyMore, lobbyLoadingMore, lobbyMoreFailed, loadMoreLobby };
 }
 
 export type DiscoveryActions = ReturnType<typeof useDiscovery>;

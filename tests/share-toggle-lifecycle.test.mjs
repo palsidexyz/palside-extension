@@ -10,7 +10,7 @@ const code = ts.transpileModule(readFileSync(file, 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 
-// Run the complete component with a deterministic hook/element host; no browser or network is required.
+// Run the page sheet's 共享在看 hook with a deterministic hook host; no browser or network is required.
 function fixture() {
   const hooks = [];
   let cursor = 0;
@@ -23,6 +23,11 @@ function fixture() {
   const modules = {
     react: {
       useRef(value) { const index = cursor++; return hooks[index] ??= { current: value }; },
+      useState(value) {
+        const index = cursor++;
+        hooks[index] ??= { value };
+        return [hooks[index].value, next => { hooks[index].value = typeof next === 'function' ? next(hooks[index].value) : next; }];
+      },
       useLayoutEffect(effect, deps) {
         const index = cursor++;
         const previous = hooks[index];
@@ -34,11 +39,11 @@ function fixture() {
         }
       },
     },
-    'react/jsx-runtime': { jsx: (type, props) => ({ type, props }) },
+    'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }), Fragment: 'fragment' },
     '@palside/i18n': { message: key => key },
+    '@palside/ui/tooltip': { Tooltip: 'tooltip' },
     'use-intl': { useTranslations: () => key => key },
     'lucide-react': {},
-    '@palside/ui/tooltip': { Tooltip: 'tooltip' },
     '../../../runtime/browser/permissions': {
       requestTabs() {
         assert.equal(clicking, true, 'permission request starts inside the click');
@@ -49,7 +54,7 @@ function fixture() {
     '../ui/icons': { ShareIcon: 'share-icon' },
     '../annotations/social-state': {},
     '../settings/use-grants': { useGrants: () => ({ tabs }) },
-    './page-toggles.module.css': { default: {} },
+    './page-toggles.module.css': { default: { toggle: 'toggle', key: 'key', center: 'center', waveInner: 'wave-inner', waveOuter: 'wave-outer', knock: 'knock', slash: 'slash', ban: 'ban' } },
   };
   const exports = {};
   vm.runInNewContext(code, { exports, require(name) {
@@ -57,8 +62,8 @@ function fixture() {
     return modules[name];
   } }, { filename: file });
   let c = {
-    data: { self: 'account-a' }, current: 'squad-a', web: { share: true }, canWrite: true,
-    live: { state: { account: { id: 'account-a' } } }, toggles: { share: false }, now: 0,
+    data: { self: 'account-a' }, current: 'squad-a', share: false, canWrite: true,
+    live: { state: { account: { id: 'account-a' } } }, now: 0,
     toggle: (...args) => { calls.push(args); return Promise.resolve(); },
     setNotice: notice => notices.push(notice),
   };
@@ -76,6 +81,7 @@ function fixture() {
     click() {
       clicking = true;
       try { tree.props.children.props.onClick(); } finally { clicking = false; }
+      render();
     },
     unmount() { for (const hook of hooks) hook.cleanup?.(); },
     async settle(index, allowed = true) { requests[index].resolve(allowed); await Promise.resolve(); },
@@ -87,7 +93,6 @@ for (const [name, patch] of [
   ['account change', { data: { self: 'account-b' }, live: { state: { account: { id: 'account-b' } } } }],
   ['account termination', { live: { state: {} } }],
   ['loss of write access', { canWrite: false }],
-  ['sharing disabled in settings', { web: { share: false } }],
 ]) test(`approval after ${name} cannot enable sharing`, async () => {
   const f = fixture();
   f.click();
@@ -113,20 +118,19 @@ test('approval after unmount cannot enable sharing', async () => {
   assert.deepEqual(f.calls, []);
 });
 
-test('a newer permission request supersedes the older click', async () => {
+test('a repeated click while permission is pending does not request tabs twice', async () => {
   const f = fixture();
   f.click();
   f.click();
+  assert.equal(f.requests.length, 1);
   await f.settle(0);
-  assert.deepEqual(f.calls, []);
-  await f.settle(1);
   assert.deepEqual(f.calls, [['share', true]]);
 });
 
 test('an off toggle supersedes pending approval', async () => {
   const f = fixture();
   f.click();
-  f.render({ toggles: { share: true } });
+  f.render({ share: true });
   f.click();
   await f.settle(0);
   assert.deepEqual(f.calls, [['share', false]]);
@@ -147,7 +151,7 @@ test('denial leaves sharing off', async () => {
   f.click();
   await f.settle(0, false);
   assert.deepEqual(f.calls, []);
-  assert.deepEqual(f.notices, []);
+  assert.deepEqual(f.notices, ['extension.share.blockedByChrome']);
 });
 
 test('permission errors report only to their initiating context', async () => {

@@ -1,11 +1,13 @@
 'use client';
-import { AVATAR_BYTES, IMAGE_MIME_TYPES, INVITE_PASSWORD_LENGTH, TEAM_DESCRIPTION_LENGTH, TEAM_JOINED_LIMIT, TEAM_MEMBER_LIMIT, TEAM_NAME_LENGTH, TEAM_OWNED_LIMIT } from '@palside/shared/contracts/limits';
+import { MINUTE_MS } from '@palside/shared/units';
+import { AVATAR_BYTES, IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
+import { INVITE_PASSWORD_LENGTH, TEAM_DESCRIPTION_LENGTH, TEAM_JOINED_LIMIT, TEAM_MEMBER_LIMIT, TEAM_NAME_LENGTH, TEAM_OWNED_LIMIT } from '@palside/shared/rules/teams';
 import { normalizeInvitePassword } from '@palside/shared/contracts/rules';
 import { deadlineTime, errorMessage, localeOrEnglish, message as uiMessage } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
-import { Ban, Camera, ChevronRight, ClipboardPaste, Compass, History, Link2, MoreHorizontal, Settings2, Shuffle, Trash2, UsersRound, X } from 'lucide-react';
+import { Ban, Camera, ChevronRight, ClipboardPaste, Compass, History, Link2, MoreHorizontal, Plus, Settings2, Trash2, UsersRound, X } from 'lucide-react';
 import { Button, IconButton } from '@palside/ui/button';
 import { Field, Input, PinInput, Textarea, CharacterCount } from '@palside/ui/field';
 import { Sheet } from '@palside/ui/sheet';
@@ -25,18 +27,16 @@ import type { PalsideController } from '../app/use-palside';
 import base from '../app/palside.module.css';
 import s from './team-start.module.css';
 
-const PICKS = 5;
+const STAGE_NEIGHBOUR = 116;
+const STAGE_STEP = 84;
 const errorCode = (failure: unknown) => typeof failure === 'object' && failure && 'code' in failure ? String((failure as { code?: unknown }).code) : '';
 const passwordErrors = new Set(['INVITE_PASSWORD_WRONG', 'INVITE_PASSWORD_REQUIRED', 'INVITE_PASSWORD_LOCKED']);
 const terminalJoinErrors = new Set(['INVITE_INVALID', 'INVITE_EXPIRED', 'TEAM_NOT_FOUND', 'TEAM_CLOSED', 'TEAM_FULL', 'TEAM_LIMIT', 'JOIN_BLOCKED', 'JOIN_CANCELLED', 'ACCOUNT_UNAVAILABLE', 'ACCOUNT_RESTRICTED', 'ACCOUNT_BANNED', 'LOGIN_REQUIRED', 'DEVICE_REVOKED', 'INVALID_INPUT', 'ORIGIN_DENIED', 'OPERATION_ID_REQUIRED', 'OPERATION_CONFLICT', 'OPERATION_ENDED', 'OPERATION_EXPIRED']);
 type EntryPrompt = NonNullable<PalsideController['joinPrompt']> & { pendingInvite?: string };
-function randomPicks() {
-  return defaultTeamAvatarOptions.map(option => option.id).sort(() => Math.random() - .5).slice(0, PICKS);
-}
 /** Teams the user left, was removed from or saw dissolved; their read-only history is still open. */
 export const formerTeams = (c: PalsideController) => c.teams.filter(team => team.readonly && !team.joined);
 
-/** 首页 with no team, and 添加小队 with some: the team being made is the page — its avatar, its name, then the two other ways in. */
+/** 首页 with no team, and 添加小队 with some: the avatar stage and the name are the page; the intro stays folded and the two other ways in sit below 创建. */
 export function TeamStart({ c }: { c: PalsideController }) {
   const t = useTranslations();
   return <section className={s.start} aria-label={t('extension.copy.yourTeam')}>
@@ -49,10 +49,12 @@ export function TeamStartForm({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const id = useId();
   const file = useRef<HTMLInputElement>(null);
-  const [picks, setPicks] = useState(() => randomPicks());
-  const [avatar, setAvatar] = useState<{ preset?: string; upload?: string }>(() => ({ preset: picks[0] }));
+  const [preset, setPreset] = useState(() => Math.floor(Math.random() * defaultTeamAvatarOptions.length));
+  const [upload, setUpload] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [introOpen, setIntroOpen] = useState(false);
+  const intro = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useTextState();
   const [busy, setBusy] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -63,20 +65,21 @@ export function TeamStartForm({ c }: { c: PalsideController }) {
   const tooLong = characterLength(name.trim()) > TEAM_NAME_LENGTH;
   const invites = c.live?.state.rooms.invites.length ?? 0;
   const former = formerTeams(c).length;
-  const src = avatar.upload ?? defaultTeamAvatarOptions.find(option => option.id === avatar.preset)?.src;
+  const introLength = characterLength(description);
+  const src = upload || defaultTeamAvatarOptions[preset]!.src;
   const ready = !busy && !processing && !limit && Boolean(name.trim()) && !tooLong && characterLength(description.trim()) <= TEAM_DESCRIPTION_LENGTH;
-  function selectPreset(preset: string) {
-    avatarVersion.current++; setProcessing(false); setAvatar({ preset });
+  function selectPreset(next: number) {
+    avatarVersion.current++; setProcessing(false); setUpload(''); setPreset(next);
   }
-  async function upload(chosen?: File) {
+  async function chooseUpload(chosen?: File) {
     if (!chosen) return;
     const version = ++avatarVersion.current;
     setProcessing(true); setError('');
     try {
       const { blob } = await prepareImage(chosen, { maxBytes: AVATAR_BYTES, maxDimension: 256 });
       if (version !== avatarVersion.current) return;
-      const upload = await readImage(blob);
-      if (version === avatarVersion.current) setAvatar({ upload });
+      const image = await readImage(blob);
+      if (version === avatarVersion.current) setUpload(image);
     } catch (failure) { if (version === avatarVersion.current) setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.imageReadFailed')); }
     finally { if (version === avatarVersion.current) setProcessing(false); }
   }
@@ -90,27 +93,56 @@ export function TeamStartForm({ c }: { c: PalsideController }) {
   return <div className={s.body}>
     <form className={s.form} aria-busy={busy || undefined} onSubmit={event => { event.preventDefault(); void create(); }}>
       <div className={s.identity}>
-        <button type="button" className={s.face} aria-label={t('extension.copy.uploadAvatar')} disabled={busy} onClick={() => file.current?.click()}>
-          <TeamAvatar team={{ id: `start-${avatar.preset ?? 'upload'}`, name: name || t('common.team'), avatar: src }} size="xl" />
-          <span className={s.camera} aria-hidden="true"><Camera size={14} /></span>
-        </button>
-        <input ref={file} type="file" hidden accept={IMAGE_MIME_TYPES.join(',')} tabIndex={-1} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ''; void upload(chosen); }} />
-        <div className={s.picks} role="group" aria-label={t('extension.copy.teamAvatarCount', { count: defaultTeamAvatarOptions.length })}>
-          {picks.map(pick => { const option = defaultTeamAvatarOptions.find(item => item.id === pick)!; return <button type="button" key={pick} className={s.pick} aria-pressed={avatar.preset === pick} aria-label={t(option.label)} disabled={busy} onClick={() => selectPreset(pick)}><img src={option.src} alt="" /></button>; })}
-          <IconButton label={t('extension.start.shuffle')} size="sm" variant="surface" className={s.shuffle} disabled={busy} onClick={() => { const next = randomPicks(); setPicks(next); selectPreset(next[0]!); }}><Shuffle size={15} /></IconButton>
+        <AvatarStage selected={preset} upload={upload} disabled={busy} onSelect={selectPreset} onUpload={() => file.current?.click()} />
+        <input ref={file} type="file" hidden accept={IMAGE_MIME_TYPES.join(',')} tabIndex={-1} onChange={event => { const chosen = event.target.files?.[0]; event.target.value = ''; void chooseUpload(chosen); }} />
+        <div className={s.fields}>
+          <Input id={`${id}-name`} className={s.name} aria-label={t('extension.copy.teamName')} aria-invalid={tooLong || Boolean(limit) || undefined} placeholder={t('extension.copy.teamName')} value={name} disabled={busy} autoComplete="off" autoFocus onChange={event => { setName(event.target.value); setError(''); }} />
+          {(limit || tooLong || error) && <p className={s.error} role="alert">{limit || (tooLong ? t('extension.copy.teamNameLimit') : error)}</p>}
+          <div className={s.more} data-open={introOpen || undefined} inert={!introOpen}>
+            <div><Field id={`${id}-description`} label={t('extension.copy.teamIntro')} className={s.bare} counter={introLength >= TEAM_DESCRIPTION_LENGTH * .8 ? <CharacterCount value={description} limit={TEAM_DESCRIPTION_LENGTH} label={t('extension.dynamic.characterCount', { count: introLength, maximum: TEAM_DESCRIPTION_LENGTH, excess: Math.max(0, introLength - TEAM_DESCRIPTION_LENGTH) })} /> : undefined}>{props => <Textarea {...props} ref={intro} className={s.intro} disabled={busy} value={description} placeholder={t('extension.copy.teamIntro')} onChange={event => setDescription(event.target.value)} />}</Field></div>
+          </div>
+          {!introOpen && <button type="button" className={s.addIntro} disabled={busy} onClick={() => { setIntroOpen(true); requestAnimationFrame(() => intro.current?.focus()); }}><Plus size={14} aria-hidden="true" />{t('extension.start.addIntro')}</button>}
         </div>
-        <Input id={`${id}-name`} className={s.name} aria-label={t('extension.copy.teamName')} aria-invalid={tooLong || Boolean(limit) || undefined} placeholder={t('extension.copy.teamName')} value={name} disabled={busy} autoComplete="off" autoFocus onChange={event => { setName(event.target.value); setError(''); }} />
-        {(limit || tooLong || error) && <p className={s.error} role="alert">{limit || (tooLong ? t('extension.copy.teamNameLimit') : error)}</p>}
       </div>
-      <Field id={`${id}-description`} label={t('extension.copy.teamIntro')} className={s.bare} counter={<CharacterCount value={description} limit={TEAM_DESCRIPTION_LENGTH} label={t('extension.dynamic.characterCount', { count: characterLength(description), maximum: TEAM_DESCRIPTION_LENGTH, excess: Math.max(0, characterLength(description) - TEAM_DESCRIPTION_LENGTH) })} />}>{props => <Textarea {...props} className={s.intro} disabled={busy} value={description} placeholder={t('extension.copy.teamIntro')} onChange={event => setDescription(event.target.value)} />}</Field>
       <Button type="submit" variant="primary" size="lg" loading={busy} loadingLabel={t('extension.start.creating')} disabled={!ready}>{t('extension.copy.createTeam')}</Button>
     </form>
-    <div className={s.or}><span>{t('extension.start.or')}</span></div>
     <div className={s.ways}>
       <Button size="lg" leadingIcon={<Link2 size={16} />} disabled={busy} onClick={() => c.go('join')}>{t('extension.copy.joinInvitation')}</Button>
       <Button size="lg" leadingIcon={<Compass size={16} />} disabled={busy} onClick={() => c.go('lobby')}>{t('extension.copy.visitLobby')}{invites > 0 && <span className={s.badge} aria-label={t('extension.invite.pending', { count: invites })}><Count value={invites} /></span>}</Button>
     </div>
     {former > 0 && <button type="button" className={s.former} disabled={busy} onClick={() => c.go('former-teams')}><History size={16} aria-hidden="true" /><span>{t('extension.start.formerTeams')}</span><small><Count value={former} /></small><ChevronRight size={15} aria-hidden="true" /></button>}
+  </div>;
+}
+
+/** Every preset avatar on one looping stage: drag, arrow keys or a neighbour change it; the centre one opens the file picker. */
+function AvatarStage({ selected, upload, disabled, onSelect, onUpload }: { selected: number; upload: string; disabled: boolean; onSelect: (index: number) => void; onUpload: () => void }) {
+  const t = useTranslations();
+  const count = defaultTeamAvatarOptions.length;
+  const root = useRef<HTMLDivElement>(null);
+  const position = useRef(selected);
+  const drag = useRef<{ x: number; from: number; moved: boolean } | undefined>(undefined);
+  const wheel = useRef(0);
+  const offset = (index: number) => { const distance = (((index - position.current) % count) + count) % count; return distance > count / 2 ? distance - count : distance; };
+  const layout = () => root.current?.querySelectorAll<HTMLElement>('[data-tile]').forEach((tile, index) => {
+    const away = offset(index), near = Math.abs(away), side = Math.sign(away);
+    const x = side * (near <= 1 ? STAGE_NEIGHBOUR * near : STAGE_NEIGHBOUR + STAGE_STEP * (near - 1));
+    const scale = near <= 1 ? 1 - .42 * near : Math.max(.58 - .12 * (near - 1), .2);
+    tile.style.transform = `translateX(${x}px) scale(${scale})`;
+    tile.style.opacity = String(near <= 1 ? 1 - .42 * near : Math.max(.58 - .3 * (near - 1), 0));
+    tile.style.zIndex = String(20 - Math.round(near * 2));
+    tile.style.visibility = near > 3.2 ? 'hidden' : 'visible';
+  });
+  useLayoutEffect(layout);
+  const go = (next: number) => { position.current = Math.round(next); layout(); onSelect(((position.current % count) + count) % count); };
+  return <div ref={root} className={s.stage} tabIndex={disabled ? -1 : 0} role="group" aria-label={t('extension.copy.teamAvatarCount', { count })}
+    onKeyDown={event => { if (disabled) return; if (event.key === 'ArrowLeft') { event.preventDefault(); go(position.current - 1); } if (event.key === 'ArrowRight') { event.preventDefault(); go(position.current + 1); } }}
+    onPointerDown={event => { if (!disabled && event.button === 0 && !(event.target as Element).closest('[data-camera]')) drag.current = { x: event.clientX, from: position.current, moved: false }; }}
+    onPointerMove={event => { const current = drag.current; if (!current) return; const moved = event.clientX - current.x; if (!current.moved && Math.abs(moved) > 4) { current.moved = true; event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.dataset.dragging = ''; } if (current.moved) { position.current = current.from - moved / STAGE_NEIGHBOUR; layout(); } }}
+    onPointerUp={event => { const current = drag.current; drag.current = undefined; delete event.currentTarget.dataset.dragging; if (current?.moved) go(position.current); }}
+    onPointerCancel={event => { const current = drag.current; drag.current = undefined; delete event.currentTarget.dataset.dragging; if (current?.moved) go(position.current); }}
+    onWheel={event => { if (disabled || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return; wheel.current += event.deltaX; if (Math.abs(wheel.current) > 50) { go(position.current + Math.sign(wheel.current)); wheel.current = 0; } }}>
+    {defaultTeamAvatarOptions.map((option, index) => <button type="button" key={option.id} data-tile="" className={s.tile} tabIndex={-1} aria-label={t(option.label)} aria-pressed={index === selected} disabled={disabled} onClick={() => { const away = offset(index); if (Math.abs(away) < .5) onUpload(); else go(position.current + away); }}><img src={index === selected && upload ? upload : option.src} alt="" draggable={false} /></button>)}
+    <button type="button" data-camera="" className={s.camera} aria-label={t('extension.copy.uploadAvatar')} disabled={disabled} onClick={onUpload}><Camera size={14} aria-hidden="true" /></button>
   </div>;
 }
 
@@ -242,7 +274,7 @@ function JoinPrompt({ c, prompt, close, isActive }: { c: PalsideController; prom
             setEnded(terminalJoinErrors.has(errorCode(refreshFailure)));
           }
         }
-        if (code === 'INVITE_PASSWORD_LOCKED') { const details = failure as { lockedUntil?: number; retryAfterMs?: number }; setLockedUntil(details.lockedUntil ?? Date.now() + (details.retryAfterMs ?? 60_000)); }
+        if (code === 'INVITE_PASSWORD_LOCKED') { const details = failure as { lockedUntil?: number; retryAfterMs?: number }; setLockedUntil(details.lockedUntil ?? Date.now() + (details.retryAfterMs ?? MINUTE_MS)); }
         else requestAnimationFrame(() => { if (isActive()) input.current?.focus(); });
       } else { setNotice(message); setEnded(terminalJoinErrors.has(code)); }
     } finally { if (isActive()) setBusy(false); }

@@ -1,8 +1,7 @@
 import Type, { type StaticDecode } from 'typebox';
 import { strictObject } from './contracts/validation.ts';
 import { count, timestamp } from './contracts/common.ts';
-import { TEAM_LEVELS } from './team-activity-rules.ts';
-export * from './team-activity-rules.ts';
+import { TEAM_LEVELS } from './rules/teams.ts';
 
 export const teamLevel = Type.Enum(TEAM_LEVELS);
 export const teamDiscoverySort = Type.Enum(['heat', 'latest']);

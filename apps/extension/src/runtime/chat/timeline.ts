@@ -1,6 +1,8 @@
-import { READ_IDS_LIMIT,IMAGE_MIME_TYPES } from '@palside/shared/contracts/limits';
+import { READ_IDS_LIMIT, CHAT_TEXT_MAX } from '@palside/shared/rules/messages';
+import { IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
+import { truncateChatText } from './text';
 import { notificationTarget } from './notification-policy';
-import { messageExpiry } from './message-expiry';
+import { imageExpiry, messageExpiry } from './message-expiry';
 import type { MatrixEvent } from 'matrix-js-sdk';
 import { decryptAttachment } from 'matrix-encrypt-attachment';
 import { ApiError } from '../transport/api';
@@ -12,6 +14,7 @@ import { publicShareUrl } from '@palside/shared/navigation';
 import type { RuntimeDevice } from '../account/device';
 import { SNAPSHOT_INTERVAL,text } from '../composition/state';
 import type { PalsideService } from '../composition/core';
+import { expired } from '../../domain/chat/expiry.ts';
 
 export class TimelineRuntime {
   readonly runtime: PalsideService;
@@ -35,7 +38,7 @@ export class TimelineRuntime {
     const readableTeam = () => {
       if (runtime.auth.session !== session) return;
       const current = runtime.cache.readableTeam(teamId, timestamp, roomId);
-      return current && messageExpiry(event.getUnsigned()?.['xyz.palside.expires_at'], timestamp, current.retentionDays) > Date.now() ? current : undefined;
+      return current && !expired(messageExpiry(event.getUnsigned()?.['xyz.palside.expires_at'], timestamp, current.retentionDays), Date.now()) ? current : undefined;
     };
     const eventId = event.getId(); if (!eventId) return;
     if (event.isEncrypted() && event.isBeingDecrypted()) return;
@@ -45,7 +48,9 @@ export class TimelineRuntime {
     if (!event.isRedaction() && !readableTeam()) return;
     if (event.isDecryptionFailure()) {
       const missing = this.missingEvents.get(team.id) ?? new Set<string>(); missing.add(eventId); this.missingEvents.set(team.id, missing);
-      runtime.state.history ??= {}; runtime.state.history[team.id] = { missingKeys: missing.size, loaded: false, loading: false }; runtime.emit(); return;
+      const history = runtime.state.history?.[team.id];
+      if (history) { history.missingKeys = missing.size; runtime.emit(); }
+      return;
     }
     this.missingEvents.get(team.id)?.delete(eventId);
     if (runtime.state.history?.[team.id]) runtime.state.history[team.id]!.missingKeys = this.missingEvents.get(team.id)?.size ?? 0;
@@ -66,7 +71,7 @@ export class TimelineRuntime {
         runtime.interactions.stickyRecords = runtime.interactions.stickyRecords.filter(item => !removedStickies.includes(item));
         runtime.interactions.refreshStickies();
         // Persist the tombstone before removing cached records, including when redaction arrives before the original.
-        await scope.wait(runtime.interactions.rememberAnnotationDeletion(target, team.id, Math.max(Date.now(), event.getTs()) + team.retentionDays * 86_400_000));
+        await scope.wait(runtime.interactions.rememberAnnotationDeletion(target, team.id, messageExpiry(undefined, Math.max(Date.now(), event.getTs()), team.retentionDays)));
         for (const item of removedStickies) await scope.wait(runtime.storage.remove(`${session.account.id}:cache:item:${item.id}`));
       }
       runtime.emit(); return;
@@ -96,9 +101,11 @@ export class TimelineRuntime {
     if (relation?.rel_type === 'm.replace' && typeof relation.event_id === 'string') {
       const original = runtime.state.data.messages.find(m => m.id === relation.event_id && m.author === person.id && !m.recalled);
       const latest = this.edits.get(relation.event_id);
-      if (typeof content['m.new_content']?.body === 'string' && !this.redactions.has(relation.event_id) && (!latest || timestamp > latest.timestamp)) this.edits.set(relation.event_id, { text: text(content['m.new_content'].msgtype === 'm.image' ? content['m.new_content']['com.palside.caption'] : content['m.new_content'].body).slice(0, 40_000), timestamp, author: person.id, teamId: team.id, expiresAt });
+      const replacement = content['m.new_content'];
+      const editedText = truncateChatText(text(replacement?.msgtype === 'm.image' ? replacement['com.palside.caption'] : replacement?.body), CHAT_TEXT_MAX * 2);
+      if (typeof content['m.new_content']?.body === 'string' && !this.redactions.has(relation.event_id) && (!latest || timestamp > latest.timestamp)) this.edits.set(relation.event_id, { text: editedText, timestamp, author: person.id, teamId: team.id, expiresAt });
       if (original && typeof content['m.new_content']?.body === 'string' && timestamp > (original.editedAt ?? 0)) {
-        original.text = text(content['m.new_content'].msgtype === 'm.image' ? content['m.new_content']['com.palside.caption'] : content['m.new_content'].body).slice(0, 40_000); original.edited = true; original.editedAt = timestamp; original.mentionIds = [];
+        original.text = editedText; original.edited = true; original.editedAt = timestamp; original.mentionIds = [];
         await scope.wait(runtime.cache.cacheMessage(original, runtime.cache.eventTimes.get(original.id)!)); runtime.emit();
       }
       return;
@@ -110,26 +117,26 @@ export class TimelineRuntime {
     const transactionId = person.id === session.account.id ? event.getTxnId() ?? event.getUnsigned().transaction_id : undefined;
     const refContent = content['com.palside.ref'] as Record<string, unknown> | undefined; const refTarget = readMessageRefTarget(refContent?.target); const refCaption = readRefCaption(refContent?.caption, refTarget); const refView = await scope.wait(readView(refContent?.view)); const ref = refTarget && refCaption && refView ? { target: refTarget, caption: refCaption, view: refView } : undefined;
     team = readableTeam(); if (!team) return;
-    const message: Message = { clientId: transactionId, id: eventId, teamId: team.id, author: person.id, text: text(content.body).slice(0, 40_000), time: '', timestamp, expiresAt, status: 'sent', replyTo: relation?.['m.in_reply_to']?.event_id, replyRange: relation?.['m.in_reply_to']?.event_id ? readQuoteRange(content['com.palside.reply_range']) : undefined, mentionIds: team.people.filter(p => Array.isArray(content['m.mentions']?.user_ids) && content['m.mentions'].user_ids.includes(p.matrixId)).map(p => p.id), ...(ref ? { ref } : {}), ...(asset ? { attachment: { kind: 'asset', assetId: asset.id, view: asset } } : {}) };
+    const message: Message = { clientId: transactionId, id: eventId, teamId: team.id, author: person.id, text: truncateChatText(text(content.body), CHAT_TEXT_MAX * 2), time: '', timestamp, expiresAt, status: 'sent', replyTo: relation?.['m.in_reply_to']?.event_id, replyRange: relation?.['m.in_reply_to']?.event_id ? readQuoteRange(content['com.palside.reply_range']) : undefined, mentionIds: team.people.filter(p => Array.isArray(content['m.mentions']?.user_ids) && p.matrixId !== null && content['m.mentions'].user_ids.includes(p.matrixId)).map(p => p.id), ...(ref ? { ref } : {}), ...(asset ? { attachment: { kind: 'asset', assetId: asset.id, view: asset } } : {}) };
     if (!event.isRedacted() && !this.redactions.has(eventId) && !runtime.state.data.messages.find(m => m.id === eventId)?.recalled && content.msgtype === 'm.image' && content.file?.['com.palside.media'] && content.info?.mimetype && IMAGE_MIME_TYPES.some(type => type === content.info.mimetype)) {
       const mediaId = text(content.file['com.palside.media']);
       try {
-        const src = await scope.wait(runtime.cache.cachedMedia(`event:${eventId}`, async () => { const ciphertext = await scope.wait(runtime.api.media(mediaId, eventId)); const clear = await scope.wait(decryptAttachment(ciphertext, content.file)); return new Blob([clear], { type: content.info.mimetype }); }, () => readableTeam() ? runtime.cache.expiresAt(message) : 0));
-        message.attachment = { kind: 'image', src, name: text(content.filename) }; message.text = text(content['com.palside.caption']);
-      } catch { scope.check(); message.attachment = { kind: 'image', src: '', name: text(content.filename) }; message.text = text(content['com.palside.caption']); }
+        const src = await scope.wait(runtime.cache.cachedMedia(`event:${eventId}`, async () => { const ciphertext = await scope.wait(runtime.api.media(mediaId, eventId)); const clear = await scope.wait(decryptAttachment(ciphertext, content.file)); return new Blob([clear], { type: content.info.mimetype }); }, () => readableTeam() ? imageExpiry(message, runtime.cache.expiresAt(message)) : 0));
+        message.attachment = { kind: 'image', src, name: text(content.filename) }; message.text = truncateChatText(text(content['com.palside.caption']), CHAT_TEXT_MAX * 2);
+      } catch { scope.check(); message.attachment = { kind: 'image', src: '', name: text(content.filename) }; message.text = truncateChatText(text(content['com.palside.caption']), CHAT_TEXT_MAX * 2); }
     }
     if (runtime.auth.session !== session) return;
     if (!readableTeam()) { await scope.wait(runtime.storage.remove(`${session.account.id}:cache:media:event:${eventId}`)); runtime.cache.pruneMedia(); return; }
     const edit = this.edits.get(eventId); const cached = runtime.state.data.messages.find(m => m.id === eventId);
     message.expiresAt = runtime.cache.expiresAt(message);
     if (cached?.expiresAt !== undefined) message.expiresAt = Math.min(message.expiresAt, cached.expiresAt);
-    if (message.expiresAt <= Date.now()) { await scope.wait(runtime.storage.remove(`${session.account.id}:cache:media:event:${eventId}`)); runtime.cache.pruneMedia(); return; }
+    if (expired(message.expiresAt, Date.now())) { await scope.wait(runtime.storage.remove(`${session.account.id}:cache:media:event:${eventId}`)); runtime.cache.pruneMedia(); return; }
     message.liveArrival = cached?.liveArrival ?? (!cached && liveArrival);
     message.replyToExpiresAt = cached?.replyToExpiresAt;
     message.clientId ??= cached?.clientId ?? [...runtime.sending.outgoing.values()].find(packet => packet.eventId === eventId)?.message.id;
     if (edit?.author === person.id && edit.timestamp >= (cached?.editedAt ?? 0)) { message.text = edit.text; message.edited = true; message.editedAt = edit.timestamp; message.mentionIds = []; }
     else if (cached?.editedAt) { message.text = cached.text; message.edited = true; message.editedAt = cached.editedAt; message.mentionIds = []; }
-    if (fallbackAssetUrl && !message.text.includes(fallbackAssetUrl)) message.text = [message.text, fallbackAssetUrl].filter(Boolean).join('\n');
+    if (fallbackAssetUrl && !message.text.includes(fallbackAssetUrl)) message.text = truncateChatText([message.text, fallbackAssetUrl].filter(Boolean).join('\n'), CHAT_TEXT_MAX * 2);
     if (event.isRedacted() || this.redactions.has(eventId) || cached?.recalled) {
       const mediaKey = `${session.account.id}:cache:media:event:${eventId}`;
       await scope.wait(runtime.storage.remove(mediaKey)); if (runtime.auth.session !== session) return; runtime.cache.evictCachedContent([mediaKey]);

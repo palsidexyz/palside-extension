@@ -1,9 +1,14 @@
+import { DAY_MS, HOUR_MS } from '../../units.ts';
+import { ADMIN_REASON_LENGTH, ADMIN_ID_LENGTH } from '../../rules/admin.ts';
 import Type, { type TSchema } from 'typebox';
-import { strictObject, type Infer } from '../validation.ts';
+import { contractString, strictObject, type Infer } from '../validation.ts';
 
-export const ADMIN_IDLE_MS = 12 * 60 * 60 * 1000;
-export const text = Type.String({ minLength: 1, maxLength: 500 });
-export const targetId = Type.String({ minLength: 1, maxLength: 512 });
+const TAIPEI_OFFSET_MS = 8 * HOUR_MS;
+/** Start of the Taipei calendar day containing `at`; Taipei is fixed UTC+8 with no daylight saving. */
+export const taipeiDayStart = (at: number) => Math.floor((at + TAIPEI_OFFSET_MS) / DAY_MS) * DAY_MS - TAIPEI_OFFSET_MS;
+/** Governance reasons: trimmed, counted in visible characters. */
+export const text = contractString({ min: 1, max: ADMIN_REASON_LENGTH, unit: 'grapheme', trim: true });
+export const targetId = Type.String({ minLength: 1, maxLength: ADMIN_ID_LENGTH });
 export const nullable = <S extends TSchema>(schema: S) => Type.Union([schema, Type.Null()]);
 export const id = Type.String();
 export const amount = Type.String({ pattern: '^[0-9]+$' });

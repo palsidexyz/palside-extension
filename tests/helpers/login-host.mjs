@@ -16,7 +16,7 @@ export function loginHost(t) {
     getUnsigned: () => ({}), getSender: () => '@peer:test', getContent: () => ({ msgtype: 'm.text', body: 'Initial message' }),
   };
   const context = {
-    ...languageGlobals, deviceLabel: () => 'Test browser',
+    ...languageGlobals, browser: { runtime: { id: "palside-test", sendMessage: async () => ({ ok: true }) } }, deviceLabel: () => 'Test browser',
     ClientEvent: { Sync: 'sync', ToDeviceEvent: 'device' }, RoomEvent: { Timeline: 'timeline' }, MatrixEventEvent: { Decrypted: 'decrypted' },
     EventType: { RoomMessage: 'm.room.message' }, MsgType: { Text: 'm.text' }, PendingEventOrdering: { Detached: 'detached' }, MatrixScheduler: class {},
     connectLiveEvents: () => () => {},

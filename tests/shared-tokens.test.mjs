@@ -1,8 +1,9 @@
+import { DAY_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sharedTokens } from '../apps/extension/src/domain/assets/shared-tokens.ts';
 
-const now = 20 * 86_400_000;
+const now = 20 * DAY_MS;
 const view = (suffix, name = suffix) => ({ id: suffix, kind: 'asset', chain: 'Ethereum', address: `0x${suffix.padStart(40, '0')}`, name, source: 'DEX Screener', url: `https://dexscreener.com/ethereum/${suffix}`, color: '#000', glyph: name });
 const asset = value => `${value.chain}:${value.address}`;
 const a = view('abc'), b = view('def');
@@ -18,7 +19,7 @@ test('shared tokens count each asset once per message and include token referenc
 });
 
 test('shared tokens include retained messages and omit expired, recalled, pending and future messages', () => {
-  const timestamp = now - 12 * 86_400_000;
+  const timestamp = now - 12 * DAY_MS;
   const messages = [message('retained', { timestamp, attachment: card(a) }), message('retained-older', { timestamp: timestamp - 1, attachment: card(b) }), message('expired', { expiresAt: now, attachment: card(a) }), message('recalled', { recalled: true, attachment: card(a) }), message('removed', { removedByOwner: true, attachment: card(a) }), message('pending', { status: 'sending', attachment: card(a) }), message('future', { timestamp: now + 1, attachment: card(a) }), message('untimed', { timestamp: undefined, attachment: card(a) }), message('nan', { timestamp: NaN, attachment: card(a) })];
   const input = { messages, now };
   assert.deepEqual(sharedTokens({ ...input, order: 'recent' }).map(item => [item.asset, item.messages]), [[asset(a), 1], [asset(b), 1]]);

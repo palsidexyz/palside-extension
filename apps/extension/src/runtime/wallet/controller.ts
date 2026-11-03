@@ -1,10 +1,11 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import { chainBalance, chainRecords, type ChainClientConfig, type ChainEvent, type ChainOrder, type ChainOrderInput } from '@palside/shared/contracts/chain';
 import type { Infer } from '@palside/shared/contracts/validation';
 import type { ApiResult } from '../transport/api';
 import { orderCalls, orderFingerprint, type OrderAuthorization } from '@palside/shared/chain/orders';
 import type { RelaySigningEnvelope, RelaySigningExpectation, RelaySignature } from '@palside/shared/chain/signing';
-import { chainAmount } from '@palside/shared/chain/rules';
-import { paymentTotal, terminalPayment, type WalletBaseState, type WalletPayment } from '../../domain/wallet/model';
+import { chainAmount } from '@palside/shared/chain/amount';
+import { nextUtcDay, paymentTotal, terminalPayment, type WalletBaseState, type WalletPayment } from '../../domain/wallet/model';
 import { WalletLocalState } from './local-state';
 import { WalletKeys } from './keys';
 import { checkTransferAddress, receiveRequest } from './receive';
@@ -49,6 +50,7 @@ export interface WalletControllerPort {
   setHideAmounts(hidden: boolean): Promise<void>;
   receive(amount?: string): string;
 }
+const PENDING_POLL_MS = 3000, PENDING_FAST_MS = 2 * MINUTE_MS, PENDING_MAX_POLL_MS = 30_000;
 const code = (error: unknown) => error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : error instanceof Error ? error.message : 'WALLET_ERROR';
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, item: unknown) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
@@ -78,6 +80,7 @@ export class WalletController implements WalletControllerPort {
   snapshot(): WalletState { return structuredClone(this.state); }
   private pendingKey() { return `${this.options.accountId}:wallet-payment`; }
   private async savePayment() {
+    if (this.state.payment && ['submitting', 'pending'].includes(this.state.payment.phase)) this.state.payment.pendingSince ??= this.now();
     await this.options.storage.put(this.pendingKey(), this.options.accountId, 'wallet-payment', this.state.payment ?? null);
     this.check();
   }
@@ -136,9 +139,12 @@ export class WalletController implements WalletControllerPort {
     try {
       const item = await this.recoveryItem(orderId);
       if (!item.canResume || item.order.status !== 'quoted' || item.relay && item.relay.state !== 'prepared') throw new Error('PAYMENT_BUSY');
-      this.verifyOrder(item.order, item.order.payload);
-      await this.options.validateRecipient(item.order.payload, item.order); this.check();
-      this.state.payment = { id: item.order.id, input: structuredClone(item.order.payload), order: structuredClone(item.order), phase: 'review', passwordRequired: true, total: paymentTotal(item.order).toString(), ...(item.relay ? { requestId: item.relay.requestId } : {}) };
+      const input = item.order.payload;
+      // The recipient deleted their account after the order was quoted: nobody is left to pay.
+      if (!resumable(input)) throw new Error('RECIPIENT_UNAVAILABLE');
+      this.verifyOrder(item.order, input);
+      await this.options.validateRecipient(input, item.order); this.check();
+      this.state.payment = { id: item.order.id, input: structuredClone(input), order: structuredClone(item.order), phase: 'review', passwordRequired: true, total: paymentTotal(item.order).toString(), ...(item.relay ? { requestId: item.relay.requestId } : {}) };
       await this.savePayment(); this.emit(); return structuredClone(this.state.payment);
     } finally { this.busy = false; }
   }
@@ -181,6 +187,8 @@ export class WalletController implements WalletControllerPort {
   }
   acknowledgeOpened() { this.check(); this.state.openedNotice = false; this.emit(); }
   lock() { this.check(); if (this.state.config?.enabled) this.state.availability = 'locked'; this.emit(); }
+  /** Signing keys were forgotten: a payment under review now needs the password. */
+  keysLocked() { if (this.state.payment?.phase === 'review' && !this.state.payment.passwordRequired) { this.state.payment.passwordRequired = true; this.emit(); } }
   offline() { this.check(); this.state.availability = this.state.config?.enabled ? 'offline' : 'closed'; this.emit(); }
   async handleEvent(event: ChainEvent): Promise<void> {
     this.check();
@@ -243,8 +251,9 @@ export class WalletController implements WalletControllerPort {
       this.verifyOrder(order, input);
       await this.options.validateRecipient(input, order); this.check();
       const total = paymentTotal(order);
-      const passwordRequired = !this.options.keys.unlocked || !await this.local.canSkip(input, total, order.deployment.decimals); this.check();
-      this.state.payment = { id: order.id, input: structuredClone(input), order: structuredClone(order), phase: 'review', passwordRequired, total: total.toString() };
+      const smallPayment = await this.local.smallPayment(input, total, order.deployment.decimals, this.ready().quickPay); this.check();
+      const passwordRequired = !this.options.keys.unlocked || smallPayment !== 'allowed';
+      this.state.payment = { id: order.id, input: structuredClone(input), order: structuredClone(order), phase: 'review', passwordRequired, total: total.toString(), ...(smallPayment === 'daily-limit' ? { quickPayResetAt: nextUtcDay(this.now()) } : {}) };
       await this.savePayment(); this.emit(); return structuredClone(this.state.payment);
     } catch (error) {
       this.check(); await this.refreshAfterConfigError(error); throw error;
@@ -266,10 +275,12 @@ export class WalletController implements WalletControllerPort {
       if (payment.order.expiresAt <= this.now()) { payment.phase = 'expired'; throw new Error('ORDER_EXPIRED'); }
       signatureIssued = !!payment.signed;
       await this.options.validateRecipient(payment.input, payment.order); this.check();
-      if (password === undefined && this.options.keys.unlocked && !payment.passwordRequired) reserved = await this.local.reserve(payment.id, payment.input, BigInt(payment.total), payment.order.deployment.decimals);
+      if (password === undefined && this.options.keys.unlocked && !payment.passwordRequired) reserved = await this.local.reserve(payment.id, payment.input, BigInt(payment.total), payment.order.deployment.decimals, this.ready().quickPay);
       this.check();
       if (!reserved) {
-        payment.passwordRequired = true; payment.phase = 'password'; this.emit();
+        payment.passwordRequired = true; payment.phase = 'password';
+        const smallPayment = await this.local.smallPayment(payment.input, BigInt(payment.total), payment.order.deployment.decimals, this.ready().quickPay); this.check();
+        payment.quickPayResetAt = smallPayment === 'daily-limit' ? nextUtcDay(this.now()) : undefined; this.emit();
         if (password === undefined) return structuredClone(payment);
         const address = await this.options.keys.unlock(password); this.check();
         if (!same(address, this.state.address)) throw new Error('WALLET_ADDRESS_MISMATCH');
@@ -328,8 +339,6 @@ export class WalletController implements WalletControllerPort {
     } else if (result.state === 'failed' || result.state === 'expired' || result.state === 'cancelled') {
       payment.phase = result.state === 'cancelled' ? 'expired' : result.state; await this.local.release(payment.id, result.state === 'failed' ? 0n : payment.signed ? BigInt(payment.total) : 0n); payment.error = result.error ?? undefined;
       clearTimeout(this.pollTimer); this.pollTimer = undefined; this.quoteAttempt = undefined;
-    } else if (result.state === 'prepared' && payment.phase === 'pending') {
-      payment.phase = 'password'; payment.passwordRequired = true;
     } else payment.phase = 'pending';
   }
   private async acceptOrder(order: ChainOrder) {
@@ -348,6 +357,7 @@ export class WalletController implements WalletControllerPort {
     else if (order.status === 'submitted') payment.phase = 'pending';
     if (terminalPayment(payment.phase)) { clearTimeout(this.pollTimer); this.pollTimer = undefined; this.quoteAttempt = undefined; payment.error = undefined; }
     await this.savePayment(); this.emit();
+    if (payment.phase === 'pending' && !this.pollTimer) this.schedulePoll();
   }
   async reconcile(): Promise<WalletPayment | undefined> {
     this.check();
@@ -363,7 +373,12 @@ export class WalletController implements WalletControllerPort {
   }
   private schedulePoll() {
     clearTimeout(this.pollTimer);
-    this.pollTimer = setTimeout(() => { this.pollTimer = undefined; void this.reconcile().catch(() => {}); }, 3000);
+    const payment = this.state.payment;
+    if (!payment || payment.phase !== 'pending') return;
+    payment.pendingSince ??= this.now();
+    const elapsed = this.now() - payment.pendingSince;
+    const delay = elapsed < PENDING_FAST_MS ? PENDING_POLL_MS : Math.min(PENDING_MAX_POLL_MS, PENDING_POLL_MS * 2 ** Math.min(4, 1 + Math.floor((elapsed - PENDING_FAST_MS) / PENDING_MAX_POLL_MS)));
+    this.pollTimer = setTimeout(() => { this.pollTimer = undefined; void this.reconcile().catch(() => {}); }, delay);
   }
   async dismiss(expected: PaymentOwner) {
     this.checkPayment(expected);
@@ -393,3 +408,5 @@ export class WalletController implements WalletControllerPort {
   receive(amount?: string) { this.check(); return receiveRequest(this.state.address, this.state.config?.deployment ?? undefined, amount); }
   dispose() { this.disposed = true; this.generation++; clearTimeout(this.pollTimer); this.options.keys.dispose(); this.state.payment = undefined; }
 }
+
+function resumable(input: ChainOrder['payload']): input is ChainOrderInput { return !('recipientId' in input) || input.recipientId !== null; }

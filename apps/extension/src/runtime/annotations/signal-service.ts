@@ -1,10 +1,11 @@
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import type { MatrixEvent } from 'matrix-js-sdk';
-import { SIGNAL_EVENT,SIGNAL_TTL,readSignal } from './signals';
+import { SIGNAL_CLOCK_SKEW,SIGNAL_EVENT,SIGNAL_TTL,readSignal } from './signals';
 import { sharingWork } from '../viewing/sharing-work';
 import { trustedDeviceMessages } from '../viewing/viewing-targets';
 import type { RuntimeDevice } from '../account/device';
 import type { PalsideService } from '../composition/core';
+import { liveMembers } from '../../domain/teams/model.ts';
 
 const SEEN_LIMIT = 512;
 const DISPLAY_LIMIT = 128;
@@ -47,7 +48,7 @@ export class SignalService {
     this.sendTimes = this.sendTimes.filter(at => sentAt - at < 2_000);
     if (this.sendTimes.length >= 3) throw new MessageError(uiMessage('extension.runtime.signalRateLimited'));
     this.sendTimes.push(sentAt);
-    const recipients = (value: typeof team) => value.people.filter(person => !person.deleted && value.memberIds.includes(person.id) && person.id !== session!.account.id && person.matrixId !== session!.matrix.userId).map(person => person.matrixId).sort();
+    const recipients = (value: typeof team) => liveMembers(value).filter(person => person.id !== session!.account.id && person.matrixId !== session!.matrix.userId).map(person => person.matrixId).sort();
     const others = recipients(team), membership = JSON.stringify(others);
     const check = () => {
       const latest = currentTeam();
@@ -77,7 +78,7 @@ export class SignalService {
     const runtime = this.runtime, now = Date.now();
     if (runtime.auth.session !== session || !event.isEncrypted() || event.getType() !== SIGNAL_EVENT) return;
     const signal = readSignal(event.getContent(), now);
-    if (!signal || signal.sentAt + SIGNAL_TTL <= now) return;
+    if (!signal) return;
     const team = runtime.state.remoteTeams.find(item => item.id === signal.teamId && item.joined && item.memberIds.includes(session.account.id));
     const person = team?.people.find(item => !item.deleted && item.matrixId === event.getSender() && team.memberIds.includes(item.id) && item.id !== session.account.id && item.matrixId !== session.matrix.userId);
     if (!person) return;
@@ -85,7 +86,8 @@ export class SignalService {
     const key = `${signal.teamId}\0${person.id}\0${signal.id}`;
     // Fail closed at capacity so an evicted id cannot immediately be replayed.
     if (this.seen.has(key) || this.seen.size >= SEEN_LIMIT) return;
-    this.seen.set(key, signal.sentAt + SIGNAL_TTL);
+    // Kept for as long as readSignal would still accept this send time, so a replay cannot slip in.
+    this.seen.set(key, signal.sentAt + SIGNAL_CLOCK_SKEW);
     runtime.state.signals = [...(runtime.state.signals ?? []), { ...signal, personId: person.id, at: now }].slice(-DISPLAY_LIMIT);
     this.schedule(session);
     runtime.emit();
@@ -93,12 +95,12 @@ export class SignalService {
 
   private prune(now: number) {
     for (const [key, expiresAt] of this.seen) if (expiresAt <= now) this.seen.delete(key);
-    this.runtime.state.signals = (this.runtime.state.signals ?? []).filter(signal => signal.sentAt + SIGNAL_TTL > now);
+    this.runtime.state.signals = (this.runtime.state.signals ?? []).filter(signal => signal.at + SIGNAL_TTL > now);
   }
 
   private schedule(session: RuntimeDevice) {
     clearTimeout(this.timer);
-    const next = Math.min(...this.seen.values());
+    const next = Math.min(...this.seen.values(), ...(this.runtime.state.signals ?? []).map(signal => signal.at + SIGNAL_TTL));
     if (!Number.isFinite(next)) { this.timer = undefined; return; }
     const generation = this.generation;
     this.timer = setTimeout(() => {

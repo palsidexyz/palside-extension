@@ -5,13 +5,15 @@ import { useEffect, type ReactNode } from 'react';
 import { personFor } from '../../../domain/account/model';
 import { type Viewing } from '../../../domain/assets/model';
 import { viewAsset } from '../../../domain/annotations/social';
-import { captureSocialUi, openWithReturn, setSocialUi, useSocialUi } from './social-state';
+import { captureSocialUi, setSocialUi, useSocialUi } from './social-state';
 import { relativeTime } from '../assets/asset-discussion';
 import { PersonAvatar, Token } from '../ui/primitives';
 import { ContextBar } from '../ui/context-bar';
 import { SessionCard } from '../feedback/session-notice';
 import type { PalsideController } from '../app/use-palside';
 import s from '../viewing/watch-strip.module.css';
+import { tokenLabel } from '../assets/token-name';
+import { liveView } from '../assets/token-data';
 
 type Poke = NonNullable<NonNullable<PalsideController['live']>['state']['pokes']>[number];
 export type TopCard = {
@@ -47,10 +49,11 @@ export function useTopCard(c: PalsideController): TopCard | undefined {
   if (c.disconnected || c.team.readonly) return { key: c.team.readonly ? 'readonly' : `connection-${c.connection}`, card: <SessionCard c={c} />, waiting: [] };
   const following = follow?.teamId === c.current && c.team.memberIds.includes(follow.personId) ? personFor(c.people, follow.personId, t('common.member')) : undefined;
   if (following) {
-    const view = c.data.views.find(item => item.id === following.viewing);
+    const found = c.data.views.find(item => item.id === following.viewing);
+    const view = found && liveView(c, found);
     const synced = here(view);
     const card = <ContextBar tone="accent" lead={<PersonAvatar person={following} size="sm" />} badge={view && <Token view={view} size="sm" />} title={t('extension.top.followTitle', { name: following.name })}
-      meta={view ? synced ? <><i data-live="" /><span>{t('extension.top.syncing')}</span><span>· {view.name}</span></> : <><Token view={view} size="sm" /><span>{view.name}</span></> : <span>{t('extension.top.notSharing')}</span>}
+      meta={view ? synced ? <><i data-live="" /><span>{t('extension.top.syncing')}</span><span>· {tokenLabel(view, t)}</span></> : <><Token view={view} size="sm" /><span>{tokenLabel(view, t)}</span></> : <span>{t('extension.top.notSharing')}</span>}
       actions={[...(view && !synced ? [{ label: t('extension.top.go'), primary: true, onClick: () => openPage(c, view) }] : []), { label: t('extension.top.end'), onClick: () => setSocialUi({ follow: undefined }) }]} />;
     return { key: `follow-${following.id}-${view?.id ?? ''}-${synced}`, card, waiting, person: following.id };
   }
@@ -61,7 +64,7 @@ export function useTopCard(c: PalsideController): TopCard | undefined {
 
 function openPage(c: PalsideController, view: Viewing, then?: () => void) {
   const session = captureSocialUi();
-  if (c.live) void openWithReturn(c.live, view.url).then(() => { if (session.current()) then?.(); }, error => { if (session.current()) c.setNotice(errorMessage(error)); });
+  if (c.live) void c.live.openPage(view.url).then(() => { if (session.current()) then?.(); }, error => { if (session.current()) c.setNotice(errorMessage(error)); });
 }
 const dismiss = (c: PalsideController, id: string) => void c.live?.command('dismiss-poke', { id }).catch(() => {});
 
@@ -70,7 +73,7 @@ function PokeCard({ c, poke }: { c: PalsideController; poke: Poke }) {
   const locale = useLocale();
   const person = personFor(c.people, poke.from, t('common.member'));
   return <ContextBar lead={<PersonAvatar person={person} size="sm" />} badge={<Token view={poke.view} size="sm" />} title={t('extension.top.pokeTitle', { name: person.name })}
-    meta={<span>{[poke.view.name, poke.view.source, relativeTime(poke.at, locale, c.now)].filter(Boolean).join(' · ')}</span>}
+    meta={<span>{[tokenLabel(poke.view, t), poke.view.source, relativeTime(poke.at, locale, c.now)].filter(Boolean).join(' · ')}</span>}
     actions={[{ label: t('extension.top.open'), primary: true, onClick: () => openPage(c, poke.view, () => dismiss(c, poke.id)) }]}
     onClose={() => dismiss(c, poke.id)} closeLabel={t('extension.top.ignore')} />;
 }
@@ -81,7 +84,7 @@ export function PokeRow({ c, poke, onDone }: { c: PalsideController; poke: Poke;
   const person = personFor(c.people, poke.from, t('common.member'));
   return <div className={s.pokeRow}>
     <PersonAvatar person={person} size="xs" />
-    <span className={s.pokeText}><strong>{t('extension.top.pokeTitle', { name: person.name })}</strong><small><Token view={poke.view} size="sm" />{poke.view.name}</small></span>
+    <span className={s.pokeText}><strong>{t('extension.top.pokeTitle', { name: person.name })}</strong><small><Token view={poke.view} size="sm" />{tokenLabel(poke.view, t)}</small></span>
     <button type="button" className={s.pokeOpen} onClick={() => { onDone(); openPage(c, poke.view, () => dismiss(c, poke.id)); }}>{t('extension.top.open')}</button>
   </div>;
 }

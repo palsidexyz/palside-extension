@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TokenImageFailures } from '../apps/extension/src/features/palside/assets/token-image-failures.ts';
@@ -5,7 +6,7 @@ import { TokenImageFailures } from '../apps/extension/src/features/palside/asset
 test('failed image memory suppresses remounts briefly and success clears the failure', () => {
   let now=100;const failures=new TokenImageFailures(()=>now);
   failures.remember('one');assert.equal(failures.has('one'),true);assert.equal(failures.has('another'),false);
-  now+=60_000;assert.equal(failures.has('one'),false);
+  now+=MINUTE_MS;assert.equal(failures.has('one'),false);
   failures.remember('one');failures.forget('one');assert.equal(failures.has('one'),false);
 });
 test('failed image memory is bounded and replacing an entry refreshes its order', () => {

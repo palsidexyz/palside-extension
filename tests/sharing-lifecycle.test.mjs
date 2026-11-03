@@ -1,5 +1,13 @@
 import { productionModules } from './helpers/production-module.mjs';
-import * as contractLimits from '../packages/shared/src/contracts/limits.ts';
+import * as contractLimits0 from '../packages/shared/src/rules/teams.ts';
+import * as contractLimits1 from '../packages/shared/src/rules/retention.ts';
+import * as contractLimits2 from '../packages/shared/src/rules/accounts.ts';
+import * as contractLimits3 from '../packages/shared/src/rules/messages.ts';
+import * as contractLimits4 from '../packages/shared/src/rules/media.ts';
+import * as contractLimits5 from '../packages/shared/src/rules/rooms.ts';
+import * as contractLimits6 from '../packages/shared/src/rules/interactions.ts';
+import * as contractLimits7 from '../packages/shared/src/rules/admin.ts';
+const contractLimits = { ...contractLimits0, ...contractLimits1, ...contractLimits2, ...contractLimits3, ...contractLimits4, ...contractLimits5, ...contractLimits6, ...contractLimits7 };
 import * as contractCommon from '../packages/shared/src/contracts/common.ts';
 import { languageGlobals } from './helpers/language-host.mjs';
 import { renderMessage } from '../packages/i18n/src/core.ts';
@@ -11,27 +19,28 @@ import { trustedDeviceMessages } from '../apps/extension/src/runtime/viewing/vie
 import { teamSendGuard } from '../apps/extension/src/runtime/account/crypto-identity.ts';
 import { encryptedCrypto } from './helpers/encrypted-room.mjs';
 import { startedTeams } from '../apps/extension/src/runtime/teams/onboarding.ts';
-import { defaultWebFeatures, interactionAllows, readFavorites, readHosts, readInteraction, readWebFeatures } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { TokenProfiles } from '../apps/extension/src/runtime/viewing/token-profiles.ts';
+import { readFavorites, readHosts, readSiteInteractions } from '../apps/extension/src/domain/annotations/interaction.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const plain = value => JSON.parse(JSON.stringify(value));
-const context = { ...languageGlobals, ...contractLimits, ...contractCommon, defaultWebFeatures, interactionAllows, readFavorites, readHosts, readInteraction, readWebFeatures, startedTeams, sharingWork, clearTimeout, URL, trustedDeviceMessages, teamSendGuard };
+const context = { ...languageGlobals, ...contractLimits, ...contractCommon, readFavorites, readHosts, readSiteInteractions, startedTeams, sharingWork, clearTimeout, URL, trustedDeviceMessages, teamSendGuard };
 const load = productionModules(context);
 const { SharingRuntime } = load('apps/extension/src/runtime/viewing/sharing.ts');
 const { RuntimeCommands } = load('apps/extension/src/runtime/composition/dispatch.ts');
 function fixture() {
   const value = new SharingRuntime(undefined);
   value.execute = RuntimeCommands.prototype.execute;
-  value.runtime = value; value.auth = value; value.sharing = value; value.dispatch = value;
+  value.runtime = value; value.auth = value; value.sharing = value; value.dispatch = value; value.tokens = new TokenProfiles();
   value.scope = () => sessionScope(() => true, () => Error('session changed'));
   const requests=[]; const stored=new Map(); const snapshots=[];
-  value.state={account:{}, toggles:{share:true,interact:false}, preferences:{current:'team',web:{share:true,interact:true},tokenOff:['x.com'],notifications:'off'}, remoteTeams:[{id:'team',joined:true,people:[{id:'self',matrixId:'@self'}],memberIds:['self']}],data:{teams:[]}};
-  value.requireConnection=()=>{};
-  value.initialise=async()=>{};value.preferencesQueue=Promise.resolve();value.togglesQueue=Promise.resolve();value.persistedInteract=false;
+  value.state={account:{}, preferences:{current:'team',share:true,siteInteraction:{'x.com':{on:true}},tokenOff:['x.com'],notifications:'off'}, remoteTeams:[{id:'team',joined:true,people:[{id:'self',matrixId:'@self'}],memberIds:['self']}],data:{teams:[]}};
+  value.requireConnection=()=>{}; value.preloadHistory=async()=>{};
+  value.initialise=async()=>{};value.preferencesQueue=Promise.resolve();
   value.pageObservation=0;value.viewingSequence=0;value.viewingOrder=1;
   value.session={account:{id:'self'},matrix:{}}; value.emit=()=>snapshots.push(structuredClone(value.state));
-  value.expireViewing=()=>value.emit();value.mayObserve=()=>value.state.preferences.web.share&&value.state.toggles.share;value.foreground=async()=>true;value.clearRemoteViewing=async()=>{};
+  value.expireViewing=()=>value.emit();value.mayObserve=()=>Boolean(value.state.preferences.share);value.foreground=async()=>true;value.clearRemoteViewing=async()=>{};
   value.storage={get:async key=>stored.get(key),put:async(key,_id,_kind,data)=>stored.set(key,data),remove:async key=>stored.delete(key)};
   value.api={request:async(path,body)=>{requests.push({path,...body});return {selected:true,expiresAt:Date.now()+30000};}};
   value.client={getCrypto:()=>({...encryptedCrypto(),getUserDeviceInfo:async()=>new Map([['@self',new Map([['OTHER',{}]])]]),encryptToDeviceMessages:async()=>({batch:[]})})};
@@ -49,7 +58,7 @@ test('switching 共享在看 off during encryption prevents the old page being s
   const {value,requests}=fixture();const crypto=deferred();
   value.client.getCrypto=()=>({...encryptedCrypto(),getUserDeviceInfo:async()=>new Map([['@self',new Map([['OTHER',{}]])]]),encryptToDeviceMessages:()=>crypto.promise});
   const publishing=value.publishViewing();await tick();
-  assert.deepEqual(plain(await value.execute({name:'toggle',payload:{share:false}})),{share:false,interact:false});
+  assert.deepEqual(plain(await value.execute({name:'toggle',payload:{share:false}})),{share:false});
   crypto.resolve({batch:[]});await publishing;
   assert.equal(requests.filter(call=>call.path==='/viewing').length,0);assert.equal(value.ownViewing,undefined);assert.equal(value.page,undefined);
 });
@@ -72,13 +81,12 @@ test('preference persistence captures each revision and never rewinds newer in-m
   first.resolve();await Promise.all([old,latest]);assert.deepEqual(writes.map(p=>p.tokenOff),[['x.com'],[]]);assert.deepEqual(value.persistedPreferences.tokenOff,[]);
 });
 
-test('禁用 共享在看 clears local and remote viewing before any queued disk write completes',async()=>{
-  const {value}=fixture();value.initialise=async()=>{};value.preferencesQueue=Promise.resolve();value.togglesQueue=Promise.resolve();value.persistedInteract=false;
+test('turning 网页互动 off for a site leaves independent shared viewing active',async()=>{
+  const {value}=fixture();value.initialise=async()=>{};value.preferencesQueue=Promise.resolve();
   const disk=deferred();value.storage.put=()=>disk.promise;let cleared=0;value.clearRemoteViewing=async()=>{cleared++;};
-  const save=value.execute({name:'preferences',payload:{accountId:'self',web:{share:false,interact:true}}});await tick();
-  assert.equal(value.page,undefined);assert.equal(cleared,1);assert.equal(value.state.preferences.web.share,false);
-  assert.deepEqual(plain(value.state.toggles),{share:false,interact:false},'禁用 also switches the composer button off');
-  disk.resolve();await save;
+  const pending=save(value, { siteInteraction: { 'x.com': { on: false } } });await tick();
+  assert.equal(value.page.id,'page');assert.equal(cleared,0);assert.equal(value.state.preferences.siteInteraction['x.com'].on,false);
+  disk.resolve();await pending;
 });
 
 const save = (value, patch) => value.execute({ name: 'preferences', payload: { accountId: 'self', ...patch } });
@@ -112,26 +120,23 @@ test('concurrent preference saves apply in order over the latest preferences and
   let settled = false;
   const first = save(value, { tokenOff: ['EXAMPLE.COM.'] }).then(() => { settled = true; }); await tick();
   const second = save(value, { tokenOff: ['example.com', 'other.com'] });
-  const other = save(value, { restoreSites: ['other.com'] }); await tick();
+  await tick();
   assert.equal(settled, false); assert.equal(writes.length, 1);
   assert.deepEqual(plain(value.state.preferences.tokenOff), ['example.com', 'other.com']);
-  assert.deepEqual(plain(value.state.preferences.restoreSites), ['other.com']);
-  assert.deepEqual(plain(value.state.preferences.web), { share: true, interact: true });
-  disk.resolve(); await Promise.all([first, second, other]);
-  assert.equal(writes.length, 3);
-  assert.deepEqual(plain(writes.map(row => row.tokenOff)), [['example.com'], ['example.com', 'other.com'], ['example.com', 'other.com']]);
+  disk.resolve(); await Promise.all([first, second]);
+  assert.equal(writes.length, 2);
+  assert.deepEqual(plain(writes.map(row => row.tokenOff)), [['example.com'], ['example.com', 'other.com']]);
   assert.deepEqual(plain(stored.get('self:preferences')), plain(value.state.preferences));
 });
 
 test('latest failed preference write rolls back to the last committed value without resurrecting revoked viewing', async () => {
   const { value } = fixture();
   value.clearRemoteViewing = async () => {};
-  await save(value, { web: { share: true, interact: false } });
+  await save(value, { siteInteraction: { 'x.com': { signal: false } } });
   value.storage.put = async () => { throw Error('disk full'); };
-  await assert.rejects(save(value, { web: { share: false, interact: false } }), /disk full/);
-  assert.deepEqual(plain(value.state.preferences.web), { share: true, interact: false });
-  assert.equal(value.state.toggles.share, false, 'the switch stays off');
-  assert.equal(value.page, undefined); assert.equal(value.ownViewing, undefined);
+  await assert.rejects(save(value, { siteInteraction: { 'x.com': { sticky: false } } }), /disk full/);
+  assert.deepEqual(plain(value.state.preferences.siteInteraction), { 'x.com': { on: true, danmaku: true, signal: false, sticky: true } });
+  assert.equal(value.state.preferences.share, true);
 });
 
 test('older failed write cannot rewind a newer intent and later writes remain usable', async () => {
@@ -159,21 +164,21 @@ test('queued preference writes from an old session cannot overwrite the replacem
   value.scope = () => { const session = value.session; return sessionScope(() => value.session === session, () => Error('session changed')); };
   const pending = assert.rejects(save(value, { tokenOff: ['example.com'] }), /session changed/); await tick();
   value.session = { account: { id: 'replacement' } };
-  const replacement = { current: 'new', web: { share: true, interact: true }, notifications: 'off' };
+  const replacement = { current: 'new', share: true, siteInteraction: { 'x.com': { on: false } }, notifications: 'off' };
   value.state.preferences = replacement;
   queue.resolve(); await pending;
   assert.equal(stored.size, 0); assert.equal(value.state.preferences, replacement);
 });
 
 test('preference and switch commands validate account and every field before mutating state', async () => {
-  const { value, stored } = fixture(); const before = plain(value.state.preferences); const toggles = plain(value.state.toggles);
+  const { value, stored } = fixture(); const before = plain(value.state.preferences);
   for (const patch of [{ accountId: 'other', tokenOff: [] }, { siteRules: {} }, { allowedSites: [] }, { notificationPreview: 'yes' }, { sitesChosen: true },
-    ...[undefined, null, {}, { share: true }, { share: 'yes', interact: false }, { share: true, interact: false, extra: true }].map(web => ({ web })),
-    ...['https://x.com', '*.x.com', 'printer.local', ''].map(host => ({ tokenOff: [host] })), { tokenOff: 'x.com' }, { restoreSites: ['x.com', 'bad host'] }]) {
+    ...[undefined, null, [], { 'https://x.com': { on: true } }, { 'x.com': { signal: 'yes' } }, { 'x.com': { on: true, extra: true } }].map(siteInteraction => ({ siteInteraction })),
+    ...['https://x.com', '*.x.com', 'printer.local', ''].map(host => ({ tokenOff: [host] })), { tokenOff: 'x.com' }]) {
     await assert.rejects(value.execute({ name: 'preferences', payload: { accountId: 'self', ...patch } }), error => !['ReferenceError', 'TypeError'].includes(error?.name), JSON.stringify(patch));
   }
   for (const payload of [{ share: 'yes' }, { interact: 1 }]) await assert.rejects(toggle(value, payload), error => !['ReferenceError', 'TypeError'].includes(error?.name), JSON.stringify(payload));
-  assert.deepEqual(plain(value.state.preferences), before); assert.deepEqual(plain(value.state.toggles), toggles); assert.equal(stored.size, 0);
+  assert.deepEqual(plain(value.state.preferences), before); assert.equal(stored.size, 0);
   await save(value, { notificationPreview: false, hiddenStickies: ['saved'] });
   assert.equal(stored.get('self:preferences').notificationPreview, false);
   assert.deepEqual(plain(stored.get('self:preferences').hiddenStickies), ['saved']);
@@ -194,54 +199,18 @@ test('switching 共享在看 off clears local and remote viewing at once', async
   assert.equal(value.state.notice, undefined);
 });
 
-test('a switch turns on only while its feature is 启用; interaction also needs one 互动选项', async () => {
+test('共享在看 can turn on independently of a site 网页互动 setting', async () => {
   const { value } = fixture();
-  assert.deepEqual(plain(await toggle(value, { interact: true })), { share: true, interact: true });
-  await save(value, { interaction: { signal: false, sticky: false } });
-  assert.equal(value.state.toggles.interact, false, 'turning every 互动选项 off switches 网页互动 off');
-  assert.deepEqual(plain(await toggle(value, { interact: true })), { share: true, interact: false });
-  await save(value, { web: { share: false, interact: true } });
-  assert.deepEqual(plain(await toggle(value, { share: true })), { share: false, interact: false });
+  await save(value, { siteInteraction: { 'x.com': { on: false } } });
+  assert.deepEqual(plain(await toggle(value, { share: true })), { share: true });
 });
 
 test('Chrome revoking the tabs permission switches sharing off with a notice, once', async () => {
   const { value } = fixture();
   await toggle(value, { share: false, revoked: true });
-  assert.equal(value.state.toggles.share, false); assert.equal(value.page, undefined);
+  assert.equal(value.state.preferences.share, false); assert.equal(value.page, undefined);
   assert.equal(value.state.notice.key, 'extension.share.revoked');
   value.state.notice = undefined;
   await toggle(value, { share: false, revoked: true });
   assert.equal(value.state.notice, undefined, 'already off: nothing to report');
-});
-
-
-test('网页互动 persists per account while 共享在看 is never persisted', async () => {
-  const { value, stored } = fixture();
-  await toggle(value, { interact: true });
-  assert.deepEqual(plain(stored.get('self:toggles')), { interact: true });
-  value.state.toggles = { share: false, interact: false }; await value.restoreToggles();
-  assert.deepEqual(plain(value.state.toggles), { share: false, interact: true });
-  value.session = { account: { id: 'other' } }; value.state.toggles = { share: false, interact: false }; await value.restoreToggles();
-  assert.deepEqual(plain(value.state.toggles), { share: false, interact: false });
-  await toggle(value, { share: true }); assert.equal(stored.has('other:toggles'), false);
-});
-
-test('persisted interaction turns off when disabled and failed switch writes roll back', async () => {
-  const { value, stored } = fixture(); await toggle(value, { interact: true });
-  await save(value, { web: { share: true, interact: false } });
-  assert.deepEqual(plain(stored.get('self:toggles')), { interact: false });
-  await save(value, { web: { share: true, interact: true } });
-  value.storage.put = async () => { throw Error('disk full'); };
-  await assert.rejects(toggle(value, { interact: true }), /disk full/); assert.equal(value.state.toggles.interact, false);
-});
-
-test('queued interaction toggles keep newest intent and cannot write into a replacement account', async () => {
-  const { value, stored } = fixture(), gate = deferred(); let writes = 0; const put = value.storage.put;
-  value.storage.put = async (...args) => { if (++writes === 1) await gate.promise; return put(...args); };
-  const on = toggle(value, { interact: true }); await tick(); const off = toggle(value, { interact: false }); await tick();
-  gate.resolve(); await Promise.all([on, off]); assert.deepEqual(plain(stored.get('self:toggles')), { interact: false });
-  value.scope = () => { const session = value.session; return sessionScope(() => session === value.session, () => Error('session changed')); };
-  const queued = deferred(); value.togglesQueue = queued.promise;
-  const pending = assert.rejects(toggle(value, { interact: true }), /session changed/); await tick(); value.session = { account: { id: 'new' } }; value.state.toggles = { share: false, interact: false };
-  queued.resolve(); await pending; assert.equal(stored.has('new:toggles'), false); assert.equal(value.state.toggles.interact, false);
 });

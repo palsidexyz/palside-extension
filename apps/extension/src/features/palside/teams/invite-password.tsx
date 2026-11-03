@@ -1,6 +1,6 @@
 'use client';
 import { errorMessage, message as uiMessage } from '@palside/i18n';
-import { INVITE_PASSWORD_ALPHABET, INVITE_PASSWORD_LENGTH } from '@palside/shared/contracts/limits';
+import { INVITE_PASSWORD_ALPHABET, INVITE_PASSWORD_LENGTH } from '@palside/shared/rules/teams';
 import { normalizeInvitePassword } from '@palside/shared/contracts/rules';
 import { useTranslations } from 'use-intl';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -79,10 +79,10 @@ function InvitePasswordEditor({ c, onClose }: { c: PalsideController; onClose: (
     catch (failure) { setError(failure instanceof Error ? errorMessage(failure) : uiMessage('common.error')); }
     finally { setBusy(false); }
   }
-  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }} title={current ? t('extension.copy.changeInvitePasswordTitle') : t('extension.copy.setInvitePasswordTitle')} description={t('extension.copy.invitePasswordDescription')} pending={busy} initialFocusRef={input} placement="bottom" boundarySelector="[data-palside-app]"
+  return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }} title={current ? t('extension.copy.changeInvitePasswordTitle') : t('extension.copy.setInvitePasswordTitle')} pending={busy} initialFocusRef={input} placement="bottom" boundarySelector="[data-palside-app]"
     footer={<><Button disabled={busy} onClick={onClose}>{t('common.cancel')}</Button><Button type="submit" form={form} variant="primary" loading={busy} loadingLabel={t('common.working')} disabled={!ready}>{t('extension.copy.save')}</Button></>}>
     <form id={form} className={s.passwordForm} onSubmit={event => { event.preventDefault(); void save(); }}>
-      <Field label={t('extension.copy.invitePassword')} hint={error ? undefined : t('extension.copy.invitePasswordRule')} error={error}>{props => <div className={s.passwordInput}>
+      <Field label={t('extension.copy.invitePassword')} hideLabel error={error}>{props => <div className={s.passwordInput}>
         {/* Selecting on focus lets the first keystroke replace the suggestion. */}
         <PinInput {...props} ref={input} className={s.passwordCells} length={INVITE_PASSWORD_LENGTH} reveal normalize={normalizeInvitePassword} autoComplete="off" value={value} disabled={busy} onFocus={event => event.currentTarget.select()} onValueChange={next => { setValue(next); setError(''); }} />
         <Tooltip content={t('extension.copy.randomInvitePassword')}><IconButton label={t('extension.copy.randomInvitePassword')} variant="quiet" disabled={busy} onClick={() => { setValue(randomInvitePassword()); setError(''); input.current?.focus(); }}><Shuffle size={16} /></IconButton></Tooltip>

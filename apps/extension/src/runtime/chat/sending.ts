@@ -1,5 +1,6 @@
+import { DAY_MS as DAY } from '@palside/shared/units';
 import { IMAGE_LIMIT } from '../../domain/images/image-policy';
-import { IMAGE_MIME_TYPES } from '@palside/shared/contracts/limits';
+import { IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
 import { completeTeamStart } from '../teams/onboarding.ts';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { readonlyNotice,sendFailure } from '../transport/connection';
@@ -17,9 +18,9 @@ import { assetView } from '../../domain/assets/model';
 import { canSend,emptyDraft,readQuoteRange,type Draft,type Message } from '../../domain/chat/model';
 import type { Outgoing } from './outgoing';
 import type { RuntimeDevice } from '../account/device';
-import { DAY } from '../composition/state';
 import { publishSendQueue } from './messages';
 import type { PalsideService } from '../composition/core';
+import { liveMembers } from '../../domain/teams/model.ts';
 
 export class SendingRuntime {
   readonly runtime: PalsideService;
@@ -90,7 +91,7 @@ export class SendingRuntime {
     if (!client) { runtime.state.connection.messaging = 'connecting'; runtime.emit(); throw new ApiError(0, { error: 'CONNECTION_UNAVAILABLE', text: uiMessage('extension.runtime.messagingNotReady') }); }
     if (!team) throw new MessageError(uiMessage('extension.runtime.notTeamMember'));
     const eligibility = teamSendGuard(runtime, team.id);
-    const people = team.people.filter(person => !person.deleted && team.memberIds.includes(person.id));
+    const people = liveMembers(team);
     message = this.outgoing.get(message.id)?.message ?? message;
     if (message.ref) {
       const target = readMessageRefTarget(message.ref.target); const caption = readRefCaption(message.ref.caption, target); const view = await scope.wait(readView(message.ref.view));
@@ -121,7 +122,7 @@ export class SendingRuntime {
       if (message.ref) runtime.cache.upsertView(message.ref.view);
       runtime.state.data.messages = [...runtime.state.data.messages.filter(m => m.id !== message.id), { ...message, failure: undefined, status: 'sending' }]; runtime.emit();
       await scope.wait(this.releaseDraft(session, team.id, packet.draftRevision ?? revision)); guard();
-      const mentions = team.people.filter(p => message.mentionIds?.includes(p.id) && team.memberIds.includes(p.id)).map(p => p.matrixId);
+      const mentions = liveMembers(team).filter(p => message.mentionIds?.includes(p.id)).map(p => p.matrixId);
       const content: RoomMessageEventContent & Record<string, unknown> = { 'm.mentions': { user_ids: mentions }, msgtype: MsgType.Text, body: message.text, 'com.palside.asset': packet.asset, ...(message.ref ? { 'com.palside.ref': message.ref } : {}), ...(message.replyTo ? { 'm.relates_to': { 'm.in_reply_to': { event_id: message.replyTo } }, ...(message.replyRange ? { 'com.palside.reply_range': message.replyRange } : {}) } : {}) };
       if (message.attachment?.kind === 'image') {
         const blob = await scope.wait((await scope.wait(fetch(message.attachment.src))).blob());
@@ -132,7 +133,9 @@ export class SendingRuntime {
           guard(); packet.file = { ...encrypted.info, 'com.palside.media': packet.uploadId };
           await scope.wait(runtime.storage.put(`${session.account.id}:outgoing:${message.id}`, session.account.id, 'outgoing', packet, packet.createdAt + DAY));
         }
-        Object.assign(content, { msgtype: 'm.image', body: message.attachment.name, filename: message.attachment.name, file: packet.file, info: { mimetype: blob.type, size: blob.size }, 'com.palside.caption': message.text });
+        // The local file name can carry a person's name or a date; teammates receive a neutral one.
+        const sentName = `image.${blob.type === 'image/png' ? 'png' : blob.type === 'image/jpeg' ? 'jpg' : 'webp'}`;
+        Object.assign(content, { msgtype: 'm.image', body: sentName, filename: sentName, file: packet.file, info: { mimetype: blob.type, size: blob.size }, 'com.palside.caption': message.text });
       }
       runtime.auth.requireConnection();
       if (!packet.eventId) {

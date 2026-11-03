@@ -1,4 +1,4 @@
-import { RECRUITMENT_TTL_MS } from '@palside/shared/contracts/limits';
+import { RECRUITMENT_TTL_MS } from '@palside/shared/rules/teams';
 import type { Request,Team } from './model';
 
 export function isRecruiting(team: Team, now: number) {

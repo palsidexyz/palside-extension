@@ -8,6 +8,7 @@ import { parseHTML } from 'linkedom';
 import * as React from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
+import * as platform from '../apps/extension/src/runtime/browser/platform.ts';
 import * as signalModel from '../apps/extension/src/runtime/annotations/signals.ts';
 
 const require = createRequire(import.meta.url), h = React.createElement;
@@ -33,16 +34,20 @@ async function fixture(t, { shared = false, read } = {}) {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => key => key },
     '@palside/i18n': { errorMessage: error => error.message },
-    '@palside/ui/button': { Button: props => h('button', without(props, ['size', 'variant'])) },
+    '@palside/ui/button': { Button: props => h('button', without(props, ['size', 'variant'])), IconButton: () => null },
+    '../ui/primitives': { Token: () => null },
     '@palside/ui/tooltip': { Tooltip: passthrough },
     '@palside/ui/switch': { Switch: props => h('input', { ...without(props, ['label', 'hideLabel']), type: 'checkbox', 'aria-label': props.label }) },
     './motion-details': { Count: ({ value }) => value },
     './primitives': { useHeld: value => [value, (_next, run) => run(), false] },
     '../../../runtime/annotations/signals': signalModel,
+    '../../../runtime/browser/platform': platform,
     '../../../domain/assets/model': { assetView: () => undefined },
     '../../../domain/assets/shared-tokens': { sharedTokens: () => [] },
     '../media/message-image': { MessageImage: () => null },
     './asset-card': { AssetCard: () => null },
+    './token-name': { tokenLabel: view => view.name },
+    './token-data': { liveView: (_c, view) => view },
     '../chat/history-scope': { EmptyState: passthrough, HistoryMore: () => null },
     '@palside/shared/navigation': { publicShareUrl: value => value },
     'lucide-react': Object.fromEntries(['ArrowUpRight', 'Coins', 'Image', 'Link2'].map(name => [name, () => null])),
@@ -75,7 +80,7 @@ async function fixture(t, { shared = false, read } = {}) {
   };
   let c = { data: { self: account }, live: { state: { account: { id: account } }, command }, setNotice: value => notices.push(value), currentMessages: [], people: [], now: 0 };
   function Shared() {
-    const [sharedCategory, setSharedCategory] = React.useState('images');
+    const [sharedCategory, setSharedCategory] = React.useState('messages');
     return h(SharedContent, { c: { ...c, sharedCategory, setSharedCategory }, onJump() {} });
   }
   const root = createRoot(document.getElementById('root'));

@@ -1,4 +1,5 @@
 import type { Message } from '../../../domain/chat/model';
+import { expired } from '../../../domain/chat/expiry.ts';
 
 type ReadingAnchor = { id: string; offset: number };
 export type ReadingPosition = { latest: boolean; top: number; anchors: ReadingAnchor[] };
@@ -57,7 +58,7 @@ export class ChatArrivals {
   readonly pending = new Set<string>();
 
   update(messages: Message[], self: string) {
-    const valid = new Set(messages.filter(m => m.status === 'sent' && !m.recalled && m.author !== self && (m.expiresAt === undefined || m.expiresAt > Date.now())).map(m => m.id));
+    const valid = new Set(messages.filter(m => m.status === 'sent' && !m.recalled && m.author !== self && !expired(m.expiresAt, Date.now())).map(m => m.id));
     for (const id of this.pending) if (!valid.has(id)) this.pending.delete(id);
     for (const message of messages) {
       if (this.initialised && !this.seen.has(message.id) && message.liveArrival && valid.has(message.id)) this.pending.add(message.id);

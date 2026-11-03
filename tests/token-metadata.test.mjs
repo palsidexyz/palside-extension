@@ -9,19 +9,22 @@ import { pageName } from '../apps/extension/src/runtime/viewing/page-title.ts';
 import { pageView, readView, validateView } from '../apps/extension/src/runtime/viewing/view-snapshot.ts';
 import { pageFavicon } from '../apps/extension/src/runtime/viewing/viewing.ts';
 import { createTabObserver } from '../apps/extension/src/runtime/browser/tab-observer.ts';
+import { TokenProfiles } from '../apps/extension/src/runtime/viewing/token-profiles.ts';
+import { assetKey } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { siteByDomain } from '../packages/shared/src/sites/index.ts';
 
 const address='0x0000000000000000000000000000000000000001';
 const url=`https://gmgn.ai/eth/token/${address}`;
 const identity=identifyPage(url,['gmgn.ai']);
 const source=ts.createSourceFile('sharing.ts',readFileSync('apps/extension/src/runtime/viewing/sharing.ts','utf8'),ts.ScriptTarget.Latest,true);
 const classNode=source.statements.find(ts.isClassDeclaration);
-const members=classNode.members.filter(n=>['localTokenMetadata','refreshTokenMetadata','prepareView'].includes(n.name?.getText(source))).map(n=>n.getText(source)).join('\n');
-const context={tokenName,resolveTokenMetadata,pageView,readView,identifyPage,publicShareUrl,websiteIdentity,pageName,pageFavicon,URL,AbortController,setTimeout,clearTimeout,Date};
+const members=classNode.members.filter(n=>['localTokenMetadata','refreshTokenMetadata','prepareView','cachedToken'].includes(n.name?.getText(source))).map(n=>n.getText(source)).join('\n');
+const context={assetKey,siteByDomain,tokenName,resolveTokenMetadata,pageView,readView,identifyPage,publicShareUrl,websiteIdentity,pageName,pageFavicon,URL,AbortController,setTimeout,clearTimeout,Date};
 vm.runInNewContext(ts.transpileModule(`class Metadata { ${members} };globalThis.Metadata=Metadata;`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);
 function fixture(reader){
  const instance=new context.Metadata();let emitted=0,published=0;
  const session={account:{id:'self'}};
- instance.runtime={auth:{session,scope:()=>({wait:p=>p})},state:{preferences:{current:'team'}},tokenPage:reader,cache:{upsertView(){}},emit:()=>emitted++};
+ instance.runtime={auth:{session,scope:()=>({wait:p=>p})},state:{preferences:{current:'team'}},tokenPage:reader,tokens:new TokenProfiles(),cache:{upsertView(){}},emit:()=>emitted++};
  instance.page=pageView(identity);instance.pageObservation=1;instance.mayObserve=()=>true;instance.publishViewing=async()=>published++;
  return {instance,counts:()=>({emitted,published})};
 }

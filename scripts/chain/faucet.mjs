@@ -13,8 +13,7 @@ export function faucetArguments(args) {
 }
 async function main() {
   const { address, units } = faucetArguments(process.argv.slice(2));
-  for (const key of ['PALSIDE_CHAIN_RPC_URL', 'PALSIDE_CHAIN_RPC']) if (process.env[key]) localRpc(process.env[key]);
-  const rpc = localRpc(process.env.PALSIDE_CHAIN_RPC_URL ?? process.env.PALSIDE_CHAIN_RPC);
+  const rpc = localRpc(process.env.PALSIDE_CHAIN_RPC_URL);
   await requireLocalChain(rpc);
   if (await rpcCall(rpc, 'eth_getCode', [LOCAL_TOKEN, 'latest']) === '0x') throw new Error('MockPALS is not deployed; start dev-chain first');
   const data = encodeFunctionData({ abi: erc20Abi, functionName: 'transfer', args: [address, units] });

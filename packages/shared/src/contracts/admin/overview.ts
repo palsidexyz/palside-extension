@@ -18,8 +18,9 @@ export const adminOverview = strictObject({
   // Ordinary background jobs with failed attempts awaiting retry; excludes completed or currently leased work.
   jobs: strictObject({ retrying: count, oldestRetryingAt: nullable(time), href: Type.Literal('#/system?status=retrying') }),
   // usedToday is site-wide reserved quota, not successful payments or a fraction of the per-account cap.
-  // failedToday counts currently failed sponsored requests last updated in today's Taipei window.
-  sponsorship: strictObject({ day, usedToday: count, failedToday: count, oldestFailedAt: nullable(time), perAccountDailyLimit: nullable(count), href: Type.Literal('#/chain') }),
+  // failedToday counts currently failed sponsored requests last updated in today's UTC window.
+  sponsorship: strictObject({ day, timezone: Type.Literal('UTC'), usedToday: count, failedToday: count, oldestFailedAt: nullable(time), perAccountDailyLimit: nullable(count), href: Type.Literal('#/chain') }),
+  alerts: adminHealth.properties.alerts,
   services: strictObject({ checkedAt: time, abnormalIds: Type.Array(Type.Index(Type.Union(adminHealth.properties.services.items), ['id']), { uniqueItems: true }), href: Type.Literal('#/system') }),
 });
 export type AdminOverview = Infer<typeof adminOverview>;

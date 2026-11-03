@@ -82,7 +82,7 @@ contract AdversarialTest is Test {
     function testRejectFeeOnTransferEscrowAtomically() public {
         AdversarialToken other = new AdversarialToken();
         other.approve(address(packets), 3 ether);
-        bytes32 otherId = packets.createPacket(other, "other", PalsideRedPacket.Kind.Invitation, 3 ether, 1, 3 ether, 0);
+        bytes32 otherId = packets.createPacket(other, "other", PalsideRedPacket.Kind.Team, 3 ether, 1, 3 ether, 0);
         token.configure(true, false, address(0), "");
         vm.expectRevert(PalsideRedPacket.UnsupportedToken.selector);
         packets.createPacket(token, "tax", PalsideRedPacket.Kind.Team, 2 ether, 2, 1 ether, 0);

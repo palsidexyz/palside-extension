@@ -8,7 +8,7 @@ const uint = Type.String({ pattern: '^(0|[1-9][0-9]*)$', maxLength: 256 });
 export const adminJobRow = strictObject({
   id, kind: Type.String(), status: Type.Enum(['pending', 'running', 'retrying', 'failed-permanently', 'complete']), attempts: count,
   nextAttemptAt: nullable(count), leaseExpiresAt: nullable(count), subject: nullable(adminRef), team: nullable(adminTeamRef),
-  retry: strictObject({ allowed: Type.Boolean(), blockedReason: nullable(Type.Enum(['running', 'registration-protected', 'complete', 'worker-unavailable', 'unsupported-kind', 'failed-permanently'])) }),
+  retry: strictObject({ allowed: Type.Boolean(), blockedReason: nullable(Type.Enum(['running', 'registration-protected', 'complete', 'worker-unavailable', 'unsupported-kind'])) }),
   createdAt: count, completedAt: nullable(count),
 });
 export const adminJobPage = strictObject({ ...page(adminJobRow).properties, checkedAt: count });
@@ -22,7 +22,13 @@ export const adminMatrixHealth = strictObject({ id: Type.Literal('matrix'), ...s
 export const adminIndexHealth = strictObject({ id: Type.Literal('index'), ...sample, chainId: nullable(count), progress: nullable(adminIndexProgress) });
 export const adminRelayHealth = strictObject({ id: Type.Literal('relay'), ...sample, configured: nullable(Type.Boolean()), provider: nullable(Type.Enum(['alchemy', 'local'])), probe: Type.Enum(['configuration', 'provider-read']) });
 export const adminPriceHealth = strictObject({ id: Type.Literal('price'), ...sample, quote: nullable(adminHealthQuote) });
+export const adminJobAlerts = strictObject({
+  storage: nullable(strictObject({ state: Type.Enum(['ok', 'low', 'unavailable']), checkedAt: count, bytes: nullable(count), freeBytes: nullable(count) })),
+  queue: nullable(strictObject({ backlog: count, oldestPendingAt: nullable(count), alert: Type.Boolean() })),
+  failedJobs: nullable(count),
+  moneyTasks: nullable(strictObject({ count, oldestFailureAt: nullable(count), alert: Type.Boolean() })),
+});
 /** Fixed order guarantees exactly one result for each dependency. Index reachability alone is unverified. */
-export const adminHealth = strictObject({ checkedAt: count, services: Type.Tuple([adminDatabaseHealth, adminMatrixHealth, adminIndexHealth, adminRelayHealth, adminPriceHealth]) });
+export const adminHealth = strictObject({ checkedAt: count, services: Type.Tuple([adminDatabaseHealth, adminMatrixHealth, adminIndexHealth, adminRelayHealth, adminPriceHealth]), alerts: adminJobAlerts });
 export type AdminHealth = Infer<typeof adminHealth>;
 export type AdminIndexProgress = Infer<typeof adminIndexProgress>;

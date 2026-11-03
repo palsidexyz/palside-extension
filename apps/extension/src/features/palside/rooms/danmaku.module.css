@@ -1,19 +1,9 @@
 /* 弹幕: the full-panel view of one token's public messages, its 看法, 热门, the people in it and team invites. */
 .view { position:relative; display:flex; flex-direction:column; flex:1; min-height:0; background:var(--ui-canvas); }
-
-/* Header: back to the team · the token · who is here · 热门. */
-.head { display:grid; grid-template-columns:auto minmax(0, 1fr) auto auto; align-items:center; gap:6px; flex:none; height:56px; padding:0 8px 0 10px; }
-.back { position:relative; display:inline-flex; align-items:center; gap:2px; flex:none; height:32px; padding:0 6px 0 2px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); cursor:pointer; }
-.back:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
-.backDot { position:absolute; top:3px; right:3px; width:8px; height:8px; border-radius:50%; background:var(--ui-ink-accent); box-shadow:0 0 0 2px var(--ui-canvas); }
-.title { display:flex; align-items:center; gap:9px; min-width:0; height:40px; padding:0 6px 0 2px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-.title:hover { background:var(--ui-control-hover); }
-.title > :first-child { --token-size:28px; }
-.title > span:last-child { display:flex; flex-direction:column; min-width:0; }
-.title strong { overflow:hidden; color:var(--ui-text-primary); font-size:var(--ui-type-headline); line-height:20px; font-weight:600; letter-spacing:-.01em; text-overflow:ellipsis; white-space:nowrap; }
-.title small { overflow:hidden; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height:15px; text-overflow:ellipsis; white-space:nowrap; }
-.watch { display:inline-flex; align-items:center; height:32px; padding:0 9px 0 6px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; cursor:pointer; }
-.watch:hover { background:var(--ui-control-hover); }
+/* Opened from 聊天: it comes in from the right, the side its tab is on. */
+:global([data-from=chat]) > .view { animation:tabFromRight .32s var(--ui-ease-feedback); }
+@keyframes tabFromRight { from { opacity:0; transform:translateX(14px); } }
+@media (prefers-reduced-motion:reduce) { :global([data-from=chat]) > .view { animation:none; } }
 
 /* Overlapping faces; teammates ringed. */
 .faces { display:inline-flex; align-items:center; flex:none; }
@@ -24,29 +14,65 @@
 .faces b { margin-left:6px; color:var(--ui-text-primary); font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; }
 .faces:not(:has(span)) b { margin-left:0; }
 
-/* 看法: three equal columns before and after voting, one share bar under them. */
-.pollWrap { flex:none; padding:10px 12px; }
-/* 看法: a 36px track of three equal 32px choices; the shares run as a 2px hairline along its foot. */
-.poll { position:relative; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:2px; padding:2px 2px 4px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
-.poll button { --tone:var(--ui-text-primary); display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; height:32px; padding:0 6px; border:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; white-space:nowrap; cursor:pointer; transition:background-color .16s ease, color .16s ease; }
+/* The 弹幕 toolbar: 看法 across the row, then 去网站 when the tab is elsewhere. Its 12px gutters match the switch row and the list below. */
+.toolbar { position:relative; display:flex; align-items:flex-start; gap:6px; flex:none; padding:8px 12px 6px; }
+.toolbar > .stance { flex:1; min-width:0; }
+/* 去网站: the site's logo with a small ↗, and a ⌄ beside it for the other sites. */
+.sites { display:inline-flex; flex:none; align-items:center; margin-left:4px; }
+.siteOpen { position:relative; display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
+.siteArrow { position:absolute; right:3px; bottom:3px; display:grid; place-items:center; width:12px; height:12px; border-radius:50%; background:var(--ui-canvas); box-shadow:0 0 0 1px var(--ui-border-soft); color:var(--ui-text-primary); }
+.siteArrow svg { width:9px; height:9px; stroke-width:3; }
+.siteMore { display:grid; place-items:center; width:18px; height:32px; margin-left:-2px; padding:0; border:0; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
+.siteOpen:hover, .siteMore:hover, .siteMore[aria-expanded=true] { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.siteMenu { --popover-width:200px; padding:6px; }
+.siteMenuHead { padding:6px 10px 4px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; }
+
+/* 看法: a 36px track of three equal 32px choices, and under it the shares as one 4px bar across the full width. */
+.stance { display:flex; flex-direction:column; gap:6px; }
+.poll { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:2px; padding:2px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.poll button { --tone:var(--ui-text-primary); display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; height:32px; padding:0 6px; border:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; white-space:nowrap; cursor:pointer; transition:background-color .16s ease, color .16s ease, box-shadow .16s ease; }
 .poll button:hover:not(:disabled) { background:var(--ui-control-hover); color:var(--ui-text-primary); }
 .poll button:disabled { cursor:default; }
 .poll button > svg { flex:none; color:var(--tone); }
 .poll button > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .poll button > b { color:var(--ui-text-primary); font-weight:600; font-variant-numeric:tabular-nums; }
-.poll [data-stance=bull] { --tone:var(--ui-ink-success); }
-.poll [data-stance=hold] { --tone:var(--ui-ink-warning); }
-.poll [data-stance=bear] { --tone:var(--ui-ink-error); }
+.poll [data-stance=bull], .pollBar [data-stance=bull] { --tone:var(--ui-ink-success); }
+.poll [data-stance=hold], .pollBar [data-stance=hold] { --tone:var(--ui-ink-warning); }
+.poll [data-stance=bear], .pollBar [data-stance=bear] { --tone:var(--ui-ink-error); }
 .poll button[aria-checked=true] { background:var(--ui-canvas); color:var(--tone); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent); }
 .poll button[aria-checked=true] > b { color:var(--tone); }
-.pollBar { position:absolute; inset-inline:8px; bottom:1px; display:flex; gap:2px; height:2px; border-radius:1px; overflow:hidden; }
-.pollBar span { background:var(--tone); transition:flex-grow .3s ease; }
-.poll:not([data-shares]) .pollBar span { background:color-mix(in srgb, var(--ui-text-secondary) 25%, transparent); }
+.pollBar { display:flex; gap:2px; height:4px; margin:0 2px; border-radius:2px; overflow:hidden; }
+.pollBar span { background:var(--tone); transition:flex-grow .3s var(--ui-ease-feedback), background-color .3s ease; }
+.stance:not([data-shares]) .pollBar span { background:var(--ui-control-surface); }
 
 /* The tab moved to another token: one row under 看法 offering the switch. */
-.switchRow { display:flex; align-items:center; gap:8px; flex:none; height:40px; padding:0 8px 0 12px; background:var(--ui-control-surface); font-size:var(--ui-type-callout); }
+.switchRow { display:flex; align-items:center; gap:8px; flex:none; height:40px; padding:0 12px; background:var(--ui-control-surface); font-size:var(--ui-type-callout); }
 .switchRow > :first-child { --token-size:20px; }
 .switchRow strong { flex:1; min-width:0; overflow:hidden; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+/* On the token's own page, when Chrome has not allowed the site: the grey site logo and a plain statement, no warning colour. */
+.switchRow[data-notice] strong { font-weight:500; }
+.noticeLogo { flex:none; display:block; --logo-size:20px; }
+.noticeLogo > span { --logo-size:20px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-caption); }
+/* No token: the whole room (看法, list, box) frosts over and says why, the header staying sharp. Under it only grey shapes.
+   A sanctioned veil, not a slab: an ellipse of canvas behind the words (94%, then 70% at its rim) fading to 12% at the edges over a 1.5px blur,
+   so the skeleton shows round it. Flat, no border or shadow. It fades in and thaws out with the feedback timing. */
+.skeleton { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; padding:6px 10px; overflow:hidden; }
+.skeleton > div { display:grid; grid-template-columns:28px minmax(0, 1fr); column-gap:10px; padding:7px 8px; }
+.skeleton i { width:28px; height:28px; border-radius:50%; background:var(--ui-control-surface); }
+.skeleton span { display:flex; flex-direction:column; gap:7px; padding-top:3px; }
+.skeleton b { height:12px; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); }
+.skeleton b:first-child { height:9px; }
+.frost { position:absolute; inset:0; z-index:2; display:flex; align-items:center; justify-content:center; padding:24px; background:radial-gradient(60% 34% at 50% 48%, color-mix(in srgb, var(--ui-canvas) 94%, transparent) 0%, color-mix(in srgb, var(--ui-canvas) 70%, transparent) 55%, color-mix(in srgb, var(--ui-canvas) 12%, transparent) 100%); -webkit-backdrop-filter:blur(1.5px); backdrop-filter:blur(1.5px); }
+.frostBody { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; }
+.frostBody strong { color:var(--ui-text-primary); font-size:var(--ui-type-headline); font-weight:600; }
+.frostGlyph { display:grid; place-items:center; width:44px; height:44px; margin-bottom:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); }
+.frostGlyph svg { width:22px; height:22px; }
+.frostAction.frostAction { min-width:120px; margin-top:8px; }
+.frostLink { display:inline-flex; align-items:center; gap:4px; height:28px; margin-top:2px; padding:0 8px; border:0; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; cursor:pointer; transition:background-color .16s ease, color .16s ease; }
+.frostLink:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.gateLogo { display:block; margin-bottom:4px; }
+.gateLogo > span { --logo-size:44px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-callout); }
+.gateLogo svg { width:65%; height:65%; opacity:.8; }
 .switchButton.switchButton { min-height:28px; height:28px; padding:0 12px; border-radius:var(--ui-radius-pill); font-size:var(--ui-type-footnote); font-weight:600; background:var(--ui-solid); color:var(--ui-on-solid); }
 
 /* Messages: dense rows, not chat bubbles. */
@@ -92,25 +118,25 @@
 .send { border-radius:50%; background:var(--ui-text-primary); color:var(--ui-canvas); font-size:var(--ui-type-callout); font-weight:600; font-variant-numeric:tabular-nums; }
 .send:disabled { background:var(--ui-control-recess); color:var(--ui-text-secondary); cursor:default; }
 
-/* An icon switch whose off state cannot be mistaken for on: no tint and a slash. Unauthorised: amber 授权. */
-.toggle { position:relative; display:inline-grid; place-items:center; flex:none; width:32px; height:32px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); color:var(--ui-text-secondary); cursor:pointer; }
-.toggle svg { width:17px; height:17px; }
-.toggle[data-state=on] { background:var(--ui-accent-soft); color:var(--ui-ink-accent); }
-.toggle[data-state=paused] { opacity:.45; }
-.toggle[data-state=off]::after, .toggle[data-state=paused]::after { content:""; position:absolute; left:50%; top:50%; width:20px; height:1.6px; border-radius:1px; background:currentColor; box-shadow:0 0 0 1.5px var(--ui-canvas); transform:translate(-50%, -50%) rotate(-40deg); }
-.grant { display:inline-flex; align-items:center; gap:4px; flex:none; height:32px; padding:0 10px 0 8px; border:0; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-ink-warning) 16%, var(--ui-canvas)); color:var(--ui-ink-warning); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; }
-.grant svg { width:13px; height:13px; }
-
 /* 热门 */
-/* The chain row scrolls when the panel is narrow; its right edge fades only while more chips are hidden there. */
-@property --chains-fade { syntax:'<length>'; inherits:false; initial-value:0px; }
-.chains { display:flex; gap:6px; overflow-x:auto; padding:2px 0 4px; scrollbar-width:none; mask-image:linear-gradient(to right, #000 calc(100% - var(--chains-fade)), transparent); animation:chainsEnd linear both; animation-timeline:scroll(self inline); }
-@keyframes chainsEnd { 0%, 92% { --chains-fade:32px; } 100% { --chains-fade:0px; } }
-.chains button { flex:none; height:28px; padding:0 11px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; cursor:pointer; }
-.chains button:hover { color:var(--ui-text-primary); }
-.chains button[aria-pressed=true] { background:var(--ui-solid); color:var(--ui-on-solid); box-shadow:none; }
-.group { display:flex; flex-direction:column; gap:var(--ui-space-1); margin-top:16px; }
-.groupHead { padding:0 6px 4px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); font-weight:500; }
+/* The chain menu sits at the end of the header; its label and logo keep the same weight as a quiet control. */
+.chainOption { display:flex; flex:1; align-items:center; justify-content:space-between; gap:12px; min-width:132px; }
+.chainOption svg { color:var(--ui-text-primary); }
+/* Rows trade places with the reorder spring; an opaque row background keeps crossing rows readable. */
+/* 热门's chains: pills in one row that scrolls sideways and fades at the right edge; it stays on top while the ranking scrolls. */
+.chains { position:sticky; top:-8px; z-index:2; display:flex; gap:6px; margin:-8px -16px -6px; padding:8px 16px 4px; overflow-x:auto; scrollbar-width:none; background:var(--ui-canvas); mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.chains::-webkit-scrollbar { display:none; }
+.chains > button { display:inline-flex; align-items:center; gap:6px; flex:none; height:30px; padding:0 12px 0 8px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; line-height:16px; white-space:nowrap; cursor:pointer; transition:background-color .18s var(--ui-ease-feedback), color .18s var(--ui-ease-feedback); }
+.chains > button:hover:not([aria-selected=true]) { background:var(--ui-control-hover); }
+.chains > button[aria-selected=true] { background:var(--ui-solid); color:var(--ui-on-solid); }
+.chains > button:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.chains > button > svg:first-child { color:inherit; }
+.board { position:relative; display:flex; flex-direction:column; flex:1 1 auto; gap:var(--ui-space-1); }
+/* The ranking is one grouped card like every other list; the empty and loading states stand alone on the page. */
+.board:has(> .hot) { flex:0 0 auto; gap:0; padding:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.board > .hot { border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; }
+.climbed { position:absolute; inset:0; border-radius:inherit; background:var(--ui-control-hover); pointer-events:none; animation:climbed .9s var(--ui-ease-feedback) both; }
+@keyframes climbed { 0% { opacity:0; } 25% { opacity:1; } 100% { opacity:0; } }
 .hot { position:relative; display:grid; grid-template-columns:18px 32px minmax(0, 1fr) auto 56px; align-items:center; gap:10px; width:100%; min-height:58px; padding:0 6px; border:0; background:transparent; color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; }
 .hot:last-child { border-bottom:0; }
 .hot:hover { border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-hover); }
@@ -121,9 +147,7 @@
 .hot[data-top] .rank { color:var(--ui-text-primary); }
 .hotName { display:flex; flex-direction:column; min-width:0; }
 .hotName strong { display:flex; align-items:center; gap:6px; min-width:0; font-size:var(--ui-type-body); line-height:20px; font-weight:600; }
-.hotToken { position:relative; z-index:2; min-width:0; padding:0; border:0; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:transparent; color:inherit; font:inherit; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
-.hotToken:hover { text-decoration:underline; text-underline-offset:2px; }
-.hotToken:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.hotToken { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hotName small { display:flex; align-items:center; gap:6px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .mini { display:inline-flex; gap:1px; width:44px; height:4px; border-radius:2px; overflow:hidden; background:var(--ui-control-surface); }
 .mini span { background:var(--tone); }
@@ -133,9 +157,12 @@
 .here { flex:none; height:18px; padding:0 6px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); line-height:18px; font-weight:600; }
 .hotNum { display:flex; flex-direction:column; align-items:flex-end; font-variant-numeric:tabular-nums; }
 .hotNum b { font-size:var(--ui-type-headline); line-height:19px; font-weight:600; }
-.hotNum b[data-up] { color:var(--ui-ink-success); }
-.hotNum small { color:var(--ui-text-secondary); font-size:var(--ui-type-caption); white-space:nowrap; }
-.hotEmpty { padding:14px 6px; color:var(--ui-text-secondary); font-size:var(--ui-type-callout); }
+.hotNum small { display:grid; justify-items:end; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); white-space:nowrap; }
+.hotNum small > span { grid-area:1 / 1; transition:opacity .24s var(--ui-ease-feedback), transform .24s var(--ui-ease-feedback); }
+.hotNum small > [data-up] { display:inline-flex; align-items:center; color:var(--ui-ink-success); font-weight:600; opacity:0; transform:translateY(4px); }
+.hotNum[data-rising] small > [data-up] { opacity:1; transform:none; }
+.hotNum[data-rising] small > [data-unit] { opacity:0; transform:translateY(-4px); }
+@media (prefers-reduced-motion: reduce) { .hotNum small > span, .hotNum small > [data-up], .hotNum[data-rising] small > [data-up], .hotNum[data-rising] small > [data-unit] { transition:opacity .12s linear; transform:none; } }
 
 /* 在看 list and 已屏蔽 */
 .personRow { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; padding:0 14px; border:0; background:transparent; color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; }
@@ -179,7 +206,7 @@
 .preview svg { position:absolute; inset:12px 0 0; width:100%; height:calc(100% - 12px); opacity:.6; }
 .preview > span { position:absolute; color:var(--dm-ink); opacity:var(--dm-alpha); font:bold var(--dm-size)/1.25 SimHei, "Microsoft JhengHei", Arial, Helvetica, sans-serif; white-space:nowrap; text-shadow:1px 0 1px var(--dm-outline), 0 1px 1px var(--dm-outline), 0 -1px 1px var(--dm-outline), -1px 0 1px var(--dm-outline); }
 
-.back:focus-visible, .title:focus-visible, .watch:focus-visible, .poll button:focus-visible, .row > button:first-child:focus-visible, .toggle:focus-visible, .grant:focus-visible, .chains button:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.poll button:focus-visible, .siteOpen:focus-visible, .siteMore:focus-visible, .row > button:first-child:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 @media (prefers-reduced-motion:reduce) { .pollBar span, .row, .menu { transition:none; } }
 
 /* 互动选项's tabs: 弹幕, 信号, 便利贴 — each with its icon. */
@@ -194,3 +221,4 @@
 .messageAction { min-height:34px; padding:7px 9px; gap:9px; border-radius:calc(var(--ui-radius-popover) - 5px); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-footnote); }
 
 .foldedAction.foldedAction { min-height:22px; height:22px; padding:0 8px; font-size:var(--ui-type-footnote); }
+

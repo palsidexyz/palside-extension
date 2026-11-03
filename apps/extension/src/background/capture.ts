@@ -1,4 +1,5 @@
 import { MessageError,errorMessage,message as uiMessage } from '@palside/i18n';
+import { CAPTURE_MAX_MS } from '../domain/images/drawing.ts';
 import { accessStatus } from '../runtime/browser/permissions.ts';
 import { pageCapabilities,type CapabilityAccess } from '../runtime/browser/page-capabilities.ts';
 import type { PageAction,PageDown } from '../runtime/browser/page-protocol.ts';
@@ -72,7 +73,12 @@ export function capture(bg: Background) {
     return src;
   }
 
-  const shortcuts = new Map<number, number>();
+  const shortcuts = new Map<number, { at: number; timer: ReturnType<typeof setTimeout> }>();
+  function clearShortcut(windowId: number) {
+    const pending = shortcuts.get(windowId);
+    if (pending) bg.clearTimeout(pending.timer);
+    shortcuts.delete(windowId);
+  }
   const api = {
     captures, tabAccess, grantActiveTab, invalidateActiveTab, requirePageAction, pageActionFailure, discardCapture,
     /** The page of a running capture, which may connect without a site grant (activeTab). */
@@ -96,15 +102,17 @@ export function capture(bg: Background) {
       void bg.pages.pushPageStatus();
       const panel = [...bg.panels].find(([, id]) => id === tab.windowId)?.[0];
       if (panel) { fromShortcut(panel, tab.windowId); return; }
-      shortcuts.set(tab.windowId, Date.now());
+      clearShortcut(tab.windowId);
+      const pending = { at: Date.now(), timer: bg.setTimeout(() => clearShortcut(tab.windowId), SHORTCUT_WAIT_MS) };
+      shortcuts.set(tab.windowId, pending);
       // Opened inside the key press, before anything is awaited, so Chrome counts it as the user's.
-      void browser.sidePanel.open({ windowId: tab.windowId }).catch(() => { shortcuts.delete(tab.windowId); });
+      void browser.sidePanel.open({ windowId: tab.windowId }).catch(() => { if (shortcuts.get(tab.windowId) === pending) clearShortcut(tab.windowId); });
     },
     /** A panel said hello for its window: a shortcut pressed just before, while no panel was open there, starts its capture now. */
     panelReady(panel: Port, windowId: number) {
-      const at = shortcuts.get(windowId);
-      shortcuts.delete(windowId);
-      if (at !== undefined && Date.now() - at < SHORTCUT_WAIT_MS) fromShortcut(panel, windowId);
+      const pending = shortcuts.get(windowId);
+      clearShortcut(windowId);
+      if (pending && Date.now() - pending.at < SHORTCUT_WAIT_MS) fromShortcut(panel, windowId);
     },
   };
 
@@ -130,7 +138,7 @@ export function capture(bg: Background) {
           if (captures.get(windowId) !== session) return;
           discardCapture(windowId);
           bg.notifyWindow(windowId, { ok: false, message: 'Screenshot timed out.', text: uiMessage('extension.runtime.captureTimedOut') });
-        }, 120_000),
+        }, CAPTURE_MAX_MS),
       };
       captures.set(windowId, session);
       void bg.signals.broadcastSignals().catch(() => {});

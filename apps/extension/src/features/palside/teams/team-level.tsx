@@ -7,7 +7,7 @@ import { Tooltip } from '@palside/ui/tooltip';
 import { Count, Swap } from '../ui/motion-details';
 import { Chip, type ChipTone } from '../ui/chip';
 import { SettingGroup } from '../settings/setting-rows';
-import { TEAM_LEVEL_THRESHOLDS } from '@palside/shared/team-activity-rules';
+import { TEAM_LEVEL_THRESHOLDS } from '@palside/shared/rules/teams';
 import type { PalsideController } from '../app/use-palside';
 import s from './team-level.module.css';
 

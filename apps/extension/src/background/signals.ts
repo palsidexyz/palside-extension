@@ -44,13 +44,13 @@ export function signals(bg: Background) {
   /** Host tokens of sends in flight; the offscreen document asks `palside/signal-current` before it relays. */
   const sends = new Map<string, () => Promise<boolean>>();
 
-  function signalOn(info: { url?: string; windowId?: number }) { return bg.allows('signal') && bg.interactivePage(info); }
+  function signalOn(info: { url?: string; windowId?: number }) { return bg.allows('signal', info.url) && bg.interactivePage(info); }
   async function eligible(port: Port, info: PageConnection, version = bg.sessionVersion) {
     const url = info.url, accountId = bg.state?.account?.id, teamId = pageTeam(bg.state), tabVersion = bg.tabVersions.get(info.tabId), activity = activityVersion;
     const valid = () => activity === activityVersion && version === bg.sessionVersion && bg.tabVersions.get(info.tabId) === tabVersion && bg.pages.pagePorts.get(port) === info && info.url === url && accountId === bg.state?.account?.id && teamId === pageTeam(bg.state) && Boolean(teamId) && signalOn(info) && !bg.capture.captures.has(info.windowId);
     if (!valid()) return false;
     const [access, window, tab] = await Promise.all([accessStatus(url, browser), browser.windows.get(info.windowId), bg.activeTab(info.windowId)]);
-    return Boolean(valid() && access.site && window.focused && !window.incognito && tab?.id === info.tabId && tab.url === url && !tab.incognito && tab.status !== 'loading' && (!info.documentId || port.sender?.documentId === info.documentId));
+    return Boolean(valid() && access.site && window.focused && !window.incognito && tab?.id === info.tabId && tab.url === url && !tab.incognito && (!info.documentId || port.sender?.documentId === info.documentId));
   }
   async function signalConfig(port: Port, info: PageConnection) {
     const configVersion = (configVersions.get(port) ?? 0) + 1;
@@ -69,6 +69,11 @@ export function signals(bg: Background) {
   }
 
   return {
+    async clearAccount(accountId: string) {
+      await changes;
+      await browser.storage.local.remove(settingsKey(accountId));
+      if (settingsAccount === accountId) { loadVersion++; settingsAccount = undefined; settings = { ...defaultSignalSettings }; loadError = undefined; }
+    },
     get signalsReady() { return loadSettings(); },
     signalSettings: currentSettings,
     signalConfig, broadcastSignals,
@@ -130,7 +135,7 @@ export function signals(bg: Background) {
         for (const item of freshPageSignals(previous, next, url)) {
           if (!await eligible(port, info, version)) break;
           const author = await bg.pagePerson(item.personId);
-          if (bg.state?.account?.id !== next.account?.id || pageTeam(bg.state) !== pageTeam(next) || info.url !== url || item.sentAt + SIGNAL_TTL <= Date.now() || !await eligible(port, info, version)) break;
+          if (bg.state?.account?.id !== next.account?.id || pageTeam(bg.state) !== pageTeam(next) || info.url !== url || item.at + SIGNAL_TTL <= Date.now() || !await eligible(port, info, version)) break;
           port.postMessage({ type: 'signal', item, author } satisfies PageDown);
         }
       }

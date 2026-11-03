@@ -1,6 +1,5 @@
 import { denseArray, decodeContract, ContractDecodeError, Type, type Infer as Static, contractString, safeInteger, strictObject, plainRecord } from '@palside/shared/contracts/validation';
-import { retentionDays } from '@palside/shared/contracts/team-model';
-import { LOBBY_SEARCH_LENGTH } from '@palside/shared/contracts/limits';
+import { retentionDays, lobbySearch } from '@palside/shared/contracts/team-model';
 import { teamDiscoverySort } from '@palside/shared/team-activity';
 import { activity } from '@palside/shared/contracts/presence';
 import { MessageError,message as uiMessage } from '@palside/i18n';
@@ -9,9 +8,10 @@ import { roomKey,roomProfileInput,stance } from '@palside/shared/contracts/rooms
 import { chainOrderInput, chainAmount } from '@palside/shared/contracts/chain';
 import type { WalletState, WalletRecords } from '../wallet/controller';
 import type { WalletPayment } from '../../domain/wallet/model';
-import { readFavorites,readHosts,readInteraction,readWebFeatures } from '../../domain/annotations/interaction.ts';
+import { readFavorites,readHosts,readSiteInteractions } from '../../domain/annotations/interaction.ts';
 import { readMessageRefTarget } from '../../domain/annotations/social.ts';
 import type { ApiResult } from './api';
+import type { LobbyPaging } from '../teams/command-handlers';
 import type { RuntimeState } from '../composition/runtime-state';
 import type { Draft,Message,Attachment } from '../../domain/chat/model';
 import type { Viewing } from '../../domain/assets/model';
@@ -19,7 +19,7 @@ import type { RevisionedDraft } from '../storage/storage';
 import type { LanguageState } from './language';
 import type { LocateReply } from '../browser/page-protocol';
 import { documentCopy,type ImageSessionSnapshot } from '../media/image-sessions.ts';
-import { signalKinds,signalEmotes,wheelEntries,normalizeSignalKey,readSignalElementTarget,type SignalSettings } from '../annotations/signals.ts';
+import { signalKinds,signalEmotes,wheelEntries,normalizeSignalKey,readSignalTarget,type SignalSettings } from '../annotations/signals.ts';
 
 const text = contractString(), bool = Type.Boolean(), integer = safeInteger({ minimum: 0 });
 const optionalText = Type.Optional(text), optionalBool = Type.Optional(bool), optionalInt = Type.Optional(integer);
@@ -50,7 +50,7 @@ const message = Type.Decode(object, (input): Message => {
   if (input.ref !== undefined) { const ref = decodeContract(object, input.ref); decodeContract(refTarget, ref.target); }
   return input as Message;
 });
-const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), hiddenStickies: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), web: Type.Optional(validated(readWebFeatures)), interaction: Type.Optional(validated(readInteraction)), favorites: Type.Optional(validated(readFavorites)), tokenOff: Type.Optional(validated(readHosts)), restoreSites: Type.Optional(validated(readHosts)), rooms: Type.Optional(strictObject({ off: optionalBool })) });
+const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), hiddenStickies: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), siteInteraction: Type.Optional(validated(readSiteInteractions)), favorites: Type.Optional(validated(readFavorites)), tokenOff: Type.Optional(validated(readHosts)), toured: optionalBool, rooms: Type.Optional(strictObject({ off: optionalBool, site: optionalText, noticed: optionalBool })) });
 const windowTarget = { windowId: optionalInt, teamId: optionalText, accountId: optionalText };
 const sticky = { ...team, accountId: optionalText, kind: Type.Literal('sticky'), asset: optionalText, text: text, site: optionalText, url: optionalText, target: Type.Optional(refTarget), edits: optionalText, baseRevision: optionalText, operationId: optionalText, caption: optionalText };
 
@@ -60,12 +60,12 @@ export const commandPayloads = {
   'wallet-room': roomQuery, 'wallet-packet': strictObject({ id: text }),
   'wallet-person': strictObject({ accountId: text }),
   'wallet-claim': strictObject({ packetId: text }),
-  'wallet-refresh': empty, 'wallet-unlock': strictObject({ password: text }),
+  'wallet-refresh': empty, 'wallet-lock': empty, 'wallet-unlock': strictObject({ password: text }),
   'wallet-records': strictObject({ direction: Type.Enum(['all', 'in', 'out']), more: optionalBool }),
   'wallet-recovery': strictObject({ more: optionalBool }),
   'wallet-recovery-check': strictObject({ orderId: text }), 'wallet-recovery-resume': strictObject({ orderId: text }),
   'wallet-review': strictObject({ input: chainOrderInput }), 'wallet-confirm': strictObject({ accountId: text, paymentId: text, password: optionalText }),
-  'wallet-packet-review': strictObject({ kind: Type.Enum(['team', 'invitation', 'room']), scope: text, count: safeInteger({ minimum: 1, maximum: 100 }), distribution: Type.Enum(['equal', 'random']), total: chainAmount, blessing: optionalText }),
+  'wallet-packet-review': strictObject({ kind: Type.Enum(['team', 'room']), scope: text, count: safeInteger({ minimum: 1, maximum: 100 }), distribution: Type.Enum(['equal', 'random']), total: chainAmount, blessing: optionalText }),
   'wallet-reconcile': empty, 'wallet-dismiss': strictObject({ accountId: text, paymentId: text }), 'wallet-opened-ack': empty,
   'wallet-preferences': strictObject({ smallPayments: optionalBool, hideAmounts: optionalBool, password: optionalText }),
   'wallet-receive': strictObject({ amount: Type.Optional(chainAmount) }),
@@ -89,7 +89,8 @@ export const commandPayloads = {
   recruitment: strictObject({ ...team, active: bool }), apply: strictObject({ ...team, note: optionalText }), 'cancel-application': strictObject(team),
   decide: strictObject({ ...team, accountId: text, accept: bool }),
   transfer: strictObject({ ...team, action: Type.Enum(['request', 'accept', 'reject', 'cancel']), accountId: optionalText }),
-  'team-preferences': strictObject({ ...team, muted: optionalBool, readIds: Type.Optional(denseArray(text)) }), lobby: strictObject({ q: Type.Optional(contractString({ max: LOBBY_SEARCH_LENGTH, pattern: /^[^\x00-\x1f\x7f]*$/ })), sort: Type.Optional(teamDiscoverySort) }),
+  'team-preferences': strictObject({ ...team, muted: optionalBool, readIds: Type.Optional(denseArray(text)) }), lobby: strictObject({ q: Type.Optional(lobbySearch), sort: Type.Optional(teamDiscoverySort) }),
+  'lobby-more': strictObject({ list: Type.Enum(['teams', 'applications']) }),
   'invite-list': empty, 'invite-options': strictObject({ accountId: text }), 'invite-send': strictObject(accountTeam),
   'invite-accept': strictObject({ id: text }), 'invite-ignore': strictObject({ id: text }), 'invite-settings': strictObject({ accept: bool }),
   'team-invite-permission': strictObject({ ...team, on: bool }),
@@ -98,9 +99,9 @@ export const commandPayloads = {
   'room-tab': strictObject({ asset: Type.Union([text, Type.Null()]), profile: Type.Optional(roomProfileInput) }), 'room-panels': strictObject({ connected: bool }),
   'room-send': strictObject({ text }), 'room-more': empty, 'room-find': strictObject({ key: roomKey, id: text }), 'room-retract': strictObject({ id: text }), 'room-report': strictObject({ id: text }),
   'room-stance': strictObject({ key: roomKey, value: Type.Union([stance, Type.Null()]) }), 'room-summary': roomQuery,
-  'room-people': roomQuery, 'room-hot': strictObject({ sourceId: optionalText, chain: Type.Optional(Type.Union([text, Type.Null()])) }), 'room-blocks': empty,
+  'room-people': roomQuery, 'room-hot': strictObject({ sourceId: optionalText, open: Type.Boolean() }), 'room-blocks': empty,
   'room-block': strictObject({ accountId: text, blocked: bool }), 'room-settings': strictObject({ off: bool }),
-  preferences, toggle: strictObject({ share: optionalBool, interact: optionalBool, revoked: optionalBool }),
+  preferences, toggle: strictObject({ share: optionalBool, revoked: optionalBool }),
   'device-state': activity,
   'host-notice': strictObject({ message: strictObject({ key: text, values: Type.Optional(plainRecord(Type.Union([text, safeInteger()]))) }) }),
   'dismiss-notice': empty, 'dismiss-jump': strictObject({ messageId: optionalText, windowId: optionalInt }),
@@ -127,7 +128,7 @@ export const commandPayloads = {
   'selection-enabled': strictObject({ ...windowTarget, on: bool }), capture: strictObject(windowTarget), 'link-card': strictObject({ ...windowTarget, url: optionalText }),
   'quote-sticky': strictObject({ ...team, accountId: optionalText, stickyId: text }), 'locate-sticky': strictObject({ ...windowTarget, stickyId: text }), 'locate-ref': strictObject({ ...windowTarget, messageId: text }),
   'signal-settings-get': empty, 'signal-settings': strictObject({ settings: signalSettings, expectedAccountId: text }), 'danmaku-settings': strictObject({ settings: danmakuSettings }),
-  'signal-send': strictObject({ ...team, id: optionalText, url: text, sentAt: optionalInt, kind: Type.Enum(signalKinds), target: Type.Union([strictObject({ kind: Type.Literal('page') }), strictObject({ kind: Type.Literal('quote'), exact: text, prefix: text, suffix: text }), validated(readSignalElementTarget)]), emote: Type.Optional(Type.Enum(signalEmotes)), hostToken: text }),
+  'signal-send': strictObject({ ...team, id: optionalText, url: text, sentAt: optionalInt, kind: Type.Enum(signalKinds), target: validated(readSignalTarget), emote: Type.Optional(Type.Enum(signalEmotes)), hostToken: text }),
 } as const;
 export type CommandName = keyof typeof commandPayloads;
 export type CommandPayload<N extends CommandName> = Static<typeof commandPayloads[N]>;
@@ -151,7 +152,7 @@ type Results = {
   react: ApiResult<'viewing.react'>; poke: ApiResult<'viewing.react'>;
   team: { done: true }; retention: { done: true }; dissolve: { done: true }; leave: { done: true }; remove: { done: true }; unban: { done: true }; recruitment: { done: true }; apply: { done: true }; 'cancel-application': { done: true }; decide: { done: true }; transfer: { done: true }; 'team-preferences': { done: true };
   edit: { done: true }; avatar: { done: true }; 'remove-avatar': { done: true }; recall: { done: true };
-  lobby: ApiResult<'teams.lobby'> | undefined;
+  lobby: LobbyPaging | undefined; 'lobby-more': LobbyPaging | undefined;
   snapshot: RuntimeState; 'account-generate': { words: string[] }; 'mnemonic-reveal': { words: string[] }; devices: ApiResult<'devices.list'>;
   create: ApiResult<'teams.create'>; join: ApiResult<'invites.join'>; invitation: RuntimeState['invitations'][string] | undefined;
   'invite-preview': ApiResult<'invites.preview'> & { invite: string }; 'invite-options': ApiResult<'invites.options'>; 'invite-send': ApiResult<'invites.send'>;
@@ -165,7 +166,7 @@ type Results = {
   report: { submitted?: true; pending?: true; recovered?: boolean }; logout: { remote: boolean };
   'link-card': { attachment?: Extract<Attachment, { kind: 'asset' }>; view?: Viewing }; capture: { started: true };
   'locate-sticky': LocateReply; 'locate-ref': LocateReply; 'signal-settings': SignalSettings; 'signal-settings-get': SignalSettings;
-  language: LanguageState; toggle: RuntimeState['toggles'];
+  language: LanguageState; toggle: { share: boolean };
   'permissions-get': { origins: string[]; tabs: boolean; notifications: boolean; site: boolean };
   'permissions-remove': { removed: boolean; origins: string[] };
 };

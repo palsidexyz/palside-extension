@@ -1,9 +1,9 @@
+import { DAY_MS as DAY } from '@palside/shared/units';
 import { commandHandler } from './handler-registry';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { ApiError,type ApiOptions,type ApiResult } from '../transport/api';
 import type { EndpointId } from '@palside/shared/contracts/endpoints';
 import type { Command } from '../transport/command-map';
-import { DAY } from './state';
 import type { PalsideService } from './core';
 
 export class RuntimeCommands {

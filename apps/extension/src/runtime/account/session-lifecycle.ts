@@ -1,6 +1,8 @@
-import { refresh,requestRefresh,scheduleDeviceStateReport,reportDeviceState } from './live-sync';
+import { MINUTE_MS } from '@palside/shared/units';
+import { clearBrowserAccount } from '../browser/account-cleanup';
+import { refresh, requestRefresh, scheduleDeviceStateReport, reportDeviceState, refreshDomains, type RefreshDomain } from './live-sync';
 import { fetchSnapshot } from './snapshot';
-import { connectRuntimeDevice,history } from './matrix-session';
+import { connectRuntimeDevice,history,preloadHistory } from './matrix-session';
 import { start } from './local-restore';
 import { type PresenceState } from '@palside/shared/contracts/common';
 import type { DeviceState } from '@palside/shared/contracts/presence';
@@ -16,7 +18,6 @@ import { sessionScope } from './session';
 import { DeviceCleanup,within,type CleanupIntent } from './cleanup';
 import type { PalsideService } from '../composition/core';
 
-import { refreshDomains,type RefreshDomain } from './live-sync';
 
 export class SessionRuntime {
   readonly runtime: PalsideService;
@@ -114,7 +115,7 @@ export class SessionRuntime {
     if (runtime.state.connection.messaging === 'failed') return;
     if (!this.cryptoInitialised) return this.connect(this.session);
     if (runtime.state.connection.messaging !== 'ready') this.client?.retryImmediately();
-    else if (connectionStatus(runtime.state.connection) === 'connected' && Date.now() - this.snapshotAt < (this.sseOpen ? 60_000 : SNAPSHOT_INTERVAL)) return;
+    else if (connectionStatus(runtime.state.connection) === 'connected' && Date.now() - this.snapshotAt < (this.sseOpen ? MINUTE_MS : SNAPSHOT_INTERVAL)) return;
     await this.refresh(refreshDomains);
   }
   connect(session: RuntimeDevice, identity?: Identity): Promise<void> {
@@ -137,6 +138,9 @@ export class SessionRuntime {
     this.connecting = { session, promise }; return promise;
   }
   connectRuntimeDevice(session: RuntimeDevice, identity?: Identity) { return connectRuntimeDevice.call(this, session, identity); }
+  historyPages = new WeakMap<Room, number>();
+  historyPreloads = new WeakMap<Room, Promise<void>>();
+  preloadHistory() { return preloadHistory.call(this); }
   historyPage?: { client: MatrixClient; events: Set<MatrixEvent> };
   historyQueue: Promise<void> = Promise.resolve();
   history(room: Room) { return history.call(this, room); }
@@ -166,7 +170,7 @@ export class SessionRuntime {
     this.cleanup.add('device-cleanup', async () => {
       await runtime.storage.put('device-cleanup', '_device', 'cleanup', intent);
       const jobs = ['device', 'vault', 'pending-device', 'pending-invite'].map(key => runtime.storage.remove(key));
-      if (intent.accountId) jobs.push(runtime.storage.clearAccount(intent.accountId, intent.preservePreferences));
+      if (intent.accountId) jobs.push(runtime.storage.clearAccount(intent.accountId, intent.preservePreferences), clearBrowserAccount(intent.accountId, intent.preservePreferences));
       if (intent.cryptoDatabasePrefix) jobs.push((async () => {
         await opening?.catch(() => {});
         const owner = client ?? createClient({ baseUrl: runtime.api.baseUrl });

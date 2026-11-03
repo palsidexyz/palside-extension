@@ -1,3 +1,4 @@
+import { SECOND_MS } from '../units.ts';
 // Adapted from darrenprx/lolPing (MIT), c98806ae96a4dd83ca9c12be224878057f3d3ae7. See LICENSE.
 import type { PingTag } from './manifest';
 const EMOTE_DURATION_S = 3;
@@ -59,7 +60,7 @@ export class EmoteStage {
       if (live.gone) return;
       img.onload = null; img.onerror = null;
       clearTimeout(live.timer);
-      live.timer = setTimeout(() => this.end(owner, live), EMOTE_DURATION_S * 1000 + 150);
+      live.timer = setTimeout(() => this.end(owner, live), EMOTE_DURATION_S * SECOND_MS + 150);
       fx.style.animationName = '';
       opts.onReady?.();
     };

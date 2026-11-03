@@ -2,7 +2,6 @@
 import type { PalsideProps } from './panel-props';
 import type { PanelActions } from './panel-actions';
 import { createLiveActions } from './live-actions';
-import { interactionAllows } from '../../../domain/annotations/interaction';
 import { usePanelState } from './use-panel-state';
 import { usePanelEffects } from './use-panel-effects';
 import { usePanelCommands } from './use-panel-commands';
@@ -29,7 +28,7 @@ export function usePalside(props: PalsideProps) {
     ...(props.adapter?.actions ?? createLiveActions)(state, getActions),
   });
   usePanelEffects(state, getActions());
-  const { view: { web, interaction }, preferences, notice, text } = state;
-  return { ...state.view, ...actions, interacting: web.interact && interactionAllows(interaction), preferenceError: preferences.error, notice: text(notice.text), noticeUndo: notice.undo };
+  const { preferences } = state;
+  return { ...state.view, ...actions, preferenceError: preferences.error };
 }
 export type PalsideController = ReturnType<typeof usePalside>;

@@ -1,5 +1,5 @@
 // Plain values and checks shared by the schemas and by UI code that must not load the schema engine.
-import { INVITE_PASSWORD_ALPHABET, INVITE_PASSWORD_LENGTH } from './limits.ts';
+import { INVITE_PASSWORD_ALPHABET, INVITE_PASSWORD_LENGTH } from '../rules/teams.ts';
 
 const graphemeSegmenter = new Intl.Segmenter('und', { granularity: 'grapheme' });
 /** Length in user-perceived characters, including composed emoji. */

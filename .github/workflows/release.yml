@@ -42,8 +42,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          node scripts/release-notes.mjs "$GITHUB_REF_NAME" "$GITHUB_SHA" > "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" \
             apps/extension/.output/release/palside-*-chrome.zip \
             apps/extension/.output/release/SHA256SUMS.txt \
             apps/extension/.output/release/manifest.json \
-            --verify-tag
+            --title "Palside $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

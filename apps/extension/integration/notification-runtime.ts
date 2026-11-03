@@ -1,3 +1,4 @@
+import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import { PalsideService } from '../src/runtime/composition/core';
 import { ClientStorage } from '../src/runtime/storage/storage';
 import type { RuntimeDevice } from '../src/runtime/account/device';
@@ -15,9 +16,9 @@ const run=async()=>{
     const service=new PalsideService(async payload=>{notifications.push(payload);},undefined,storage);
     fixtures.push({storage,service,name});const now=Date.now(),key='alice:notified:event';
     const session:RuntimeDevice={token:'test-only',storageKey:[],account:{ bio: '', tags: [], id:'alice',nickname:'Alice',matrixId:'@alice:example.test',avatarId:null,revision:1, acceptTeamInvites: true},matrix:{userId:'@alice:example.test',deviceId:'qa'}};
-    service.auth.session=session;service.auth.receiveSince=now-1000;service.state.authenticated=true;service.state.account=session.account;service.state.preferences.notifications='all';service.state.preferences.notificationPreview=true;
+    service.auth.session=session;service.auth.receiveSince=now-SECOND_MS;service.state.authenticated=true;service.state.account=session.account;service.state.preferences.notifications='all';service.state.preferences.notificationPreview=true;
     service.state.remoteTeams=[remoteTeam({id:'team',roomId:'!team:example.test',name:'QA team'})];
-    const message:Message={id:'event',teamId:'team',author:'friend',status:'sent',time:'12:00',text:'private preview',expiresAt:now+60000,liveArrival:true};service.state.data.messages=[message];service.state.data.people=[{id:'friend',name:'Friend',color:'#fff'}];
+    const message:Message={id:'event',teamId:'team',author:'friend',status:'sent',time:'12:00',text:'private preview',expiresAt:now+MINUTE_MS,liveArrival:true};service.state.data.messages=[message];service.state.data.people=[{id:'friend',name:'Friend',color:'#fff'}];
     return{storage,service,notifications,message,now,key};
   }
   try{
