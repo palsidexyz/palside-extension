@@ -32,7 +32,7 @@ regexes = ['''^zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong$''']
 [[allowlists]]
 description = "Invite password alphabet"
 condition = "AND"
-paths = ['''^packages/shared/src/(protocol|contracts/limits)\.ts$''']
+paths = ['''^packages/shared/src/(protocol|contracts/limits|rules/teams)\.ts$''', '''^tests/fixtures/config-rules\.json$''']
 regexes = ['''^ABCDEFGHJKMNPQRSTUVWXYZ23456789$''']
 
 [[allowlists]]
