@@ -28,6 +28,23 @@ export class SendPacer {
   clear() { this.next.clear(); }
 }
 
+/**
+ * Keeps each team's sends reaching the service in the order they were made: `take` claims the next turn at once, and its `ready`
+ * settles when every earlier send has been handed to the service or given up. A turn must be released either way.
+ */
+export class SendLanes {
+  private readonly tails = new Map<string, Promise<void>>();
+  take(key: string) {
+    const ready = this.tails.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const done = new Promise<void>(resolve => { release = resolve; });
+    const tail = ready.then(() => done);
+    this.tails.set(key, tail);
+    void tail.then(() => { if (this.tails.get(key) === tail) this.tails.delete(key); });
+    return { ready, release };
+  }
+}
+
 /** The wait a throttled Matrix or business response asks for, when it is short enough to absorb. */
 export function throttleWait(error: unknown) {
   if (!error || typeof error !== 'object') return;

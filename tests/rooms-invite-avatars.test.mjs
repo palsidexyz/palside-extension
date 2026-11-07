@@ -32,7 +32,7 @@ function fixture(t) {
       if (['invites.accept', 'invites.ignore'].includes(path)) { pending = []; return { teamId: 'team', ignored: true }; }
       return Api.prototype.request.call(this, path, options);
     }, async roomAvatar(room, account) { people.push({ room, account }); return new Blob(['person']); } },
-    tokens: new TokenProfiles(),
+    tokens: new TokenProfiles(), directory: { clear() {}, show() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
     dispatch: { mutate: path => runtime.api.request(path) },
     async refresh() {},
     emit() { service.prune(); },

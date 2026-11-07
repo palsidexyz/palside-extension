@@ -1,6 +1,5 @@
 import { visibleStickies } from '../../domain/annotations/social.ts';
 import { identifyPage } from '@palside/shared/navigation';
-import { siteProfile } from '@palside/shared/sites';
 import { assetKey,viewAsset,pageScopeUrl } from '../../domain/annotations/interaction.ts';
 import type { AssetKey,LocateResult,PageStatus } from './page-protocol.ts';
 import { broadOrigin,grantedHost } from './permissions.ts';
@@ -33,20 +32,19 @@ export function locateResponse(requestId: string, message: unknown): LocateResul
   return ['shown', 'missing', 'hidden', 'other-site', 'unavailable'].includes(value.result as string) ? value.result as LocateResult : undefined;
 }
 export function pageTeam(state: RuntimeState | undefined) { return state?.authenticated ? state.remoteTeams.find(team => team.joined && team.id === state.preferences.current)?.id : undefined; }
+/** The tab's token: read from the URL, or for a pool or chainless contract page the token the server found for it (see `PageResolver`). */
 export function pageAsset(url: string, state?: RuntimeState): AssetKey | undefined {
-  const host = pageUrlHost(url);
-  if (!host) return;
-  const identity = identifyPage(url, [host]);
+  const identity = pageIdentity(url);
   if (identity?.kind === 'asset') return assetKey(identity.chain, identity.address);
-  if (identity?.kind !== 'pool' || !state) return;
-  const views = [...state.data.views, ...state.data.messages.flatMap(message => [message.ref?.view, message.attachment?.kind === 'asset' ? message.attachment.view : undefined]), ...Object.values(state.drafts).map(draft => draft.value.ref?.view)];
-  const assets = new Set(views.flatMap(view => {
-    if (!view || view.chain !== identity.chain) return [];
-    const source = identifyPage(view.url, [host]), asset = viewAsset(view);
-    return asset && source?.kind === 'pool' && source.url === identity.url ? [asset] : [];
-  }));
-  return assets.size === 1 ? [...assets][0] : undefined;
+  if (identity?.kind !== 'pool' && identity?.kind !== 'address') return;
+  return (state?.pages?.[identity.url] ?? undefined) as AssetKey | undefined;
 }
+/** A pool or chainless contract page the server has not answered for yet: the page the runtime should look up. */
+export function pageLookup(url: string, state?: RuntimeState) {
+  const identity = pageIdentity(url);
+  return (identity?.kind === 'pool' || identity?.kind === 'address') && state?.pages?.[identity.url] === undefined ? identity : undefined;
+}
+function pageIdentity(url: string) { const host = pageUrlHost(url); return host ? identifyPage(url, [host]) : null; }
 export const PAGE_SCRIPT_ID = 'palside-page';
 /** The page layer's content script for exact host patterns: top frame only, re-registered after each browser start. */
 export function pageScript(matches: string[]) {
@@ -74,7 +72,6 @@ export function pageStatus(windowId: number, tab: (CapabilityTab & { title?: str
   const granted = Boolean(pageTeam(state) && capabilities.pick.state === 'ready');
   const sites = state?.preferences.siteInteraction;
   const interactive = Boolean(granted && siteAllows(sites, host));
-  const tokenProfile = Boolean(host && siteProfile(host));
   return {
     windowId,
     tabId: tab?.id,
@@ -91,7 +88,6 @@ export function pageStatus(windowId: number, tab: (CapabilityTab & { title?: str
     stickyEnabled: granted && siteAllows(sites, host, 'sticky'),
     signalEnabled: granted && siteAllows(sites, host, 'signal'),
     connected: Boolean(access.site && port),
-    tokenProfile,
     missingStickies: port?.missingStickies ?? [],
   };
 }

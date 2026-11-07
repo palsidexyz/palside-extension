@@ -83,7 +83,7 @@ export const catalog: readonly { id: string; name: string; domain: string; categ
   { id: 'defined', name: 'Defined', domain: 'www.defined.fi', category: 'market' },
   { id: 'blockworks', name: 'Blockworks', domain: 'app.blockworks.com', category: 'market', plate: 'light' },
   { id: 'crypto-bubbles', name: 'Crypto Bubbles', domain: 'cryptobubbles.net', category: 'market' },
-  { id: 'birdeye', name: 'Birdeye', domain: 'birdeye.so', category: 'market' },
+  { id: 'birdeye', name: 'Birdeye', domain: 'birdeyeterminal.com', category: 'market' },
   { id: 'tokenomist', name: 'Tokenomist', domain: 'tokenomist.ai', category: 'market' },
   { id: 'ave', name: 'Ave.ai', domain: 'ave.ai', category: 'market' },
   { id: 'feixiaohao', name: '非小号', domain: 'www.feixiaohao.com', category: 'market' },

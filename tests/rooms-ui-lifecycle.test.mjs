@@ -52,7 +52,7 @@ function fixture() {
     motion: { span: 'motion.span' }, useSocialUi: () => social, setSocialUi: patch => Object.assign(social, patch),
     message: key => key, errorMessage: error => error.message, characterLength: text => [...text].length,
     HOT_CHAIN_ORDER: [null, 'Robinhood', 'Solana', 'BNB Chain', 'Base', 'Ethereum'], ...units, ROOM_TEXT_MAX: 200, TEAM_MEMBER_LIMIT: 30, viewAsset: view => view?.id,
-    tokenNamed, withProfile, shortAddress, tokenPageUrl, siteById, tokenLabel: view => view.name, TokenName: 'TokenName',
+    tokenNamed, withProfile, shortAddress, tokenPageUrl, siteById, tokenLabel: view => view.name, tokenWaiting: () => undefined, TokenName: 'TokenName',
     capability: () => ({ state: 'on' }), accountLabel: id => id, pageUnusable: () => false, pageIssue: () => undefined, ConnectionState: 'ConnectionState',
   };
   function load(file) {
@@ -175,7 +175,7 @@ test('people, blocks, invites and Hot show retry without replacing verified rows
 test('room quote completion returns only its originating navigation to the chat and keeps the original reference payload', async () => {
   for (const leave of ['none', 'new-room', 'same-room-reopened', 'hot', 'unmount']) {
     const f = fixture(), { c, rooms, calls, take } = controller(), api = f.load('rooms/rooms.ts');
-    c.screen = 'room'; rooms.pinned = 'token:Ethereum:token'; rooms.current = { key: rooms.pinned, profile: null };
+    c.screen = 'room'; rooms.pinned = 'token:Ethereum:token'; rooms.current = { key: rooms.pinned, site: null };
     const owner = f.mount(api.useRoomOpening); owner.render(c);
     const menu = f.mount(f.load('rooms/danmaku-view.tsx').LineMenu);
     const message = { id: 'line', text: 'whole line', author: { id: 'friend', nickname: 'Friend' }, createdAt: 123 };

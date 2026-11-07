@@ -10,8 +10,9 @@ import { presenceEndpoints } from './routes/presence.ts';
 import { viewingEndpoints } from './routes/viewing.ts';
 import { operationEndpoints } from './routes/operations.ts';
 import { chainEndpoints } from './routes/chain.ts';
+import { tokenEndpoints } from './routes/tokens.ts';
 /** OPTIONS is transport preflight. /_matrix/*, including anonymous versions, belongs to the gateway allowlist. */
-export const endpoints = [...systemEndpoints, ...accountEndpoints, ...deviceEndpoints, ...teamEndpoints, ...inviteEndpoints, ...roomEndpoints, ...mediaEndpoints, ...reportEndpoints, ...presenceEndpoints, ...viewingEndpoints, ...operationEndpoints, ...chainEndpoints] as const;
+export const endpoints = [...systemEndpoints, ...accountEndpoints, ...deviceEndpoints, ...teamEndpoints, ...inviteEndpoints, ...roomEndpoints, ...mediaEndpoints, ...reportEndpoints, ...presenceEndpoints, ...viewingEndpoints, ...operationEndpoints, ...chainEndpoints, ...tokenEndpoints] as const;
 export { pathFor } from './endpoint.ts';
 export type EndpointId = typeof endpoints[number]['id'];
 export type EndpointById<I extends EndpointId> = Extract<typeof endpoints[number], { id: I }>;

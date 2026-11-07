@@ -3,10 +3,11 @@ import { graphemeLength, isRoomKey, roomKeyForAsset, stances } from '@palside/sh
 import type { EndpointId } from '@palside/shared/contracts/endpoints';
 import type { ApiOptions,ApiResult } from '../transport/api';
 import { ROOM_MESSAGE_LIMIT, ROOM_RENEW_MS, ROOM_TEXT_MAX } from '@palside/shared/rules/rooms';
-import type { RoomEvent,RoomMessage,RoomPerson,RoomProfile,RoomProfileInput,RoomStance,Stance,StanceCounts } from './contract-types';
+import type { RoomEvent,RoomMessage,RoomPerson,RoomStance,Stance,StanceCounts } from './contract-types';
 import { ApiError } from '../transport/api';
 import { commandError } from '../composition/commands';
 import type { PalsideService } from '../composition/core';
+import { siteById } from '@palside/shared/sites';
 
 const SUMMARY_LIMIT = 64, RESULT_TTL = 10 * MINUTE_MS;
 /** A token's public numbers this recent are reused instead of read again; live events and 热门 keep them current meanwhile. */
@@ -24,8 +25,8 @@ export class RoomService {
   private tab?: string;
   /** The active tab's token room, which the panel names before any room is open. */
   get tabKey() { return this.tab; }
-  private tabProfile?: RoomProfileInput;
-  private pinnedProfile?: RoomProfileInput;
+  /** The registry site the tab's token is open on: this device's vote for the room's usual site. A pinned token votes nothing. */
+  private tabSite?: string;
   private epoch = 0;
   private version = 0;
   private reads = 0;
@@ -74,11 +75,10 @@ export class RoomService {
   private requireEnabled() { this.requireAccount(); if (!this.enabled()) throw commandError('ROOM_OFF', 'common.error'); }
   private key(value: unknown) { if (!isRoomKey(value)) throw commandError('INVALID_INPUT', 'common.error'); return value; }
   private id(value: unknown) { if (typeof value !== 'string' || !value) throw commandError('INVALID_INPUT', 'common.error'); return value; }
-  private profile(value: unknown): RoomProfileInput | undefined {
+  private site(value: unknown): string | undefined {
     if (value === undefined) return;
-    const input = value as RoomProfileInput;
-    if (!input || typeof input.name !== 'string' || typeof input.site !== 'string' || input.logo !== undefined && typeof input.logo !== 'string') throw commandError('INVALID_INPUT', 'common.error');
-    return { name: input.name, site: input.site, ...(input.logo === undefined ? {} : { logo: input.logo }) };
+    if (typeof value !== 'string' || !siteById(value)) throw commandError('INVALID_INPUT', 'common.error');
+    return value;
   }
   private requireRoom() {
     this.requireEnabled(); const room = this.runtime.state.rooms.current;
@@ -105,8 +105,8 @@ export class RoomService {
     const token = this.runtime.auth.session?.token;
     if (token && this.remoteLease) void this.serial(() => this.runtime.api.request('rooms.lease', { body: { key: null }, token })).catch(() => {});
     this.dropHot('');
-    this.stop(); this.epoch++; this.reads++; this.clearCurrent(); this.panels = false; this.tab = undefined; this.tabProfile = undefined; this.pinnedProfile = undefined; this.remoteLease = false;
-    this.blocksQueue = Promise.resolve(); this.stanceQueues.clear(); this.stanceVersions.clear(); this.summaryReads.clear(); this.summaryAccess.clear(); this.summaryFetched.clear(); this.recent.clear(); this.watches.clear(); this.clearAvatars(); this.runtime.tokens.clear(); this.runtime.state.rooms = emptyRooms();
+    this.stop(); this.epoch++; this.reads++; this.clearCurrent(); this.panels = false; this.tab = undefined; this.tabSite = undefined; this.remoteLease = false;
+    this.blocksQueue = Promise.resolve(); this.stanceQueues.clear(); this.stanceVersions.clear(); this.summaryReads.clear(); this.summaryAccess.clear(); this.summaryFetched.clear(); this.recent.clear(); this.watches.clear(); this.clearAvatars(); this.runtime.tokens.clear(); this.runtime.directory.clear(); this.runtime.pages.clear(); this.runtime.state.rooms = emptyRooms();
   }
   private clearAvatars() {
     this.avatarVersion++; for (const url of this.avatarUrls.values()) URL.revokeObjectURL(url);
@@ -118,16 +118,15 @@ export class RoomService {
     await this.sync().catch(() => {}); scope.check(); this.runtime.emit();
   }
   panelChanged(connected: boolean) { this.panels = connected; if (!connected) this.dropHot(''); return this.sync().then(() => ({ connected })); }
-  tabChanged(input: { asset?: unknown; profile?: unknown }) {
+  tabChanged(input: { asset?: unknown; site?: unknown }) {
     const key = input.asset === null ? undefined : typeof input.asset === 'string' ? roomKeyForAsset(input.asset) : null;
     if (key === null) throw commandError('INVALID_INPUT', 'common.error');
-    const profile = this.profile(input.profile); this.tab = key; this.tabProfile = profile; return this.sync();
+    const site = this.site(input.site); this.tab = key; this.tabSite = site; return this.sync();
   }
-  open(input: { key?: unknown; profile?: unknown }) {
-    this.requireEnabled(); const key = this.key(input.key), profile = this.profile(input.profile);
-    this.runtime.state.rooms.pinned = key; this.pinnedProfile = profile; return this.sync();
+  open(input: { key?: unknown }) {
+    this.requireEnabled(); this.runtime.state.rooms.pinned = this.key(input.key); return this.sync();
   }
-  close() { this.runtime.state.rooms.pinned = undefined; this.pinnedProfile = undefined; return this.sync(); }
+  close() { this.runtime.state.rooms.pinned = undefined; return this.sync(); }
   private target() { return this.panels && this.enabled() ? this.runtime.state.rooms.pinned ?? this.tab : undefined; }
   private sync(refresh = false): Promise<unknown> {
     const key = this.target(), state = this.runtime.state.rooms, same = key && state.current?.key === key;
@@ -140,7 +139,7 @@ export class RoomService {
         // Returning to a room shows its last lines and its token's known numbers at once; the snapshot below then replaces both with the service's.
         const kept = this.recent.get(key), summary = state.summaries[key];
         const recent = kept && Date.now() - kept.at < RECENT_ROOM_MS ? kept : undefined;
-        state.current = { key, profile: summary?.profile ?? null, count: summary?.count ?? 0, stance: summary?.stance ?? emptyStance(), faces: summary?.faces ?? [], messages: [], hasMore: false, loading: true, slowUntil: recent?.slowUntil ?? 0, slowMs: recent?.slowMs ?? 0 };
+        state.current = { key, site: summary?.site ?? null, count: summary?.count ?? 0, stance: summary?.stance ?? emptyStance(), faces: summary?.faces ?? [], messages: [], hasMore: false, loading: true, slowUntil: recent?.slowUntil ?? 0, slowMs: recent?.slowMs ?? 0 };
         if (recent) for (const message of recent.messages) this.messages.set(message.id, message);
       }
     } else { state.current!.loading = true; this.updates = []; }
@@ -155,8 +154,8 @@ export class RoomService {
             return false;
           }
           this.remoteLease = true;
-          const profile = state.pinned ? this.pinnedProfile : this.tabProfile;
-          const lease = await scope.wait(this.runtime.api.request('rooms.lease', { body: { key, ...(profile ? { profile } : {}) }, token }));
+          const site = state.pinned ? undefined : this.tabSite;
+          const lease = await scope.wait(this.runtime.api.request('rooms.lease', { body: { key, ...(site ? { site } : {}) }, token }));
           if (version !== this.version) return false;
           state.leased = key; room!.slowMs = lease.slowMs; room!.slowUntil = Math.max(room!.slowUntil, lease.slowUntil);
           // Snapshot reads must never delay lease renewal or release.
@@ -169,9 +168,9 @@ export class RoomService {
         ]));
         if (version !== this.version) return;
         this.messages = new Map(); for (const message of page.messages) this.append(message);
-        this.cursor = page.messages[0]?.id; Object.assign(room!, summary, { hasMore: page.hasMore, loading: false }); this.rememberProfile(key, summary.profile);
+        this.cursor = page.messages[0]?.id; Object.assign(room!, summary, { hasMore: page.hasMore, loading: false });
         const updates = this.updates; this.updates = []; for (const update of updates) update();
-        state.summaries[key] = { key, profile: room!.profile, count: room!.count, stance: room!.stance, faces: room!.faces, at: Date.now() }; this.summaryFetched.set(key, Date.now());
+        state.summaries[key] = { key, site: room!.site, count: room!.count, stance: room!.stance, faces: room!.faces, at: Date.now() }; this.summaryFetched.set(key, Date.now());
         this.retryAvatars(); this.runtime.emit();
       } catch (error) {
         if (scope.current() && version === this.version) { this.clearCurrent(); this.scheduleLease(); this.runtime.emit(); }
@@ -191,8 +190,8 @@ export class RoomService {
     try {
       await this.serial(async () => {
         scope.check(); if (version !== this.version || this.target() !== key) return;
-        const profile = this.runtime.state.rooms.pinned ? this.pinnedProfile : this.tabProfile;
-        const result = await scope.wait(this.runtime.api.request('rooms.lease', { body: { key, ...(profile ? { profile } : {}) } }));
+        const site = this.runtime.state.rooms.pinned ? undefined : this.tabSite;
+        const result = await scope.wait(this.runtime.api.request('rooms.lease', { body: { key, ...(site ? { site } : {}) } }));
         if (version === this.version) { this.update(() => { this.applyCount(key, result.count); const room = this.runtime.state.rooms.current; if (room) { room.slowUntil = Math.max(room.slowUntil, result.slowUntil); room.slowMs = result.slowMs; } }); this.runtime.emit(); }
       });
     } finally { if (scope.current() && version === this.version) this.scheduleLease(); }
@@ -330,7 +329,7 @@ export class RoomService {
     try {
       const result = await scope.wait(this.read('rooms.summary', { query: { key } }, stanceVersion));
       if (reads === this.reads && read === this.summaryReads.get(key) && this.enabled()) {
-        this.touchSummary(key); this.rememberProfile(key, result.profile); this.summaryFetched.set(key, Date.now());
+        this.touchSummary(key); this.summaryFetched.set(key, Date.now());
         const previous = this.runtime.state.rooms.summaries[key];
         const next = { ...result, ...(previous && stanceVersion !== this.stanceVersions.get(key) ? { stance: previous.stance } : {}), at: previous?.at ?? Date.now() };
         if (!this.sameRead(previous, next)) { this.runtime.state.rooms.summaries[key] = { ...next, at: Date.now() }; this.runtime.emit(); }
@@ -417,12 +416,13 @@ export class RoomService {
   async invitePermission(team: unknown, on: unknown) {
     this.requireAccount(); const teamId = this.id(team); if (typeof on !== 'boolean') throw commandError('INVALID_INPUT', 'common.error');
     const scope = this.scope(), result = await scope.wait(this.runtime.api.request('teams.invitePermission', { params: { id: teamId }, body: { on } }));
-    if (this.runtime.auth.refreshing) await scope.wait(this.runtime.auth.refreshing.catch(() => {}));
-    await scope.wait(this.runtime.refresh()); return result;
+    // The answer carries the saved value: the switch settles on it now, and the wider refresh follows without holding it.
+    const saved = this.runtime.state.remoteTeams.find(item => item.id === teamId);
+    if (saved) { saved.membersCanInvite = result.membersCanInvite; this.runtime.emit(); }
+    void this.runtime.refresh().catch(() => {}); return result;
   }
-  async clearLocal() { this.summaryFetched.clear(); this.recent.clear(); this.peopleAt = 0; this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.reads++; this.clearAvatars(); this.runtime.tokens.clear(); return { cleared: true }; }
+  async clearLocal() { this.summaryFetched.clear(); this.recent.clear(); this.peopleAt = 0; this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.reads++; this.clearAvatars(); this.runtime.tokens.clear(); this.runtime.directory.clear(); this.runtime.pages.clear(); return { cleared: true }; }
   /** The service's voted name and icon fill the memory-only token cache; a page read on this device stays stronger. */
-  private rememberProfile(key: string, profile: RoomProfile | null | undefined) { if (profile && key.startsWith('token:')) this.runtime.tokens.put(key.slice('token:'.length), profile, 'room'); }
   preferencesChanged() {
     void this.syncHot().catch(() => {});
     if (this.runtime.state.preferences.rooms?.off) { this.reads++; this.recent.clear(); this.summaryFetched.clear(); this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.clearAvatars(); }
@@ -451,9 +451,8 @@ export class RoomService {
         // One record per token: a newer 热门 push also refreshes that token's summary, keeping this account's own vote.
         const summaries = this.runtime.state.rooms.summaries;
         for (const row of event.rooms.rows) {
-          this.rememberProfile(row.key, row.profile);
           const summary = summaries[row.key];
-          if (summary) { summaries[row.key] = { ...summary, count: row.count, stance: { ...row.stance, mine: summary.stance.mine }, faces: row.faces, at: Date.now() }; this.summaryFetched.set(row.key, Date.now()); }
+          if (summary) { summaries[row.key] = { ...summary, count: row.count, site: row.site, stance: { ...row.stance, mine: summary.stance.mine }, faces: row.faces, at: Date.now() }; this.summaryFetched.set(row.key, Date.now()); }
         }
         this.runtime.state.rooms.hot = { rows: event.rooms.rows, loaded: true }; this.runtime.emit();
       }

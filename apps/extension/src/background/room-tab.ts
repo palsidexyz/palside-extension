@@ -1,10 +1,6 @@
-import { ROOM_NAME_MAX } from '@palside/shared/rules/rooms';
-import { viewAsset } from '../domain/annotations/interaction.ts';
 import { siteByDomain } from '@palside/shared/sites';
-import { pageAsset } from '../runtime/browser/page-layer-host.ts';
+import { pageAsset, pageLookup } from '../runtime/browser/page-layer-host.ts';
 import { accessStatus } from '../runtime/browser/permissions.ts';
-import { tokenLogoUrl } from '../runtime/viewing/token-logo.ts';
-import { tokenNamed } from '../runtime/viewing/token-profiles.ts';
 import type { Background } from './index.ts';
 
 /** A panel window remains the room source when focus moves to a window without a panel. Only an added site (网站授权) follows its token:
@@ -28,15 +24,11 @@ export function roomTab(bg: Background) {
       const granted = Boolean(tab?.url && !tab.incognito && (await accessStatus(tab.url, bg.browser)).site);
       if (request !== version) return;
       const asset = granted && tab?.url ? pageAsset(tab.url, bg.state) : undefined;
-      const site = tab?.url && siteByDomain(new URL(tab.url).hostname);
-      const state = bg.state;
-      const views = state ? [...state.data.views, ...state.data.messages.flatMap(message => [message.ref?.view, message.attachment?.kind === 'asset' ? message.attachment.view : undefined]), ...Object.values(state.drafts).map(draft => draft.value.ref?.view)] : [];
-      const view = asset ? views.find(view => viewAsset(view) === asset && tokenNamed(view)) : undefined;
-      // Only a real name votes for the token's public profile; the address placeholder never does.
-      const known = view ?? (asset ? state?.tokens?.[asset] : undefined);
-      const name = known ? Array.from(known.name.trim()).slice(0, ROOM_NAME_MAX).join('') : '';
-      const logo = known && tokenLogoUrl(known.logo);
-      const payload = { asset: asset ?? null, ...(asset && site && name ? { profile: { name, ...(logo ? { logo } : {}), site: site.id } } : {}) };
+      // The registry site the token is open on is this device's vote for the room's usual site; names come from the token directory.
+      const site = asset && tab?.url ? siteByDomain(new URL(tab.url).hostname) : undefined;
+      // A pool or chainless contract page names its URL until the server answers; the answer comes back through state.
+      const lookup = granted && tab?.url && !asset ? pageLookup(tab.url, bg.state) : undefined;
+      const payload = { asset: asset ?? null, ...(site ? { site: site.id } : {}), ...(lookup ? { page: lookup.url } : {}) };
       pending = pending.catch(() => {}).then(async () => {
         if (request !== version || JSON.stringify(payload) === sent) return;
         const result = await bg.run({ name: 'room-tab', payload });

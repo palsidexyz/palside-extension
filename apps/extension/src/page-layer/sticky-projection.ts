@@ -4,7 +4,7 @@ import { mergePins,pinPoint,stickyCard,createStickyHighlight } from './pins';
 import type { OverlayHost } from './overlay-host';
 import { face } from './overlay-host';
 
-export function createStickyProjection(context: OverlayHost, send: (message: PageUp) => void, scheduleDanmakuArea: () => void) {
+export function createStickyProjection(context: OverlayHost, send: (message: PageUp) => void) {
   const { host, documentLayer, documentPoint, timers, later, isControl } = context;
   const pins = document.createElement('div'); pins.className = 'pins'; documentLayer.append(pins);
   let stickies: PageSticky[] = [];
@@ -153,7 +153,7 @@ export function createStickyProjection(context: OverlayHost, send: (message: Pag
     if (stickyFrame !== undefined || !stickies.length && !pins.childElementCount) return;
     stickyFrame = requestAnimationFrame(drawStickies);
   }
-  const resizeObserver = new ResizeObserver(() => { scheduleStickies(); scheduleDanmakuArea(); });
+  const resizeObserver = new ResizeObserver(() => scheduleStickies());
   function observeTargets() {
     resizeObserver.disconnect();
     if (document.body) resizeObserver.observe(document.body);
@@ -178,7 +178,6 @@ export function createStickyProjection(context: OverlayHost, send: (message: Pag
       if (!element || !element.isConnected || detached || changed) stickyLocations.delete(id);
     }
     if (stickyScanTimer === undefined) stickyScanTimer = window.setTimeout(() => { stickyScanTimer = undefined; scheduleStickies(); }, Math.max(80, 250 - (performance.now() - stickyScanAt)));
-    scheduleDanmakuArea();
   });
   mutations.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['id', 'class', 'style', 'hidden', 'aria-hidden', 'inert', 'contenteditable', 'role', 'data-private', 'data-trade-panel', 'aria-label', 'data-testid', 'autocomplete'] });
   let openHighlightTimer: number | undefined;

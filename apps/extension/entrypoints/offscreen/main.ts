@@ -4,9 +4,7 @@ import { PalsideService } from '../../src/runtime/composition/core';
 import type { Command } from '../../src/runtime/transport/command-map';
 import type { Reply } from '../../src/runtime/transport/reply';
 import { createPatchSliceCache, diffState } from '../../src/runtime/transport/state-diff';
-const service = new PalsideService(async payload => { await browser.runtime.sendMessage({ type: 'palside/notify', payload }); }, async url => { try { const result = await browser.runtime.sendMessage({ type: 'palside/foreground', url }); return result?.visible === true; } catch { return false; } }, undefined, async request => {
-  try { const result = await browser.runtime.sendMessage({ type: 'palside/token-page', request }); return result?.metadata; } catch { return; }
-});
+const service = new PalsideService(async payload => { await browser.runtime.sendMessage({ type: 'palside/notify', payload }); }, async url => { try { const result = await browser.runtime.sendMessage({ type: 'palside/foreground', url }); return result?.visible === true; } catch { return false; } });
 const epoch = crypto.randomUUID();
 let starting: Promise<void> | undefined;
 let started = false;

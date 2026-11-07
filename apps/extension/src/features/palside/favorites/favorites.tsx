@@ -8,7 +8,7 @@ import { captureSocialUi } from '../annotations/social-state';
 import { currentPage } from '../viewing/current-page';
 import { SettingGroup } from '../settings/setting-rows';
 import { SiteLogo } from '../assets/site-logo';
-import { siteForUrl, siteOf, type Site } from '../settings/site-catalog';
+import { siteAt, siteOf, type Site } from '../settings/site-catalog';
 import { Action, Token } from '../ui/primitives';
 import { EmptyState } from '../chat/history-scope';
 import type { Viewing } from '../../../domain/assets/model';
@@ -65,7 +65,7 @@ export function Favorites({ c }: { c: PalsideController }) {
     </SettingGroup>}
     {c.favorites.pages.length > 0 && <SettingGroup title={t('extension.web.pages')} aside={c.favorites.pages.length}>
       {c.favorites.pages.map(item => <div key={item.url} className={s.row}>
-        <SiteLogo site={siteForUrl(item.url, c.sites)} size="sm" />
+        <SiteLogo site={siteAt(c, item.url)} size="sm" />
         <button type="button" className={s.rowLink} onClick={() => open(item.url)}><strong>{item.title}</strong><small>{new URL(item.url).hostname}</small></button>
         <Action label={t('extension.web.unsave', { name: item.title })} onClick={() => toggleFavoritePage(c, { url: item.url, name: item.title })}><X size={14} /></Action>
       </div>)}

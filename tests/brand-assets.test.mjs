@@ -39,3 +39,18 @@ test('store icon has exactly 16 transparent pixels around its 96px artwork', asy
   }
   assert.deepEqual(bounds, [16, 16, 111, 111]);
 });
+
+test('PALS token image is an opaque 1024px full-bleed mark that survives a circle crop', async () => {
+  const { renderTokenPng, tokenImageSize } = await import('../scripts/lib/brand-assets.mjs');
+  const bytes = await renderTokenPng(source);
+  const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  assert.equal(info.width, tokenImageSize);
+  assert.equal(info.height, tokenImageSize);
+  const pixel = (x, y) => [...data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 4)];
+  const lime = [0xCC, 0xFF, 0x00, 255];
+  for (const [x, y] of [[0, 0], [1023, 0], [0, 1023], [1023, 1023], [512, 2], [2, 512]]) assert.deepEqual(pixel(x, y), lime);
+  const unit = tokenImageSize / 128;
+  for (const x of [53, 75]) assert.deepEqual(pixel(Math.round(x * unit), Math.round(56 * unit)), lime);
+  const body = pixel(Math.round(64 * unit), Math.round(40 * unit));
+  assert.ok(body[0] < 50 && body[1] < 50, 'dark bubble body stays in place');
+});

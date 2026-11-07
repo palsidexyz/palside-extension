@@ -54,7 +54,7 @@ export function stateSync(bg: Background) {
     if ((interactionChanged || roomChanged) && !contextChanged) {
       void bg.danmaku.broadcastDanmakuSettings().then(bg.signals.broadcastSignals).then(() => { for (const [port, info] of bg.pages.pagePorts) void bg.stickies.pushStickies(port, info); }).catch(() => {});
     }
-    const pageChanged = previous?.data.views !== next.data.views || previous?.data.messages !== next.data.messages || previous?.drafts !== next.drafts;
+    const pageChanged = previous?.data.views !== next.data.views || previous?.data.messages !== next.data.messages || previous?.drafts !== next.drafts || previous?.pages !== next.pages;
     if (policyChanged) bg.pages.pagePolicyChanged(contextChanged);
     if (policyChanged || pageChanged || previous?.items.stickies !== next.items.stickies) bg.pages.restoreAllPages();
     const pageContentChanged = pageChanged || previous?.items.stickies !== next.items.stickies || previous?.chainRoom !== next.chainRoom || previous?.rooms !== next.rooms || previous?.data.people !== next.data.people || previous?.remoteTeams !== next.remoteTeams || previous?.preferences.hiddenStickies !== next.preferences.hiddenStickies;

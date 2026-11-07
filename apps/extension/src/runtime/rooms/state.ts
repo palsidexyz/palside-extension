@@ -1,6 +1,6 @@
-import type { HotRooms,RoomKey,RoomMessage,RoomPeople,RoomPerson,RoomProfile,RoomStance,RoomSummary,TeamInvite } from './contract-types';
+import type { HotRooms,RoomKey,RoomMessage,RoomPeople,RoomPerson,RoomStance,RoomSummary,TeamInvite } from './contract-types';
 /** The live room of `RoomState.leased`: kept fresh by events while a panel is open. */
-export type RoomView = { key: RoomKey; profile: RoomProfile | null; count: number; stance: RoomStance; faces: RoomPerson[]; messages: RoomMessage[]; hasMore: boolean; loading: boolean; slowUntil: number; slowMs: number };
+export type RoomView = { key: RoomKey; /** The registry site most participants have the token open on. */ site: string | null; count: number; stance: RoomStance; faces: RoomPerson[]; messages: RoomMessage[]; hasMore: boolean; loading: boolean; slowUntil: number; slowMs: number };
 export type RoomState = {
   /** The 弹幕 view's token while it is open (`room-open` … `room-close`). */
   pinned?: RoomKey;

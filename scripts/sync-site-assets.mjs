@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { syncThirdPartyLicenses } from './third-party-licenses.mjs';
-import { brandIconSizes, renderBrandPng } from './lib/brand-assets.mjs';
+import { brandIconSizes, renderBrandPng, renderTokenPng } from './lib/brand-assets.mjs';
 import { assetFolders, hostAssets, presentHosts } from './lib/site-assets.mjs';
 
 const website = presentHosts().includes('website');
@@ -39,6 +39,9 @@ if (website) {
   for (const file of ['LICENSE', 'sources.json']) await copyFile(new URL(file, source), new URL(file, target));
   console.log('Synced signal art to the website.');
   await copyFile(new URL('../packages/design/assets/brand/palside.svg', import.meta.url), new URL('../apps/website/app/icon.svg', import.meta.url));
+  // PALS token image served at /brand/pals-token.png for the launch metadata.
+  const brand = await readFile(new URL('../packages/design/assets/brand/palside.svg', import.meta.url), 'utf8');
+  await writeFile(new URL('../apps/website/public/brand/pals-token.png', import.meta.url), await renderTokenPng(brand));
 }
 
 // One master feeds Chrome and reusable brand exports. Large exports never enter public/.

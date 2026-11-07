@@ -75,6 +75,7 @@ export function startLiveSync(auth: SessionRuntime, session: RuntimeDevice, curr
       },
       onTeamInvites: () => { if (current() && status.initialIssued) auth.requestRefresh(['invites']); },
       onRoom: event => { if (current()) runtime.rooms.consume(event); },
+      onTokens: entries => { if (current()) runtime.directory.push(entries); },
       onChainConfig: config => { if (current()) void runtime.wallet.event({ type: 'config', config }).catch(() => {}); },
       onChain: event => { if (current()) void runtime.wallet.event(event).catch(() => {}); },
       onBanned: ban => {

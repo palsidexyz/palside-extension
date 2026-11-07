@@ -33,8 +33,6 @@ export type PageStatus = {
   signalSettings?: SignalSettings;
   /** The page script is running in the active tab, for 互动 or for a one-off action (quote, locate, capture). */
   connected: boolean;
-  /** The registry can read the token's name and icon on this site. */
-  tokenProfile: boolean;
   /** 便利贴 of this page whose target the page script could not find (已不在页面上). */
   missingStickies?: string[];
   /** What each page action can do on this tab right now; the panel disables or grants from this alone. */
@@ -57,17 +55,20 @@ export type PageCapabilities = Record<PageAction, PageCapability>;
 
 /** Person shown next to page-layer content; the avatar is a data URL or absent (initials are drawn). */
 export type PagePerson = { name: string; avatar?: string };
-export type DanmakuArea = 'top' | 'chart' | 'full';
+/** Share of the viewport height, measured from the top, that lines drift through. */
+export type DanmakuArea = 25 | 50 | 75 | 100;
+export const danmakuAreas: readonly DanmakuArea[] = [25, 50, 75, 100];
 export type DanmakuSpeed = 110 | 144 | 190;
 export type DanmakuSize = 'sm' | 'md' | 'lg';
 export type DanmakuDensity = 'low' | 'mid' | 'high';
 export const danmakuLimits = { low: 4, mid: 8, high: 14 };
 export type DanmakuSettings = { density: DanmakuDensity; enabled: boolean; area: DanmakuArea; speed: DanmakuSpeed; size: DanmakuSize; opacity: number };
-export const defaultDanmakuSettings: DanmakuSettings = { density: 'mid', enabled: true, area: 'chart', speed: 144, size: 'md', opacity: 90 };
+export const defaultDanmakuSettings: DanmakuSettings = { density: 'mid', enabled: true, area: 25, speed: 144, size: 'md', opacity: 90 };
 export function normalizeDanmakuSettings(value: unknown): DanmakuSettings {
   if (!value || typeof value !== 'object') return { ...defaultDanmakuSettings };
   const input = value as Record<string, unknown>;
-  const area: DanmakuArea = input.area === 'top' || input.area === 'full' || input.area === 'chart' ? input.area : defaultDanmakuSettings.area;
+  // Earlier builds stored 'top' / 'chart' / 'full'; full keeps covering the page, the rest start at the top quarter.
+  const area: DanmakuArea = danmakuAreas.includes(input.area as DanmakuArea) ? input.area as DanmakuArea : input.area === 'full' ? 100 : defaultDanmakuSettings.area;
   const speed: DanmakuSpeed = input.speed === 110 || input.speed === 190 || input.speed === 144 ? input.speed : defaultDanmakuSettings.speed;
   const size: DanmakuSize = input.size === 'sm' || input.size === 'md' || input.size === 'lg' ? input.size : defaultDanmakuSettings.size;
   const opacity = typeof input.opacity === 'number' && Number.isFinite(input.opacity) ? Math.max(30, Math.min(100, Math.round(input.opacity))) : defaultDanmakuSettings.opacity;

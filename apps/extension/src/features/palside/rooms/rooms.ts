@@ -3,10 +3,11 @@ import { identifyPage,websiteIdentity } from '@palside/shared/navigation';
 import { roomKeyForAsset } from '@palside/shared/contracts/rules';
 import type { RoomKey,RoomPerson } from '../../../runtime/rooms/contract-types';
 import type { PageStatus } from '../../../runtime/browser/page-protocol';
-import { resolveTokenMetadata } from '../../../runtime/viewing/token-page';
+import { resolveTokenMetadata } from '../../../runtime/viewing/token-name';
 import { pageName } from '../../../runtime/viewing/page-title';
 import { pageFavicon } from '../../../runtime/viewing/viewing';
 import { pageView } from '../../../runtime/viewing/view-snapshot';
+import { tokenPage } from '../../../runtime/viewing/page-resolver';
 import { tokenNamed } from '../../../runtime/viewing/token-profiles';
 import { tokenStats,tokenView } from '../assets/token-data';
 import type { Person } from '../../../domain/account/model';
@@ -39,8 +40,10 @@ export function roomCount(c: PalsideController, key: RoomKey) { return tokenStat
 export function tabView(page: PageStatus | undefined, asset?: string): Viewing | undefined {
   if (!page || asset && page.asset !== asset || !page.url || !page.host) return;
   const identity = identifyPage(page.url, [page.host]);
-  const source = identity?.kind === 'asset' ? identity : websiteIdentity(page.url, 'page');
-  return source ? pageView(source, source.kind === 'asset' ? resolveTokenMetadata(source) : { name: pageName(page.title, page.host), logo: pageFavicon(page.favicon) }) : undefined;
+  // A pool or chainless contract page shows its token once the background reports it (`page.asset`).
+  const lookup = identity?.kind === 'pool' || identity?.kind === 'address' ? identity : undefined;
+  const source = identity?.kind === 'asset' ? identity : lookup && page.asset ? tokenPage(lookup, page.asset) : websiteIdentity(page.url, 'page');
+  return source ? pageView(source, source.kind === 'asset' ? resolveTokenMetadata(source) : { name: pageName(page.title, page.host), logo: pageFavicon(page.favicon) }, lookup && source.kind === 'asset' ? lookup.kind : undefined) : undefined;
 }
 
 /** A token by its room key, drawn from its one token record; a known view or the active tab supplies the page it opens. */
@@ -64,7 +67,7 @@ export function roomPerson(c: PalsideController, person: RoomPerson, fallback: s
   return { id: person.id, name: person.nickname || fallback, color: '#e5e6e9', avatar: c.live?.state.rooms.avatars[person.id], mate };
 }
 
-type Opening = { key: RoomKey; status: 'opening' | 'error'; profile?: { name: string; logo?: string; site: string } };
+type Opening = { key: RoomKey; status: 'opening' | 'error' };
 type RoomSession = { opening?: Opening; current?: PalsideController; navigation: object; listeners: Set<() => void> };
 // The stable panel state setter identifies one mounted account session.
 const sessions = new WeakMap<PalsideController['setPersonId'], RoomSession>();
@@ -79,13 +82,13 @@ function publishOpening(session: RoomSession, opening?: Opening) {
 }
 
 /** Opens the requested token in the 弹幕 tab, pinned, while its snapshot travels to the panel. */
-export function openRoom(c: PalsideController, key: RoomKey, profile?: Opening['profile']) {
+export function openRoom(c: PalsideController, key: RoomKey) {
   if (!c.live || !roomsOn(c)) return;
-  const session = roomSession(c), opening: Opening = { key, profile, status: 'opening' };
+  const session = roomSession(c), opening: Opening = { key, status: 'opening' };
   session.navigation = {};
   publishOpening(session, opening);
   c.go('room');
-  if (c.live.state.rooms.pinned !== key) void c.live.command('room-open', { key, ...profile ? { profile } : {} }).catch(() => {
+  if (c.live.state.rooms.pinned !== key) void c.live.command('room-open', { key }).catch(() => {
     if (session.opening === opening) publishOpening(session, { ...opening, status: 'error' });
   });
 }

@@ -19,7 +19,6 @@ export type PanelData = {
   localDrafts: Record<string, Draft>; setDrafts: Setter<Record<string, Draft>>;
   localShare: boolean; setLocalShare: Setter<boolean>;
   localSites: string[]; setLocalSites: Setter<string[]>;
-  localTokenOff: string[]; setLocalTokenOff: Setter<string[]>;
   localOffline: boolean; setOffline: Setter<boolean>;
   localViewingId: string | undefined; setViewingId: Setter<string | undefined>;
 };

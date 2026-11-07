@@ -62,10 +62,11 @@ function assertReference(f, result, view) {
   assert.equal(f.runtime.state.drafts.team, result);
 }
 
-test('attach-ref accepts a pool page when a matching view is known', async () => {
-  const known = assetView();
-  const f = referenceFixture([known], async () => assert.fail('A known pool does not need preparation'));
-  assertReference(f, await f.attach(), known);
+test('attach-ref asks the directory for a pool page even when a view with that URL is known', async () => {
+  const calls = [], known = assetView(), prepared = { ...assetView(), name: 'SOL' };
+  const f = referenceFixture([known], async url => { calls.push(url); return prepared; });
+  assertReference(f, await f.attach(), prepared);
+  assert.deepEqual(calls, [poolUrl]);
 });
 
 test('attach-ref completes a pool reference with the prepared asset', async () => {
@@ -81,7 +82,7 @@ test('attach-ref keeps a page reference when a pool page has no confirmed asset'
   const page = { kind: 'website', url: poolUrl, name: 'DEX Screener' };
   const f = referenceFixture([], async url => { calls.push(url); return page; });
   assertReference(f, await f.attach(), page);
-  assert.deepEqual(calls, [poolUrl, poolUrl]);
+  assert.deepEqual(calls, [poolUrl]);
 });
 
 test('attach-ref accepts a direct asset page', async () => {

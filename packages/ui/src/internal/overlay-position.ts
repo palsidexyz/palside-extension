@@ -2,9 +2,8 @@ type AnchorRect = { left: number; right: number; top: number; bottom: number; wi
 type ViewportRect = { left: number; top: number; width: number; height: number };
 
 /** Clamp horizontally and choose the side with enough room before constraining height. */
-export function overlayPosition(anchor: AnchorRect, surface: { width: number; height: number }, viewport: ViewportRect, align: "start" | "end" = "start", preferred: "top" | "bottom" = "bottom") {
+export function overlayPosition(anchor: AnchorRect, surface: { width: number; height: number }, viewport: ViewportRect, align: "start" | "end" = "start", preferred: "top" | "bottom" = "bottom", gap = 8) {
   const margin = 8;
-  const gap = 8;
   const width = Math.min(surface.width, Math.max(0, viewport.width - margin * 2));
   const below = Math.max(0, viewport.top + viewport.height - margin - anchor.bottom - gap);
   const above = Math.max(0, anchor.top - viewport.top - margin - gap);

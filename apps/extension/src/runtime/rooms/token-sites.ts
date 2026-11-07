@@ -2,7 +2,7 @@ import { tokenPageUrl } from '@palside/shared/navigation';
 import { siteById } from '@palside/shared/sites';
 
 export const HOT_CHAIN_ORDER = [null, 'Robinhood', 'Solana', 'BNB Chain', 'Base', 'Ethereum'] as const;
-const TOKEN_SITES = ['gmgn', 'fomo', 'bullx', 'birdeye'];
+const TOKEN_SITES = ['gmgn', 'axiom', 'dexscreener', 'fomo', 'bullx', 'birdeye'];
 type Token = { chain: string; address: string };
 
 export function tokenSites(token: Token) {

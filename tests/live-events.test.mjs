@@ -30,7 +30,7 @@ test('401 stops reconnection and expires the session even with an unreadable res
 test('room SSE carries a single hot ranking and rejects the removed two-board shape', async () => {
   const { decodeContract } = await import('../packages/shared/src/contracts/validation.ts');
   const { events } = await import('../packages/shared/src/contracts/events.ts');
-  const row = { key: `token:sol:${'a'.repeat(32)}`, count: 5, profile: null, stance: { bull: 2, hold: 1, bear: 0 }, faces: [], rise: 3 };
+  const row = { key: `token:sol:${'a'.repeat(32)}`, count: 5, site: null, stance: { bull: 2, hold: 1, bear: 0 }, faces: [], rise: 3 };
   const payload = { type: 'hot', rooms: { rows: [row] } };
   const wire = parseSseEvents(`event: room\ndata: ${JSON.stringify(payload)}\n\n`).events[0];
   assert.deepEqual(decodeContract(events.room, JSON.parse(wire.data)), payload);

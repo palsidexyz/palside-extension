@@ -10,7 +10,7 @@ type Live = Pick<PalsideController, 'live'>;
 
 /**
  * One record per token: every surface draws a token's name and icon from the runtime's token record
- * (page read > teammates and messages > 弹幕 service), falling back to the view's own snapshot.
+ * (the server token directory, else a teammate's or a message's snapshot name), falling back to the view itself.
  * Cards, 详情, 弹幕, 热门, 在看 and titles therefore always agree.
  */
 export function liveView<T extends Viewing>(c: Live, view: T): T {

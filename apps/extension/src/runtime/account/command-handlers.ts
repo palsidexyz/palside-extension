@@ -8,6 +8,7 @@ import type { Command } from '../transport/command-map';
 import { text } from '../composition/state';
 import { commandError } from '../composition/commands';
 import type { RuntimeCommands } from '../composition/dispatch';
+import type { SignupPhase } from '../composition/runtime-state';
 import type { HandlerRegistry } from '../composition/handler-registry';
 import { liveMembers } from '../../domain/teams/model.ts';
 
@@ -73,10 +74,13 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
       const token = runtime.api.token;
       const attempt = runtime.auth.authenticationScope();
       attempt.check();
+      const phase = (next: SignupPhase) => { if (attempt.current()) { runtime.state.signupPhase = next; runtime.emit(); } };
       try {
+        phase('seal');
         await attempt.wait(runtime.auth.finishCleanup());
         const vault = await attempt.wait(sealMnemonic(runtime.auth.mnemonic, password));
         if (!runtime.auth.pendingDevice) {
+          phase('register');
           const body = { label: deviceLabel() };
           const storageKey = [...crypto.getRandomValues(new Uint8Array(32))];
           let result: ApiResult<'accounts.create'>;
@@ -102,6 +106,7 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
         }
         const session = runtime.auth.pendingDevice;
         await attempt.wait(runtime.storage.put('pending-device', session.account.id, 'device', session));
+        phase('connect');
         await attempt.wait(runtime.auth.connect(session, identity));
         const connected = runtime.auth.scope();
         const guard = () => { attempt.check(); connected.check(); if (!runtime.auth.client || !runtime.auth.cryptoInitialised) throw new MessageError(uiMessage('extension.runtime.loginChanged')); };
@@ -111,9 +116,10 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
           { key: 'vault', account: session.account.id, kind: 'vault', value: vault },
         ]);
         guard();
+        phase('wallet');
         await runtime.wallet.start(runtime.auth.mnemonic).catch(() => {}); guard();
         await runtime.storage.remove('pending-device').catch(() => {}); guard();
-        runtime.auth.mnemonic = undefined; runtime.auth.pendingIdentity = undefined; runtime.auth.pendingDevice = undefined; runtime.auth.authMode = undefined; runtime.state.setup = undefined;
+        runtime.auth.mnemonic = undefined; runtime.auth.pendingIdentity = undefined; runtime.auth.pendingDevice = undefined; runtime.auth.authMode = undefined; runtime.state.setup = undefined; runtime.state.signupPhase = undefined;
         runtime.state.authenticated = true; runtime.state.error = undefined; runtime.emit();
         return { nicknameRequired: !session.account.nickname };
       } catch (error) {
@@ -122,7 +128,7 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
         clearTimeout(runtime.auth.deviceStateTimer); runtime.auth.deviceStateTimer = undefined;
         const client = runtime.auth.client; runtime.auth.client = undefined; client?.stopClient(); runtime.auth.cryptoInitialised = false;
         runtime.auth.generation++; runtime.rooms.reset(); runtime.auth.session = undefined; runtime.state.authenticated = false; runtime.state.account = undefined; runtime.api.token = token;
-        runtime.timeline.readyForLiveEvents = false; runtime.state.connection.messaging = 'unavailable'; runtime.state.setup = 'password'; runtime.emit();
+        runtime.timeline.readyForLiveEvents = false; runtime.state.connection.messaging = 'unavailable'; runtime.state.setup = 'password'; runtime.state.signupPhase = undefined; runtime.emit();
         throw error instanceof MessageError || error instanceof ApiError ? error : new MessageError(uiMessage('extension.runtime.cryptoIdentityUnavailable'));
       }
 }

@@ -39,7 +39,3 @@ export const ROOM_RISE_MIN = 3;
 export const ROOM_TOP_MIN = 3;
 /** Tokens; caps hot-board rows; docs/product/danmaku.md#弹幕视图. */
 export const ROOM_TOP_LIMIT = 20;
-/** Graphemes; caps public token names; docs/product/danmaku.md#弹幕视图. */
-export const ROOM_NAME_MAX = 40;
-/** UTF-16 code units; caps token logo URLs; docs/product/danmaku.md#弹幕视图. */
-export const ROOM_LOGO_URL_LENGTH = 2048;

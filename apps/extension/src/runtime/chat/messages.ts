@@ -37,3 +37,4 @@ export function publishSendQueue(
   state.sendQueue = Object.keys(queue).length ? queue : undefined;
   emit();
 }
+

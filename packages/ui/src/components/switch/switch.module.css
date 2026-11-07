@@ -10,9 +10,17 @@
 .nativeChoice:checked ~ .switchTrack { background: var(--ui-accent); }
 .nativeChoice:checked ~ .switchTrack .switchThumb { transform: translateX(16px); }
 .nativeChoice:checked ~ .switchTrack:dir(rtl) .switchThumb { transform: translateX(-16px); }
+/* Not yet saved: an arc turns in the thumb, fading in so a fast save never flashes it. */
+.pending { position: absolute; inset: 3px; width: 12px; height: 12px; opacity: 0; transition: opacity .15s cubic-bezier(.22,1,.36,1); }
+.pending circle { fill: none; stroke: var(--ui-text-secondary); stroke-width: 1.8; stroke-linecap: round; stroke-dasharray: 9 27; transform-origin: 6px 6px; animation: pendingTurn .8s linear infinite; }
+.nativeChoice:checked ~ .switchTrack .pending circle { stroke: color-mix(in srgb, var(--ui-on-accent) 70%, transparent); }
+.nativeChoice[aria-busy="true"] ~ .switchTrack .pending { opacity: 1; }
+.choice:has(.nativeChoice[aria-busy="true"]) { cursor: progress; }
+@keyframes pendingTurn { to { transform: rotate(360deg); } }
 .status { margin: 0; font-size:var(--ui-type-footnote); line-height: 18px; overflow-wrap: anywhere; color: var(--ui-ink-muted); }
 @media (prefers-reduced-motion: reduce) {
   .switchTrack, .switchThumb { transition: none; }
+  .pending circle { animation-duration: 2.4s; }
 }
 @media (forced-colors: active) {
   .switchTrack { border: 1px solid ButtonText; }

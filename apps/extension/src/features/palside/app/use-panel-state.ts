@@ -16,7 +16,7 @@ import { emptyDraft,type Draft } from '../../../domain/chat/model';
 import { type Screen } from './panel-model';
 import { type Team } from '../../../domain/teams/model';
 import { type Viewing } from '../../../domain/assets/model';
-import type { PalsideProps } from './panel-props';
+import type { PalsideProps, Working } from './panel-props';
 import { walletDeadlines } from '../wallet/clock';
 import { imageExpiry } from '../../../runtime/chat/message-expiry';
 const signedOutScreens: Screen[] = ['welcome', 'new-account', 'confirm-phrase', 'restore'];
@@ -38,7 +38,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
   const initialTeam: Team = data.teams[0] ?? noTeam;
 
   const initialView = data.views[0];
-  const { localPeople, setPeople, localTeams, setTeams, localMessages, setMessages, localAllRequests, setRequests, localCurrent, setCurrent, localSiteInteraction, setLocalSiteInteraction, localFavorites, setLocalFavorites, localDrafts, setDrafts, localShare, setLocalShare, localSites, setLocalSites, localTokenOff, setLocalTokenOff, localOffline, setOffline, localViewingId, setViewingId } = adapter?.data ?? livePanelData({ data, scenario, initialTeam });
+  const { localPeople, setPeople, localTeams, setTeams, localMessages, setMessages, localAllRequests, setRequests, localCurrent, setCurrent, localSiteInteraction, setLocalSiteInteraction, localFavorites, setLocalFavorites, localDrafts, setDrafts, localShare, setLocalShare, localSites, setLocalSites, localOffline, setOffline, localViewingId, setViewingId } = adapter?.data ?? livePanelData({ data, scenario, initialTeam });
 
   const sourceTeams = live ? data.teams : localTeams;
 
@@ -208,7 +208,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
 
   const [authBusy, setAuthBusy] = useState(false);
 
-  const [localWorking, setLocalWorking] = useState(false);
+  const [localWorking, setLocalWorking] = useState<Working>(false);
 
   const [localFlow, setLocalFlow] = useState<'create' | 'restore'>('create');
 
@@ -239,7 +239,6 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
 
   const share = live ? Boolean(live.state.preferences.share) : localShare;
 
-  const tokenOff = live ? live.state.preferences.tokenOff ?? [] : localTokenOff;
 
   const people = (live ? data.people : localPeople).map(person => {
     const visible = !disconnected && team.joined && team.memberIds.includes(person.id);
@@ -286,7 +285,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
 
   /** 网站详情: the site the page shows. */
   const [siteHost, setSiteHost] = useState('');
-  return { view: { ownsScreen, ownsAccess, editSessionId, locale, data, setPeople, setTeams, setMessages, teams, discoveryTeams, messages, now, requests, current, screen, drafts, localSites, setOffline, setViewingId, connection, disconnected, viewingId, selectedAsset, selectedView, personId, setPersonId, memberFilter, setMemberFilter, selectingOwner, setSelectingOwner, query, setQuery, lobbyLoading, lobbyError, recruitmentId, setRecruitmentId, phrase, editing, setEditing, editText, setEditText, confirmation, setConfirmation, sharedCategory, setSharedCategory, reportTarget, setReportTarget, image, setImage, inviteSuspended, inviteActive, inviteVersion, invitePassword, joinPrompt, setJoinPrompt, copied, setCopied, authBusy, working, flow, objectUrls, team, draft, draftConflict, viewing, currentMessages, canWrite, pageHost, share, tokenOff, people, me, siteInteraction, favorites, siteHost, setNotice, setInviteActive, setInviteVersion, live, scenario, sites }, text, t, preferences, setRequests, setCurrent, localScreen, setScreen, origins, setLocalSiteInteraction, setLocalFavorites, setKeptTeams, setDrafts, setOptimisticDrafts, draftConflicts, setDraftConflicts, draftQueue, blockedDrafts, draftVersions, resolvingDrafts, draftRevisions, setLocalShare, setLocalSites, setLocalTokenOff, setSelectedAsset, setSelectedView, setLobbyLoading, setLobbyError, setPhrase, editSession, editRevision, setEditRevision, setInvitations, setAuthBusy, setWorking, setFlow, returnFocus, pending, mounted, openTeam, authenticated, setSiteHost, deliver };
+  return { view: { ownsScreen, ownsAccess, editSessionId, locale, data, setPeople, setTeams, setMessages, teams, discoveryTeams, messages, now, requests, current, screen, drafts, localSites, setOffline, setViewingId, connection, disconnected, viewingId, selectedAsset, selectedView, personId, setPersonId, memberFilter, setMemberFilter, selectingOwner, setSelectingOwner, query, setQuery, lobbyLoading, lobbyError, recruitmentId, setRecruitmentId, phrase, editing, setEditing, editText, setEditText, confirmation, setConfirmation, sharedCategory, setSharedCategory, reportTarget, setReportTarget, image, setImage, inviteSuspended, inviteActive, inviteVersion, invitePassword, joinPrompt, setJoinPrompt, copied, setCopied, authBusy, working, flow, objectUrls, team, draft, draftConflict, viewing, currentMessages, canWrite, pageHost, share, people, me, siteInteraction, favorites, siteHost, setNotice, setInviteActive, setInviteVersion, live, scenario, sites }, text, t, preferences, setRequests, setCurrent, localScreen, setScreen, origins, setLocalSiteInteraction, setLocalFavorites, setKeptTeams, setDrafts, setOptimisticDrafts, draftConflicts, setDraftConflicts, draftQueue, blockedDrafts, draftVersions, resolvingDrafts, draftRevisions, setLocalShare, setLocalSites, setSelectedAsset, setSelectedView, setLobbyLoading, setLobbyError, setPhrase, editSession, editRevision, setEditRevision, setInvitations, setAuthBusy, setWorking, setFlow, returnFocus, pending, mounted, openTeam, authenticated, setSiteHost, deliver };
 }
 export type PanelState = ReturnType<typeof usePanelState>;
 

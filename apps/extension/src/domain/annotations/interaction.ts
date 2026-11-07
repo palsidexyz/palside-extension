@@ -2,14 +2,6 @@ import { normalizeAddress,publicShareUrl,type Network } from '@palside/shared/na
 import { graphemeLength } from '@palside/shared/contracts/rules';
 import { normalizeSiteHost } from '../assets/site-host.ts';
 
-/** Exact public hosts, deduplicated in order; nothing when any entry is not one. */
-export function readHosts(input: unknown, limit = 500): string[] | undefined {
-  if (!Array.isArray(input) || input.length > limit) return;
-  const hosts: string[] = [];
-  for (const item of input) { const host = normalizeSiteHost(item); if (!host) return; if (!hosts.includes(host)) hosts.push(host); }
-  return hosts;
-}
-
 /** 信号 and 便利贴: the page features drawn from the squad's own data. */
 export type InteractionFeature = 'signal' | 'sticky';
 export const interactionFeatures: InteractionFeature[] = ['signal', 'sticky'];

@@ -13,7 +13,7 @@ export function createOverlay(send: (message: PageUp) => void) {
   const { host, stage, timers } = context;
   const danmaku = createDanmakuRenderer(context, send);
   const reference = createReferenceOutline(context, send);
-  const stickies = createStickyProjection(context, send, danmaku.scheduleArea);
+  const stickies = createStickyProjection(context, send);
   const selection = createSelectionMenu(context, send);
   const capture = createCaptureHost(stage, send);
   return {

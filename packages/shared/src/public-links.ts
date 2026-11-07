@@ -1,3 +1,5 @@
+import { EXTENSION_ID } from './extension.ts';
+
 const repository = 'https://github.com/palsidexyz/palside-extension';
 
 /** Public project links only. Service origins, extension trust and contract addresses have separate configuration. */
@@ -7,7 +9,5 @@ export const PUBLIC_LINKS = {
   issues: `${repository}/issues`,
   x: 'https://x.com/palside_xyz',
   contactEmail: 'palside@pm.me',
-  // Replace the reserved placeholder and enable availability only after the listing is published.
-  chromeStore: 'https://example.invalid/palside/chrome',
-  chromeStoreAvailable: false,
+  chromeStore: `https://chromewebstore.google.com/detail/${EXTENSION_ID}`,
 } as const;

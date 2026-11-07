@@ -9,10 +9,10 @@ import { sessionScope } from '../apps/extension/src/runtime/account/session.ts';
 import { parseInvitation } from '../packages/shared/src/navigation.ts';
 import { languageGlobals } from './helpers/language-host.mjs';
 import { connectionStatus } from '../apps/extension/src/runtime/transport/connection.ts';
-import { readFavorites, readHosts, readSiteInteractions } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { readFavorites, readSiteInteractions } from '../apps/extension/src/domain/annotations/interaction.ts';
 
 const context = {
-  ...languageGlobals, connectLiveEvents, connectionStatus, readFavorites, readHosts, readSiteInteractions, ApiError, completeTeamStart, startedTeams, sessionScope, parseInvitation,
+  ...languageGlobals, connectLiveEvents, connectionStatus, readFavorites, readSiteInteractions, ApiError, completeTeamStart, startedTeams, sessionScope, parseInvitation,
   text: value => typeof value === 'string' ? value : '', DAY: DAY_MS, Date, URL,
   DeviceCleanup: class {}, uniqueMediaIds: () => new Set(), color: () => '#eee',
   pruneTeamItems: items => items, offlineDirectory: () => ({}),

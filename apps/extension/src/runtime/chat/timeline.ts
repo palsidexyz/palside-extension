@@ -1,15 +1,15 @@
 import { READ_IDS_LIMIT, CHAT_TEXT_MAX } from '@palside/shared/rules/messages';
 import { IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
 import { truncateChatText } from './text';
+import { orderMessages } from '../../domain/chat/order';
 import { notificationTarget } from './notification-policy';
 import { imageExpiry, messageExpiry } from './message-expiry';
 import type { MatrixEvent } from 'matrix-js-sdk';
 import { decryptAttachment } from 'matrix-encrypt-attachment';
 import { ApiError } from '../transport/api';
-import type { RevisionedDraft } from '../storage/storage';
 import { readView } from '../viewing/view-snapshot';
 import { STICKY_EVENT,readTeamEvent,readMessageRefTarget,readRefCaption } from '../../domain/annotations/social';
-import { emptyDraft,readQuoteRange,type Draft,type Message } from '../../domain/chat/model';
+import { readQuoteRange,type Message } from '../../domain/chat/model';
 import { publicShareUrl } from '@palside/shared/navigation';
 import type { RuntimeDevice } from '../account/device';
 import { SNAPSHOT_INTERVAL,text } from '../composition/state';
@@ -150,15 +150,13 @@ export class TimelineRuntime {
     const same = (m: Message) => m.id === eventId || (message.clientId && m.id === message.clientId);
     runtime.state.data.messages = [...runtime.state.data.messages.filter(m => !same(m)), message];
     if (message.recalled) runtime.cache.pruneViews();
-    runtime.cache.eventTimes.set(eventId, timestamp); runtime.state.data.messages.sort((a, b) => (runtime.cache.eventTimes.get(a.id) ?? Date.now()) - (runtime.cache.eventTimes.get(b.id) ?? Date.now()));
+    runtime.cache.eventTimes.set(eventId, timestamp); orderMessages(runtime.state.data.messages);
     const pending = transactionId ? runtime.sending.outgoing.get(transactionId) : undefined;
     if (transactionId && pending) {
+      // The send in flight reads these from the same packet and finishes without sending again.
       pending.eventId = eventId; pending.receivedAt = timestamp;
-      runtime.sending.outgoing.delete(transactionId); await scope.wait(runtime.storage.remove(`${session.account.id}:outgoing:${transactionId}`));
-      await scope.wait(runtime.storage.clearSentDraft(session.account.id, team.id, pending.draftRevision ?? -1, emptyDraft));
-      const draft = await scope.wait(runtime.storage.get<RevisionedDraft<Draft>>(`${session.account.id}:draft:${team.id}`));
+      await scope.wait(runtime.sending.settle(session, team.id, transactionId, pending.draftRevision ?? -1));
       if (runtime.auth.session !== session) return;
-      if (draft) runtime.state.drafts[team.id] = draft;
     }
     if (!readableTeam()) return;
     await scope.wait(runtime.cache.cacheMessage(message, timestamp));

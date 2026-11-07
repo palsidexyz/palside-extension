@@ -37,11 +37,8 @@ async function createTeam(name: string, description = '', avatar?: string) {
 function setRecruitment(active: boolean) {
     const { run } = getActions();
     if (!team.joined || team.readonly || team.owner !== data.self)
-        return;
-    {
-        void run('recruitment', { teamId: current, active });
-        return;
-    }
+        return Promise.resolve(false);
+    return run('recruitment', { teamId: current, active }).then(result => result !== undefined);
 }
 
 function requestTeam(id: string, text: string) {

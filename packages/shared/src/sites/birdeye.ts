@@ -1,16 +1,9 @@
-import { chartSelectors, defineSitePages, dexScreenerImages } from './define.ts';
+import { chartSelectors, defineSitePages } from './define.ts';
 
 export default defineSitePages({
   id: 'birdeye',
-  identify: {
-    chains: ['Solana', 'BNB Chain', 'Ethereum', 'Base'],
-    // The live site redirects shared query links to /<network>/token/<contract>.
-    // Both are public source routes; the network in the canonical path is authoritative.
-    routes: [
-      { kind: 'token', path: '^/([a-z]+)/token/([^/]+)/?$', chain: { group: 1 }, id: { group: 2 }, url: '/{chain}/token/{id}' },
-      { kind: 'token', path: '^/token/([^/]+)/?$', chain: { query: 'chain' }, id: { group: 1 }, url: '/token/{id}?chain={chain}' },
-    ],
-  },
-  profile: { inline: 'span,strong', images: [dexScreenerImages] },
+  // birdeye.so redirects to birdeyeterminal.com with the same path; links shared from the old domain still read.
+  aliases: ['birdeye.so'],
+  tokenUrl: { path: '/{chain}/token/{id}', chains: { Solana: 'solana', 'BNB Chain': 'bsc', Ethereum: 'ethereum', Base: 'base' } },
   layout: { chart: chartSelectors },
 });

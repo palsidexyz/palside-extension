@@ -234,7 +234,7 @@ test('escape, resize, blur and navigation cancel active drags', () => {
 });
 test('local playback precedes acknowledgement; failed result is localized and dispose cleans resources', async () => {
   const f = fixture();
-  f.drag(); assert.equal(f.plays.length, 1); assert.equal(f.audio.length, 0);
+  f.configure({ sound: false }); f.drag(); assert.equal(f.plays.length, 1); assert.equal(f.audio.length, 0);
   f.controller.result(f.calls[0].requestId, false, 'No recipients');
   const notice = f.host.shadow.children.find(node => node.className === 'notice'); assert.equal(notice.textContent, '!'); assert.equal(notice.title, 'No recipients'); assert.equal(notice.attrs['aria-label'], 'No recipients');
   f.configure({ sound: true }); f.drag(); await Promise.resolve();

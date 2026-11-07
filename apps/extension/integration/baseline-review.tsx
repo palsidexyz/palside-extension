@@ -411,7 +411,7 @@ async function watchChecks() {
 
 function pageFixture(index = 0): NonNullable<LivePort['page']> {
   const view = state.data.views[index]!;
-  return { windowId: 1, tabId: 1, url: view.url, asset: viewAsset(view), title: view.name, host: new URL(view.url).hostname, access: { site: true }, granted: true, interactive: true, stickyEnabled: true, signalEnabled: true, connected: true, tokenProfile: true, capabilities: { capture: { state: 'ready' }, pick: { state: 'ready' }, danmaku: { state: 'ready' }, signal: { state: 'ready' }, share: { state: 'ready' } } };
+  return { windowId: 1, tabId: 1, url: view.url, asset: viewAsset(view), title: view.name, host: new URL(view.url).hostname, access: { site: true }, granted: true, interactive: true, stickyEnabled: true, signalEnabled: true, connected: true, capabilities: { capture: { state: 'ready' }, pick: { state: 'ready' }, danmaku: { state: 'ready' }, signal: { state: 'ready' }, share: { state: 'ready' } } };
 }
 async function reminderChecks() {
   await reset('top', () => { page = pageFixture(2); });
@@ -444,7 +444,7 @@ async function roomChecks() {
   await reset('room', () => {
     const key = `token:${viewAsset(state.data.views[0]!)}`;
     state.data.teams[1]!.memberIds.push('alice');
-    state.rooms.current = { key, profile: { name: 'CASHCAT', logo: null, site: 'gmgn' }, count: 3, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
+    state.rooms.current = { key, site: 'gmgn', count: 3, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
   });
   state.data.messages = [{ id: 'room-reference', teamId: 'night', author: 'mia', text: '', time: '12:00', status: 'sent', ref: { view: state.data.views[0]!, caption: 'Quoted room text', target: { kind: 'danmaku', id: 'line0', author: 'mia', name: 'Mia', at: Date.now() } } }]; await refresh();
   await click(t('extension.composer.findRef', { caption: 'Quoted room text' }));

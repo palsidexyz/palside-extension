@@ -569,6 +569,13 @@
       "onboardingSteps": "Account setup progress",
       "createTitle": "Creating your account",
       "restoreProgressTitle": "Signing you in",
+      "phaseSeal": "Encrypting your recovery phrase",
+      "phaseRegister": "Registering your account",
+      "phaseAddDevice": "Adding this device",
+      "phaseConnect": "Setting up encrypted chat",
+      "phaseWallet": "Preparing your wallet",
+      "createDone": "Account created",
+      "restoreDone": "Signed in",
       "revealPhrase": "Reveal phrase",
       "revealHint": "Make sure no one can see your screen",
       "phraseSafety": "Safety tips",
@@ -627,6 +634,7 @@
       "ACCOUNT_BANNED": "This account is banned. Contact {email} for help.",
       "TEXT_NOT_ALLOWED": "This text is not allowed. Edit it and try again.",
       "CHAIN_UNAVAILABLE": "Onchain services are temporarily unavailable",
+      "TOKENS_UNAVAILABLE": "Token info is temporarily unavailable",
       "CHAIN_RELAY_UNAVAILABLE": "Transaction submission is temporarily unavailable",
       "CHAIN_INDEX_UNAVAILABLE": "Onchain records are temporarily unavailable",
       "CHAIN_DISABLED": "Onchain features are currently disabled",
@@ -983,24 +991,6 @@
       "discard": "Discard changes",
       "keepEditing": "Keep editing"
     },
-    "trust": {
-      "chromeWording": "Chrome uses its own wording: Share viewing appears as “Read your browsing history” and site access as “Read and change your data on the site”. Chrome has no read-only site permission; Palside only does what is listed here.",
-      "panelTitle": "Side panel and encrypted chat",
-      "panelDetail": "Runs the side panel and encrypts and decrypts messages on this device.",
-      "notificationsTitle": "Desktop notifications",
-      "notificationsDetail": "Notifies you of new messages.",
-      "neverTitle": "What Palside never does",
-      "neverWallet": "Read wallet or account data from other websites, including balances and orders",
-      "neverSign": "Connect to your other wallets, or sign a transaction without your confirmation",
-      "neverContent": "Read input fields, form values or cookies",
-      "neverBackground": "Keep browsing history or upload other tabs",
-      "siteDetail": "Only sites you allowed: danmaku, signals and sticky notes from Page interaction, quote locating, and the token name and icon on token pages. Disabling Page interaction hands all of them back.",
-      "siteTitle": "Site access",
-      "activeTitle": "The tab where you click Palside",
-      "activeDetail": "Only after you click the toolbar icon or press the screenshot shortcut, for screenshots of that one tab; it ends when you leave the site.",
-      "historyTitle": "Browsing history",
-      "historyDetail": "Only while Share viewing is on: the address and title of the foreground tab. Nothing is kept, and page content is never read. Disabling Share viewing hands it back."
-    },
     "discussion": {
       "chat": "Chat",
       "firstShared": "<b>{name}</b> shared first",
@@ -1282,7 +1272,6 @@
       "empty": "No sites yet",
       "allSites": "All sites",
       "tokenData": "Token data",
-      "tokenDataHint": "Read the token’s name and icon when syncing",
       "remove": "Remove site",
       "undo": "Undo",
       "denied": "Chrome did not allow it",
@@ -1392,9 +1381,10 @@
       "mid": "Medium",
       "high": "High",
       "area": "Area",
-      "chart": "Chart",
-      "top": "Top",
-      "full": "Full page",
+      "quarter": "1/4",
+      "half": "Half",
+      "threeQuarters": "3/4",
+      "full": "Full",
       "sampleC": "Take profit set?",
       "sampleD": "Big buy just landed"
     },
@@ -1416,6 +1406,7 @@
       "perm_active": "Current tab",
       "perm_notifications": "Display notifications",
       "perm_idle": "Idle state of this device",
+      "perm_none": "No browser permission",
       "revoke_tabs_title": "Revoke “Read your browsing history”?",
       "revoke_tabs": "Share viewing turns off. Turning it on again later won’t make Chrome ask again.",
       "revoke_sites_title": "Revoke site access?",
@@ -1443,10 +1434,10 @@
           "no": "Other tabs, page content"
         },
         "token": {
-          "line": "On supported, authorized sites with token data on, reads public token names and icons for sharing or cards; danmaku participation can send public details to the service for display.",
-          "who": "Your squad; the service and public danmaku, hot lists and token details",
-          "keep": "Shares and messages follow their retention; public details stay in service memory, may outlast participation, and clear on restart.",
-          "no": "Balances, holdings, orders, wallets"
+          "line": "When a token is recognized, sends its chain and contract address to the Palside service, which reads its public name, symbol and icon from the blockchain; everyone sees the same record.",
+          "who": "The Palside service; blockchain nodes receive only the contract address",
+          "keep": "Public token details stay on the service and are deleted after 90 days without lookups; who looked a token up is not recorded.",
+          "no": "Page content, balances, holdings, orders, wallets"
         },
         "quote": {
           "line": "Selection reads up to 200 characters, up to 24 characters on each side, and the URL. Quote adds them to a local draft; sending shares them with your squad.",
@@ -1503,7 +1494,9 @@
       "collapse": "Show less",
       "queued": "Queued",
       "quote": "Quote",
-      "quoteSelection": "Quote selection"
+      "quoteSelection": "Quote selection",
+      "copyText": "Copy text",
+      "copySelection": "Copy selection"
     },
     "start": {
       "ownedLimit": "You already own {count} squads",
@@ -1540,7 +1533,15 @@
       "chat": "Only your squad can read it; messages are encrypted",
       "room": "Public talk for each token, open to everyone",
       "share": "When it’s on, your squad sees the page you’re on at the top. Press again to turn it off.",
-      "site": "Press the site icon and turn on Page interaction to show Danmaku, signals and sticky notes on this site’s pages.",
+      "site": "Turn it on from the site icon, then on this site’s pages:",
+      "quoteTab": "Quote · Sticky",
+      "signalHow": "drag, release toward one",
+      "quoteHow": "Select text, use the bar",
+      "danmakuHow": "Public talk drifts across token pages",
+      "demoText": "LP locked 180 days, <mark>top 10 hold 62%</mark>, ownership renounced.",
+      "demoDanmaku1": "volume picking up",
+      "demoDanmaku2": "watch 0.0021 support",
+      "demoDanmaku3": "send it!",
       "toolsTitle": "Message tools",
       "reactions": "Send your squad a burst of emoji",
       "image": "Send an image",
@@ -1549,6 +1550,19 @@
       "inviteTitle": "Invite friends",
       "invite": "Send friends the invitation link so you can watch together.",
       "replay": "Replay the tour"
+    },
+    "installed": {
+      "title": "Palside is installed",
+      "opened": "Side panel open",
+      "openFailed": "Click the Palside icon in the toolbar",
+      "pinned": "Pinned",
+      "docs": "Docs",
+      "privacy": "Privacy",
+      "ready": "You're all set",
+      "sidePanel": "Side panel (not open)",
+      "toolbar": "Toolbar (not pinned)",
+      "pinHow": "Extensions menu › the pin next to Palside",
+      "continue": "Continue in the side panel"
     }
   },
   "website": {
@@ -1573,21 +1587,22 @@
       "signalLabel": "Signals: hold Option on the chart and drag to Attention or Question",
       "captureLabel": "Screenshot and annotation: select a region, circle the peak with the pen, then Done",
       "shareMia": "On PONS too",
-      "overviewLabel": "The Palside side panel: tokens your squad is viewing at the top, encrypted chat in the middle, and the page strip with the token's danmaku count; Leo writes, you reply and send",
+      "overviewLabel": "The Palside side panel: the header holds the squad and the page capsule, with the tokens members are viewing and the encrypted chat below; Leo sends a line and you reply",
       "accountLabel": "Create an account: reveal and back up the 12 recovery words, pick two words to verify them, set a 6-digit device PIN, then choose a nickname",
       "teamsLabel": "Invite a teammate: the captain copies the invitation link; Mia pastes it under Join by invitation, views the invitation and confirms, and the squad counts 2 people",
       "roomLabel": "Public danmaku: choosing Bullish updates the split; a new line appears in the list and drifts across the page",
       "walletLabel": "Wallet transfer: choose teammate Mia and enter 300 PALS, review, enter the device PIN and pay; once confirmed the balance goes from 4,200 to 3,900 PALS",
-      "packetLabel": "Red packet: open Leo's squad red packet, see the amount and count, claim it, and the count becomes 2/5 with your PALS shown",
+      "packetLabel": "Squad red packet: a member’s packet pops up; pressing Open bursts PALS out, your share rolls up and then shows as added to your wallet",
+      "tipLabel": "Tip: choose Tip from a danmaku line’s menu, pick 50 PALS, review and pay; after signing, sending and confirming onchain, the line’s tip total goes up",
+      "pageDanmakuLabel": "Danmaku on pages: your line drifts across the token chart; on other sites for the same token you see the same danmaku",
       "recordsLabel": "Wallet records: filter between All, Incoming and Outgoing, and open a claimed red packet to see its amount and transaction",
       "discoverLabel": "Discover squads: browse recruiting squads by intro and size, request to join, and join once the captain approves",
       "encryptionLabel": "End-to-end encryption: messages leave the sender encrypted, stay ciphertext on the server, and open only on members' devices",
       "hotLabel": "Trending: one live danmaku viewer board, showing gains of at least 3 viewers over five minutes",
-      "installLabel": "Palside is not yet listed on the Chrome Web Store",
+      "installLabel": "Install: add Palside from the Chrome Web Store; Chrome only confirms the addition and lists no permissions",
       "keysLabel": "Keys stay on the device: recovery words stay masked locally; only a signature and the public address go out",
       "sitesLabel": "Website access: adding a website asks Chrome for birdeye.so alone; once allowed it appears in the list",
       "signingLabel": "Wallet signing: every line is checked on the device before paying; an unlimited approval request is refused without a prompt",
-      "blessing": "Best wishes",
       "pendingDeploy": "Published after deployment",
       "pendingTbd": "To be announced",
       "tokenLead": "The token your Palside wallet uses",
@@ -1622,8 +1637,7 @@
       "dark": "Dark",
       "getPalside": "Get Palside",
       "copyright": "© 2026 Palside",
-      "addChrome": "Chrome · Coming soon",
-      "chromeUnavailable": "Palside is not yet listed on the Chrome Web Store. Installation will be available after publication.",
+      "addChrome": "Add to Chrome",
       "privacy": "Privacy",
       "inviteUnavailable": "This invitation is temporarily unavailable",
       "inviteExpired": "This invitation has expired",
@@ -1632,13 +1646,6 @@
       "inviteCopied": "Invitation link copied",
       "copyAddress": "Copy the full link from your browser's address bar",
       "copyInvite": "Copy invitation link",
-      "sharingPrivacy": "Share viewing shares only the foreground tab, only with the current squad, and only after you turn it on: a token page shows the token, any other page shows its title and link (tracking parameters removed; links carrying sign-in credentials show only the site name). Page cards, quotes and screenshots you share go into the draft first and are sent only when you confirm. Chat, attachments and viewing status are end-to-end encrypted by the client with Matrix.",
-      "lookupPrivacy": "Token names and logos are read from the public area of a page only on sites you allowed with Token data on; otherwise a short contract address and a default icon are shown. Receivers check token details locally and may load logos directly from a fixed set of public image hosts; on failure a default icon is shown, never fetched through Palside servers. Image hosts can see the request and connection IP; requests carry no page referrer.",
-      "retentionPrivacy": "Messages are retained for the period the captain chooses (1, 7 or 30 days, or forever, forever by default; images at most 30 days), counted from the original send time; drafts are kept for 7 days and unsent messages for 24 hours. Signing out clears local caches, drafts and decryption keys; older history may be unavailable when you sign in again. Screenshot originals and editing are processed locally without being uploaded.",
-      "submissionsHeading": "Content you submit",
-      "submissionsPrivacy": "Reports contain only content you preview and confirm. The operator can read it; the first view of a private report is audited. Recruiting squads publish their name, description, avatar, captain’s nickname and avatar, level and popularity rank. Onchain addresses, amounts and transaction hashes are public and cannot be deleted. The service stores wallet identity bindings, orders and recovery records. Alchemy and RPC services process signed transactions without receiving private keys. Levels and popularity use activity events and daily aggregates, with network address digests isolated by squad and date, without reading encrypted chat content. Deletion removes wallet bindings and reporter links. Pending chain orders are reconciled before account links are removed, retaining only amounts and transaction hashes. Only the public key and deletion time remain for the account; the same phrase can register again. Activity IP digests retain the last 30 complete UTC days and the current day.",
-      "scopeHeading": "Current availability",
-      "scopePrivacy": "Palside is not yet listed in the Chrome Web Store. Website demos use sample data separately from the extension services and do not verify security or readiness for release.",
       "permissionsEncryption": "Permissions and encryption",
       "chromePermissions": "Chrome permissions",
       "endToEnd": "End-to-end encryption",
@@ -1662,62 +1669,54 @@
       "lobbyUnavailable": "The squad list is temporarily unavailable",
       "backToLobby": "Back to all squads",
       "applyToJoin": "Apply in Palside",
-      "termsTitle": "Terms of use",
-      "termsOperator": "Operator, contact and governing region: to be announced before public release.",
-      "termsService": "Palside is a Chrome side-panel extension and service for chatting with a small squad and showing what you choose to share. Chat is end-to-end encrypted; the service relays and stores encrypted messages for the retention period set by each captain.",
-      "termsAccount": "Your recovery phrase is generated on your device and separately derives your account identity and wallet keys. It controls both your account and PALS funds; Palside cannot recover it. Keep a private backup. Private keys are decrypted and used to sign only on your device; Palside never asks for your phrase. Once enabled, onchain features include transfers, red packets and tips. PALS amounts are shown before payment, and Palside charges no fees. Confirmed onchain transactions cannot be reversed. Deleting your account does not delete onchain records or move your funds.",
-      "termsConduct": "Do not use Palside for spam, scams, phishing, harassment, illegal content or impersonation. Captains are responsible for recruitment content. Confirmed violations may lead to profile removal, recruitment removal, deletion of public messages or an account ban. Bans last 7 days, 30 days or permanently and immediately sign out every device. Appeals can be sent to {email}.",
-      "termsPublic": "A recruiting squad's name, description, avatar, captain’s nickname and avatar are visible to anyone on the website and may be indexed by search engines. After recruiting ends, the page is removed; copies kept by search engines disappear on their own schedule.",
-      "termsLiability": "Palside is provided as is. Token information shown by third-party sites or shared by members is not verified and is not financial advice. Names and icons do not prove a project is genuine. Messages may become unavailable when they expire or when a server fails, and there is no backup.",
-      "termsChanges": "We may update these terms and will publish the new version on this page.",
       "workflowRegion": "Squad workflows"
     },
     "features": {
       "sync": {
-        "title": "Your squad’s on-chain view, in sync",
-        "description": "Detected, grouped and synced: every token a teammate opens shows up in the side panel live."
+        "title": "Your squad’s view of the chain",
+        "description": "Every token a teammate opens syncs to your side panel, live."
       },
       "signal": {
         "title": "Talk right on the chart",
-        "description": "Mark, warn, react. Only teammates on the same page see it, and it fades on its own."
+        "description": "Drop signals and circle what matters in a screenshot, all without leaving the page."
       },
       "danmaku": {
         "title": "Live market mood",
-        "description": "Public danmaku for every token, the same on every site."
+        "description": "One public danmaku stream per token, synced live across sites."
       },
-      "capture": {
-        "title": "Capture and mark up in place",
-        "description": "Capture, mark up and send without leaving the page."
+      "packet": {
+        "title": "Grab red packets with your squad",
+        "description": "Send lucky red packets to your squad; claimed PALS go straight to your wallet."
       },
       "encryption": {
         "title": "Matrix end-to-end encryption",
-        "description": "Built on the open Matrix protocol. Private messages, attachments and Share viewing content are encrypted on your devices. Recruitment profiles and metadata are not."
+        "description": "Private messages, attachments and Share viewing content are all encrypted on your devices."
       }
     },
     "questions": {
       "purpose": {
         "question": "What is Palside?",
-        "answer": "Palside is a side panel extension for desktop Chrome. Sync the tokens you are viewing with your squad, leave signals, danmaku and sticky notes on pages, and discuss it all in an end-to-end encrypted squad chat."
+        "answer": "A side panel extension for desktop Chrome for following tokens with your squad: share viewing, page interaction (signals, danmaku, sticky notes) and end-to-end encrypted squad chat."
       },
       "account": {
         "question": "Do I need to sign up?",
-        "answer": "No email or phone number. Palside generates a recovery phrase on your device, and that phrase is your account. Back it up: if it is lost, no one can recover it."
+        "answer": "No email or phone number. Your account derives from a 12-word recovery phrase generated on your device. Palside never stores it; a lost phrase cannot be recovered."
       },
       "privacy": {
-        "question": "Can squad members see what I browse?",
-        "answer": "Share viewing shares only the token, or the page title and link, of your current tab when you turn it on; links carrying sign-in credentials share only the site name. It never automatically shares page content, your screen or page actions. Quotes and screenshots are shared only when you select and send them. Turn Share viewing off any time."
+        "question": "Can my squad see what I browse?",
+        "answer": "Only while Share viewing is on, and only your current tab’s token, or its page title and link. Page content, your screen and page actions are never shared. Quotes and screenshots appear only after you send them."
       },
       "permissions": {
-        "question": "Which browser permissions does Palside need?",
-        "answer": "Installing it requests no permissions that trigger a Chrome warning. Share viewing needs “Read your browsing history”; page interaction asks for access only on the sites you add. You can revoke both in Chrome at any time."
+        "question": "Which browser permissions are required?",
+        "answer": "None that trigger a Chrome warning at install. Share viewing requires “Read your browsing history”; page interaction is granted per site. Both can be revoked in Chrome."
       },
       "encryption": {
-        "question": "How are chats encrypted?",
-        "answer": "Squad messages, images and viewing status are end-to-end encrypted on members’ devices. Servers relay ciphertext and cannot read it. A new device shows only messages received after it signs in."
+        "question": "How is chat encrypted?",
+        "answer": "Messages, images and viewing status are end-to-end encrypted on members’ devices; servers relay ciphertext only. A new device decrypts only messages received after sign-in."
       },
       "teams": {
         "question": "How do I join a squad?",
-        "answer": "Use an invitation link from a captain, or request to join a recruiting squad in Discover squads; you are in once the captain approves. Each squad holds up to 30 members."
+        "answer": "Through an invitation link, or by applying in Discover squads for captain approval. Each squad holds up to 30 members."
       }
     },
     "notFound": {
@@ -1729,41 +1728,9 @@
       "teamFull": "Squad full",
       "retry": "Try again",
       "detailUnavailable": "This squad is temporarily unavailable",
-      "privacyLabel": "Privacy",
-      "privacyTitle": "Data and privacy",
-      "privacyLead": "What is synced, how data is used and how to stop syncing.",
-      "permissions": "Browser permissions",
-      "permissionsSummary": "No website access at install. Chrome asks for optional permissions the first time you turn on the feature that needs them.",
-      "encryptionSummary": "Only authorized squad members decrypt chat, attachments and viewing content.",
-      "retention": "Data retention",
-      "retentionSummary": "Captains choose 1, 7 or 30 days, or forever, with forever as the default. Images last at most 30 days after sending, then show “Image expired”.",
-      "screenshots": "Local screenshots",
-      "screenshotsSummary": "Originals and editing stay on your device. Send only when you confirm.",
-      "screenshotsDetail": "Cropping and annotation happen on your device. A separate editing window may retain the original in extension background memory. Cancelling, signing out or restarting the background clears it; expired sessions are cleared on later access. Adding to a draft is not sending. A sent image is an ordinary encrypted image message, without the original, layers or cropped-out parts.",
-      "metadataDetail": "End-to-end encryption does not hide all metadata. The service still processes necessary account, membership, connection time and IP information. Recruiting profiles and reports you choose to submit are separate from private chat.",
-      "retentionDetail": "Expired content becomes inaccessible immediately; related metadata is cleared within 7 days. Local content cache is capped at 300 MiB; squads you leave remain visible for at most 30 days after leaving. Service logs last up to 7 days. Report evidence lasts at most 90 days while unresolved or 30 days after closure; report and case records are deleted one year after closure. Bans are retained while active and for one year after ending; permanent bans remain. Operator audits last one year, operation deduplication records 7 days, and aggregate counts indefinitely. There are no server backups; copies saved by others cannot be forcibly deleted.",
-      "publicSummary": "Recruiting profiles are public. Reports include only what you confirm.",
-      "availabilitySummary": "Currently in development and testing; not publicly operated yet.",
-      "updated": "Last updated: October 29, 2026",
-      "termsTitle": "Rules of use",
-      "termsLead": "Read these rules before using the service.",
-      "service": "The service",
-      "serviceSummary": "Chat with your squad in Chrome and share what you choose.",
-      "account": "Account and keys",
-      "accountSummary": "Keep your recovery phrase safe. Palside cannot recover your account.",
-      "conduct": "Community rules",
-      "conductSummary": "No harassment, impersonation, scams or illegal content.",
-      "publicContent": "Public content",
-      "publicContentSummary": "Recruiting profiles you publish can be viewed and indexed by anyone.",
-      "liability": "Responsibility",
-      "liabilitySummary": "The service is provided as is; token information is not investment advice.",
-      "changes": "Terms updates",
-      "changesSummary": "Updated terms are published on this page.",
-      "canTitle": "What Palside does",
-      "canChat": "Encrypts and decrypts chat on your device",
-      "canCapture": "Take screenshots, share pages and quote page content when you ask",
-      "canShare": "Once you turn on Share viewing, sync the token, or the page title and link, you are viewing with your squad",
-      "canNotify": "Alerts you to new messages with desktop notifications, once you turn them on",
+      "privacyTitle": "Privacy policy",
+      "privacyLead": "What Palside reads, who can see it, how long it is kept, and how to stop it.",
+      "termsTitle": "Terms of use",
       "lobbyPlaceholder": "Search names or descriptions",
       "unavailableLead": "The service isn't responding right now. Try again in a moment.",
       "noResultsTitle": "No squads match “{query}”",
@@ -1774,7 +1741,7 @@
       "daysLeft": "{days, plural, =0 {Closes today} one {# day left} other {# days left}}",
       "noExtension": "Don't have Palside?",
       "handoffReceived": "Sent to Palside. Click the Palside icon in the toolbar to continue.",
-      "handoffMissing": "Palside wasn't detected. The Chrome Web Store release is <link>not yet available</link>.",
+      "handoffMissing": "Palside wasn't detected. Install it from the <link>Chrome Web Store</link> first.",
       "browseTeams": "Discover squads",
       "invitedBy": "<strong>{name}</strong> invited you to join",
       "invited": "You're invited to join",
@@ -1798,35 +1765,7 @@
       "factRequired": "Required",
       "teamEnded": "This squad is no longer recruiting",
       "teamEndedLead": "Recruiting may have expired or been closed by the captain.",
-      "publishedAgo": "Published {time}",
-      "dataTitle": "Data we process",
-      "dataSummary": "Each item leaves your device only for the feature it serves.",
-      "dataMessagesTitle": "Messages",
-      "dataMessages": "Squad messages are encrypted on your device and the service stores only ciphertext; danmaku is public.",
-      "dataBrowsingTitle": "Browsing",
-      "dataBrowsing": "Only while Share viewing is on, the token, or the page title and link, of your foreground tab is sent encrypted to your squad. No history is kept.",
-      "dataPageTitle": "Page content",
-      "dataPage": "Text you quote or pin as a sticky note, screenshots you confirm sending, and the public token name and icon on token pages.",
-      "dataActionsTitle": "Page actions",
-      "dataActions": "When you send a signal, the page element you point at and its relative position are sent encrypted to your squad. Keystrokes and scrolling are never recorded.",
-      "dataTransactionsTitle": "Transactions",
-      "dataTransactions": "Your wallet’s public address, transfer, red packet and tip orders, and their onchain status. Onchain records are public and cannot be deleted.",
-      "dataNetworkTitle": "Network",
-      "dataNetwork": "The service processes connection IPs. Necessary error records last up to 7 days; anti-abuse counters stay in memory or for at most one day. Squad activity IP digests retain the last 30 complete UTC days and the current day.",
-      "danmakuTitle": "Danmaku",
-      "danmakuSummary": "Danmaku is public and not encrypted.",
-      "danmakuDetail": "Your danmaku, nickname and avatar are public. The service stores the text, author and token, retaining the latest 10000 lines per token without time expiry. Votes remain until changed, withdrawn or the account is deleted. The service knows which token you participate in, without receiving page URLs or keeping a persistent browsing trail. Trending counts only accounts with danmaku open, not private squad viewing.",
-      "thirdPartiesTitle": "Third parties and data use",
-      "thirdPartiesSummary": "Data is used only to provide the features on this page.",
-      "thirdPartiesDetail": "Palside does not sell user data, use it for advertising, or use it to determine creditworthiness or for lending. Squad chat runs on a Matrix service operated by Palside.",
-      "thirdPartiesChainTitle": "Alchemy and RPC nodes",
-      "thirdPartiesChain": "Process the PALS transactions you sign and public onchain information. They never receive private keys.",
-      "thirdPartiesImagesTitle": "Public image hosts",
-      "thirdPartiesImages": "Receivers may load token icons directly from a fixed set of public image hosts, which can see the image request and connection IP.",
-      "limitedUse": "The use of information received from Chrome APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.",
-      "choicesTitle": "Your choices and contact",
-      "choicesSummary": "Take back permissions or clear local data anytime.",
-      "choicesDetail": "Use Settings › Privacy & data to take back permissions and clear local caches. Deleting your account removes your profile and associations, except records already onchain. Palside is not directed to anyone under 18. For privacy questions, contact palside@pm.me."
+      "publishedAgo": "Published {time}"
     },
     "og": {
       "recruiting": "Recruiting",
@@ -1845,7 +1784,7 @@
       "continueTeam": "Return to your squad"
     },
     "film": {
-      "heroAccessible": "Demo: public danmaku on PONS, holding ⌥ to send a “Look here” signal, then capturing and marking the chart for the squad; opening the X post Leo shared, quoting it, clicking the sent quote to highlight the original text, and adding a sticky note, then back to PONS. All demo data is fictional.",
+      "heroAccessible": "Demo: on PONS, turning on Share viewing, then Page interaction for the site, so public danmaku appear on the chart; holding ⌥ to send a “Look here” signal, capturing and marking the chart for the squad, opening Robin’s red packet; opening the X post Leo shared, quoting it and adding a sticky note, then back on PONS turning Page interaction and Share viewing off again. All demo data is fictional.",
       "ranking": "Ranking",
       "holders": "Holders {value}",
       "volume": "24h volume {value}",
@@ -1901,27 +1840,40 @@
         "huntersDescription": "Tracking smart money, one trade reviewed a day.",
         "baseName": "Base Research",
         "baseDescription": "Sharing project docs and reading notes."
-      }
+      },
+      "wishLuck": "Good luck!",
+      "wishRide": "Let’s ride",
+      "wishThanks": "Thanks for the call",
+      "noteLp": "LP is burned, check on-chain",
+      "noteLocked": "Liquidity locked for 180 days",
+      "noteHolders": "Holders still climbing",
+      "noteDoubled": "Holders doubled since yesterday",
+      "noteTime": "2 min ago"
     },
     "workflows": {
       "hot": {
         "label": "Hot",
-        "title": "Follow where attention goes",
-        "description": "Ranked live by danmaku viewers, with “↑N” for gains of at least 3 viewers over five minutes."
+        "title": "Follow the attention",
+        "description": "Ranked live by who’s watching, so rising tokens stand out at a glance."
       },
       "discover": {
         "title": "Find traders on your wavelength",
-        "description": "Browse public squads by intro and size; captains approve requests."
+        "description": "Browse public squads by intro and size, and request to join in one click."
+      },
+      "tip": {
+        "label": "Tips",
+        "title": "Tip the calls that land",
+        "description": "Spot a danmaku you enjoy? Tip its author PALS in one click."
       },
       "notes": {
         "label": "Notes and quotes",
-        "title": "Page quotes and sticky notes",
-        "description": "Quotes carry their source; sticky notes stay where you put them for teammates to see."
+        "title": "Page quotes and notes",
+        "description": "Quotes keep their source and notes stay where you left them, ready when teammates open the page."
       },
       "people": {
         "label": "Follow",
         "title": "Follow traders you trust",
-        "description": "Follow a teammate’s page: go along in one tap when they switch tokens. Kept on your device only; they are not notified."
+        "description": "Follow a teammate’s page and switch along with them in one click."
       }
     },
     "statement": {
@@ -1949,7 +1901,6 @@
       "openSource": "Open-source extension",
       "license": "MIT License",
       "viewSource": "View on GitHub",
-      "policy": "Privacy policy",
       "aboutMatrix": "About Matrix"
     },
     "security": {
@@ -1997,6 +1948,7 @@
       "film": {
         "locked": "Encrypted here",
         "toServer": "Sent to the server",
+        "byContract": "Palside's server reads them from the chain by contract address",
         "signature": "Signature",
         "publicAddress": "Public address",
         "approval": "Approval",
@@ -2004,6 +1956,130 @@
         "unlimited": "Unlimited",
         "rejected": "Refused",
         "packetContract": "Red packet contract"
+      }
+    },
+    "policy": {
+      "updated": "Last updated: November 7, 2026",
+      "can": {
+        "title": "What Palside does",
+        "chat": "Encrypts and decrypts squad chat on your device",
+        "share": "Shares the current token or page with your squad once Share viewing is on",
+        "capture": "Takes screenshots and quotes page text when you act",
+        "notify": "Sends desktop notifications for new messages once enabled"
+      },
+      "never": {
+        "title": "What Palside never does",
+        "wallet": "Read wallet or account data from other websites, including balances and orders",
+        "sign": "Connect your other wallets, or sign transactions without your confirmation",
+        "content": "Read input fields, form values or cookies",
+        "background": "Store browsing history or upload other tabs"
+      },
+      "permissions": {
+        "title": "Browser permissions",
+        "summary": "No website access is requested at install. Chrome asks for optional permissions the first time you enable the feature that needs them.",
+        "note": "Chrome offers no read-only site permission, hence the wording “read and change”; Palside uses it only as listed above. Turning a feature off does not revoke its permission; revoke it in Settings › Privacy & data.",
+        "installed": "Granted at install",
+        "optional": "Optional",
+        "panel": {
+          "title": "Side panel, storage and idle state",
+          "detail": "Runs the side panel and local encryption; shows you as away after 5 minutes without input, reporting only active or away."
+        },
+        "active": {
+          "title": "Current tab",
+          "detail": "Captures a screenshot of the tab when you click the toolbar icon or press the screenshot shortcut."
+        },
+        "history": {
+          "title": "Read your browsing history",
+          "detail": "Share viewing and page recognition: reads only the address and title of the foreground tab; nothing is stored and page content is not read."
+        },
+        "site": {
+          "title": "Read and change site data",
+          "detail": "Page interaction (danmaku, signals, sticky notes, quotes); granted per site or for all sites."
+        },
+        "notifications": {
+          "title": "Display notifications",
+          "detail": "Alerts for new messages, mentions and replies."
+        }
+      },
+      "data": {
+        "title": "Data visibility",
+        "note": "End-to-end encryption protects content but does not hide all metadata. Only the screenshot you confirm is uploaded, without the original or cropped areas.",
+        "device": {
+          "title": "Your device only",
+          "detail": "Recovery phrase, local password and wallet private key; full screenshots and their editing; drafts; the page text index for locating quotes."
+        },
+        "squad": {
+          "title": "Squad members",
+          "scope": "End-to-end encrypted",
+          "detail": "Chat text and images, page cards, quotes, sticky notes, signals, and the token or page shared through Share viewing. Links are stripped of tracking parameters; links carrying sign-in credentials send only the site name. The service stores ciphertext only."
+        },
+        "public": {
+          "title": "Everyone",
+          "scope": "Public, not encrypted",
+          "detail": "Danmaku, votes, and the poster’s nickname and avatar; public profiles of recruiting squads; addresses, amounts and transaction hashes of PALS onchain transactions."
+        },
+        "service": {
+          "title": "Palside service",
+          "detail": "Account public key, squad membership, connection times and IP; tokens whose danmaku you join, without page addresses; token contracts looked up for names and icons, without recording who asked; wallet order status; reports you confirm."
+        }
+      },
+      "retention": {
+        "title": "Retention",
+        "note": "There are no server backups. Palside cannot retrieve copies saved by other members; onchain records are public and cannot be deleted.",
+        "messages": {
+          "title": "Squad messages",
+          "detail": "Set by the captain to 1, 7 or 30 days, or forever, forever by default; images are kept at most 30 days."
+        },
+        "danmaku": {
+          "title": "Danmaku",
+          "detail": "The latest 10,000 lines per token are kept; authors can withdraw their own."
+        },
+        "votes": {
+          "title": "Votes",
+          "detail": "Kept until changed, withdrawn or the account is deleted."
+        },
+        "device": {
+          "title": "On your device",
+          "detail": "Drafts are kept for 7 days; signing out clears local caches and decryption keys."
+        }
+      },
+      "thirdParties": {
+        "title": "Third-party services",
+        "services": "Squad chat runs on a Matrix service operated by Palside. Alchemy and RPC nodes process the PALS transactions you sign and never receive private keys. Token names and icons are read by Palside's server from blockchain RPC nodes, IPFS gateways and Codex, then cached; these services receive only contract addresses sent by the server, never your account, pages or IP.",
+        "use": "Palside does not sell user data or use it for advertising, creditworthiness or lending. The use of information received from Chrome APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements."
+      },
+      "choices": {
+        "title": "Your choices and contact",
+        "controls": "Revoke permissions and clear local caches in Settings › Privacy & data. Deleting your account removes your profile and associations; the service keeps only the public key and deletion time. Onchain records are excluded.",
+        "contact": "Palside is not directed to anyone under 18. For privacy questions, contact palside@pm.me."
+      }
+    },
+    "terms": {
+      "lead": "By using Palside, you agree to these terms.",
+      "updated": "Last updated: November 8, 2026",
+      "service": {
+        "title": "The service",
+        "body": "Palside is a desktop Chrome side-panel extension and related service providing squad chat, Share viewing, Page interaction, danmaku and the PALS wallet. It is operated by palside and can be reached at {email}. You must be at least 18 years old to use it. The handling of personal data is described in the Privacy policy."
+      },
+      "account": {
+        "title": "Account and wallet",
+        "body": "Your recovery phrase is generated on your device and controls both your account and wallet. Palside neither stores nor requests it and cannot recover it if lost; keep your own secure backup. The wallet is used only for PALS transfers, red packets and tips. Palside charges no fees and pays network fees on your behalf, up to a daily limit. Confirmed onchain transactions cannot be reversed; deleting your account neither deletes onchain records nor moves your balance."
+      },
+      "conduct": {
+        "title": "Acceptable use",
+        "body": "Do not use Palside to send spam, commit scams or phishing, harass or impersonate others, or distribute illegal, sexual, violent or hateful content. You are responsible for the content you send; captains are responsible for recruiting profiles and squad management. Where a violation is confirmed on review, Palside may remove public profiles, take down recruiting, delete danmaku or ban the account. Bans last 7 days, 30 days or permanently and sign out every device. Appeals may be sent to {email}."
+      },
+      "public": {
+        "title": "Public content",
+        "body": "Danmaku, votes and the profiles of recruiting squads are public, and recruiting profiles may be indexed by search engines. When recruiting ends, the website page is removed; search engine caches expire on their own schedules."
+      },
+      "liability": {
+        "title": "Disclaimer",
+        "body": "The service is provided as is, without any guarantee of continuous or uninterrupted availability. Palside does not offer buying, swapping or trading services. Token names and icons come from public blockchain data and image services and do not establish a project’s authenticity; USD prices are indicative only, and no information constitutes investment advice. Palside is not affiliated with the third-party sites it displays. Messages may become unavailable after they expire or after a service failure, and servers keep no backups."
+      },
+      "changes": {
+        "title": "Changes and termination",
+        "body": "You may delete your account at any time to stop using the service. Updated terms are published on this page with a revised date; continued use after an update constitutes acceptance of the updated terms."
       }
     }
   }

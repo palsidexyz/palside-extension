@@ -28,7 +28,7 @@ const key = 'token:Solana:So11111111111111111111111111111111111111112';
 test('all room and invite commands route their payload to the owned service', async () => {
   const routes = [
     ['room-watch', 'watch', { id: 'panel:summary', view: key }, ['panel:summary', key]],
-    ['room-panels', 'panelChanged', { connected: true }, [true]], ['room-tab', 'tabChanged', { asset: key.slice(6) }], ['room-open', 'open', { key }], ['room-close', 'close', {}, []],
+    ['room-panels', 'panelChanged', { connected: true }, [true]], ['room-tab', 'tabChanged', { asset: key.slice(6), site: 'gmgn' }], ['room-open', 'open', { key }], ['room-close', 'close', {}, []],
     ['room-send', 'send', { text: 'hi' }, ['hi']], ['room-more', 'more', {}, []], ['room-find', 'find', { key, id: 'm' }, [key, 'm']], ['room-retract', 'retract', { id: 'm' }, ['m']], ['room-report', 'report', { id: 'm' }, ['m']],
     ['room-stance', 'stance', { key, value: 'bull' }, [key, 'bull']], ['room-summary', 'summary', { key }, [key]], ['room-people', 'people', { key }, [key]], ['room-hot', 'watchHot', { sourceId: 'panel', chain: 'Solana' }],
     ['room-block', 'block', { accountId: 'peer', blocked: true }, ['peer', true]], ['room-blocks', 'blocks', {}, []], ['room-settings', 'settings', { off: true }],

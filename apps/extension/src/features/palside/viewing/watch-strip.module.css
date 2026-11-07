@@ -3,8 +3,12 @@
 .region { --watch-more:44px; overflow:hidden; flex-shrink:0; }
 .strip { display:flex; gap:6px; height:52px; padding:0 16px 8px; }
 .card { flex:1; min-width:0; }
-.chip { position:relative; display:flex; flex:0 1 auto; align-items:stretch; min-width:0; height:44px; padding:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.chip { position:relative; display:flex; flex:0 1 auto; align-items:stretch; min-width:0; height:44px; padding:3px; overflow:clip; overflow-clip-margin:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .chip > [data-token-lock] { align-self:center; margin-inline:-6px 2px; }
+/* The page's content: the current layer in flow, a leaving one rolled out above it on top of the same place. */
+.wrap { position:relative; display:flex; flex:1 1 auto; min-width:0; overflow:clip; overflow-clip-margin:3px; }
+.layer { display:flex; flex:1 1 auto; min-width:0; }
+.layer[data-leaving] { position:absolute; inset:0; pointer-events:none; }
 .target { display:flex; flex:1; align-items:center; gap:7px; min-width:0; padding:0 4px 0 5px; border-radius:calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs) var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px); corner-shape:var(--ui-corner-shape); text-align:left; background:transparent; border:0; color:var(--ui-text-primary); }
 .target > [data-token-size][data-token-size] { --token-size:24px; }
 .text { flex:1; min-width:0; }
@@ -27,13 +31,25 @@
 .count:active { --stack-edge:var(--ui-control-recess); }
 .stack { display:flex; align-items:center; height:24px; }
 .stack > * + * { margin-left:-10px; }
-.face > :global([data-person-avatar][data-avatar-size]) { --person-size:20px; --person-font:8px; }
-.face { position:relative; display:grid; flex:none; border-radius:50%; box-shadow:0 0 0 1.5px var(--stack-edge); }
+.face :global([data-person-avatar][data-avatar-size]) { --person-size:20px; --person-font:8px; }
+/* A face keeps its place; who is in it cross-fades. */
+.face { position:relative; display:grid; flex:none; width:20px; height:20px; border-radius:50%; box-shadow:0 0 0 1.5px var(--stack-edge); }
+.faceLayer { position:absolute; inset:0; display:grid; border-radius:50%; }
 .face [data-presence] { display:none; }
 .rest { position:relative; display:flex; align-items:center; justify-content:center; flex:none; white-space:nowrap; min-width:20px; height:20px; padding:0 3px; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-text-primary) 9%, var(--stack-edge)); box-shadow:0 0 0 1.5px var(--stack-edge); color:var(--ui-text-primary); font-size:var(--ui-type-caption); line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
-.more { display:grid; place-items:center; flex:none; width:var(--watch-more); height:44px; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-callout)/1 var(--font-geist-mono), ui-monospace, monospace; cursor:pointer; }
+.more { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:1 1 auto; min-width:var(--watch-more); height:44px; padding:0 14px 0 12px; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-callout)/1 var(--font-geist-mono), ui-monospace, monospace; cursor:pointer; }
 .more:hover, .more[aria-expanded="true"] { background:var(--ui-control-hover); }
 .more:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+/* +N fills what the chips leave: the hidden pages' marks lead (overlapping, cut first when the bar is narrow), the count keeps the far edge. */
+.moreMarks { display:flex; flex:1; align-items:center; min-width:0; overflow:hidden; }
+.moreMark { display:grid; flex:none; border-radius:50%; box-shadow:0 0 0 1.5px var(--ui-control-surface); }
+.moreMark + .moreMark { margin-left:-6px; }
+.moreMark > [data-token-size][data-token-size] { --token-size:20px; }
+.more:hover .moreMark, .more[aria-expanded="true"] .moreMark { box-shadow:0 0 0 1.5px var(--ui-control-hover); }
+.more > b { flex:none; }
+/* A card holding the row (跟看, 喊你来看, connection) keeps the width; +N goes back to its 44px square, count only. */
+.card ~ .more { flex:none; width:var(--watch-more); padding:0; justify-content:center; }
+.card ~ .more .moreMarks { display:none; }
 /* +N: the chips and waiting 喊你来看 the row has no room for, as full-width rows. */
 .moreList { display:flex; flex-direction:column; gap:4px; }
 /* The popup's generic button rows must not reshape the chips inside it. */

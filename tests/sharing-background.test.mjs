@@ -1,10 +1,7 @@
 import { addBackgroundHost, startWorker, stateSender } from './helpers/background-host.mjs';
-import { productionModules } from './helpers/production-module.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTabObserver} from '../apps/extension/src/runtime/browser/tab-observer.ts';
-import { identifyPage } from '../packages/shared/src/navigation.ts';
-import {readVisibleToken} from '../apps/extension/src/runtime/viewing/token-page.ts';
 const wait=()=>new Promise(resolve=>setTimeout(resolve,35));
 const until=async(ready,ms=1000)=>{const end=Date.now()+ms;while(!ready()&&Date.now()<end)await wait();};
 function event(){const listeners=[];return{addListener:fn=>listeners.push(fn),emit:(...args)=>listeners.map(fn=>fn(...args))};}
@@ -34,7 +31,7 @@ function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,fav
  const sendState=stateSender(browser,backgroundSender);
  const broadcast=()=>sendState(state);
  browser.runtime.onConnect.emit(port);port.onMessage.emit({type:'hello',windowId:10,activity:helloActivity});if(broadcastState)broadcast();
- return{calls,messages,pageMessages,controls,grantedOrigins,browser,port,broadcast,command:(name,payload={})=>new Promise(resolve=>browser.runtime.onMessage.emit({type:'palside/command',command:{name,payload}},panelSender,resolve)),metadata:request=>new Promise(resolve=>browser.runtime.onMessage.emit({type:"palside/token-page",request},backgroundSender,resolve)),update:patch=>{state={...state,...patch,...(patch.preferences?{preferences:{siteInteraction:quiet,...patch.preferences}}:{})};broadcast();},dispose:()=>observer.dispose(),identities:()=>calls.filter(c=>c.name==='page'&&c.payload?.identity),activities:()=>calls.filter(c=>c.name==='page'&&c.payload?.activity)};
+ return{calls,messages,pageMessages,controls,grantedOrigins,browser,port,broadcast,command:(name,payload={})=>new Promise(resolve=>browser.runtime.onMessage.emit({type:'palside/command',command:{name,payload}},panelSender,resolve)),update:patch=>{state={...state,...patch,...(patch.preferences?{preferences:{siteInteraction:quiet,...patch.preferences}}:{})};broadcast();},dispose:()=>observer.dispose(),identities:()=>calls.filter(c=>c.name==='page'&&c.payload?.identity),activities:()=>calls.filter(c=>c.name==='page'&&c.payload?.activity)};
 }
 test('worker restart restores observation from the runtime snapshot without claiming fresh device activity',async t=>{
  const f=fixture({broadcastState:false,helloActivity:false});t.after(f.dispose);await until(()=>f.identities().length>=2);
@@ -85,87 +82,6 @@ test('SPA navigation refreshes identity without claiming device activity; locked
  f.controls.locked=true;f.browser.idle.onStateChanged.emit('locked');await wait();assert.equal(f.identities().length,4);
  f.controls.locked=false;f.port.onDisconnect.emit();await wait();assert.equal(f.identities().length,4);
 });
-function tokenRequest(f) {
- const url='https://gmgn.ai/robinhood/token/0x39dbed3a2bd333467115de45665cc57f813c4571';f.controls.tab.url=url;
- return {identity:identifyPage(url),context:{tabId:1,windowId:10},accountId:'alice',teamId:'one',purpose:'viewing'};
-}
-test('token DOM reads stop immediately without site access',async t=>{
- const f=fixture();t.after(f.dispose);const request=tokenRequest(f);let attempts=0;
- f.browser.scripting.executeScript=async()=>{attempts++;return[]};
- assert.equal((await f.metadata(request)).metadata,undefined);assert.equal(attempts,0);
-});
-
-test('token-data changes during executeScript reject the result, including disabling and reenabling',async t=>{
- for(const restore of [false,true]) {
-  const f=fixture({site:true});t.after(f.dispose);const request=tokenRequest(f);
-  let finish,started;const executing=new Promise(resolve=>{started=resolve;});
-  f.browser.scripting.executeScript=()=>new Promise(resolve=>{finish=resolve;started();});
-  const pending=f.metadata(request);await executing;
-  const preferences={current:'one',share:true};
-  f.update({preferences:{...preferences,tokenOff:['gmgn.ai']}});
-  if(restore)f.update({preferences:{...preferences,tokenOff:[]}});
-  finish([{frameId:0,result:{name:'STALE'}}]);
-  assert.equal((await pending).metadata,undefined);
- }
-});
-
-test('site permission changes reject pending reads and invalidate cached metadata',async t=>{
- const f=fixture({site:true});t.after(f.dispose);const request=tokenRequest(f);let reads=0;
- f.browser.scripting.executeScript=async()=>{reads++;return[{frameId:0,result:{name:'FIRST'}}];};
- assert.equal((await f.metadata(request)).metadata.name,'FIRST');
- assert.equal((await f.metadata(request)).metadata.name,'FIRST');assert.equal(reads,1);
- f.grantedOrigins.clear();f.browser.permissions.onRemoved.emit({origins:['<all_urls>']});
- assert.equal((await f.metadata(request)).metadata,undefined);
- f.grantedOrigins.add('<all_urls>');f.browser.permissions.onAdded.emit({origins:['<all_urls>']});
- let finish,started;const executing=new Promise(resolve=>{started=resolve;});
- f.browser.scripting.executeScript=()=>new Promise(resolve=>{reads++;finish=resolve;started();});
- const pending=f.metadata(request);await executing;
- f.grantedOrigins.clear();f.browser.permissions.onRemoved.emit({origins:['<all_urls>']});
- f.grantedOrigins.add('<all_urls>');f.browser.permissions.onAdded.emit({origins:['<all_urls>']});
- finish([{frameId:0,result:{name:'STALE'}}]);
- assert.equal((await pending).metadata,undefined);assert.equal(reads,2);
-});
-
-test('same-tab same-contract navigation reads each source and each document through the background cache',async t=>{
- const f=fixture({site:true});t.after(f.dispose);const request=tokenRequest(f);let reads=0;
- const {SharingRuntime}=productionModules()('apps/extension/src/runtime/viewing/sharing.ts');
- const runtime={auth:{session:{account:{id:'alice'}},scope:()=>({wait:p=>p})},state:{preferences:{current:'one'}},tokens:{put(){},get(){}},tokenPage:async input=>(await f.metadata(input)).metadata};
- const sharing=new SharingRuntime(runtime);
- f.browser.scripting.executeScript=async()=>[{frameId:0,result:{name:`SOURCE ${++reads}`}}];
- const read=identity=>sharing.localTokenMetadata(identity,request.context,'share');
- assert.equal((await read(request.identity)).name,'SOURCE 1');
- assert.equal((await read(request.identity)).name,'SOURCE 1');assert.equal(reads,1);
- f.controls.tab.url=`https://fomo.family/tokens/robinhood/${request.identity.address}`;
- const other=identifyPage(f.controls.tab.url);assert.equal(other.address,request.identity.address);
- f.browser.tabs.onUpdated.emit(1,{url:f.controls.tab.url},f.controls.tab);
- assert.equal((await read(other)).name,'SOURCE 2');
- f.browser.tabs.onUpdated.emit(1,{status:'loading'},f.controls.tab);
- assert.equal((await read(other)).name,'SOURCE 3');
-});
-
-test('navigation to a replacement document at the same URL rejects an in-flight token read',async t=>{
- const f=fixture({site:true});t.after(f.dispose);const request=tokenRequest(f);
- let finish,started;const executing=new Promise(resolve=>{started=resolve;});
- f.browser.scripting.executeScript=()=>new Promise(resolve=>{finish=resolve;started();});
- const pending=f.metadata(request);await executing;
- f.browser.tabs.onUpdated.emit(1,{status:'loading'},f.controls.tab);
- finish([{frameId:0,result:{name:'OLD DOCUMENT'}}]);
- assert.equal((await pending).metadata,undefined);
-});
-
-test('failed token reads share a bounded document budget and policy changes start a fresh read',async t=>{
- const f=fixture({site:true});t.after(f.dispose);const request=tokenRequest(f);let reads=0;
- f.browser.scripting.executeScript=async()=>{reads++;return[];};
- for(let i=0;i<5;i++)assert.equal((await f.metadata(request)).metadata,undefined);
- assert.equal(reads,3);
- const preferences={current:'one',share:true};
- f.update({preferences:{...preferences,tokenOff:['gmgn.ai']}});
- assert.equal((await f.metadata(request)).metadata,undefined);assert.equal(reads,3);
- f.update({preferences:{...preferences,tokenOff:[]}});
- f.browser.scripting.executeScript=async()=>{reads++;return[{frameId:0,result:{name:'FRESH'}}];};
- assert.equal((await f.metadata(request)).metadata.name,'FRESH');assert.equal(reads,4);
-});
-
 test('service unavailability stops automatic sharing without claiming device offline',async t=>{
  const f=fixture();t.after(f.dispose);await wait();
  const count=f.identities().length;f.update({connection:{networkOnline:true,service:'unavailable',messaging:'ready',retrying:false}});await wait();
@@ -204,27 +120,6 @@ test('共享在看 is independent of 网页互动 and follows every public host'
   f.browser.tabs.onUpdated.emit(1, { url: f.controls.tab.url }, f.controls.tab);
   await wait(); assert.equal(f.identities().length, count + 4);
   assert.equal(f.identities().at(-1).payload.identity.host, 'sub.custom.example.com');
-});
-
-test('token metadata adapters run with a site grant even when automatic interaction is disabled', async t => {
-  const f = fixture({ site: true }); t.after(f.dispose);
-  const request = tokenRequest(f); let attempts = 0;
-  f.browser.scripting.executeScript = async options => { assert.equal(options.func, readVisibleToken); attempts++; return [{ frameId: 0, result: { name: 'Confirmed' } }]; };
-  assert.equal((await f.metadata(request)).metadata.name, 'Confirmed');
-  assert.equal(attempts, 1);
-});
-
-test('token name reads need a registry token profile, site access and 代币数据 on for that site', async t => {
-  const f = fixture({ site: true }); t.after(f.dispose);
-  const request = tokenRequest(f); let attempts = 0;
-  f.browser.scripting.executeScript = async () => { attempts++; return [{ frameId: 0, result: { name: 'Confirmed' } }]; };
-  const dex = { ...request, identity: { ...request.identity, host: 'dexscreener.com', url: request.identity.url.replace('gmgn.ai', 'dexscreener.com') } };
-  assert.equal((await f.metadata(dex)).metadata, undefined); assert.equal(attempts, 0, 'no registry profile');
-  assert.equal((await f.metadata(request)).metadata.name, 'Confirmed'); assert.equal(attempts, 1);
-  f.update({ preferences: { current: 'one', share: true, tokenProfile: false } });
-  assert.equal((await f.metadata(request)).metadata.name, 'Confirmed', 'a stray tokenProfile preference changes nothing'); assert.equal(attempts, 2);
-  f.update({ preferences: { current: 'one', share: true, tokenOff: ['gmgn.ai'] } });
-  assert.equal((await f.metadata(request)).metadata, undefined, '代币数据 off'); assert.equal(attempts, 2);
 });
 
 test('禁用 共享在看 stops observation even while the switch state is on', async t => {
@@ -271,7 +166,7 @@ test('a replacement offscreen epoch replays live panels, room tab, page context 
  assert.ok(replay.some(c=>c.name==='room-tab'&&c.payload.asset==='Ethereum:0x1111111111111111111111111111111111111111'));
  assert.ok(replay.some(c=>c.name==='room-panels'&&c.payload.connected===true));
  assert.ok(replay.some(c=>c.name==='device-state'&&c.payload.state==='active'));
- assert.ok(replay.some(c=>c.name==='page'&&c.payload.context?.windowId===10&&c.payload.context?.tabId===1));
+ assert.ok(replay.some(c=>c.name==='page'&&c.payload.identity?.host==='gmgn.ai'));
  assert.equal(replay.some(c=>c.name==='page'&&c.payload.activity),false);
  const after=f.calls.length;ready('replacement');await wait();assert.equal(f.calls.length,after);
 });

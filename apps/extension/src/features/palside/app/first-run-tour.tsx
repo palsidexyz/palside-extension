@@ -6,6 +6,11 @@ import { Gift, ImageIcon, Scissors, SmilePlus } from 'lucide-react';
 import { Button } from '@palside/ui/button';
 import { motionPresets } from '@palside/design/motion';
 import type { PalsideController } from './use-palside';
+import { defaultSignalSettings } from '../../../runtime/annotations/signals';
+import { shortcutKeys } from '../../../runtime/browser/shortcuts';
+import { KeyCaps } from '../settings/signal-settings';
+import { useCaptureShortcut } from '../settings/use-shortcut';
+import { TourDemo } from './tour-demo';
 import s from './first-run-tour.module.css';
 
 /** Controls the tour points at carry `data-tour`; a step whose control is not on screen is left out. */
@@ -39,9 +44,10 @@ function useBox(app: Element | null, anchor: Anchor | undefined) {
 
 /**
  * The first-run tour: the panel dims, one control at a time stays lit, and a bubble with an arrow says what it does. It runs once per
- * account on this device; finishing or skipping it saves `toured`, and 关于 › 重看引导 clears it.
+ * account on this device: the first bubble saves `toured`, because the panel can leave the chat from outside (a press on the page's
+ * 弹幕) or close without 跳过 ever being pressed. `onRun` holds the run open past that save and lets it go after the last fade. 关于 › 重看引导 clears it.
  */
-export function FirstRunTour({ c }: { c: PalsideController }) {
+export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team: string | undefined) => void }) {
   const t = useTranslations();
   const reduced = useReducedMotion();
   const layer = useRef<HTMLDivElement>(null);
@@ -52,23 +58,23 @@ export function FirstRunTour({ c }: { c: PalsideController }) {
   const [index, setIndex] = useState(0);
   const [closed, setClosed] = useState(false);
   const [height, setHeight] = useState(140);
+  const shotKeys = shortcutKeys(useCaptureShortcut(c) ?? '');
   const steps: Record<Anchor, { title: string; body: ReactNode }> = {
     tabs: { title: t('extension.tour.tabsTitle'), body: <dl className={s.pairs}>
       <dt>{t('extension.discussion.chat')}</dt><dd>{t('extension.tour.chat')}</dd>
       <dt>{t('extension.room.name')}</dt><dd>{t('extension.tour.room')}</dd>
     </dl> },
     share: { title: t('extension.web.share'), body: <p>{t('extension.tour.share')}</p> },
-    site: { title: t('extension.settings.interaction'), body: <p>{t('extension.tour.site')}</p> },
+    site: { title: t('extension.settings.interaction'), body: <><p>{t('extension.tour.site')}</p><TourDemo settings={c.live?.page?.signalSettings ?? defaultSignalSettings} /></> },
     tools: { title: t('extension.tour.toolsTitle'), body: <ul className={s.tools}>
       <li><SmilePlus aria-hidden="true" /><b>{t('extension.copy.reactionPicker')}</b><span>{t('extension.tour.reactions')}</span></li>
       <li><ImageIcon aria-hidden="true" /><b>{t('extension.copy.image')}</b><span>{t('extension.tour.image')}</span></li>
-      <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><span>{t('extension.tour.shot')}</span></li>
+      <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><span>{t('extension.tour.shot')}</span>{shotKeys.length > 0 && <KeyCaps keys={shotKeys} />}</li>
       <li><Gift aria-hidden="true" /><b>{t('extension.wallet.packet')}</b><span>{t('extension.tour.packet')}</span></li>
     </ul> },
     invite: { title: t('extension.tour.inviteTitle'), body: <p>{t('extension.tour.invite')}</p> },
   };
 
-  // Saved once the bubble has faded out: the saved flag unmounts the tour, which would otherwise cut its exit short.
   function save() {
     const live = c.live;
     if (live) void live.command('preferences', { accountId: c.data.self, toured: true }).catch(() => {});
@@ -89,6 +95,8 @@ export function FirstRunTour({ c }: { c: PalsideController }) {
   const anchor = anchors?.[index];
   const target = useBox(app, closed ? undefined : anchor);
   const open = !closed && Boolean(anchor && target);
+  const begin = useEffectEvent(() => { onRun(c.current); saveNow(); });
+  useEffect(() => { if (open) begin(); }, [open]);
   const finish = () => setClosed(true);
   const count = anchors?.length ?? 0;
   const last = index === count - 1;
@@ -137,7 +145,7 @@ export function FirstRunTour({ c }: { c: PalsideController }) {
   const step = anchor && steps[anchor];
 
   return <div ref={layer} className={s.root}>
-    <AnimatePresence onExitComplete={() => { if (closed) save(); }}>
+    <AnimatePresence onExitComplete={() => { if (closed) onRun(undefined); }}>
       {open && step && <motion.div key="tour" className={s.layer} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={motionPresets.feedback}>
         <div className={s.block} />
         <motion.div className={s.hole} initial={false} animate={hole!} transition={spring} />

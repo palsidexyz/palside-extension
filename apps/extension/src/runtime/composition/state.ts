@@ -2,7 +2,7 @@ import { siteById } from '@palside/shared/sites';
 import type { Preferences } from '../../domain/account/preferences';
 import type { RuntimeState } from './runtime-state';
 import { startedTeams } from '../teams/onboarding';
-import { readFavorites,readHosts,readSiteInteractions } from '../../domain/annotations/interaction';
+import { readFavorites,readSiteInteractions } from '../../domain/annotations/interaction';
 
 export const SNAPSHOT_INTERVAL = 15_000;
 export const READ_FLUSH_DELAY = 1_500;
@@ -14,8 +14,8 @@ export function defaultPreferences(): Preferences {
   };
 }
 
-type PreferencePatch = Pick<Preferences, 'current' | 'hiddenStickies' | 'forgottenTeams' | 'notificationPreview' | 'notifications' | 'share' | 'siteInteraction' | 'favorites' | 'tokenOff' | 'rooms' | 'toured'>;
-const preferenceFields = ['current', 'hiddenStickies', 'forgottenTeams', 'notificationPreview', 'notifications', 'share', 'siteInteraction', 'favorites', 'tokenOff', 'rooms', 'toured'] as const;
+type PreferencePatch = Pick<Preferences, 'current' | 'hiddenStickies' | 'forgottenTeams' | 'notificationPreview' | 'notifications' | 'share' | 'siteInteraction' | 'favorites' | 'rooms' | 'toured'>;
+const preferenceFields = ['current', 'hiddenStickies', 'forgottenTeams', 'notificationPreview', 'notifications', 'share', 'siteInteraction', 'favorites', 'rooms', 'toured'] as const;
 
 /** Only these user-editable fields may be patched; policy and onboarding have their own writers. */
 export function readPreferencePatch(input: Record<string, unknown>): Partial<PreferencePatch> | undefined {
@@ -42,11 +42,6 @@ export function readPreferencePatch(input: Record<string, unknown>): Partial<Pre
       case 'rooms': {
         if (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([key, item]) => key === 'off' || key === 'noticed' ? typeof item !== 'boolean' : key !== 'site' || typeof item !== 'string' || !siteById(item))) return;
         patch.rooms = { ...value }; break;
-      }
-      case 'tokenOff': {
-        const hosts = readHosts(value);
-        if (!hosts) return;
-        patch.tokenOff = hosts; break;
       }
       case 'siteInteraction': {
         const sites = readSiteInteractions(value);

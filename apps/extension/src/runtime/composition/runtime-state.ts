@@ -25,6 +25,8 @@ export type RuntimeState = {
   rooms: RoomState;
   /** Recently used token names and icons by asset (`chain:address`), from this memory-only cache. */
   tokens?: Record<string, TokenProfile>;
+  /** Pool and chainless-contract pages by URL: the token the server found, or `null` when there is none. */
+  pages?: Record<string, string | null>;
   /** The active page's token while its name is still being read; its name shows as a placeholder. */
   tokenPending?: string;
   /** Messages waiting for their pacing slot, per team: how many and when the next one goes out. */
@@ -37,7 +39,9 @@ export type RuntimeState = {
   items: Pick<TeamItems, 'stickies'>;
   /** Teammates who asked you to look at their page during the last minute. */
   pokes?: Poke[];
-  history?: Record<string, { missingKeys: number; loaded: boolean; loading: boolean }>; /** Signup proof of work has run past a minute. */ signupWaiting?: boolean; notice?: TextValue; pendingShareTeamId?: string; jumpMessageId?: string; jumpWindowId?: number; pendingShare?: string; revision: number; ready: boolean; authenticated: boolean; account?: Account; connection: Connection; error?: TextValue; data: Dataset;
+  history?: Record<string, { missingKeys: number; loaded: boolean; loading: boolean }>; /** Signup proof of work has run past a minute. */ signupWaiting?: boolean; /** Which part of password-set is running, so the panel can name it. */ signupPhase?: SignupPhase; notice?: TextValue; pendingShareTeamId?: string; jumpMessageId?: string; jumpWindowId?: number; pendingShare?: string; revision: number; ready: boolean; authenticated: boolean; account?: Account; connection: Connection; error?: TextValue; data: Dataset;
   drafts: Record<string, RevisionedDraft<Draft>>; preferences: Preferences; viewingId?: string; remoteTeams: TeamSnapshot[]; lobbyTeams?: Team[];
   config: ApiResult<'system.config'>; setup?: 'password'; invitations: Record<string, Invitation>;
 };
+/** Ordered parts of password-set: seal the phrase, register or add the device, open encrypted chat, start the wallet. */
+export type SignupPhase = 'seal' | 'register' | 'connect' | 'wallet';

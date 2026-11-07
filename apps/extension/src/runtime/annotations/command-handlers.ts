@@ -77,21 +77,9 @@ export async function attachRefCommand(this: RuntimeCommands, command: Extract<C
       if (identity.kind === 'asset') {
         const known = runtime.state.data.views.filter(candidate => candidate.kind === 'asset' && viewAsset(candidate) === viewAsset(pageView(identity)));
         view = known.find(candidate => candidate.url === url) ?? known[0] ?? await scope.wait(runtime.sharing.prepareView(url));
-      } else if (identity.kind === 'pool') {
-        const candidates = [
-          ...runtime.state.data.views,
-          ...runtime.state.data.messages.flatMap(message => [message.ref?.view, message.attachment?.kind === 'asset' ? message.attachment.view : undefined]),
-          ...Object.values(runtime.state.drafts).map(draft => draft.value.ref?.view),
-        ].filter((candidate): candidate is Viewing => candidate?.kind === 'asset');
-        const known = candidates.filter(candidate => { const source = identifyPage(candidate.url, [host]); return source?.kind === 'pool' && source.url === identity.url; });
-        view = known.find(candidate => candidate.url === url) ?? known[0];
-        if (!view) {
-          const prepared = await scope.wait(runtime.sharing.prepareView(url));
-          view = prepared?.kind === 'asset' ? { ...prepared, url } : undefined;
-        }
       }
       if (!view) {
-        view = await scope.wait(runtime.sharing.prepareView(url, undefined, undefined, undefined, undefined));
+        view = await scope.wait(runtime.sharing.prepareView(url));
       }
       if (!view) throw new MessageError(uiMessage('extension.runtime.tokenIdentityUnknown'));
       view = { ...view, url };

@@ -21,7 +21,7 @@ const chart = (selectors: readonly string[]) => () => {
     .sort((a, b) => b.getBoundingClientRect().width * b.getBoundingClientRect().height - a.getBoundingClientRect().width * a.getBoundingClientRect().height)[0];
 };
 
-/** Any page: the largest chart-like block, so danmaku stays off headers and order books there too. */
+/** Any page: the largest chart-like block, where chart-anchored signals land. */
 export const genericChart = chart(chartSelectors);
 
 /** Sites with registry layout hints; every other host uses the generic adapter. */

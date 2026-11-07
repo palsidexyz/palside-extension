@@ -40,14 +40,14 @@ async function fixture(t) {
     '@palside/i18n': { message: key => key, errorMessage: error => error.message },
     'motion/react': { motion, AnimatePresence: passthrough, useIsPresent: () => true, useReducedMotion: () => false },
     'lucide-react': { ArrowUpRight: icon, ChevronDown: icon, Copy: icon },
-    '@palside/design/motion': { motionPresets: {} },
+    '@palside/design/motion': { motionPresets: { feedback: { duration: .24, ease: [.22, 1, .36, 1] }, reduced: { duration: 0 }, reorder: {} } },
     '@palside/shared/navigation': {},
     '../ui/primitives': { PersonAvatar: icon, Token: icon },
     '../rooms/rooms': { openRoom() {}, roomKeyFor: () => undefined, roomsOn: () => false },
     '../annotations/social-state': social,
     '../annotations/reminders': { PokeRow: icon },
-    '../assets/chain-identity': {}, '../assets/site-logo': {}, '../settings/site-catalog': {},
-    '../assets/token-name': { TokenName: ({ view }) => view.name, tokenLabel: view => view.name },
+    '../assets/chain-identity': {}, '../assets/site-logo': {}, '../settings/site-catalog': { siteAt: () => undefined },
+    '../assets/token-name': { TokenName: ({ view }) => view.name, tokenLabel: view => view.name, tokenWaiting: () => undefined },
     '../assets/token-data': { liveView: (_c, view) => view },
     '../ui/motion-details': { Count: icon, CountText: icon },
     './watch-groups': load('apps/extension/src/features/palside/viewing/watch-groups.ts'),
@@ -97,6 +97,20 @@ test('hidden and vanished chips expire independently and do not replay an expire
   await f.advance(1800); await f.join();
   assert.equal(f.mergeCount(), 1, 'only the newly observed join animates');
   await f.advance(1800); assert.equal(f.mergeCount(), 0);
+});
+
+test('a busy chip tints at most once per three seconds', async t => {
+  const f = await fixture(t); await f.join(); assert.equal(f.mergeCount(), 1);
+  await f.render({ people: [{ id: 'self', viewing: 'page' }] }); await f.join();
+  await f.advance(1800); assert.equal(f.mergeCount(), 0, 'a second join inside the window does not tint again');
+  await f.render({ people: [{ id: 'self', viewing: 'page' }] }); await f.advance(1300); await f.join();
+  assert.equal(f.mergeCount(), 1, 'after the window a join tints again');
+});
+
+test('coming back online does not count everyone as newly joined', async t => {
+  const f = await fixture(t); await f.join(); await f.advance(3100); assert.equal(f.mergeCount(), 0);
+  await f.render({ disconnected: true }); await f.render({ disconnected: false });
+  assert.equal(f.mergeCount(), 0);
 });
 
 test('strip unmount releases sorting, hold-space and merge timers', async t => {

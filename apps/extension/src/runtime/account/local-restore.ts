@@ -8,6 +8,7 @@ import { type StickyRecord } from '../../domain/annotations/social';
 import type { Draft,Message } from '../../domain/chat/model';
 import type { Viewing } from '../../domain/assets/model';
 import type { Outgoing } from '../chat/outgoing';
+import { orderMessages } from '../../domain/chat/order';
 import type { RuntimeDevice } from './device';
 import { color,readPreferences } from '../composition/state';
 import { type CleanupIntent } from './cleanup';
@@ -94,7 +95,8 @@ export async function restoreLocalData(this: SessionRuntime, session: RuntimeDev
     guard();
     for (const row of await runtime.storage.rows<Outgoing>(session.account.id, 'outgoing')) {
       guard();
-      row.value.message.timestamp = row.value.createdAt;
+      // Restored sends keep the time they were written, so they come back in writing order.
+      row.value.message.timestamp ??= row.value.createdAt;
       runtime.sending.outgoing.set(row.value.message.id, row.value);
       runtime.state.data.messages = [...runtime.state.data.messages.filter(m => m.id !== row.value.message.id), { ...row.value.message, status: row.value.attempted ? 'uncertain' : 'waiting' }];
       if (row.value.asset) runtime.cache.upsertView(row.value.asset);
@@ -107,7 +109,7 @@ export async function restoreLocalData(this: SessionRuntime, session: RuntimeDev
       const view = attachment.view;
       if (view && validateView(view)) runtime.cache.upsertView({ ...view, id: attachment.assetId });
     }
-    runtime.state.data.messages.sort((a, b) => (runtime.cache.eventTimes.get(a.id) ?? runtime.sending.outgoing.get(a.id)?.createdAt ?? Date.now()) - (runtime.cache.eventTimes.get(b.id) ?? runtime.sending.outgoing.get(b.id)?.createdAt ?? Date.now()));
+    orderMessages(runtime.state.data.messages);
     await runtime.cache.expireLocalContent(); guard();
     runtime.state.ready = true; runtime.emit();
 }

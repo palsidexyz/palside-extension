@@ -20,7 +20,6 @@ export type PanelActions = {
   enableSites: (hosts: string[]) => Promise<boolean>;
   addedNotice: (hosts: string[]) => TextMessage;
   removeSite: (host: string | "all") => void;
-  setTokenData: (host: string, on: boolean) => void;
   siteName: (host: string) => string;
   openSite: (host: string) => void;
   refreshLobby: () => Promise<void>;
@@ -38,7 +37,8 @@ export type PanelActions = {
   saveEdit: () => void;
   recall: (message: Message) => void;
   createTeam: (name: string, description?: string, avatar?: string) => Promise<void>;
-  setRecruitment: (active: boolean) => void;
+  /** Resolves true once saved. */
+  setRecruitment: (active: boolean) => Promise<boolean>;
   requestTeam: (id: string, text: string) => void;
   cancelApplication: (id: string) => void;
   joinTeam: (id: string) => void;

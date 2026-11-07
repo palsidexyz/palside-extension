@@ -22,16 +22,19 @@ import s from './privacy.module.css';
 
 /** The Chrome permissions Palside runs on, named as Chrome's own prompt words them. `active` (当前标签页) and `idle` (设备空闲状态) come with the install. */
 type Permission = 'tabs' | 'sites' | 'active' | 'idle' | 'notifications';
+/** A card is a Chrome permission, or `none`: features that run on no browser permission, such as 代币数据 (names and icons come from the Palside service). */
+type CardKey = Permission | 'none';
 
 /** Each permission and the features that use it. 弹幕 follows the tab's token only on an added site, like every page feature. */
-const cards: [Permission, ReadKey[]][] = [
+const cards: [CardKey, ReadKey[]][] = [
   ['tabs', ['share']],
-  ['sites', ['token', 'quote', 'signal', 'sticky', 'room']],
+  ['sites', ['quote', 'signal', 'sticky', 'room']],
   ['active', ['shot']],
   ['idle', ['presence']],
   ['notifications', ['notify']],
+  ['none', ['token']],
 ];
-const uses: Record<ReadKey, Permission[]> = { share: ['tabs'], token: ['sites'], quote: ['sites'], signal: ['sites'], sticky: ['sites'], room: ['sites'], shot: ['active'], presence: ['idle'], notify: ['notifications'] };
+const uses: Record<ReadKey, Permission[]> = { share: ['tabs'], token: [], quote: ['sites'], signal: ['sites'], sticky: ['sites'], room: ['sites'], shot: ['active'], presence: ['idle'], notify: ['notifications'] };
 
 const readIcons: Record<ReadKey, () => ReactNode> = {
   share: () => <ShareIcon size={14} />, token: () => <Coins size={14} />, quote: () => <TextQuote size={14} />, signal: () => <MapPin size={14} />,
@@ -102,10 +105,12 @@ export function Privacy({ c }: { c: PalsideController }) {
     <div className={s.cards}>
       {cards.map(([permission, features]) => <section key={permission} className={s.card} aria-label={t(`extension.privacy.perm_${permission}`)}>
         <header className={s.head}>
-          <ChromeMark />
-          <h2 className={s.name}>{t(`extension.privacy.perm_${permission}`)}</h2>
-          <PermissionState c={c} grants={grants} permission={permission} />
-          {granted(permission, grants, c) && <Button size="xs" variant="surface" className={s.revoke} onClick={() => revoke(permission)}>{t('extension.privacy.revoke')}</Button>}
+          {permission === 'none' ? <h2 className={s.name}>{t('extension.privacy.perm_none')}</h2> : <>
+            <ChromeMark />
+            <h2 className={s.name}>{t(`extension.privacy.perm_${permission}`)}</h2>
+            <PermissionState c={c} grants={grants} permission={permission} />
+            {granted(permission, grants, c) && <Button size="xs" variant="surface" className={s.revoke} onClick={() => revoke(permission)}>{t('extension.privacy.revoke')}</Button>}
+          </>}
         </header>
         <div className={s.chips}>
           {features.filter(id => c.live || id !== 'room').map(id => <button key={id} type="button" className={s.chip} onClick={() => setSocialUi({ read: id })}>{readIcons[id]()}{t(`extension.privacy.feature_${id}`)}</button>)}
@@ -142,6 +147,7 @@ export function ReadSheet({ c }: { c: PalsideController }) {
         <small>{t('extension.privacy.chrome')}</small>
         {permissions.map(permission => <div key={permission} className={s.permRow}><ChromeMark size={18} /><b>{t(`extension.privacy.perm_${permission}`)}</b><PermissionState c={c} grants={grants} permission={permission} />
           {granted(permission, grants, c) && <Button size="xs" variant="surface" className={s.revoke} onClick={() => { close(); revoke(permission); }}>{t('extension.privacy.revoke')}</Button>}</div>)}
+        {!permissions.length && <div className={s.permRow}><b>{t('extension.privacy.perm_none')}</b></div>}
       </div>
       <p className={sheet.lead}>{t(`extension.privacy.read.${id}.line`)}</p>
       <dl className={sheet.facts}>

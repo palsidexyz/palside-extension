@@ -5,12 +5,12 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { siteDefinitions, websiteUrl } from '../packages/shared/src/navigation.ts';
 import { normalizeSiteHost } from '../apps/extension/src/domain/assets/site-host.ts';
-import { defaultSiteInteraction, readFavorites, readHosts, readSiteInteractions, siteAllows, siteDraws } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { defaultSiteInteraction, readFavorites, readSiteInteractions, siteAllows, siteDraws } from '../apps/extension/src/domain/annotations/interaction.ts';
 import { startedTeams } from '../apps/extension/src/runtime/teams/onboarding.ts';
 
 const source = ts.createSourceFile('state.ts', readFileSync('apps/extension/src/runtime/composition/state.ts', 'utf8'), ts.ScriptTarget.Latest, true);
 const declarations = source.statements.filter(node => !ts.isImportDeclaration(node)).map(node => node.getText(source).replace(/^export /, '')).join('\n');
-const context = { defaultSiteInteraction, readFavorites, readHosts, readSiteInteractions, startedTeams };
+const context = { defaultSiteInteraction, readFavorites, readSiteInteractions, startedTeams };
 vm.runInNewContext(ts.transpileModule(`${declarations}\nglobalThis.readPreferences = readPreferences; globalThis.readPreferencePatch = readPreferencePatch;`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
 const { readPreferences, readPreferencePatch } = context;
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -52,28 +52,20 @@ test('per-site 网页互动 defaults on and accepts only normalized hosts and bo
   assert.equal(siteDraws({ 'gmgn.ai': { ...defaultSiteInteraction, signal: false, sticky: false } }, 'gmgn.ai'), false);
 });
 
-test('host lists are exact public hosts, deduplicated in order and bounded', () => {
-  assert.deepEqual(readHosts(['GMGN.AI.', 'gmgn.ai', 'birdeye.so']), ['gmgn.ai', 'birdeye.so']);
-  assert.deepEqual(readHosts([]), []);
-  for (const value of [undefined, null, {}, 'gmgn.ai', ['https://gmgn.ai'], ['localhost'], ['*.gmgn.ai'], [1], Array.from({ length: 501 }, (_, i) => `s${i}.com`)]) {
-    assert.equal(readHosts(value), undefined, JSON.stringify(value)?.slice(0, 60));
-  }
-});
-
 test('restore preserves valid optional preferences and ignores unknown fields', () => {
-  const saved = { current: 'team', notifications: 'mentions', share: true, siteInteraction: { 'gmgn.ai': { ...defaultSiteInteraction, on: false } }, notificationPreview: false, hiddenStickies: ['sticky'], tokenOff: ['gmgn.ai'], startedTeams: ['team'] };
+  const saved = { current: 'team', notifications: 'mentions', share: true, siteInteraction: { 'gmgn.ai': { ...defaultSiteInteraction, on: false } }, notificationPreview: false, hiddenStickies: ['sticky'], startedTeams: ['team'] };
   assert.deepEqual(plain(readPreferences(saved)), saved);
   assert.deepEqual(plain(readPreferences({})), { current: '', notifications: 'off', startedTeams: [] });
   assert.equal(readPreferences({ siteInteraction: { 'gmgn.ai': { on: 'false' } } }).siteInteraction, undefined, 'a malformed value is ignored');
-  const restored = readPreferences({ unknownRules: { 'x.com': { share: true, interact: true } }, unknownChoice: true, unknownSites: [{ name: 'Example', domain: 'example.com' }], unknownHosts: ['example.com'], unknownList: ['gmgn.ai'], unknownFlag: false, notificationPreview: 'yes', hiddenStickies: [1], unknownTeams: ['team'], unknownField: false, unknownOption: false, tokenOff: ['https://x.com'], current: 5, notifications: 'invalid' });
+  const restored = readPreferences({ unknownRules: { 'x.com': { share: true, interact: true } }, unknownChoice: true, unknownSites: [{ name: 'Example', domain: 'example.com' }], unknownHosts: ['example.com'], unknownList: ['gmgn.ai'], unknownFlag: false, notificationPreview: 'yes', hiddenStickies: [1], unknownTeams: ['team'], unknownField: false, unknownOption: false, tokenOff: ['gmgn.ai'], current: 5, notifications: 'invalid' });
   assert.deepEqual(Object.keys(restored).sort(), ['current', 'notifications', 'startedTeams']);
   assert.equal(restored.notifications, 'off'); assert.equal(restored.current, '');
 });
 
 test('generic preference patches accept optional fields and reject unknown or malformed values', () => {
   assert.deepEqual(plain(readPreferencePatch({ notificationPreview: false, hiddenStickies: ['one', 'one'], notifications: 'all', current: 'one' })), { notificationPreview: false, hiddenStickies: ['one'], notifications: 'all', current: 'one' });
-  assert.deepEqual(plain(readPreferencePatch({ share: true, siteInteraction: { 'GMGN.ai': { on: false } }, tokenOff: ['GMGN.ai', 'gmgn.ai'] })), { share: true, siteInteraction: { 'gmgn.ai': { ...defaultSiteInteraction, on: false } }, tokenOff: ['gmgn.ai'] });
-  for (const patch of [{ unknownRules: {} }, { unknownChoice: true }, { unknownSites: [] }, { unknownHosts: [] }, { unknownList: [] }, { unknownFlag: false }, { current: false }, { notifications: true }, { notificationPreview: 'true' }, { hiddenStickies: [1] }, { unknownTeams: ['one'] }, { unknownTeams: {} }, { web: { share: true } }, { interaction: {} }, { tokenOff: ['localhost'] }, { siteInteraction: { 'gmgn.ai': { on: 1 } } }]) assert.equal(readPreferencePatch(patch), undefined, JSON.stringify(patch));
+  assert.deepEqual(plain(readPreferencePatch({ share: true, siteInteraction: { 'GMGN.ai': { on: false } } })), { share: true, siteInteraction: { 'gmgn.ai': { ...defaultSiteInteraction, on: false } } });
+  for (const patch of [{ unknownRules: {} }, { unknownChoice: true }, { unknownSites: [] }, { unknownHosts: [] }, { unknownList: [] }, { unknownFlag: false }, { current: false }, { notifications: true }, { notificationPreview: 'true' }, { hiddenStickies: [1] }, { unknownTeams: ['one'] }, { unknownTeams: {} }, { web: { share: true } }, { interaction: {} }, { tokenOff: ['gmgn.ai'] }, { siteInteraction: { 'gmgn.ai': { on: 1 } } }]) assert.equal(readPreferencePatch(patch), undefined, JSON.stringify(patch));
   assert.deepEqual(plain(readPreferencePatch({ startedTeams: ['invented'] })), {});
 });
 

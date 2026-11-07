@@ -20,6 +20,7 @@ import { PersonAvatar } from '../ui/primitives';
 import { Count, CountText, Dots, DrawnCheck, Rise, Swap } from '../ui/motion-details';
 import { AnimatedAmount, formatPals } from './amount';
 import { openPayment, usePaymentRequest } from './payment-sheet';
+import { usePacketCoins, type PacketCoins } from './packet-coins';
 import { useText } from '../ui/text';
 import s from './wallet.module.css';
 import p from './packet.module.css';
@@ -72,9 +73,9 @@ type EnvelopeState = 'idle' | 'spinning' | 'opened' | 'lost' | 'leaving';
  * flap lifts away and the result rises. When the last share went first, the seal stops, the envelope shakes and says so.
  * Opened from a banner before its detail arrived, it shows the sender at once and the seal breathes until the wish lands.
  */
-function PacketEnvelope({ c, packet, detail, onClose, onOpened, feedback }: { c: PalsideController; packet: Packet; detail?: Detail; onClose: () => void; onOpened: () => void; feedback?: ReactNode }) {
+function PacketEnvelope({ c, packet, detail, onClose, onOpened, onBurst, feedback }: { c: PalsideController; packet: Packet; detail?: Detail; onClose: () => void; onOpened: () => void; onBurst: (seal: Element) => void; feedback?: ReactNode }) {
   const t = useTranslations(), text = useText(), reduced = useReducedMotion();
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null), sealRef = useRef<HTMLButtonElement>(null);
   const [state, setState] = useState<EnvelopeState>('idle'), [note, setNote] = useState<string>();
   const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
   const canOpen = detail ? openable(detail, c.now) : undefined;
@@ -86,7 +87,12 @@ function PacketEnvelope({ c, packet, detail, onClose, onOpened, feedback }: { c:
     if (state !== 'idle' || !c.live) return;
     setState('spinning');
     const started = Date.now(), turn = () => new Promise(resolve => setTimeout(resolve, reduced ? 0 : Math.max(0, started + 700 - Date.now())));
-    try { await c.live.command('wallet-claim', { packetId: packet.id }); await turn(); setState('opened'); }
+    try {
+      await c.live.command('wallet-claim', { packetId: packet.id }); await turn();
+      // The share is assigned: PALS fan out of the seal as the flap lifts.
+      if (!reduced && sealRef.current) onBurst(sealRef.current);
+      setState('opened');
+    }
     catch (error) {
       await turn();
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
@@ -108,7 +114,7 @@ function PacketEnvelope({ c, packet, detail, onClose, onOpened, feedback }: { c:
         <strong className={p.envWish}><Swap k={shown ?? (detail ? 'wish' : 'waiting')}>{shown ?? (detail ? detail.blessing || t('extension.wallet.blessingPlaceholder') : ' ')}</Swap></strong>
       </motion.div>
       {canOpen !== false && state !== 'lost'
-        ? <motion.button type="button" className={p.envSeal} aria-label={t('extension.wallet.open')} disabled={state !== 'idle' || !canOpen} onClick={() => void open()}
+        ? <motion.button ref={sealRef} type="button" className={p.envSeal} aria-label={t('extension.wallet.open')} disabled={state !== 'idle' || !canOpen} onClick={() => void open()}
           animate={state === 'spinning' && !reduced ? { rotateY: [0, 360] } : state === 'opened' ? { scale: .6, opacity: 0 } : canOpen === undefined && !reduced ? { opacity: [1, .72, 1] } : { rotateY: 0, opacity: 1 }}
           transition={state === 'spinning' ? { duration: .6, repeat: Infinity, ease: 'linear' } : canOpen === undefined ? { duration: 1.2, repeat: Infinity, ease: 'easeInOut' } : { duration: .2 }} whileTap={reduced || !canOpen ? undefined : { scale: .94 }}>{t('extension.wallet.open')}</motion.button>
         : <motion.span className={p.envSealOff} aria-hidden="true" initial={state === 'lost' && !reduced ? { scale: 1.6, opacity: 1 } : false} animate={{ scale: 1, opacity: .55 }} />}
@@ -127,13 +133,30 @@ function ShareState({ claim, delay }: { claim: NonNullable<Detail['myClaim']>; d
   </Rise>;
 }
 
-/** What I got rolls up from zero, then says whether it is already in 零钱; below, who got what, in the order they grabbed. */
-function PacketResult({ c, detail, onClose }: { c: PalsideController; detail: Detail; onClose: () => void }) {
+/**
+ * What I got rolls up from zero, then says whether it is already in 零钱; below, who got what, in the order they grabbed.
+ * Coins from the envelope, when still floating, fly into the amount once the sheet has risen; it rolls as the first lands.
+ */
+function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; detail: Detail; coins?: PacketCoins; onClose: () => void }) {
   const t = useTranslations(), locale = useLocale(), reduced = useReducedMotion(), { packet } = detail;
-  const [shown, setShown] = useState('0');
+  const [shown, setShown] = useState('0'), [pocketing] = useState(() => !reduced && !!coins?.pending()), amountRef = useRef<HTMLSpanElement>(null);
   const mine = packet.accountId === c.data.self, claim = detail.myClaim && detail.myClaim.status !== 'failed' ? detail.myClaim : undefined, got = claim?.amount;
   const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
-  useEffect(() => { if (got === undefined) return; const timer = setTimeout(() => setShown(got), reduced ? 0 : 260); return () => clearTimeout(timer); }, [got, reduced]);
+  useEffect(() => {
+    if (got === undefined) return;
+    if (reduced || !coins?.pending()) { const timer = setTimeout(() => setShown(got), reduced ? 0 : 260); return () => clearTimeout(timer); }
+    let live = true;
+    const timer = setTimeout(() => {
+      const target = amountRef.current;
+      if (!target) { coins.drop(); setShown(got); return; }
+      void coins.pocket(target, index => {
+        if (!live) return;
+        if (index === 0) setShown(got);
+        target.animate([{ scale: 1 }, { scale: 1.04 }, { scale: 1 }], { duration: 160, easing: 'ease-out' });
+      });
+    }, 260);
+    return () => { live = false; clearTimeout(timer); };
+  }, [got, reduced, coins]);
   const status = packet.status === 'refunded' ? t('extension.wallet.refunded') : packet.status === 'exhausted' ? t('extension.wallet.gone') : packet.expiresAt <= c.now ? t('extension.wallet.packetExpired')
     : mine ? t('extension.wallet.closesAt', { time: new Date(packet.expiresAt).toLocaleString([], { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : t(`extension.wallet.eligibility.${detail.eligibility}`);
   return <div className={`${s.page} ${s.sheetContent} ${p.result}`}>
@@ -142,8 +165,8 @@ function PacketResult({ c, detail, onClose }: { c: PalsideController; detail: De
       <span className={p.from} id="packet-detail-title"><PersonAvatar person={sender} size="xs" />{mine ? t('extension.wallet.packetMine') : t('extension.wallet.packetFrom', { name: sender.name })}</span>
       <small>{detail.blessing || t('extension.wallet.blessingPlaceholder')}</small>
       {claim && got !== undefined ? <>
-        <span className={p.amount}><AnimatedAmount value={shown} minimumFractionDigits={2} /><small>PALS</small></span>
-        <ShareState claim={claim} delay={reduced ? 0 : .9} />
+        <span ref={amountRef} className={p.amount}><AnimatedAmount value={shown} minimumFractionDigits={2} /><small>PALS</small></span>
+        <ShareState claim={claim} delay={reduced ? 0 : pocketing ? 1.3 : .9} />
       </> : <p className={s.note}>{detail.myClaim?.status === 'failed' ? t('extension.wallet.settleFailed') : status}</p>}
     </div>
     <section className={p.claims}>
@@ -166,7 +189,7 @@ function PacketResult({ c, detail, onClose }: { c: PalsideController; detail: De
 export function PacketDetail({ c, id, initial, summary, onClose }: { c: PalsideController; id: string; initial?: Detail; summary?: Packet; onClose: () => void }) {
   const t = useTranslations(), command = c.live?.command;
   const [detail, setDetail] = useState<Detail | undefined>(initial), [failed, setFailed] = useState(false), [revision, setRevision] = useState(0), [opened, setOpened] = useState(false);
-  const chainRevision = c.live?.state.chainRevision;
+  const chainRevision = c.live?.state.chainRevision, coins = usePacketCoins();
   const feedback = failed && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => { setFailed(false); setRevision(value => value + 1); } }}>{t('extension.wallet.unavailable')}</InlineFeedback>;
   useEffect(() => { let current = true; void command?.('wallet-packet', { id }).then(value => { if (current) { setFailed(false); setDetail(value); } }, () => { if (current) setFailed(true); }); return () => { current = false; }; }, [command, id, chainRevision, revision]);
   useEffect(() => { const at = detail?.eligibleAt; if (!at || at <= Date.now()) return; const timer = setTimeout(() => setRevision(value => value + 1), Math.min(at - Date.now() + 100, 2_147_483_647)); return () => clearTimeout(timer); }, [detail?.eligibleAt]);
@@ -179,11 +202,17 @@ export function PacketDetail({ c, id, initial, summary, onClose }: { c: PalsideC
   // The envelope while it can still be opened (or to say why not); the sender and anyone holding a share see the result.
   const packet = detail?.packet ?? summary;
   const envelope = packet && !opened && (detail ? !detail.myClaim && (openable(detail, c.now) || detail.packet.accountId !== c.data.self) : !failed);
-  if (envelope) return <PacketEnvelope c={c} packet={packet} detail={detail} feedback={feedback} onClose={onClose} onOpened={() => { setOpened(true); setRevision(value => value + 1); }} />;
-  return <Sheet open onOpenChange={open => { if (!open) onClose(); }} boundarySelector="[data-palside-app]" aria-labelledby="packet-detail-title">
-    {detail ? <><PacketResult c={c} detail={detail} onClose={onClose} />{feedback}</>
-      : <div className={`${s.page} ${s.sheetContent}`}><VisuallyHidden asChild><h2 id="packet-detail-title">{t('extension.wallet.packet')}</h2></VisuallyHidden><p className={s.empty}>{t(failed ? 'extension.wallet.unavailable' : 'extension.copy.loading')}</p>{failed && <Button onClick={() => setRevision(value => value + 1)}>{t('common.retry')}</Button>}</div>}
-  </Sheet>;
+  // The result sheet opens in the top layer after the coins did; lift them back above it.
+  const { raise } = coins;
+  useEffect(() => { if (opened) raise(); }, [opened, raise]);
+  return <>
+    {coins.node}
+    {envelope ? <PacketEnvelope c={c} packet={packet} detail={detail} feedback={feedback} onClose={onClose} onBurst={coins.burst} onOpened={() => { setOpened(true); setRevision(value => value + 1); }} />
+      : <Sheet open onOpenChange={open => { if (!open) onClose(); }} boundarySelector="[data-palside-app]" aria-labelledby="packet-detail-title">
+        {detail ? <><PacketResult c={c} detail={detail} coins={coins} onClose={onClose} />{feedback}</>
+          : <div className={`${s.page} ${s.sheetContent}`}><VisuallyHidden asChild><h2 id="packet-detail-title">{t('extension.wallet.packet')}</h2></VisuallyHidden><p className={s.empty}>{t(failed ? 'extension.wallet.unavailable' : 'extension.copy.loading')}</p>{failed && <Button onClick={() => setRevision(value => value + 1)}>{t('common.retry')}</Button>}</div>}
+      </Sheet>}
+  </>;
 }
 
 /** Count with − and + around it, bounded. */

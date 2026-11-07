@@ -1,9 +1,12 @@
 /** Sweep across the message, then the last grains finish drifting. */
-const SWEEP_MS = 420;
-const LIFE_MS = 460;
+const SWEEP_MS = 520;
+const LIFE_MS = 720;
 const DISSOLVE_MS = SWEEP_MS + LIFE_MS;
 /** Room the grains drift into, up and toward the trailing side. */
-const DRIFT = 44;
+const DRIFT = 120;
+/** A share of grains a step darker, and a few in the text colour, so the dust reads on a pale bubble and a pale canvas. */
+const SHADE = .28;
+const INKED = .12;
 
 type Grain = { x: number; y: number; delay: number; vx: number; vy: number; size: number; color: string };
 type Run = { finished: Promise<void>; cancel: () => void };
@@ -38,15 +41,17 @@ export function dissolve(stack: HTMLElement, layer: HTMLElement | null, fading: 
   for (const surface of surfaces) {
     const rect = surface.getBoundingClientRect(), style = getComputedStyle(surface);
     const color = transparent(style.backgroundColor) ? style.color : style.backgroundColor;
+    const shade = darker(color, SHADE), ink = style.color;
     const radius = Math.min(parseFloat(style.borderTopLeftRadius) || 0, rect.height / 2, rect.width / 2);
     // Larger surfaces sample more coarsely so a long message stays within a few thousand grains.
-    const step = Math.max(2.5, Math.sqrt(rect.width * rect.height / 2400));
+    const step = Math.max(2.2, Math.sqrt(rect.width * rect.height / 3200));
     for (let y = rect.top + step / 2; y < rect.bottom; y += step) for (let x = rect.left + step / 2; x < rect.right; x += step) {
       const cx = Math.max(rect.left + radius, Math.min(rect.right - radius, x)), cy = Math.max(rect.top + radius, Math.min(rect.bottom - radius, y));
       if ((x - cx) ** 2 + (y - cy) ** 2 > radius ** 2) continue;
       grains.push({
         x: x - area.left - left, y: y - area.top - top, delay: reach(x) + Math.random() * 60,
-        vx: (rtl ? -1 : 1) * (8 + Math.random() * 34), vy: -(10 + Math.random() * 34), size: step * (.55 + Math.random() * .5), color,
+        vx: (rtl ? -1 : 1) * (24 + Math.random() * 86), vy: -(28 + Math.random() * 72), size: step * (.8 + Math.random() * .7),
+        color: Math.random() < INKED ? ink : Math.random() < .5 ? shade : color,
       });
     }
   }
@@ -71,10 +76,11 @@ export function dissolve(stack: HTMLElement, layer: HTMLElement | null, fading: 
       const life = (elapsed - grain.delay) / LIFE_MS;
       if (life <= 0 || life >= 1) continue;
       const travel = 1 - (1 - life) ** 2;
-      context.globalAlpha = (1 - life) ** 1.4;
+      context.globalAlpha = (1 - life) ** 1.3;
       context.fillStyle = grain.color;
-      const size = grain.size * (1 - life * .5);
-      context.fillRect(grain.x + grain.vx * travel, grain.y + grain.vy * travel, size, size);
+      const size = grain.size * (1 - life * .4);
+      // A slight lift as they go, so the dust rises off the line instead of only sliding.
+      context.fillRect(grain.x + grain.vx * travel, grain.y + grain.vy * travel - 8 * life * life, size, size);
     }
     if (elapsed < DISSOLVE_MS + 60) frame = requestAnimationFrame(draw); else end();
   };
@@ -87,6 +93,14 @@ export function dissolve(stack: HTMLElement, layer: HTMLElement | null, fading: 
       end();
     },
   };
+}
+
+/** The colour a step toward black; colours the canvas cannot parse stay as they are. */
+function darker(color: string, amount: number) {
+  const channels = color.match(/rgba?\(([^)]+)\)/)?.[1]?.split(/[\s,/]+/).map(Number);
+  if (!channels || channels.length < 3 || channels.some(Number.isNaN)) return color;
+  const [r, g, b, a = 1] = channels;
+  return `rgb(${r! * (1 - amount)} ${g! * (1 - amount)} ${b! * (1 - amount)} / ${a})`;
 }
 
 /** Reduced motion, or nothing to sample: a short fade. */

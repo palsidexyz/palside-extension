@@ -17,7 +17,7 @@ import { isFavoritePage, toggleFavoritePage } from '../favorites/favorites';
 import { DanmakuIcon } from '../ui/icons';
 import { Action, PersonAvatar, Token } from '../ui/primitives';
 import { SiteLogo } from './site-logo';
-import { siteForUrl, type Site } from '../settings/site-catalog';
+import { siteAt, type Site } from '../settings/site-catalog';
 import { Faces } from '../rooms/danmaku-view';
 import { StancePoll } from '../rooms/stance-poll';
 import { pageIssue } from '../feedback/session-notice';
@@ -45,8 +45,8 @@ function detailView(c: PalsideController, asset: Viewing) {
   const roomKey = roomsOn(c) ? roomKeyFor(asset) : undefined;
   const rooms = c.live?.state.rooms;
   const summary = roomKey ? tokenStats(c, roomKey) : undefined;
-  // The site most participants use is part of the room's public profile, not of the display record.
-  const participantSite = roomKey ? (rooms?.current?.key === roomKey ? rooms.current.profile : rooms?.summaries[roomKey]?.profile)?.site : undefined;
+  // The site most participants use is the room's public vote, not part of the display record.
+  const participantSite = roomKey ? (rooms?.current?.key === roomKey ? rooms.current : rooms?.summaries[roomKey])?.site : undefined;
   const known = asset.kind === 'asset' ? [...new Map(c.data.views.filter(v => viewingKey(v) === viewingKey(asset) && v.url).map(v => [v.url, v])).values()] : asset.url ? [asset] : [];
   const profiled = roomKey && !known.length ? roomView(c, roomKey) : undefined;
   return { roomKey, summary, participantSite, sources: profiled?.url ? [profiled] : known, view: liveView(c, profiled ?? asset) };
@@ -74,7 +74,7 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
   const { roomKey, summary, participantSite, sources, view } = detailView(c, asset);
   const read = useRoomRead(c, 'summary', roomKey);
   const current = Boolean(page?.url && (pageScopeUrl(page.url) === pageScopeUrl(asset.url) || key && page.asset === key));
-  const site = siteForUrl(view.url, c.sites);
+  const site = siteAt(c, view.url, view.kind === 'website' ? view.logo : undefined);
   const [sharing, setSharing] = useState(false);
   const latest = useRef(c);
   useEffect(() => { latest.current = c; }, [c]);
@@ -96,7 +96,7 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
   const here = (url: string) => Boolean(current && pageScopeUrl(url) === pageScopeUrl(page?.url));
   const targets: OpenTarget[] = choice.site
     ? [choice.site, ...choice.sites.filter(site => site.id !== choice.site!.id)].filter(site => !here(site.url)).map(site => ({ key: site.id, name: site.name, site, go: () => openTokenSite(c, site) }))
-    : choice.sites.length ? [] : sources.filter(source => !here(source.url)).map(source => { const site = siteForUrl(source.url); return { key: source.url, name: site?.name ?? source.source, site, go: () => open(source) }; });
+    : choice.sites.length ? [] : sources.filter(source => !here(source.url)).map(source => { const site = siteAt(c, source.url, source.kind === 'website' ? source.logo : undefined); return { key: source.url, name: site?.name ?? source.source, site, go: () => open(source) }; });
   const acts = Boolean(roomKey || c.canWrite || targets.length);
   // Who is watching and the 看法 shares are live: without the service they are not shown at all rather than shown stale.
   const reachable = !pageIssue(c, 'service');

@@ -1,3 +1,4 @@
+import { identifyPage } from '@palside/shared/navigation';
 import type { Command } from '../transport/command-map';
 import type { RuntimeCommands } from '../composition/dispatch';
 import type { HandlerRegistry } from '../composition/handler-registry';
@@ -13,10 +14,13 @@ export async function roomPanelsCommand(this: RuntimeCommands, command: Extract<
 return runtime.rooms.panelChanged(p.connected === true);
 }
 
+/** The tab's token for 弹幕. A pool or chainless contract page arrives as its URL: the runtime looks it up, and the background sends the token once state carries it. */
 export async function roomTabCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-tab" }>) {
- const p = command.payload ?? {};
-    const runtime = this.runtime;
-return runtime.rooms.tabChanged(p);
+  const p = command.payload ?? {};
+  const runtime = this.runtime;
+  const page = p.page ? identifyPage(p.page) : null;
+  if (page?.kind === 'pool' || page?.kind === 'address') void runtime.pages.resolve(page).catch(() => {});
+  return runtime.rooms.tabChanged({ asset: p.asset, site: p.site });
 }
 
 export async function roomOpenCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-open" }>) {

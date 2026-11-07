@@ -4,11 +4,11 @@ import { teamDiscoverySort } from '@palside/shared/team-activity';
 import { activity } from '@palside/shared/contracts/presence';
 import { MessageError,message as uiMessage } from '@palside/i18n';
 import { profileTags } from '@palside/shared/contracts/profiles';
-import { roomKey,roomProfileInput,stance } from '@palside/shared/contracts/rooms';
+import { roomKey,roomSite,stance } from '@palside/shared/contracts/rooms';
 import { chainOrderInput, chainAmount } from '@palside/shared/contracts/chain';
 import type { WalletState, WalletRecords } from '../wallet/controller';
 import type { WalletPayment } from '../../domain/wallet/model';
-import { readFavorites,readHosts,readSiteInteractions } from '../../domain/annotations/interaction.ts';
+import { readFavorites,readSiteInteractions } from '../../domain/annotations/interaction.ts';
 import { readMessageRefTarget } from '../../domain/annotations/social.ts';
 import type { ApiResult } from './api';
 import type { LobbyPaging } from '../teams/command-handlers';
@@ -33,7 +33,7 @@ const imageDocument = Type.Decode(Type.Unknown(), documentCopy);
 const size = Type.Enum(['sm', 'md', 'lg']);
 const number = Type.Number();
 const signalSettings = strictObject({ size: Type.Optional(size), emoteSize: Type.Optional(size), wheelSize: Type.Optional(size), sound: optionalBool, volume: Type.Optional(number), key: Type.Optional(validated(normalizeSignalKey)), wheel: Type.Optional(denseArray(Type.Enum(wheelEntries))) });
-const danmakuSettings = strictObject({ density: Type.Optional(Type.Enum(['low', 'mid', 'high'])), enabled: optionalBool, area: Type.Optional(Type.Enum(['top', 'chart', 'full'])), speed: Type.Optional(Type.Enum([110, 144, 190])), size: Type.Optional(size), opacity: Type.Optional(number) });
+const danmakuSettings = strictObject({ density: Type.Optional(Type.Enum(['low', 'mid', 'high'])), enabled: optionalBool, area: Type.Optional(Type.Enum([25, 50, 75, 100])), speed: Type.Optional(Type.Enum([110, 144, 190])), size: Type.Optional(size), opacity: Type.Optional(number) });
 const refTarget = Type.Decode(Type.Unknown(), value => { const target = readMessageRefTarget(value); if (!target) throw new MessageError(uiMessage('extension.runtime.tokenIdentityUnknown')); return target; });
 const attachment = Type.Decode(object, (input): Attachment => {
   const path: (string | number)[] = [];
@@ -50,7 +50,7 @@ const message = Type.Decode(object, (input): Message => {
   if (input.ref !== undefined) { const ref = decodeContract(object, input.ref); decodeContract(refTarget, ref.target); }
   return input as Message;
 });
-const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), hiddenStickies: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), siteInteraction: Type.Optional(validated(readSiteInteractions)), favorites: Type.Optional(validated(readFavorites)), tokenOff: Type.Optional(validated(readHosts)), toured: optionalBool, rooms: Type.Optional(strictObject({ off: optionalBool, site: optionalText, noticed: optionalBool })) });
+const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), hiddenStickies: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), siteInteraction: Type.Optional(validated(readSiteInteractions)), favorites: Type.Optional(validated(readFavorites)), toured: optionalBool, rooms: Type.Optional(strictObject({ off: optionalBool, site: optionalText, noticed: optionalBool })) });
 const windowTarget = { windowId: optionalInt, teamId: optionalText, accountId: optionalText };
 const sticky = { ...team, accountId: optionalText, kind: Type.Literal('sticky'), asset: optionalText, text: text, site: optionalText, url: optionalText, target: Type.Optional(refTarget), edits: optionalText, baseRevision: optionalText, operationId: optionalText, caption: optionalText };
 
@@ -95,8 +95,8 @@ export const commandPayloads = {
   'invite-accept': strictObject({ id: text }), 'invite-ignore': strictObject({ id: text }), 'invite-settings': strictObject({ accept: bool }),
   'team-invite-permission': strictObject({ ...team, on: bool }),
   'room-watch': strictObject({ id: text, view: Type.Optional(roomKey) }),
-  'room-open': strictObject({ key: roomKey, profile: Type.Optional(roomProfileInput) }), 'room-close': empty,
-  'room-tab': strictObject({ asset: Type.Union([text, Type.Null()]), profile: Type.Optional(roomProfileInput) }), 'room-panels': strictObject({ connected: bool }),
+  'room-open': strictObject({ key: roomKey }), 'room-close': empty,
+  'room-tab': strictObject({ asset: Type.Union([text, Type.Null()]), site: Type.Optional(roomSite), page: Type.Optional(text) }), 'room-panels': strictObject({ connected: bool }),
   'room-send': strictObject({ text }), 'room-more': empty, 'room-find': strictObject({ key: roomKey, id: text }), 'room-retract': strictObject({ id: text }), 'room-report': strictObject({ id: text }),
   'room-stance': strictObject({ key: roomKey, value: Type.Union([stance, Type.Null()]) }), 'room-summary': roomQuery,
   'room-people': roomQuery, 'room-hot': strictObject({ sourceId: optionalText, open: Type.Boolean() }), 'room-blocks': empty,
@@ -108,7 +108,7 @@ export const commandPayloads = {
   'dismiss-invite': strictObject({ url: text }), 'dismiss-open-team': empty, 'dismiss-poke': strictObject({ id: text }),
   'external-team': strictObject({ id: text }), 'external-invite': strictObject({ code: text }),
   'external-share': strictObject({ text, teamId: optionalText, accountId: optionalText }),
-  page: strictObject({ failed: optionalBool, clear: optionalBool, preparing: optionalBool, activity: optionalBool, identity: Type.Optional(object), host: optionalText, metadata: optionalBool, context: Type.Optional(object), preview: optionalBool, stable: optionalBool, title: optionalText, favicon: optionalText }),
+  page: strictObject({ failed: optionalBool, clear: optionalBool, preparing: optionalBool, activity: optionalBool, identity: Type.Optional(object), host: optionalText, preview: optionalBool, stable: optionalBool, title: optionalText, favicon: optionalText }),
   history: strictObject(team), visible: strictObject({ teamId: optionalText, sourceId: text, ids: denseArray(text) }), 'visible-drop': strictObject({ panel: text }),
   'notification-open': strictObject({ accountId: text, teamId: optionalText, messageId: text, windowId: integer, preview: optionalBool }),
   'image-draft-save': strictObject({ ...accountTeam, source: text, draftRevision: integer, src: text }),

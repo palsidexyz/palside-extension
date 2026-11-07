@@ -98,9 +98,11 @@ const roomStance: RoomStance = { bull: 14, hold: 6, bear: 3, mine: scene === 'de
 const roomFaces = roomPeople.slice(0, 3);
 const roomMessages = scene === 'room-empty' ? [] : [roomLine('r1', roomPeople[0]!, '池子刚加了一倍', 9), roomLine('r2', roomPeople[3]!, '跟上了，看 5 分钟线', 7), roomLine('r3', roomPeople[1]!, 'dev 钱包刚卖了一部分，注意', 5), roomLine('r4', roomPeople[2]!, '这币要拉 10 倍，私聊带你', 4, { folded: true }), roomLine('r5', roomPeople[4]!, '哪个钱包', 1)];
 const roomFor = (key: string) => key === roomKey
-  ? { key, profile: { name: 'CASHCAT', logo: null, site: 'gmgn' }, count: 23, stance: roomStance, faces: roomFaces, messages: roomMessages, hasMore: false, loading: false, slowUntil: scene === 'room-slow' ? now + 4_000 : 0, slowMs: 5_000 }
-  : { key, profile: null, count: 1, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], messages: [], hasMore: false, loading: false, slowUntil: 0, slowMs: 5_000 };
-const hotRow = (key: string, name: string, count: number, stance: [number, number, number], faces = roomFaces) => ({ key, profile: { name, logo: null, site: 'gmgn' }, count, stance: { bull: stance[0], hold: stance[1], bear: stance[2] }, faces });
+  ? { key, site: 'gmgn', count: 23, stance: roomStance, faces: roomFaces, messages: roomMessages, hasMore: false, loading: false, slowUntil: scene === 'room-slow' ? now + 4_000 : 0, slowMs: 5_000 }
+  : { key, site: null, count: 1, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], messages: [], hasMore: false, loading: false, slowUntil: 0, slowMs: 5_000 };
+/** Hot-board names come from the token directory, as in production. */
+const hotNames: Record<string, { name: string }> = {};
+const hotRow = (key: string, name: string, count: number, stance: [number, number, number], faces = roomFaces) => (hotNames[key.slice('token:'.length)] = { name }, { key, site: 'gmgn', count, stance: { bull: stance[0], hold: stance[1], bear: stance[2] }, faces });
 // One live board: rows that climbed in the last minutes carry rise.
 const hotRows = [hotRow('token:Solana:So11111111111111111111111111111111111111112', 'WIF', 186, [80, 30, 40]), { ...hotRow(otherKey, data.views[1]!.name, 41, [9, 9, 12]), rise: 12 }, { ...hotRow(roomKey, 'CASHCAT', 23, [14, 6, 3]), rise: 15 }, hotRow('token:Base:0x4ed4e862860bed51a9570b96d89af5e1b0efefed', 'DEGEN', 4, [1, 1, 1], [])];
 const invites = scene === 'invites' ? [
@@ -108,7 +110,7 @@ const invites = scene === 'invites' ? [
   { id: 'i2', team: { id: 'meme', name: 'Meme 研究所', avatarId: null, memberCount: 48 }, from: roomPeople[1]!, createdAt: now - 2 * DAY_MS, expiresAt: now + DAY_MS },
 ] : [];
 const rooms = {
-  summaries: { [roomKey]: { key: roomKey, profile: { name: 'CASHCAT', logo: null, site: 'gmgn' }, count: 23, stance: roomStance, faces: roomFaces, at: now } },
+  summaries: { [roomKey]: { key: roomKey, site: 'gmgn', count: 23, stance: roomStance, faces: roomFaces, at: now } },
   blocked: scene === 'blocked' ? [stranger('toshi-0x52aa', 'Toshi'), stranger('ivy-0xa8f0', 'Ivy')] : [], invites, acceptInvites: params.get('accept') !== '0', avatars: {},
 } satisfies RuntimeState['rooms'];
 const defaultClicks: Record<string, string> = { room: '弹幕', 'room-slow': '弹幕', 'room-empty': '弹幕', hot: '团队菜单,热门', invite: '弹幕,Kenji,邀请进小队' };
@@ -130,7 +132,7 @@ function Review() {
     revision: 0, ready: true, authenticated: true, connection: { networkOnline: params.get('offline') !== '1', service: params.get('service') === 'down' ? 'unavailable' : 'ready', messaging: params.get('messaging') === 'down' ? 'unavailable' : 'ready', retrying: false },
     account: { id: data.self, nickname: '测试成员', bio: '', tags: data.people.find(person => person.id === data.self)?.tags ?? [], avatarId: null, matrixId: '@review:example.test', revision: 0, acceptTeamInvites: params.get('accept') !== '0' }, data,
     drafts: scene === 'ref' ? { night: { value: { text: '这里量很大', ref: { target: { kind: 'quote', exact: '24h 成交额 $1.2M，持有人 3,412', prefix: '', suffix: '' }, caption: '24h 成交额 $1.2M，持有人 3,412', view: data.views[0]! } }, revision: 1 } } as never : scene === 'draft' ? { night: { value: { text: '看这个', attachment: { kind: 'asset', assetId: 'page-github', view: data.views.at(-1)! } }, revision: 1 } } as never : {},
-    rooms,
+    rooms, tokens: hotNames,
     preferences: { toured: params.get('tour') !== '1', rooms: { off: params.get('rooms') === 'off' }, share: params.get('share') !== '0' && on.includes('share'), siteInteraction, current: 'night', notifications: params.get('notify') === 'off' ? 'off' : 'all', notificationPreview: true, hiddenStickies: scene === 'stickies' ? ['k5'] : [] },
     remoteTeams: [], lobbyTeams, config: { websiteUrl: 'https://example.test', signupDifficulty: 0 },
     items: { stickies } as never, invitations: {},
@@ -193,7 +195,7 @@ function Review() {
   // Chrome gives the tab's address with 读取您的浏览记录, for an allowed site, or for the activeTab tab.
   const active = params.get('active') === '1';
   const known = active || site || grants.permissions.has('tabs');
-  const page = { tabId: 1, signalEnabled: site && siteAllows(state.preferences.siteInteraction ?? {}, 'gmgn.ai', 'signal'), stickyEnabled: site && siteAllows(state.preferences.siteInteraction ?? {}, 'gmgn.ai', 'sticky'), missingStickies: scene === 'stickies' ? ['k4'] : [], windowId: 1, url: known ? gmgnPage : undefined, host: known ? 'gmgn.ai' : undefined, asset: known ? 'Robinhood:0x020bfc650a365f8bb26819deaabf3e21291018b4' : undefined, granted: site, interactive, tokenProfile: true, connected: interactive && params.get('layer') !== '0', access: { site, active: active && !site }, capabilities: pageCapabilities({ id: 1, url: known ? gmgnPage : undefined, status: 'complete' }, { site, active: active && !site }) } satisfies PageStatus;
+  const page = { tabId: 1, signalEnabled: site && siteAllows(state.preferences.siteInteraction ?? {}, 'gmgn.ai', 'signal'), stickyEnabled: site && siteAllows(state.preferences.siteInteraction ?? {}, 'gmgn.ai', 'sticky'), missingStickies: scene === 'stickies' ? ['k4'] : [], windowId: 1, url: known ? gmgnPage : undefined, host: known ? 'gmgn.ai' : undefined, asset: known ? 'Robinhood:0x020bfc650a365f8bb26819deaabf3e21291018b4' : undefined, granted: site, interactive, connected: interactive && params.get('layer') !== '0', access: { site, active: active && !site }, capabilities: pageCapabilities({ id: 1, url: known ? gmgnPage : undefined, status: 'complete' }, { site, active: active && !site }) } satisfies PageStatus;
   React.useEffect(() => {
     if (scene === 'chat') setSocialUi({ follow: { teamId: 'night', personId: 'robin' } });
     if (scene === 'follow-off') setSocialUi({ follow: { teamId: 'night', personId: 'lin' } });

@@ -116,8 +116,8 @@ test('matching tab sources, non-token pages and click to the correct window room
 test('room-tab follows the most recently focused panel window, emits null on non-token pages, rejects panel forgery', async t => {
   const f = fixture(); t.after(f.close); await flush();
   const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(command => command.payload);
-  // An unnamed token never votes its address placeholder as the public name.
-  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}` });
+  // room-tab carries the token and the registry site only: never a name or an icon.
+  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}`, site: 'gmgn' });
   f.controls.tabs.push({ ...f.controls.tabs[0], id: 2, windowId: 20, url: url(other) });
   f.panel(20); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${address}`);
   f.controls.focused = 20; f.browser.windows.onFocusChanged.emit(20); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${other}`);
@@ -137,13 +137,13 @@ test('room-tab follows a token only on an added site, and follows or drops it as
   assert.deepEqual(tabs().at(-1), { asset: null });
 });
 
-test('enabled, density and area persist; room-tab profiles drop untrusted logos', async t => {
-  const f = fixture({ saved: { 'palside:danmaku': { enabled: false, density: 'low', area: 'top' } } }); t.after(f.close); await flush();
+test('enabled, density and area persist; a named view still sends room-tab only its site', async t => {
+  const f = fixture({ saved: { 'palside:danmaku': { enabled: false, density: 'low', area: 50 } } }); t.after(f.close); await flush();
   assert.equal(f.primary.messages.find(item => item.type === 'danmaku').settings.enabled, false);
   await f.bg.danmaku.saveDanmakuSettings({ enabled: true, density: 'high' });
-  assert.equal(f.stored['palside:danmaku'].density, 'high'); assert.equal(f.stored['palside:danmaku'].area, 'top');
+  assert.equal(f.stored['palside:danmaku'].density, 'high'); assert.equal(f.stored['palside:danmaku'].area, 50);
   f.update({ data: { ...f.state().data, views: [{ kind: 'asset', chain: 'Ethereum', address, name: 'Token', logo: 'https://evil.example/logo.png' }] } }); await flush();
-  assert.deepEqual(f.calls.filter(command => command.name === 'room-tab').at(-1).payload.profile, { name: 'Token', site: 'gmgn' });
+  assert.deepEqual(f.calls.filter(command => command.name === 'room-tab').at(-1).payload, { asset: `Ethereum:${address}`, site: 'gmgn' });
 });
 
 test('another tab gets its own replay and a missing grant or capture-only admission cannot show room flights', async t => {
@@ -262,24 +262,19 @@ test('room payments require a site grant and matching page and cannot reuse a re
   assert.deepEqual(lastPayment(p), emptyPayments);
 });
 
-test('room-tab accepts only allowlisted logo URLs and bounds profile names', async t => {
-  const f = fixture(); t.after(f.close); await flush();
-  const logo = 'https://metadata.mobula.io/assets/logos/' + 'a'.repeat(64) + '.png';
-  f.update({ data: { ...f.state().data, views: [{ kind: 'asset', chain: 'Ethereum', address, name: 'X'.repeat(60), logo: logo + '?tracking=1' }] } }); await flush();
-  const profile = f.calls.filter(command => command.name === 'room-tab').at(-1).payload.profile;
-  assert.deepEqual(profile, { name: 'X'.repeat(40), logo, site: 'gmgn' });
-});
-
-test('a pool needs one confirmed token before room-tab and webpage danmaku are enabled', async t => {
+test('a pool page names its URL until the server finds its token, then follows the token and enables webpage danmaku', async t => {
   const f = fixture({ messages: [message('token')] }); t.after(f.close); await flush();
   const pool = `https://dexscreener.com/ethereum/${other}`;
+  const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(command => command.payload);
   f.host.grantedOrigins.add('https://dexscreener.com/*');
   f.controls.tabs[0].url = pool; f.browser.tabs.onUpdated.emit(1, { url: pool }, f.controls.tabs[0]); await flush();
-  assert.deepEqual(f.calls.filter(command => command.name === 'room-tab').at(-1).payload, { asset: null });
+  assert.deepEqual(tabs().at(-1), { asset: null, page: pool });
   const denied = f.page(); await flush(); assert.equal(denied.flights().length, 0);
   const injections = f.injected.length;
-  f.update({ data: { ...f.state().data, views: [{ kind: 'asset', chain: 'Ethereum', address, name: 'Token', url: pool }] } }); await flush();
-  assert.ok(f.injected.length > injections, 'confirmation restores the page even if the pinned room did not change');
-  assert.equal(f.calls.filter(command => command.name === 'room-tab').at(-1).payload.asset, `Ethereum:${address}`);
+  f.update({ pages: { [pool]: `Ethereum:${address}` } }); await flush();
+  assert.ok(f.injected.length > injections, 'the answer restores the page even if the pinned room did not change');
+  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}`, site: 'dexscreener' });
   const page = f.page(); await flush(); assert.deepEqual(page.flights().map(item => item.id), ['token']);
+  f.update({ pages: { [pool]: null } }); await flush();
+  assert.deepEqual(tabs().at(-1), { asset: null }, 'a pool with no single token is not asked again from the tab');
 });

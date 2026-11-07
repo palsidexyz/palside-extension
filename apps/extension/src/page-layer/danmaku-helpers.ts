@@ -3,9 +3,9 @@ import type { DanmakuArea } from '../runtime/browser/page-protocol';
 export type { DanmakuArea, DanmakuSpeed, DanmakuSize, DanmakuSettings } from '../runtime/browser/page-protocol';
 
 export type DanmakuAreaRect = { top: number; left: number; width: number; height: number };
-export function fallbackDanmakuArea(width: number, height: number, area: DanmakuArea = 'top'): DanmakuAreaRect {
-  if (area === 'full') return { top: 0, left: 0, width, height };
-  return { top: 0, left: 0, width, height: height * 0.25 };
+/** Lines drift through a band from the top of the viewport, the way video sites size their danmaku area. */
+export function danmakuAreaRect(width: number, height: number, area: DanmakuArea = 25): DanmakuAreaRect {
+  return { top: 0, left: 0, width, height: height * area / 100 };
 }
 export type MediaClock = EventTarget & { currentTime: number; paused: boolean; playbackRate: number; play(): void; pause(): void };
 export function createMediaClock(): MediaClock {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tokenName } from '../apps/extension/src/runtime/viewing/token-page.ts';
-import { tokenLogo } from '../apps/extension/src/runtime/viewing/token-logo.ts';
+import { tokenName } from '../apps/extension/src/runtime/viewing/token-name.ts';
+import { validateView } from '../apps/extension/src/runtime/viewing/view-snapshot.ts';
 import { productionModules } from './helpers/production-module.mjs';
 import { VIEWING_TTL_MS, VIEWING_CLOCK_SKEW_MS } from '@palside/shared/rules/interactions';
 import { decodeContract } from '../packages/shared/src/contracts/validation.ts';
@@ -14,14 +14,12 @@ test('token names collapse whitespace and count graphemes', () => {
   assert.equal(tokenName('é'.repeat(65)), undefined);
   for (const value of ['100%', '<script>', '↑100', '\u202eToken']) assert.equal(tokenName(value), undefined);
 });
-function png(size = 45, width = 48, height = 48, signature = 137) {
-  const bytes = new Uint8Array(size); bytes.set([signature, 80, 78, 71, 13, 10, 26, 10]);
-  const header = new DataView(bytes.buffer); header.setUint32(8, 13); bytes.set([73, 72, 68, 82], 12); header.setUint32(16, width); header.setUint32(20, height);
-  return `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`;
-}
-test('the shared logo validator enforces PNG signature, byte size, and dimensions', () => {
-  const accepted = png(8000); assert.equal(tokenLogo(accepted), accepted);
-  for (const invalid of [png(8001), png(45, 49), png(45, 48, 49), png(45, 0), png(45, 48, 48, 0)]) assert.equal(tokenLogo(invalid), undefined);
+test('snapshots never carry token icons; website favicons stay bounded data images', () => {
+  const token = validateView({ version: 1, kind: 'asset', name: 'BONK', url: 'https://gmgn.ai/sol/token/DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', chain: 'Solana', address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', logo: 'data:image/png;base64,AAAA' });
+  assert.equal(token.name, 'BONK'); assert.equal('logo' in token, false);
+  const site = favicon => validateView({ version: 1, kind: 'website', disclosure: 'site', name: 'Example', url: 'https://example.com/', logo: favicon });
+  assert.equal(site('data:image/png;base64,AAAA').logo, 'data:image/png;base64,AAAA');
+  for (const invalid of ['https://example.com/icon.png', `data:image/png;base64,${'A'.repeat(8192)}`]) assert.equal('logo' in site(invalid), false);
 });
 test('viewing receive tolerance is the lease TTL plus clock skew', async () => {
   let reads = 0;

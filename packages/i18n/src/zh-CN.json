@@ -569,6 +569,13 @@
       "onboardingSteps": "账号设置进度",
       "createTitle": "正在创建账号",
       "restoreProgressTitle": "正在登录",
+      "phaseSeal": "正在加密助记词",
+      "phaseRegister": "正在注册账号",
+      "phaseAddDevice": "正在添加设备",
+      "phaseConnect": "正在建立加密聊天",
+      "phaseWallet": "正在准备钱包",
+      "createDone": "账号已创建",
+      "restoreDone": "已登录",
       "revealPhrase": "显示助记词",
       "revealHint": "请确认屏幕不在他人视线内",
       "phraseSafety": "安全提示",
@@ -627,6 +634,7 @@
       "ACCOUNT_BANNED": "此账号已被封禁。如有疑问，请发邮件至 {email}",
       "TEXT_NOT_ALLOWED": "此文字不符合要求，请修改后重试。",
       "CHAIN_UNAVAILABLE": "链上服务暂时不可用",
+      "TOKENS_UNAVAILABLE": "代币资料暂时不可用",
       "CHAIN_RELAY_UNAVAILABLE": "暂时无法提交链上交易",
       "CHAIN_INDEX_UNAVAILABLE": "暂时无法读取链上记录",
       "CHAIN_DISABLED": "链上功能当前已停用",
@@ -983,24 +991,6 @@
       "discard": "放弃修改",
       "keepEditing": "继续编辑"
     },
-    "trust": {
-      "chromeWording": "Chrome 用自己的统一措辞：共享在看显示为“读取您的浏览记录”，网站访问显示为“读取和更改您在相应网站上的数据”。Chrome 没有只读的网站权限；Palside 只做这里列出的事。",
-      "panelTitle": "侧栏与加密聊天",
-      "panelDetail": "运行侧栏，在本机加密和解密消息。",
-      "notificationsTitle": "桌面通知",
-      "notificationsDetail": "收到新消息时提醒。",
-      "neverTitle": "Palside 不会做的事",
-      "neverWallet": "读取其他网站的钱包或账户数据，包括余额和订单",
-      "neverSign": "连接你的其他钱包，或在你未确认时签名交易",
-      "neverContent": "读取输入框、表单值或 Cookie",
-      "neverBackground": "保存浏览历史或上传其他标签页",
-      "siteDetail": "只限已授权网站：网页互动的弹幕、信号和便利贴，引用定位，以及代币页上的名称与图标。禁用网页互动即全部交还。",
-      "siteTitle": "网站访问",
-      "activeTitle": "点击 Palside 图标时的标签页",
-      "activeDetail": "只在你点击工具栏图标或按截图快捷键后，用于这一个标签页的截图；离开该网站即失效。",
-      "historyTitle": "浏览记录",
-      "historyDetail": "只在共享在看开启时，读取前台标签的网址和标题；不保存，不读取网页内容。禁用共享在看即交还。"
-    },
     "room": {
       "slow": "{seconds} 秒后可再发",
       "name": "弹幕",
@@ -1317,7 +1307,6 @@
       "empty": "还没有网站",
       "allSites": "所有网站",
       "tokenData": "代币数据",
-      "tokenDataHint": "同步时读取代币名称和图标",
       "remove": "移除网站",
       "undo": "撤销",
       "denied": "Chrome 未允许",
@@ -1392,8 +1381,9 @@
       "mid": "中",
       "high": "高",
       "area": "区域",
-      "chart": "图表区",
-      "top": "顶部",
+      "quarter": "1/4",
+      "half": "半屏",
+      "threeQuarters": "3/4",
       "full": "全屏",
       "sampleC": "止盈设好没",
       "sampleD": "大单进来了"
@@ -1416,6 +1406,7 @@
       "perm_active": "当前标签页",
       "perm_notifications": "显示通知",
       "perm_idle": "设备空闲状态",
+      "perm_none": "不用浏览器权限",
       "revoke_tabs_title": "收回「读取您的浏览记录」？",
       "revoke_tabs": "共享在看会关闭。之后再打开共享在看，Chrome 不会再询问。",
       "revoke_sites_title": "收回网站授权？",
@@ -1443,10 +1434,10 @@
           "no": "其他标签页、网页内容"
         },
         "token": {
-          "line": "在支持读取、已授权且代币数据开启的网站，读取公开代币名称和图标用于共享或卡片；参与弹幕时可将公开资料提交服务用于展示。",
-          "who": "当前小队；业务服务及公开弹幕、热门列表、代币详情",
-          "keep": "共享与消息按各自期限；公开资料存于服务内存，可在参与结束后保留，服务重启清空。",
-          "no": "余额、持仓、订单、钱包"
+          "line": "识别到代币时，把链和合约地址发给 Palside 服务；服务从区块链读取公开的名称、简称和图标，所有人看到同一份。",
+          "who": "Palside 服务；区块链节点只收到合约地址",
+          "keep": "代币公开资料存于服务，90 天无人查询后删除；不记录是谁查询。",
+          "no": "网页内容、余额、持仓、订单、钱包"
         },
         "quote": {
           "line": "选字时读取最多 200 字、前后各最多 24 字及网址。引用先放入本机草稿，发送后才分享给当前小队。",
@@ -1503,7 +1494,9 @@
       "collapse": "收起",
       "queued": "排队中",
       "quote": "引用",
-      "quoteSelection": "引用所选"
+      "quoteSelection": "引用所选",
+      "copyText": "复制文字",
+      "copySelection": "复制所选"
     },
     "start": {
       "ownedLimit": "已拥有 {count} 个小队",
@@ -1540,7 +1533,15 @@
       "chat": "只有小队成员能看，消息加密",
       "room": "每个代币的公开讨论，所有人可见",
       "share": "打开后，队友能在顶部看到你正在看的网页；再点一次关闭。",
-      "site": "点网站图标，打开“网页互动”，弹幕、信号和便利贴就会出现在这个网站的网页上。",
+      "site": "点网站图标打开后，在这个网站的网页上：",
+      "quoteTab": "引用 · 便利贴",
+      "signalHow": "拖动，朝一个方向松开",
+      "quoteHow": "选中文字，点浮条",
+      "danmakuHow": "代币页上，飘过大家的公开讨论",
+      "demoText": "流动性锁仓 180 天，<mark>前 10 地址持有 62%</mark>，权限已放弃。",
+      "demoDanmaku1": "量能起来了",
+      "demoDanmaku2": "盯一下 0.0021 支撑",
+      "demoDanmaku3": "冲！",
       "toolsTitle": "输入框工具",
       "reactions": "给小队发一阵表情雨",
       "image": "发送图片",
@@ -1549,6 +1550,19 @@
       "inviteTitle": "邀请朋友",
       "invite": "把邀请链接发给朋友，加入后一起看。",
       "replay": "重看引导"
+    },
+    "installed": {
+      "title": "Palside 已安装",
+      "opened": "侧栏已打开",
+      "openFailed": "请点工具栏的 Palside 图标",
+      "pinned": "已固定",
+      "docs": "文档",
+      "privacy": "隐私",
+      "ready": "准备好了",
+      "sidePanel": "侧栏（未打开）",
+      "toolbar": "工具栏（未固定）",
+      "pinHow": "拼图图标 › Palside 旁的图钉",
+      "continue": "去右侧侧栏继续"
     }
   },
   "website": {
@@ -1573,21 +1587,22 @@
       "signalLabel": "信号：在图表上按住 Option 拖向“注意”或“疑问”",
       "captureLabel": "截图标注：框选区域，用画笔圈出高点，然后完成",
       "shareMia": "我也在看 PONS",
-      "overviewLabel": "Palside 侧栏：小队顶部是大家在看的代币，中间是加密聊天，底部本页条显示当前代币的弹幕人数；Leo 发来一句，你回复并发送",
+      "overviewLabel": "Palside 侧栏：顶栏是小队与页面胶囊，下方是队友在看的代币和加密聊天；Leo 发来一句，你回复并发送",
       "accountLabel": "创建账号：显示并备份 12 个助记词，点选验证两个单词，设置 6 位本机密码，最后填写昵称",
       "teamsLabel": "邀请队友：队长复制邀请链接，Mia 在“通过邀请加入”粘贴链接、查看邀请并确认加入，小队人数变为 2 人",
       "roomLabel": "公开弹幕：选择看多后比例更新；发出一条弹幕，它出现在列表中并飘过网页",
       "walletLabel": "零钱转账：选择队友 Mia、填写 300 PALS，核对后输入本机密码并付款，等待确认后余额从 4,200 变为 3,900 PALS",
-      "packetLabel": "红包：打开 Leo 的小队红包，查看金额与个数，领取后个数变为 2/5 并显示你领到的 PALS",
+      "packetLabel": "小队红包：队友的红包弹出，点“开”后 PALS 散开，领到的金额滚动显示，确认后变为已存入零钱",
+      "tipLabel": "打赏：在弹幕的更多菜单选择打赏，选 50 PALS，核对付款后经过签名、发送、上链，弹幕旁的打赏总额随之增加",
+      "pageDanmakuLabel": "网页弹幕：发出的弹幕飘过代币图表；换到同一代币的其他网站，看到的是同一处弹幕",
       "recordsLabel": "零钱记录：在全部、收入、支出之间筛选，点开一笔领取红包查看金额与交易",
       "discoverLabel": "发现小队：按简介和人数浏览公开招募的小队，申请加入，队长批准后加入",
       "encryptionLabel": "端到端加密：消息离开发送者时已加密，经过服务器时保持密文，只在成员设备上解密",
       "hotLabel": "热门：按弹幕在看人数实时排序，五分钟增加至少 3 人时显示上升人数",
-      "installLabel": "Palside 尚未上架 Chrome 应用商店",
+      "installLabel": "安装：在 Chrome 应用商店添加 Palside，Chrome 只确认是否添加，不列出任何权限",
       "keysLabel": "钥匙不出设备：助记词遮蔽并留在本机，发出去的只有签名和公开地址",
       "sitesLabel": "网站授权：添加网站时 Chrome 只为 birdeye.so 一个网站申请权限，允许后出现在列表里",
       "signingLabel": "零钱签名：付款前在本机逐项核对；无限额授权请求被直接拒绝，不会弹出确认",
-      "blessing": "恭喜发财",
       "pendingDeploy": "部署后公布",
       "pendingTbd": "待公布",
       "tokenLead": "Palside 零钱使用的代币",
@@ -1622,8 +1637,7 @@
       "dark": "深色",
       "getPalside": "获取 Palside",
       "copyright": "© 2026 Palside",
-      "addChrome": "Chrome · 尚未上架",
-      "chromeUnavailable": "Palside 尚未上架 Chrome 应用商店，发布后才可安装。",
+      "addChrome": "添加到 Chrome",
       "privacy": "隐私",
       "inviteUnavailable": "暂时无法查看邀请",
       "inviteExpired": "邀请已失效",
@@ -1632,13 +1646,6 @@
       "inviteCopied": "邀请链接已复制",
       "copyAddress": "请复制浏览器地址栏中的完整链接",
       "copyInvite": "复制邀请链接",
-      "sharingPrivacy": "共享在看只在你开启后、只向当前小队同步前台标签：代币页显示代币，其他网页显示标题和链接（去掉追踪参数；带登录凭证的链接只显示站名）。主动分享的网页卡片、引用和截图先进入草稿，由你确认发送。聊天、附件和在看状态由客户端使用 Matrix 端到端加密。",
-      "lookupPrivacy": "代币名称和 Logo 只在你已授权、且开启了代币数据的网站上，从页面公开区域读取；否则显示合约缩写和默认图标。接收端在本地校验代币资料，并可直接加载限定公开图床中的 Logo；加载失败使用默认图标，不由 Palside 服务器代取。图床可见图片请求和连接 IP，图片请求不附带页面来源地址。",
-      "retentionPrivacy": "消息从原始发送起，按队长设定的期限保留（1、7 或 30 天，或永久，默认永久；图片最长 30 天）；草稿保留 7 天，未发送消息保留 24 小时。退出登录会清除本机缓存、草稿和解密密钥，重新登录可能无法查看旧历史。截图原图与编辑过程在本机处理，不上传。",
-      "submissionsHeading": "用户主动提交",
-      "submissionsPrivacy": "举报只包含你预览并确认的内容，审核人员可以查看；首次查看私密举报内容会记录审计。招募期间会公开小队名称、简介、头像、队长昵称和头像，以及等级与热度名次。链上交易的地址、金额和交易哈希公开且无法删除；服务保存钱包身份绑定、订单和恢复记录，Alchemy 与 RPC 服务处理签名交易，但不会收到私钥。等级与热度只统计活动事件及日聚合数据，网络地址使用按小队和日期隔离的摘要，不读取加密聊天正文。 注销删除钱包绑定和举报人关联；未完成链上订单先对账，完成后去掉账号关联，只留金额和交易哈希。账号只保留公钥和注销时间，同一助记词可重新注册。活动 IP 摘要保留最近 30 个完整 UTC 日和当日。",
-      "scopeHeading": "当前交付范围",
-      "scopePrivacy": "Palside 尚未上架 Chrome 应用商店。网页演示使用样例数据，与真实扩展服务分开，不作为安全或上线验收证明。",
       "permissionsEncryption": "权限与加密",
       "chromePermissions": "Chrome 权限",
       "endToEnd": "端到端加密",
@@ -1662,62 +1669,54 @@
       "lobbyUnavailable": "暂时无法获取小队列表",
       "backToLobby": "返回全部小队",
       "applyToJoin": "在 Palside 中申请",
-      "termsTitle": "用户协议",
-      "termsOperator": "运营方、联系方式和适用地区：公开发布前公布。",
-      "termsService": "Palside 是 Chrome 侧栏插件及配套服务，用于和小队聊天，并展示你选择分享的内容。聊天端到端加密；服务按队长设定的保留期限转发并保存加密消息。",
-      "termsAccount": "助记词在本机生成，分别派生账号身份和零钱密钥。助记词同时控制账号与 PALS 零钱，丢失后 Palside 无法找回；请妥善备份，不向他人透露。私钥只在本机解密和签名，Palside 不索要助记词。链上功能开放后，你可以转账、发领红包和打赏；付款前会显示 PALS 金额，Palside 不收手续费。已确认的链上交易不可撤销，注销账号不会删除链上记录或转移零钱。",
-      "termsConduct": "不得利用 Palside 发送垃圾信息、诈骗、钓鱼、骚扰、违法内容或冒充他人。队长对招募内容负责。经审核确认违规后，可以清除资料、下架招募、删除弹幕或封禁账号。封禁期限为 7 天、30 天或永久，所有设备立即退出；申诉请发邮件至 {email}。",
-      "termsPublic": "招募中小队的名称、简介、头像，以及队长昵称和头像，任何人都能在官网看到，也可能被搜索引擎收录。招募结束后页面会被移除；搜索引擎保存的副本按其自身周期消失。",
-      "termsLiability": "Palside 按现状提供。第三方网站或成员分享的代币信息未经核实，不构成投资建议；名称和图标不代表项目真实性。消息到期或服务器故障时可能无法再查看，且没有备份。",
-      "termsChanges": "我们可能更新本协议，并在本页发布新版本。",
       "workflowRegion": "协作流程"
     },
     "features": {
       "sync": {
         "title": "同步小队的链上视野",
-        "description": "识别、聚合、同步：队友打开的每个代币，实时呈现在侧栏。"
+        "description": "队友打开的每个代币，实时同步到你的侧栏。"
       },
       "signal": {
         "title": "在图表上直接沟通",
-        "description": "标记、提醒、表态，只对同页队友可见，用完即逝。"
+        "description": "在图上打信号、截图圈重点，全程不离开当前页面。"
       },
       "danmaku": {
         "title": "实时市场情绪",
-        "description": "每个代币的公开弹幕，跨站统一。"
+        "description": "每个代币一条公开弹幕，跨网站实时同步。"
       },
-      "capture": {
-        "title": "页面内截图与标注",
-        "description": "截取、标注、发送，全程不离开当前页面。"
+      "packet": {
+        "title": "和小队一起抢红包",
+        "description": "在小队里发拼手气红包，抢到的 PALS 直接存入零钱。"
       },
       "encryption": {
         "title": "Matrix 端到端加密",
-        "description": "基于 Matrix 开放协议，私密消息、附件与共享在看内容在设备端加密。招募资料与元数据不加密。"
+        "description": "私密消息、附件与共享在看内容，均在设备端加密。"
       }
     },
     "questions": {
       "purpose": {
         "question": "Palside 是什么？",
-        "answer": "Palside 是桌面 Chrome 的侧栏扩展。你可以和小队同步正在看的代币，在网页上发信号、弹幕和便利贴，并在端到端加密的小队聊天中讨论。"
+        "answer": "桌面 Chrome 侧栏扩展，用于与小队同看代币：共享在看、网页互动（信号、弹幕、便利贴）与端到端加密的小队聊天。"
       },
       "account": {
-        "question": "需要注册账号吗？",
-        "answer": "不需要邮箱或手机号。Palside 在本机为你生成一组助记词，它就是你的账号。请妥善备份，丢失后任何人都无法找回。"
+        "question": "需要注册吗？",
+        "answer": "无需邮箱或手机号。账号由本机生成的 12 词助记词派生，服务端不保存；助记词遗失后无法恢复。"
       },
       "privacy": {
-        "question": "队友能看到我在浏览什么吗？",
-        "answer": "开启共享在看后，只分享当前标签页的代币，或网页标题和链接；带登录凭证的链接只分享站名。不会自动分享网页内容、屏幕或页面操作。引用与截图仅在你主动选择并发送后分享。共享在看可随时关闭。"
+        "question": "队友能看到我的浏览内容吗？",
+        "answer": "仅在开启共享在看时，共享当前标签页的代币，或网页标题与链接。网页内容、屏幕与页面操作不会共享，引用与截图仅在手动发送后可见。"
       },
       "permissions": {
-        "question": "Palside 需要哪些浏览器权限？",
-        "answer": "安装时不申请任何会触发 Chrome 警告的权限。共享在看需要 Chrome 的“读取您的浏览记录”权限；网页互动只在你添加的网站上申请访问权限。两者都可以随时在 Chrome 中撤销。"
+        "question": "需要哪些浏览器权限？",
+        "answer": "安装时不申请触发 Chrome 警告的权限。共享在看需要“读取您的浏览记录”；网页互动按网站单独授权。均可在 Chrome 中撤销。"
       },
       "encryption": {
-        "question": "聊天内容如何加密？",
-        "answer": "小队消息、图片和在看状态都在成员设备上端到端加密，服务器只转发密文，无法读取内容。新设备只能查看登录后收到的消息。"
+        "question": "聊天如何加密？",
+        "answer": "消息、图片与在看状态在成员设备上端到端加密，服务器仅转发密文。新设备只能解密登录后收到的消息。"
       },
       "teams": {
         "question": "如何加入小队？",
-        "answer": "通过队长发来的邀请链接加入，或在“发现小队”中申请加入正在招募的小队，队长批准后即可进入。每个小队最多 30 人。"
+        "answer": "通过邀请链接，或在“发现小队”中申请，经队长批准后加入。每个小队上限 30 人。"
       }
     },
     "notFound": {
@@ -1729,41 +1728,9 @@
       "teamFull": "已满员",
       "retry": "重新加载",
       "detailUnavailable": "暂时无法查看小队",
-      "privacyLabel": "隐私说明",
-      "privacyTitle": "数据与隐私",
-      "privacyLead": "同步范围、数据用途，以及如何停止同步。",
-      "permissions": "浏览器权限",
-      "permissionsSummary": "安装时不申请任何网站权限，可选权限在你第一次开启对应功能时由 Chrome 询问。",
-      "encryptionSummary": "聊天、附件与在看内容由获准的小队成员解密。",
-      "retention": "数据保留",
-      "retentionSummary": "消息保留 1、7 或 30 天，或永久，由队长选择，默认永久；图片从发送起最长 30 天，之后显示“图片已过期”。",
-      "screenshots": "本地截图处理",
-      "screenshotsSummary": "原图与编辑留在本机，确认发送后才分享成图。",
-      "screenshotsDetail": "裁剪与标注在你的设备上完成。大窗编辑会话可能在扩展后台内存暂留原图，取消、退出账号或后台重启会清除；过期会话在后续访问时清理。加入草稿不等于发送。主动发送后的成图按普通加密图片消息处理，不附原图、图层或被裁剪内容。",
-      "metadataDetail": "端到端加密不隐藏所有元数据。服务仍处理必要的账号、成员关系、连接时间与 IP 信息；招募资料及你主动确认的举报内容不属于私密聊天。",
-      "retentionDetail": "到期后立即停止访问，相关元数据最多 7 天内清除。本机内容缓存最多 300 MiB，离队小队最多保留至离队后 30 天。运行日志最多 7 天。举报证据未结案最多 90 天、结案后最多 30 天；举报记录与案件结案满 1 年删除。处罚生效期间保留，结束满 1 年删除；永久封禁一直保留。运营审计保留 1 年，运营幂等记录 7 天，纯计数统计永久保存。不提供服务器备份；无法强制收回其他成员保存的副本。",
-      "publicSummary": "招募资料公开展示；举报只提交你确认的内容。",
-      "availabilitySummary": "目前处于开发验收阶段，尚未公开运营。",
-      "updated": "最后更新：2026 年 10 月 29 日",
-      "termsTitle": "使用规则",
-      "termsLead": "使用服务前，请阅读以下规则。",
-      "service": "服务说明",
-      "serviceSummary": "在 Chrome 侧栏和小队交流，分享你选择的内容。",
-      "account": "账号与密钥",
-      "accountSummary": "请妥善保管助记词；Palside 无法为你找回账号。",
-      "conduct": "社区规则",
-      "conductSummary": "不得骚扰、冒充、诈骗或传播违法内容。",
-      "publicContent": "公开内容",
-      "publicContentSummary": "主动发布的招募资料可被任何人查看和收录。",
-      "liability": "责任范围",
-      "liabilitySummary": "服务按现状提供，代币信息不构成投资建议。",
-      "changes": "条款更新",
-      "changesSummary": "更新后的条款将在本页公布。",
-      "canTitle": "Palside 会做的事",
-      "canChat": "在你的设备上加密和解密聊天",
-      "canCapture": "在你操作时截图、分享网页和引用网页内容",
-      "canShare": "你开启共享在看后，向小队同步正在看的代币，或网页标题和链接",
-      "canNotify": "你开启后，用桌面通知提醒新消息",
+      "privacyTitle": "隐私政策",
+      "privacyLead": "Palside 读取哪些数据、对谁可见、保存多久，以及如何停止。",
+      "termsTitle": "用户协议",
       "lobbyPlaceholder": "搜索小队名称或简介",
       "unavailableLead": "服务暂时没有响应，请稍后重试。",
       "noResultsTitle": "没有找到与“{query}”相关的小队",
@@ -1774,7 +1741,7 @@
       "daysLeft": "{days, plural, =0 {今天截止} other {还剩 # 天}}",
       "noExtension": "还没有 Palside？",
       "handoffReceived": "已发送到 Palside，点击工具栏中的 Palside 图标继续。",
-      "handoffMissing": "没有检测到 Palside，Chrome 应用商店版本<link>尚未上架</link>。",
+      "handoffMissing": "没有检测到 Palside，请先从 <link>Chrome 应用商店</link>安装。",
       "browseTeams": "发现小队",
       "invitedBy": "<strong>{name}</strong> 邀请你加入",
       "invited": "你收到一个小队邀请",
@@ -1798,35 +1765,7 @@
       "factRequired": "需要",
       "teamEnded": "这个小队已结束招募",
       "teamEndedLead": "招募可能已到期，或被队长关闭。",
-      "publishedAgo": "{time}发布",
-      "dataTitle": "我们处理的数据",
-      "dataSummary": "每项数据只为对应的功能离开你的设备。",
-      "dataMessagesTitle": "聊天消息",
-      "dataMessages": "小队消息在你的设备上加密，服务端只保存密文；弹幕公开。",
-      "dataBrowsingTitle": "浏览信息",
-      "dataBrowsing": "只在你开启共享在看时，把前台标签的代币或网页标题和链接加密发给小队，不保存历史。",
-      "dataPageTitle": "网页内容",
-      "dataPage": "你选中引用或贴成便利贴的文字、你确认发送的截图、代币页上公开的名称和图标。",
-      "dataActionsTitle": "网页操作",
-      "dataActions": "你主动发信号时，指向的网页元素和相对位置会加密发给小队；不记录按键或滚动。",
-      "dataTransactionsTitle": "交易信息",
-      "dataTransactions": "零钱的公开地址、转账、红包、打赏订单和链上状态。链上记录公开且无法删除。",
-      "dataNetworkTitle": "网络信息",
-      "dataNetwork": "服务端处理连接 IP；必要错误记录最多 7 天，防滥用计数在内存或最多 1 天。小队活动 IP 摘要保留最近 30 个完整 UTC 日和当日。",
-      "danmakuTitle": "弹幕",
-      "danmakuSummary": "弹幕是公开内容，不加密。",
-      "danmakuDetail": "你发的弹幕、昵称和头像公开可见。服务端保存正文、作者与代币，每个代币保留最近 10000 条，不按时间到期；看法保存至改票、撤回或注销。服务端知道你参与哪个代币的弹幕，不接收页面网址，不形成持久浏览轨迹。热门只统计开着弹幕的账号，不统计小队共享在看。",
-      "thirdPartiesTitle": "第三方服务与数据用途",
-      "thirdPartiesSummary": "数据只用于提供本页所述的功能。",
-      "thirdPartiesDetail": "Palside 不出售用户数据，不用于广告，也不用于判断信用或发放贷款。小队聊天使用 Palside 自己运营的 Matrix 服务。",
-      "thirdPartiesChainTitle": "Alchemy 和 RPC 节点",
-      "thirdPartiesChain": "处理你签名的 PALS 交易和公开链上信息，不会收到私钥。",
-      "thirdPartiesImagesTitle": "公开图床",
-      "thirdPartiesImages": "接收端可能直接从限定的公开图床加载代币图标，图床能看到图片请求和连接 IP。",
-      "limitedUse": "Palside 对从 Chrome 接口获得的信息的使用，遵守 Chrome 应用商店用户数据政策，包括其中的 Limited Use 要求。",
-      "choicesTitle": "你的选择与联系方式",
-      "choicesSummary": "随时可以收回权限、清除本机数据。",
-      "choicesDetail": "在“设置 › 隐私与数据”收回权限、清除本机缓存。注销账号会删除你的资料和关联，已上链的记录除外。Palside 不面向 18 岁以下的用户。隐私问题请联系 palside@pm.me。"
+      "publishedAgo": "{time}发布"
     },
     "og": {
       "recruiting": "招募中",
@@ -1845,7 +1784,7 @@
       "continueTeam": "回到原小队"
     },
     "film": {
-      "heroAccessible": "首屏演示：在 PONS 上看公开弹幕，按住 ⌥ 发出「注意」信号，截图标注后发给小队；打开 Leo 分享的 X 帖子，引用原文并点击聊天中的引用卡片回看高亮、贴便利贴，再回到 PONS。演示数据均为虚构。",
+      "heroAccessible": "首屏演示：在 PONS 上先开启共享在看，再为这个网站打开网页互动，公开弹幕出现在图表上；按住 ⌥ 发出「注意」信号，截图标注后发给小队，拆开 Robin 的红包；打开 Leo 分享的 X 帖子，引用原文、贴便利贴，回到 PONS 后关掉网页互动和共享在看。演示数据均为虚构。",
       "ranking": "排行",
       "holders": "持有人 {value}",
       "volume": "24h 成交额 {value}",
@@ -1901,27 +1840,40 @@
         "huntersDescription": "追踪聪明钱地址，每天复盘一笔交易。",
         "baseName": "Base 研究小组",
         "baseDescription": "分享项目资料和阅读笔记。"
-      }
+      },
+      "wishLuck": "恭喜发财",
+      "wishRide": "一起冲",
+      "wishThanks": "感谢带飞",
+      "noteLp": "LP 已销毁，链上能查到",
+      "noteLocked": "流动性锁了 180 天",
+      "noteHolders": "持有人还在涨",
+      "noteDoubled": "持有人比昨天多一倍",
+      "noteTime": "2 分钟前"
     },
     "workflows": {
       "hot": {
         "label": "热门",
         "title": "追踪注意力流向",
-        "description": "按弹幕在看人数实时排序，五分钟增加至少 3 人时显示“↑N”。"
+        "description": "按在看人数实时排行，人气上涨的代币一眼可见。"
       },
       "discover": {
         "title": "找到同频的交易者",
-        "description": "按简介与规模浏览公开小队，申请由队长审批。"
+        "description": "浏览公开小队的简介与规模，一键申请加入。"
+      },
+      "tip": {
+        "label": "打赏",
+        "title": "为好观点打赏",
+        "description": "看到有趣的弹幕，一键打赏 PALS 给作者。"
       },
       "notes": {
         "label": "便利贴与引用",
         "title": "网页引用与便利贴",
-        "description": "引用原文自动附带出处；便利贴固定在原位，队友打开即见。"
+        "description": "引用原文自带出处，便利贴留在原处，队友打开就能看到。"
       },
       "people": {
         "label": "跟看",
         "title": "跟随你信任的交易者",
-        "description": "跟看队友的页面：TA 换币时一键前往，只在本机记录，不通知对方。"
+        "description": "跟看队友的页面，TA 换币时一键跟上。"
       }
     },
     "statement": {
@@ -1949,7 +1901,6 @@
       "openSource": "扩展开源",
       "license": "MIT 许可证",
       "viewSource": "在 GitHub 查看",
-      "policy": "隐私政策",
       "aboutMatrix": "关于 Matrix"
     },
     "security": {
@@ -1997,6 +1948,7 @@
       "film": {
         "locked": "本机加密",
         "toServer": "发往服务器",
+        "byContract": "Palside 服务按合约地址从链上读取",
         "signature": "签名",
         "publicAddress": "公开地址",
         "approval": "授权额度",
@@ -2004,6 +1956,130 @@
         "unlimited": "无限",
         "rejected": "已拒绝",
         "packetContract": "红包合约"
+      }
+    },
+    "policy": {
+      "updated": "最后更新：2026 年 11 月 7 日",
+      "can": {
+        "title": "Palside 会做的事",
+        "chat": "在你的设备上加密和解密小队聊天",
+        "share": "开启共享在看后，向小队同步当前代币或网页",
+        "capture": "在你操作时截图、引用网页文字",
+        "notify": "开启后，以桌面通知提醒新消息"
+      },
+      "never": {
+        "title": "Palside 不会做的事",
+        "wallet": "读取其他网站的钱包或账户数据，包括余额和订单",
+        "sign": "连接你的其他钱包，或未经确认签名交易",
+        "content": "读取输入框、表单或 Cookie",
+        "background": "保存浏览历史或上传其他标签页"
+      },
+      "permissions": {
+        "title": "浏览器权限",
+        "summary": "安装时不申请网站权限。可选权限在首次启用对应功能时由 Chrome 请求授权。",
+        "note": "Chrome 不提供只读网站权限，因此显示为“读取和更改”；Palside 仅用于上表所列用途。关闭功能不会撤销权限，撤销请前往“设置 › 隐私与数据”。",
+        "installed": "安装时授予",
+        "optional": "可选",
+        "panel": {
+          "title": "侧栏、存储与设备空闲状态",
+          "detail": "运行侧栏与本机加密；连续 5 分钟无操作时显示为“离开”，仅上报活跃或离开。"
+        },
+        "active": {
+          "title": "当前标签页",
+          "detail": "点击工具栏图标或按截图快捷键时，对该标签页截图。"
+        },
+        "history": {
+          "title": "读取您的浏览记录",
+          "detail": "共享在看与网页识别：仅读取前台标签页的网址和标题，不保存，不读取网页内容。"
+        },
+        "site": {
+          "title": "读取和更改网站数据",
+          "detail": "网页互动（弹幕、信号、便利贴、引用）；可按网站授权，或授权所有网站。"
+        },
+        "notifications": {
+          "title": "显示通知",
+          "detail": "新消息、@ 与回复提醒。"
+        }
+      },
+      "data": {
+        "title": "数据可见范围",
+        "note": "端到端加密保护内容，不隐藏全部元数据。截图仅上传经你确认发送的成图，不含原图及裁剪部分。",
+        "device": {
+          "title": "仅本机",
+          "detail": "助记词、本机密码与零钱私钥；截图原图及编辑过程；草稿；引用定位所用的页面文本索引。"
+        },
+        "squad": {
+          "title": "小队成员",
+          "scope": "端到端加密",
+          "detail": "聊天文字与图片、网页卡片、引用、便利贴、信号，以及共享在看的代币或网页。网页链接去除追踪参数，含登录凭证的链接仅发送站名。服务端仅保存密文。"
+        },
+        "public": {
+          "title": "所有人",
+          "scope": "公开，不加密",
+          "detail": "弹幕、看法及发言者的昵称与头像；招募中小队的公开资料；PALS 链上交易的地址、金额与交易哈希。"
+        },
+        "service": {
+          "title": "Palside 服务",
+          "detail": "账号公钥、小队成员关系、连接时间与 IP；参与弹幕的代币（不含网页地址）；查询名称与图标的代币合约（不记录谁查过）；零钱订单状态；经你确认提交的举报内容。"
+        }
+      },
+      "retention": {
+        "title": "保存期限",
+        "note": "服务器不做备份。Palside 无法收回其他成员另存的副本；链上记录公开且不可删除。",
+        "messages": {
+          "title": "小队消息",
+          "detail": "由队长设定 1、7 或 30 天，或永久，默认永久；图片最长保存 30 天。"
+        },
+        "danmaku": {
+          "title": "弹幕",
+          "detail": "每个代币保留最近 10,000 条，发送者可撤回。"
+        },
+        "votes": {
+          "title": "看法",
+          "detail": "保留至改票、撤回或注销账号。"
+        },
+        "device": {
+          "title": "本机数据",
+          "detail": "草稿保留 7 天；退出登录时清除本机缓存与解密密钥。"
+        }
+      },
+      "thirdParties": {
+        "title": "第三方服务",
+        "services": "小队聊天使用 Palside 自行运营的 Matrix 服务。Alchemy 与 RPC 节点处理经你签名的 PALS 交易，不接触私钥。代币名称与图标由 Palside 服务端从区块链 RPC 节点、IPFS 网关和 Codex 读取并缓存；这些服务只收到服务端发出的合约地址，看不到你的账号、网页或 IP。",
+        "use": "Palside 不出售用户数据，不将其用于广告、信用评估或贷款。Palside 对 Chrome API 所获信息的使用遵守 Chrome 应用商店用户数据政策，包括 Limited Use 要求。"
+      },
+      "choices": {
+        "title": "你的选择与联系方式",
+        "controls": "可在“设置 › 隐私与数据”撤销权限、清除本机缓存。注销账号将删除个人资料及关联，服务端仅保留公钥与注销时间；已上链记录除外。",
+        "contact": "Palside 不面向 18 岁以下用户。隐私问题请联系 palside@pm.me。"
+      }
+    },
+    "terms": {
+      "lead": "使用 Palside 即表示你同意本协议。",
+      "updated": "最后更新：2026 年 11 月 8 日",
+      "service": {
+        "title": "服务说明",
+        "body": "Palside 是桌面 Chrome 侧栏扩展及配套服务，提供小队聊天、共享在看、网页互动、弹幕与 PALS 零钱。服务由 palside 运营，联系邮箱 {email}。使用者须年满 18 岁。个人数据的处理方式见《隐私政策》。"
+      },
+      "account": {
+        "title": "账号与零钱",
+        "body": "助记词在你的设备上生成，同时控制账号与零钱。Palside 不存储、不索要助记词，丢失后无法找回，请自行妥善备份。零钱仅用于 PALS 转账、红包与打赏；Palside 不收取手续费，网络费由 Palside 代付，每日次数有限。链上交易确认后不可撤销；注销账号不会删除链上记录，也不会转移余额。"
+      },
+      "conduct": {
+        "title": "使用规范",
+        "body": "不得利用 Palside 发送垃圾广告，实施诈骗或钓鱼，骚扰或冒充他人，或传播违法、色情、暴力及仇恨内容。你对自己发送的内容负责；队长负责招募资料与小队管理。经审核确认违规的，Palside 可清除公开资料、下架招募、删除弹幕或封禁账号；封禁期限为 7 天、30 天或永久，期间所有设备退出登录。申诉请发送邮件至 {email}。"
+      },
+      "public": {
+        "title": "公开内容",
+        "body": "弹幕、看法及招募中小队的资料对所有人公开，招募资料可被搜索引擎收录。招募结束后，官网页面随即移除；搜索引擎缓存的失效时间由其自行决定。"
+      },
+      "liability": {
+        "title": "免责声明",
+        "body": "服务按现状提供，不保证持续可用或无中断。Palside 不提供买币、兑换或交易服务；代币名称与图标来自区块链上的公开资料与图片服务，不证明项目真实性，美元价格仅供参考，任何信息均不构成投资建议。Palside 与其所显示的第三方网站无关联。消息到期或服务故障后可能无法查看，服务器不做备份。"
+      },
+      "changes": {
+        "title": "变更与终止",
+        "body": "你可随时注销账号以停止使用。本协议更新后将在本页公布并更新日期，更新后继续使用即视为同意更新后的协议。"
       }
     }
   }

@@ -1,13 +1,17 @@
-import { resolveTokenMetadata,tokenName } from './token-page.ts';
-import { identifyPage,normalizeAddress,publicShareUrl,shortAddress,websiteIdentity,type PageIdentity } from '@palside/shared/navigation';
+import { resolveTokenMetadata,tokenName } from './token-name.ts';
+import { identifyPage,normalizeAddress,publicShareUrl,shortAddress,websiteIdentity,type Network,type PageIdentity } from '@palside/shared/navigation';
+import { networkTokenChain } from '@palside/shared/tokens';
 import type { Viewing } from '../../domain/assets/model';
-import { tokenLogoSource,validateTokenLogo } from './token-logo.ts';
 
-export function pageView(identity: Exclude<PageIdentity, { kind: 'pool' }>, metadata?: { name?: string; logo?: string }): Viewing {
-  const name = identity.kind === 'asset' ? resolveTokenMetadata(identity, metadata).name! : metadata?.name || identity.site;
-  const logo = typeof metadata?.logo === 'string' && metadata.logo.startsWith('data:image/') && metadata.logo.length <= 8192
-    ? metadata.logo
-    : tokenLogoSource(metadata?.logo);
+const pageLogo = (value: unknown) => typeof value === 'string' && value.startsWith('data:image/') && value.length <= 8192 ? value : undefined;
+
+/**
+ * A token view carries its identity and a fallback name only: every receiver draws the name and icon from the token
+ * directory. A website view carries its page name and favicon.
+ */
+export function pageView(identity: Extract<PageIdentity, { kind: 'asset' | 'website' }>, metadata?: { name?: string; logo?: string }, via?: Viewing['via']): Viewing {
+  const name = identity.kind === 'asset' ? resolveTokenMetadata(identity, metadata).name : metadata?.name || identity.site;
+  const logo = identity.kind === 'asset' ? undefined : pageLogo(metadata?.logo);
   return {
     version: 1,
     id: `${identity.id}:${identity.kind === 'website' ? identity.disclosure : 'asset'}:${identity.url}`,
@@ -18,11 +22,11 @@ export function pageView(identity: Exclude<PageIdentity, { kind: 'pool' }>, meta
     color: '#e9edf0',
     glyph: identity.kind === 'asset' ? name.slice(0, 1) : identity.host.slice(0, 1).toUpperCase(),
     ...(identity.kind === 'asset'
-      ? { chain: identity.chain, address: identity.address, ...(logo ? { logo } : {}) }
+      ? { chain: identity.chain, address: identity.address, ...(via ? { via } : {}) }
       : { disclosure: identity.disclosure, ...(logo ? { logo } : {}) }),
   };
 }
-/** Pure snapshot validation never looks at a receiver's cache, preferences or public API. */
+/** Pure snapshot validation never looks at a receiver's cache, preferences or public API. Token icons in snapshots are ignored. */
 export function validateView(value: unknown): Viewing | undefined {
   if (!value || typeof value !== 'object') return;
   const v = value as Partial<Viewing>;
@@ -31,21 +35,19 @@ export function validateView(value: unknown): Viewing | undefined {
     if (v.disclosure !== 'site' && v.disclosure !== 'page') return;
     const identity = websiteIdentity(v.url, v.disclosure);
     if (!identity || identity.disclosure !== v.disclosure || (v.disclosure === 'site' ? new URL(v.url).pathname !== '/' || new URL(v.url).search || new URL(v.url).hash : !publicShareUrl(v.url))) return;
-    const logo = typeof v.logo === 'string' && v.logo.startsWith('data:image/') && v.logo.length <= 8192 ? v.logo : undefined;
-    return { ...pageView(identity, { name: v.name, logo }), source: new URL(v.url).hostname };
+    return { ...pageView(identity, { name: v.name, logo: pageLogo(v.logo) }), source: new URL(v.url).hostname };
   }
-  if (v.kind !== 'asset') return;
+  if (v.kind !== 'asset' || typeof v.chain !== 'string' || !(v.chain in networkTokenChain)) return;
   let host: string; try { host = new URL(v.url).hostname; } catch { return; }
-  const source = identifyPage(v.url, [host]);
-  if (!source || source.kind !== 'asset' || source.chain !== v.chain) return;
-  const address = normalizeAddress(source.chain, v.address ?? '');
-  if (!address || address !== source.address) return;
-  const name = v.name.trim();
-  const safe = tokenName(name) ?? shortAddress(address);
-  return pageView({ kind: 'asset', chain: source.chain, address, host, site: source.site, url: source.url, id: `${source.chain}:${address}` }, { name: safe, logo: tokenLogoSource(v.logo) });
+  const source = identifyPage(v.url, [host]), chain = v.chain as Network;
+  const address = normalizeAddress(chain, v.address ?? '');
+  if (!source || !address) return;
+  // A token page must name this token; a pool page must be on its chain; a chainless contract page must name this contract.
+  // Which token a pool trades is the sender's server answer; receivers draw its name and icon from the directory either way.
+  if (source.kind === 'asset' ? source.chain !== chain || source.address !== address : source.kind === 'pool' ? source.chain !== chain
+    : source.kind !== 'address' || chain === 'Solana' || source.address !== address) return;
+  const safe = tokenName(v.name.trim()) ?? shortAddress(address);
+  const via = source.kind === 'pool' || source.kind === 'address' ? source.kind : undefined;
+  return pageView({ kind: 'asset', chain, address, host, site: source.site, url: source.url, id: `${chain}:${address}` }, { name: safe }, via);
 }
-export async function readView(value: unknown): Promise<Viewing | undefined> {
-  const view = validateView(value); if (!view) return;
-  if (view.kind === 'asset' && view.logo) view.logo = await validateTokenLogo(view.logo);
-  return view;
-}
+export async function readView(value: unknown): Promise<Viewing | undefined> { return validateView(value); }

@@ -55,7 +55,7 @@ export function startWorker(browser, env = {}) {
   return startBackground({
     browser,
     websiteUrl: 'http://localhost:3000',
-    createTabObserver: () => ({ refresh: async () => {}, metadataChanged() {}, dispose() {} }),
+    createTabObserver: () => ({ refresh: async () => {}, dispose() {} }),
     openPage: async () => {},
     ...env,
   });

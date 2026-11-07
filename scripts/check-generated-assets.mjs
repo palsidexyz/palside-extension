@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isMain, validateRelativePath } from './lib/release-files.mjs';
 import { licenseBundle, licenseHosts, verifyThirdPartyLicenses } from './third-party-licenses.mjs';
 import { assetFolders, hostAssets, presentHosts } from './lib/site-assets.mjs';
-import { brandIconSizes, renderBrandPng } from './lib/brand-assets.mjs';
+import { brandIconSizes, renderBrandPng, renderTokenPng } from './lib/brand-assets.mjs';
 
 const project = fileURLToPath(new URL('../', import.meta.url));
 
@@ -65,7 +65,10 @@ async function checkGeneratedAssets(root = project) {
       }
       for (const host of hosts) {
         const files = hostAssets[host][folder];
-        await checkFolder(join(root, 'apps', host, 'public', output), files === 'all' ? expected : new Map(files.map(file => [file, expected.get(file)])));
+        const wanted = files === 'all' ? new Map(expected) : new Map(files.map(file => [file, expected.get(file)]));
+        // The website also serves the PALS token image that sync-site-assets renders from the brand master.
+        if (host === 'website' && folder === 'brand') wanted.set('pals-token.png', await renderTokenPng((await readFile(join(source, 'palside.svg'))).toString('utf8')));
+        await checkFolder(join(root, 'apps', host, 'public', output), wanted);
       }
     } catch (error) { failures.push(`SOURCE ${folder}: ${error.message}`); }
   }

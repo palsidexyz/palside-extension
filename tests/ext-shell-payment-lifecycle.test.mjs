@@ -29,6 +29,7 @@ function production() {
   const Button = ({ children, loading, ...props }) => h('button', { ...omit(props, ['variant', 'size']), disabled: props.disabled || loading }, children);
   const IconButton = ({ label, ...props }) => h(Button, { ...props, 'aria-label': label });
   const motionTags = new Map();
+  const coinsStub = { node: null, burst: () => {}, raise: () => {}, pocket: async () => {}, pending: () => false, drop: () => {} };
   const modules = {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => translate, useLocale: () => 'en' },
@@ -56,6 +57,8 @@ function production() {
     '../ui/primitives': { PersonAvatar: () => null, Token: () => null },
     '../ui/text': { useText: () => value => value },
     '../ui/motion-details': { Count: ({ value }) => value, CountText: ({ text }) => text, Dots: () => 'pending', DrawnCheck: () => 'confirmed', Fit: pass, Rise: pass, Step: pass, Swap: pass },
+    // Coin flight is DOM animation; the lifecycle under test only needs a hook with nothing in flight.
+    './packet-coins': { usePacketCoins: () => coinsStub },
     './amount': { AnimatedAmount: ({ value }) => value, PalsAmount: ({ value }) => value, formatPals: value => String(Number(value) / 1e18) },
     './recovery-state': { recordLabels: { transfer: 'transfer', tip: 'tip', packet: 'packet' }, recoveryLabel: () => 'review' },
     '@number-flow/react': { __esModule: true, default: ({ value }) => value },

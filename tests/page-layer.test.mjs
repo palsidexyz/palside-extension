@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { abbreviate, sameAddress, caption, quoteContext } from '../apps/extension/src/page-layer/text.ts';
 import { defaultDanmakuSettings, normalizeDanmakuSettings } from '../apps/extension/src/runtime/browser/page-protocol.ts';
-import { fallbackDanmakuArea, createMediaClock } from '../apps/extension/src/page-layer/danmaku-helpers.ts';
+import { danmakuAreaRect, createMediaClock } from '../apps/extension/src/page-layer/danmaku-helpers.ts';
 
 test('abbreviated addresses compare by first six and last four characters', () => {
   assert.equal(abbreviate('0x12ab34567890cd34'), '0x12ab…cd34');
@@ -26,7 +26,7 @@ test('quote context keeps exact text and up to 24 characters around it', () => {
 
 test('danmaku settings validate defaults and clamp opacity', () => {
   assert.deepEqual(normalizeDanmakuSettings(undefined), defaultDanmakuSettings);
-  assert.deepEqual(normalizeDanmakuSettings({ enabled: false, area: 'full', speed: 190, opacity: 120 }), { enabled: false, area: 'full', density: 'mid', speed: 190, size: 'md', opacity: 100 });
+  assert.deepEqual(normalizeDanmakuSettings({ enabled: false, area: 'full', speed: 190, opacity: 120 }), { enabled: false, area: 100, density: 'mid', speed: 190, size: 'md', opacity: 100 });
   assert.deepEqual(normalizeDanmakuSettings({ area: 'bad', speed: 3, opacity: 1 }), { ...defaultDanmakuSettings, opacity: 30 });
 });
 
@@ -37,9 +37,19 @@ test('danmaku sizes accept supported values and default missing or invalid setti
   assert.equal(normalizeDanmakuSettings(null).size, 'md');
 });
 
-test('danmaku area fallback occupies the top quarter of the viewport', () => {
-  assert.deepEqual(fallbackDanmakuArea(800, 600), { top: 0, left: 0, width: 800, height: 150 });
-  assert.deepEqual(fallbackDanmakuArea(800, 600, 'full'), { top: 0, left: 0, width: 800, height: 600 });
+test('danmaku area is a band from the top of the viewport, a quarter by default', () => {
+  assert.deepEqual(danmakuAreaRect(800, 600), { top: 0, left: 0, width: 800, height: 150 });
+  assert.deepEqual(danmakuAreaRect(800, 600, 50), { top: 0, left: 0, width: 800, height: 300 });
+  assert.deepEqual(danmakuAreaRect(800, 600, 75), { top: 0, left: 0, width: 800, height: 450 });
+  assert.deepEqual(danmakuAreaRect(800, 600, 100), { top: 0, left: 0, width: 800, height: 600 });
+});
+
+test('stored danmaku areas from earlier builds map onto the viewport bands', () => {
+  assert.equal(normalizeDanmakuSettings({ area: 'chart' }).area, 25);
+  assert.equal(normalizeDanmakuSettings({ area: 'top' }).area, 25);
+  assert.equal(normalizeDanmakuSettings({ area: 'full' }).area, 100);
+  assert.equal(normalizeDanmakuSettings({ area: 75 }).area, 75);
+  assert.equal(normalizeDanmakuSettings({ area: 40 }).area, 25);
 });
 
 

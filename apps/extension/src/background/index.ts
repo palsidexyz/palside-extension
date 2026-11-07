@@ -72,7 +72,7 @@ export function startBackground(env: BackgroundEnv) {
 
   browser.runtime.onInstalled.addListener(details => {
     if (details.reason !== 'install') return;
-    void bg.language.get().then(({ locale }) => browser.tabs.create({ url: `${env.websiteUrl.replace(/\/$/, '')}/${locale}/installed` })).catch(() => {});
+    void browser.tabs.create({ url: browser.runtime.getURL('/welcome.html') }).catch(() => {});
   });
 
   // The website asks to open an invitation or a team page in the panel.
@@ -136,7 +136,6 @@ export function startBackground(env: BackgroundEnv) {
         case 'palside/state-patch': bg.sync.acceptPatch(message.patch); return;
         case 'palside/notify': void bg.notifications.notify((message.payload ?? {}) as NotificationIdentity).catch(() => {}); return;
         case 'palside/signal-current': return answer(bg.signals.signalCurrent(message.token).then(ok => ({ ok })), () => ({ ok: false }));
-        case 'palside/token-page': return answer(bg.sharing.readTokenPage(message.request).then(metadata => ({ metadata })), () => ({}));
         case 'palside/foreground': return answer(bg.sharing.sharedPageVisible(message.url).then(visible => ({ visible })), () => ({ visible: false }));
       }
       return;
@@ -182,7 +181,6 @@ export function startBackground(env: BackgroundEnv) {
     if (tab.active) void bg.roomTab.refresh();
     if (tab.active && [...bg.panels.values()].includes(tab.windowId)) {
       if (change.url || change.status) void bg.sharing.observer.refresh(false, !change.url && change.status === 'complete');
-      else if (change.title !== undefined) bg.sharing.observer.metadataChanged();
     }
   });
   browser.tabs.onRemoved.addListener((tabId, { windowId }) => {

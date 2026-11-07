@@ -2,7 +2,8 @@ import { message as uiMessage,MessageError } from '@palside/i18n';
 import { pageView } from './view-snapshot';
 import { type Viewing } from '../../domain/assets/model';
 import { identifyPage,websiteIdentity,type PageIdentity } from '@palside/shared/navigation';
-import { resolveTokenMetadata } from './token-page';
+import { resolveTokenMetadata } from './token-name';
+import { TOKEN_NAME_WAIT_MS } from './sharing';
 import { tokenNamed } from './token-profiles.ts';
 import { assetKey } from '../../domain/annotations/interaction.ts';
 import type { Command } from '../transport/command-map';
@@ -34,9 +35,8 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
       }
       const input = p.identity as PageIdentity | undefined;
       const prefs = runtime.state.preferences;
-      const identity = input?.url && typeof p.host === 'string' ? identifyPage(input.url, [p.host]) : null;
-      if (!identity || !runtime.sharing.mayObserve()) return;
-      if (p.metadata && identity.kind === 'asset') { await runtime.sharing.refreshTokenMetadata(identity, p.context); return; }
+      const parsed = input?.url && typeof p.host === 'string' ? identifyPage(input.url, [p.host]) : null;
+      if (!parsed || !runtime.sharing.mayObserve()) return;
       const preview = p.preview === true;
       runtime.sharing.pagePreview = preview;
       const previousPage = runtime.sharing.page;
@@ -47,9 +47,14 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
       const controller = new AbortController();
       runtime.sharing.pageRequest = controller;
       const current = () => !controller.signal.aborted && runtime.auth.session === session && runtime.sharing.pageObservation === observation && runtime.state.preferences.current === teamId && runtime.sharing.mayObserve();
-      if (!preview && (!await runtime.foreground(identity.url) || !current())) return;
+      if (!preview && (!await runtime.foreground(parsed.url) || !current())) return;
+      // A pool or chainless contract page is its token once the server answers; a known answer is immediate.
+      const lookup = parsed.kind === 'pool' || parsed.kind === 'address' ? parsed : undefined;
+      const looked = lookup ? await runtime.sharing.pageToken(lookup, controller.signal) : undefined;
+      if (!current()) return;
+      const identity = looked ?? parsed, via = looked ? lookup!.kind : undefined;
       runtime.sharing.pageSince = Date.now();
-      // Publishing waits for the token's name, so teammates never see the address placeholder first.
+      // Publishing waits up to TOKEN_NAME_WAIT_MS for the token directory, so teammates rarely see the address placeholder first.
       const accept = async (view: Viewing | undefined, publish = true) => {
         if (!view || !current()) return;
         if (!preview && (!await runtime.foreground(identity.url) || !current())) return;
@@ -63,25 +68,31 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
           runtime.sharing.viewingTimer = setTimeout(() => { void runtime.sharing.publishViewing().catch(() => {}); }, 5);
         }
       };
-      const fallback = identity.kind === 'pool' ? websiteIdentity(identity.url)! : identity;
+      const fallback = identity.kind === 'asset' || identity.kind === 'website' ? identity : websiteIdentity(identity.url)!;
       const asset = identity.kind === 'asset' ? assetKey(identity.chain, identity.address) : undefined;
-      // The token cache is keyed by asset, so a page seen earlier shows its name at once.
-      const cached = identity.kind === 'asset' ? runtime.sharing.cachedToken(identity) : undefined;
+      // The token record is keyed by asset, so a token seen earlier shows its name at once.
+      const known = asset ? runtime.tokens.get(asset) : undefined;
+      const tokenPage = () => pageView(fallback, identity.kind === 'asset' ? resolveTokenMetadata(identity, runtime.tokens.get(asset)) : undefined, via);
       const reused = previousPage?.url === fallback.url && previousPage.kind === fallback.kind ? previousPage : undefined;
-      const previewView = reused && (tokenNamed(reused) || !cached) ? reused
-        : pageView(fallback, identity.kind === 'asset' ? resolveTokenMetadata(identity, cached) : undefined);
-      const named = tokenNamed(previewView);
-      if (asset && !named) runtime.state.tokenPending = asset;
-      await accept(previewView, named || identity.kind !== 'asset');
-      if (preview || identity.kind !== 'asset') return;
+      const previewView = reused && (tokenNamed(reused) || !known) ? reused : tokenPage();
+      const named = tokenNamed(previewView), answered = !asset || runtime.tokens.answered(asset);
+      if (asset && !answered && !named) runtime.state.tokenPending = asset;
+      await accept(previewView, answered || named);
+      if (preview || !asset || answered) return;
       void (async () => {
-        // A cached name needs one confirming read, not the late-header retries.
-        const local = await runtime.sharing.localTokenMetadata(identity, p.context, 'viewing', controller.signal, named ? 1 : 3);
+        const settled = runtime.directory.ensure(asset);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const late = await Promise.race([settled.then(() => false), new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(true), TOKEN_NAME_WAIT_MS); })]);
+        clearTimeout(timer);
         if (!current()) return;
         if (runtime.state.tokenPending === asset) runtime.state.tokenPending = undefined;
-        if (local) await accept(pageView(identity, resolveTokenMetadata(identity, local)));
-        // No name on the page: publish what is known, once.
-        else if (!named) await accept(previewView);
+        if (!late) { const next = tokenPage(); if (!named || next.name !== previewView.name) await accept(next); else runtime.emit(); return; }
+        // No answer in time: publish what is known, then at most one correction when the directory answers.
+        if (!named) await accept(previewView);
+        await settled;
+        if (!current()) return;
+        const next = tokenPage();
+        if (next.name !== runtime.sharing.page?.name) await accept(next);
       })().catch(() => {});
       return;
 }

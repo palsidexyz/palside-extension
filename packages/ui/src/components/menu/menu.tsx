@@ -1,6 +1,6 @@
 "use client";
 
-import { type ComponentPropsWithRef, type KeyboardEvent, type ReactNode } from "react";
+import { useImperativeHandle, type ComponentPropsWithRef, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { clsx } from "clsx";
 import { PopoverLayer, PopoverRoot, PopoverTrigger, usePopoverContext, type PopoverContentProps, type PopoverProps, type PopoverTriggerProps } from "../popover/popover";
 import styles from "./menu.module.css";
@@ -18,6 +18,23 @@ export type MenuTriggerProps = PopoverTriggerProps;
 
 export function MenuTrigger(props: MenuTriggerProps) {
   return <PopoverTrigger {...props} />;
+}
+
+export type MenuOpenerHandle = {
+  /** Opens the menu at a viewport point. `held`: a mouse button is still down (a context menu on press), so it opens on release, which would otherwise dismiss it. */
+  openAt: (x: number, y: number, held?: boolean) => void;
+};
+
+/** Lets an area other than the trigger open this menu at the pointer, as its context menu; focus returns to the trigger as usual. */
+export function MenuOpener({ ref }: { ref: Ref<MenuOpenerHandle> }) {
+  const { openAt, pointerOpenRef } = usePopoverContext();
+  useImperativeHandle(ref, () => ({
+    openAt(x, y, held = false) {
+      const open = () => { pointerOpenRef.current = true; openAt(x, y); };
+      if (held) addEventListener("pointerup", open, { once: true, capture: true }); else open();
+    },
+  }), [openAt, pointerOpenRef]);
+  return null;
 }
 
 export type MenuContentProps = PopoverContentProps;

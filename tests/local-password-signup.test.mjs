@@ -23,15 +23,16 @@ test('cancelling during PoW prevents any registration request and clears its wai
   t.mock.timers.tick(MINUTE_MS); await drain(); assert.equal(fetched, 0); assert.equal(slow, 0);
 });
 
-test('signup refreshes the announced bits and exposes then clears the waiting state', async () => {
+test('signup refreshes the announced bits, reports each phase, and exposes then clears the waiting state', async () => {
   let pending, finish; const calls = [], states = [];
   const { passwordSetCommand } = productionModules({ sealMnemonic: async () => ({}), isValidPin: () => true })('apps/extension/src/runtime/account/command-handlers.ts');
   const attempt = { signal: new AbortController().signal, current: () => true, check() {}, wait: p => p };
-  const runtime = { state: { setup: 'password', config: { signupDifficulty: 19 } }, auth: { mnemonic: 'words', pendingIdentity: { secretKey: new Uint8Array(32) }, authMode: 'create', authenticationScope: () => attempt, finishCleanup: async () => {}, scope: () => attempt }, api: { async request(id, input) { calls.push(id); if (id === 'system.config') return { signupDifficulty: 21 }; pending = input; return new Promise(resolve => { finish = resolve; }); } }, storage: { put: async () => {}, putMany: async () => {}, remove: async () => {} }, wallet: { start: async () => {} }, emit: () => states.push(runtime.state.signupWaiting) };
+  const runtime = { state: { setup: 'password', config: { signupDifficulty: 19 } }, auth: { mnemonic: 'words', pendingIdentity: { secretKey: new Uint8Array(32) }, authMode: 'create', authenticationScope: () => attempt, finishCleanup: async () => {}, scope: () => attempt }, api: { async request(id, input) { calls.push(id); if (id === 'system.config') return { signupDifficulty: 21 }; pending = input; return new Promise(resolve => { finish = resolve; }); } }, storage: { put: async () => {}, putMany: async () => {}, remove: async () => {} }, wallet: { start: async () => {} }, emit: () => states.push({ waiting: runtime.state.signupWaiting, phase: runtime.state.signupPhase }) };
   runtime.auth.connect = async session => { runtime.auth.session = session; runtime.auth.client = {}; runtime.auth.cryptoInitialised = true; };
   const work = passwordSetCommand.call({ runtime }, { payload: { password: '123456' } });
   await drain(); assert.deepEqual(calls, ['system.config', 'accounts.create']); assert.equal(pending.difficulty, 21);
   pending.onProofOfWorkSlow(); assert.equal(runtime.state.signupWaiting, true);
   finish({ account: { id: 'alice', nickname: 'Alice' }, token: 'token', matrix: {} }); await work;
-  assert.equal(runtime.state.signupWaiting, undefined); assert.equal(states[0], true);
+  assert.equal(runtime.state.signupWaiting, undefined); assert.ok(states.some(state => state.waiting === true));
+  assert.deepEqual([...new Set(states.map(state => state.phase).filter(Boolean))], ['seal', 'register', 'connect', 'wallet']); assert.equal(runtime.state.signupPhase, undefined);
 });

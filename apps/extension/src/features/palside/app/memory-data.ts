@@ -14,8 +14,7 @@ const [localFavorites, setLocalFavorites] = useState<Favorites>(emptyFavorites);
 const [localDrafts, setDrafts] = useState<Record<string, Draft>>({});
 const [localShare, setLocalShare] = useState(false);
 const [localSites, setLocalSites] = useState<string[]>(['gmgn.ai', 'dexscreener.com']);
-const [localTokenOff, setLocalTokenOff] = useState<string[]>([]);
 const [localOffline, setOffline] = useState(scenario === 'offline');
 const [localViewingId, setViewingId] = useState(data.people.find(p => p.id === data.self)?.viewing);
-  return { localPeople, setPeople, localTeams, setTeams, localMessages, setMessages, localAllRequests, setRequests, localCurrent, setCurrent, localSiteInteraction, setLocalSiteInteraction, localFavorites, setLocalFavorites, localDrafts, setDrafts, localShare, setLocalShare, localSites, setLocalSites, localTokenOff, setLocalTokenOff, localOffline, setOffline, localViewingId, setViewingId };
+  return { localPeople, setPeople, localTeams, setTeams, localMessages, setMessages, localAllRequests, setRequests, localCurrent, setCurrent, localSiteInteraction, setLocalSiteInteraction, localFavorites, setLocalFavorites, localDrafts, setDrafts, localShare, setLocalShare, localSites, setLocalSites, localOffline, setOffline, localViewingId, setViewingId };
 }

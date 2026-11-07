@@ -13,7 +13,7 @@ import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import { openTransfer } from '../wallet/payment-sheet';
 import card from './person-card.module.css';
-import { TokenName } from '../assets/token-name';
+import { TokenName,tokenWaiting } from '../assets/token-name';
 import { liveView } from '../assets/token-data';
 
 const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
@@ -67,7 +67,7 @@ export function PersonCard({ c }: { c: PalsideController }) {
     </div>}
     {view && <button type="button" className={card.watching} onClick={() => { close(); c.selectAsset(view.id); }}>
       <small>{t('extension.web.viewing')}</small>
-      <span className={card.watchingRow}><Token view={view} size="sm" /><b><TokenName c={c} view={view} /></b><em>{view.source || hostOf(view.url)}</em><ChevronRight size={16} aria-hidden="true" /></span>
+      <span className={card.watchingRow}><Token view={view} size="sm" waiting={tokenWaiting(c, view)} /><b><TokenName c={c} view={view} /></b><em>{view.source || hostOf(view.url)}</em><ChevronRight size={16} aria-hidden="true" /></span>
     </button>}
     {self ? <div className={card.actions} data-single>
       <button type="button" className={card.action} onClick={() => { close(); c.go('profile'); }}><PenLine size={18} /><span>{t('extension.copy.editProfile')}</span></button>

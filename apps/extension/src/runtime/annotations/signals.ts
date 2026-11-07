@@ -81,7 +81,7 @@ export const WHEEL_SLOTS = 8;
 export const signalModifiers = ['Control', 'Alt', 'Shift'] as const;
 export type SignalModifier = typeof signalModifiers[number];
 export type SignalSettings = { size: 'sm' | 'md' | 'lg'; emoteSize: 'sm' | 'md' | 'lg'; wheelSize: 'sm' | 'md' | 'lg'; sound: boolean; volume: number; key: SignalModifier[]; wheel: WheelEntry[] };
-export const defaultSignalSettings: SignalSettings = { size: 'md', emoteSize: 'md', wheelSize: 'md', sound: false, volume: 30, key: ['Alt'], wheel: [...defaultWheel] };
+export const defaultSignalSettings: SignalSettings = { size: 'md', emoteSize: 'md', wheelSize: 'md', sound: true, volume: 30, key: ['Alt'], wheel: [...defaultWheel] };
 export const isEmote = (entry: string) => (signalEmotes as readonly string[]).includes(entry);
 /** A wheel entry's still, relative to the extension's signals/ directory. */
 export const wheelIcon = (entry: WheelEntry) => isEmote(entry) ? `thumbs/${entry}.webp` : `art/${entry}.svg`;
@@ -100,7 +100,7 @@ export function normalizeWheel(value: unknown): WheelEntry[] {
 export function normalizeSignalSettings(value: unknown): SignalSettings {
   const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const size = (key: string) => input[key] === 'sm' || input[key] === 'lg' ? input[key] : 'md';
-  return { size: size('size'), emoteSize: size('emoteSize'), wheelSize: size('wheelSize'), sound: input.sound === true, volume: typeof input.volume === 'number' && Number.isFinite(input.volume) ? Math.max(0, Math.min(100, Math.round(input.volume))) : 30, key: normalizeSignalKey(input.key) ?? ['Alt'], wheel: normalizeWheel(input.wheel) };
+  return { size: size('size'), emoteSize: size('emoteSize'), wheelSize: size('wheelSize'), sound: input.sound !== false, volume: typeof input.volume === 'number' && Number.isFinite(input.volume) ? Math.max(0, Math.min(100, Math.round(input.volume))) : 30, key: normalizeSignalKey(input.key) ?? ['Alt'], wheel: normalizeWheel(input.wheel) };
 }
 export function readSignal(value: unknown, now = Date.now()): SignalPayload | undefined {
   if (!value || typeof value !== 'object') return;

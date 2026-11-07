@@ -48,6 +48,7 @@ function chat(messages, payments = [], overrides = {}) {
   const timers = clock();
   const { SendFlights } = productionModules(timers)(`${base}send-flight.ts`);
   const flights = new SendFlights();
+  const { interleaveTimed } = productionModules(timers)('apps/extension/src/domain/chat/order.ts');
   const input = { closest: () => ({}), checkVisibility: () => false };
   let refs = 0;
   const context = {
@@ -57,7 +58,7 @@ function chat(messages, payments = [], overrides = {}) {
     useMemo: fn => fn(), useCallback: fn => fn, useLayoutEffect() {}, useEffect() {},
     useChatTimeline: () => ({ sendIntent: () => () => false }), unreadMentions: () => [],
     useTopCard: () => undefined, useAway: () => ({}), showsNewTeam: () => false, panelTabsShown: () => false, NewTeam: 'NewTeam', SendFlights: function () { return flights; },
-    captureComposer: () => ({}), MINUTE_MS: 60 * 1000,
+    captureComposer: () => ({}), interleaveTimed, MINUTE_MS: 60 * 1000,
     s: new Proxy({}, { get: (_, key) => key }), navigation: {},
     ...Object.fromEntries(['MessageItem', 'TeamPaymentCard', 'SendFlightContext', 'ReactionStage', 'ChatHeader', 'WatchStrip', 'MoreTeamPayments', 'AnimatePresence', 'FloatingDate', 'Composer', 'ReadonlyDraft'].map(name => [name, name])),
     ...overrides,
@@ -86,6 +87,19 @@ test('merged entries own date boundaries, row keys, and adjacency including reca
     useState: initial => [typeof initial === 'function' ? (initial().constructor.name === 'Set' ? new Set(['recall']) : initial()) : initial, () => {}],
   });
   assert.equal(nodes(dissolving.tree, n => n.props.message?.id === 'last')[0].props.grouped, false);
+});
+
+test('a confirmed send keeps its row and key ahead of later pending sends whose written time is earlier', () => {
+  // A confirmed with a service time after B and C were written; the runtime order is A, B, C and the rows must follow it.
+  const at = new Date(2026, 9, 29, 12).getTime();
+  const { tree } = chat([
+    message('$a', at + 3_000, { author: 'self', clientId: 'a' }),
+    message('b', at + 100, { author: 'self', status: 'sending' }),
+    message('c', at + 200, { author: 'self', status: 'sending' }),
+  ], [{ id: 'paid', timestamp: at + 9_000 }]);
+  const rows = nodes(tree, n => ['MessageItem', 'TeamPaymentCard'].includes(n.type));
+  assert.deepEqual(rows.map(n => n.props.key), ['message-a', 'payment-paid', 'message-b', 'message-c']);
+  assert.equal(nodes(tree, n => n.props.className === 'day').length, 1);
 });
 
 test('send completion removes only its abandoned flight on false results and rejection', async () => {

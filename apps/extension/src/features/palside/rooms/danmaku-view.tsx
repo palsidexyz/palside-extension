@@ -27,8 +27,8 @@ import { type Person } from '../../../domain/account/model';
 import { openRoom, roomPerson, roomView, roomsOn, tabRoomKey, teammateIds, useRoomRead, useRoomOpening, useRoomDrafts, roomQuoteReturn, tokenSiteChoice, openTokenSite, useShownRoomKey } from './rooms';
 import type { Viewing } from '../../../domain/assets/model';
 import { DanmakuIcon, HotIcon } from '../ui/icons';
-import { SiteLogo } from '../assets/site-logo';
-import { openSiteSheet, pageSite, pageUnusable, SiteFace } from '../viewing/page-key';
+import { SiteFace, SiteLogo } from '../assets/site-logo';
+import { openSiteSheet, pageSite, pageUnusable } from '../viewing/page-key';
 import { siteAllows } from '../../../domain/annotations/interaction';
 import type { Site } from '../settings/site-catalog';
 import { StancePoll } from './stance-poll';
@@ -43,7 +43,7 @@ import d from './danmaku.module.css';
 import { EmptyState } from '../chat/history-scope';
 import { ConnectionState, pageIssue } from '../feedback/session-notice';
 import { whenWalletOpen } from '../wallet/closed';
-import { TokenName,tokenLabel } from '../assets/token-name';
+import { TokenName,tokenLabel,tokenWaiting } from '../assets/token-name';
 import { tokenStats } from '../assets/token-data';
 
 /** Today as hour:minute, earlier days as the short date and time. */
@@ -84,7 +84,7 @@ export function DanmakuView({ c }: { c: PalsideController }) {
     {!offline && <RoomToolbar c={c} roomKey={key} room={room} />}
     {key && !offline && <RoomPayments c={c} roomKey={key} />}
     <SwitchRow c={c} shown={key} />
-    {!offline && opening?.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => openRoom(c, opening.key, opening.profile) }}>{t('common.error')}</InlineFeedback>}
+    {!offline && opening?.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => openRoom(c, opening.key) }}>{t('common.error')}</InlineFeedback>}
     {!key ? <Skeleton /> : offline ? <ConnectionState c={c} /> : room ? <RoomList key={room.key} c={c} room={room} /> : opening?.status !== 'error' ? <div className={d.empty}><p>{t('extension.copy.loading')}</p></div> : null}
     {room && !offline ? <RoomBar key={`bar-${room.key}`} c={c} room={room} drafts={drafts} /> : <IdleBar />}
     <AnimatePresence initial={false}>{!key && <Frost key="frost" c={c} reason={gate ? 'gate' : unusable ? 'unusable' : 'idle'} />}</AnimatePresence>
@@ -96,7 +96,7 @@ function RoomToolbar({ c, roomKey, room }: { c: PalsideController; roomKey?: str
   const t = useTranslations();
   const view = roomKey ? roomView(c, roomKey) : undefined;
   // On this token's own page the site button would only repeat where the browser already is.
-  const choice = view && tabRoomKey(c) !== roomKey ? tokenSiteChoice(c, view, room?.profile?.site) : undefined;
+  const choice = view && tabRoomKey(c) !== roomKey ? tokenSiteChoice(c, view, room?.site) : undefined;
   return <div className={d.toolbar}>
     <StancePoll c={c} roomKey={room?.key} stance={room?.stance} />
     {view && choice?.site && <TokenSites c={c} view={view} sites={choice.sites} site={choice.site} />}
@@ -161,7 +161,7 @@ function SwitchRow({ c, shown }: { c: PalsideController; shown?: string }) {
   if (!c.live?.page?.access.site) return null;
   const view = roomView(c, key);
   return <div className={d.switchRow}>
-    <Token view={view} size="sm" /><strong><TokenName c={c} view={view} /></strong>
+    <Token view={view} size="sm" waiting={tokenWaiting(c, view)} /><strong><TokenName c={c} view={view} /></strong>
     <Button size="sm" variant="surface" className={d.switchButton} onClick={() => { void c.run('room-close'); }}>{t('extension.room.switch')}</Button>
   </div>;
 }
@@ -302,7 +302,6 @@ function showPerson(c: PalsideController, person: Person & { mate: boolean }, me
 function LineMenu({ c, message, name, self }: { c: PalsideController; message: RoomMessage; name: string; self: boolean }) {
   const t = useTranslations();
   const [tipping, setTipping] = useState(false);
-  const token = c.live?.state.rooms.current?.profile?.name ?? '';
   function quote() {
     const room = c.live?.state.rooms.current;
     const view = room && roomView(c, room.key);
@@ -310,7 +309,7 @@ function LineMenu({ c, message, name, self }: { c: PalsideController; message: R
     const { owns, back } = roomQuoteReturn(c, room.key);
     // A token known only by its room key has no page to point at: the line goes in as text.
     if (!view?.url) {
-      const line = t('extension.room.quoteLine', { text: message.text, name, room: token });
+      const line = t('extension.room.quoteLine', { text: message.text, name, room: view?.name ?? '' });
       c.updateDraft({ text: c.draft.text ? `${line}\n${c.draft.text}` : `${line}\n` }); back(); return;
     }
     const target = { kind: 'danmaku' as const, id: message.id, author: message.author.id, name: message.author.nickname, at: message.createdAt };
@@ -505,7 +504,7 @@ export function RoomPeople({ c }: { c: PalsideController }) {
   const view = roomView(c, key);
   const drawn = (people?.people ?? []).map(person => roomPerson(c, person, t('common.member'), mates)).sort((a, b) => Number(b.mate) - Number(a.mate));
   return <>
-    <div className={d.peopleHead}><Token view={view} size="sm" /><span className={d.peopleText}><strong><TokenName c={c} view={view} /></strong><small>{(count => <CountText text={t('extension.room.watching', { count })} value={count} />)(tokenStats(c, key)?.count ?? people?.count ?? 0)}</small></span><Faces c={c} people={tokenStats(c, key)?.faces ?? []} /></div>
+    <div className={d.peopleHead}><Token view={view} size="sm" waiting={tokenWaiting(c, view)} /><span className={d.peopleText}><strong><TokenName c={c} view={view} /></strong><small>{(count => <CountText text={t('extension.room.watching', { count })} value={count} />)(tokenStats(c, key)?.count ?? people?.count ?? 0)}</small></span><Faces c={c} people={tokenStats(c, key)?.faces ?? []} /></div>
     {read.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback>}
     {drawn.length ? <SettingGroup title={t('extension.room.speakers')}>{drawn.map(person => <button key={person.id} type="button" className={d.personRow} onClick={() => showPerson(c, person)}>
       <PersonAvatar person={person} size="sm" />

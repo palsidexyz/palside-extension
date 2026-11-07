@@ -1,6 +1,7 @@
 /* The name slot keeps its line box while a token's name is read, so nothing shifts when it arrives. */
-.pending { display:inline-block; width:5.5em; max-width:100%; height:.8em; vertical-align:-.05em; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); animation:pendingPulse 1.4s var(--ui-ease-feedback) infinite alternate; }
+/* Recess, not the chip's surface, so the bar shows on any row; one light sweep runs across it in step with the token face (palside.module.css). */
+.pending { display:inline-block; width:4.6em; max-width:100%; height:.72em; vertical-align:-.02em; border-radius:var(--ui-radius-pill); background:linear-gradient(100deg, var(--ui-control-recess) 30%, color-mix(in srgb, var(--ui-control-recess) 45%, var(--ui-canvas)) 50%, var(--ui-control-recess) 70%) 0 0 / 300% 100%; animation:pendingSweep 1.6s linear infinite; }
 .arrived { animation:nameArrive 240ms var(--ui-ease-feedback) both; }
-@keyframes pendingPulse { from { opacity:1; } to { opacity:.45; } }
+@keyframes pendingSweep { from { background-position:100% 0; } to { background-position:-50% 0; } }
 @keyframes nameArrive { from { opacity:0; filter:blur(2px); } to { opacity:1; filter:blur(0); } }
 @media (prefers-reduced-motion:reduce) { .pending { animation:none; } .arrived { animation:none; } }

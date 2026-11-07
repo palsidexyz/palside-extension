@@ -1,7 +1,6 @@
 import { parseCommand } from '../transport/command-map';
 import { Api } from '../transport/api';
 import { ClientStorage } from '../storage/storage';
-import type { TokenPageReader } from '../viewing/token-page';
 import { API_URL } from './config';
 import type { RuntimeState } from './runtime-state';
 import { emptyState } from './state';
@@ -11,6 +10,8 @@ import { SessionRuntime } from '../account/session-lifecycle';
 import { LocalDataRuntime } from '../media/cache';
 import { SharingRuntime } from '../viewing/sharing';
 import { TokenProfiles } from '../viewing/token-profiles.ts';
+import { TokenDirectoryClient } from '../viewing/token-directory.ts';
+import { PageResolver } from '../viewing/page-resolver.ts';
 import { viewAsset } from '../../domain/annotations/interaction.ts';
 import { TimelineRuntime } from '../chat/timeline';
 import { SendingRuntime } from '../chat/sending';
@@ -27,13 +28,24 @@ export class PalsideService {
   readonly storage: ClientStorage;
   readonly notify: (payload: Record<string, unknown>) => Promise<void>;
   readonly foreground: (url: string) => Promise<boolean>;
-  readonly tokenPage: TokenPageReader;
-  constructor(notify: (payload: Record<string, unknown>) => Promise<void> = async () => {}, foreground: (url: string) => Promise<boolean> = async () => true, storage = new ClientStorage(), tokenPage: TokenPageReader = async () => undefined) {
-    this.notify = notify; this.foreground = foreground; this.storage = storage; this.tokenPage = tokenPage;
+  constructor(notify: (payload: Record<string, unknown>) => Promise<void> = async () => {}, foreground: (url: string) => Promise<boolean> = async () => true, storage = new ClientStorage()) {
+    this.notify = notify; this.foreground = foreground; this.storage = storage;
   }
   readonly api = new Api(API_URL);
   state = emptyState();
-  readonly tokens = new TokenProfiles(() => this.nameViews());
+  readonly tokens = new TokenProfiles(() => this.nameViews(), undefined, new URL(API_URL).origin);
+  /** Names and icons for every token the panel shows come from the server token directory, asked once per asset while signed in. */
+  readonly directory = new TokenDirectoryClient(
+    async items => { const token = this.auth.session?.token; if (!token) return undefined; return (await this.api.request('tokens.resolve', { body: { items }, token })).items; },
+    answers => { let changed = false; for (const [asset, entry] of answers) changed = this.tokens.putDirectory(asset, entry) || changed; if (changed) this.emit(); },
+    asset => this.tokens.answered(asset),
+  );
+  /** Pool pages and chainless contract pages: the server finds the token, whose name and icon join the token records. */
+  readonly pages = new PageResolver(
+    async item => { const token = this.auth.session?.token; if (!token) return undefined; return (await this.api.request('tokens.resolve', { body: { items: [item] }, token })).items[0]; },
+    (asset, entry) => { this.tokens.putDirectory(asset, entry); },
+    () => this.emit(),
+  );
   /** A name learned later also replaces the address placeholder in views already shown, such as a teammate's 在看. */
   private nameViews() {
     let changed = false;
@@ -96,6 +108,7 @@ export class PalsideService {
     for (const listener of this.listeners) listener(this.state);
   }
   private tokenInput = '';
+  private pagesVersion = -1;
   /** The token records the panel needs: every token it currently shows, so card, 详情, 弹幕, 热门 and 在看 read one record. */
   private projectTokens() {
     const state = this.state, assets: string[] = [];
@@ -107,9 +120,10 @@ export class PalsideService {
     for (const draft of Object.values(state.drafts)) { add(draft.value.attachment?.kind === 'asset' ? draft.value.attachment.view : undefined); add(draft.value.ref?.view); }
     for (const row of state.rooms.hot?.rows ?? []) addKey(row.key);
     for (const key of Object.keys(state.rooms.summaries)) addKey(key);
-    const input = `${this.tokens.version}:${assets.join(',')}`;
+    if (this.pages.version !== this.pagesVersion) { this.pagesVersion = this.pages.version; state.pages = this.pages.pick(); }
+    const input = `${this.tokens.version}:${this.auth.session ? 1 : 0}:${assets.join(',')}`;
     if (input === this.tokenInput) return;
-    this.tokenInput = input; state.tokens = this.tokens.pick(assets);
+    this.tokenInput = input; this.directory.show(assets); state.tokens = this.tokens.pick(assets);
   }
   private authCommandEpoch = 0;
   async command(input: unknown): Promise<unknown> {

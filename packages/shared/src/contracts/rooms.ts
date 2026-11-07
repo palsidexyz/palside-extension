@@ -5,10 +5,10 @@ import { ROOM_KEY_PATTERN, isRoomKey, roomKeyForAsset, stances } from './rules.t
 import { id, count, timestamp } from './common.ts';
 import { person } from './profiles.ts';
 import { chainTipGroup } from './chain.ts';
-import { ROOM_TEXT_MAX, ROOM_NAME_MAX, ROOM_LOGO_URL_LENGTH, ROOM_PAGE_SIZE, ROOM_SPEAKER_LIMIT, ROOM_FACE_LIMIT, ROOM_TOP_LIMIT, ROOM_RISE_MIN } from '../rules/rooms.ts';
+import { ROOM_TEXT_MAX, ROOM_PAGE_SIZE, ROOM_SPEAKER_LIMIT, ROOM_FACE_LIMIT, ROOM_TOP_LIMIT, ROOM_RISE_MIN } from '../rules/rooms.ts';
 export const roomKey = contractString({ pattern: ROOM_KEY_PATTERN });
-export const roomProfileInput = strictObject({ name: contractString({ min: 1, max: ROOM_NAME_MAX, unit: 'codePoint', trim: true }), site: Type.Refine(contractString(), value => Boolean(siteById(value)), () => 'unknown site'), logo: Type.Optional(contractString({ max: ROOM_LOGO_URL_LENGTH })) });
-export const roomProfile = strictObject({ name: contractString({ min: 1, max: ROOM_NAME_MAX, unit: 'codePoint' }), site: Type.Union([contractString(), Type.Null()]), logo: Type.Union([contractString({ max: ROOM_LOGO_URL_LENGTH }), Type.Null()]) });
+/** The registry site a leasing device has the token open on; the room reports the most recent vote. Names and icons come from the token directory. */
+export const roomSite = Type.Refine(contractString(), value => Boolean(siteById(value)), () => 'unknown site');
 export { stances, isRoomKey, roomKeyForAsset };
 export const stance = Type.Enum(stances);
 const stanceFields = { bull: count, hold: count, bear: count };
@@ -17,7 +17,7 @@ export const roomStance = strictObject({ ...stanceFields, mine: Type.Union([stan
 export const roomMessage = strictObject({ id, key: roomKey, author: person, text: contractString({ min: 1, max: ROOM_TEXT_MAX, unit: 'grapheme' }), createdAt: timestamp, folded: Type.Boolean(), reported: Type.Boolean(), tips: Type.Optional(Type.Array(chainTipGroup)) });
 export const roomSendResult = strictObject({ message: roomMessage, slowUntil: timestamp, slowMs: count });
 export const roomPage = strictObject({ messages: denseArray(roomMessage, { maxItems: ROOM_PAGE_SIZE }), hasMore: Type.Boolean() });
-const summaryFields = { key: roomKey, count, profile: Type.Union([roomProfile, Type.Null()]), stance: stanceCounts, faces: denseArray(person, { maxItems: ROOM_FACE_LIMIT }) };
+const summaryFields = { key: roomKey, count, site: Type.Union([contractString(), Type.Null()]), stance: stanceCounts, faces: denseArray(person, { maxItems: ROOM_FACE_LIMIT }) };
 export const hotRoom = strictObject({ ...summaryFields, rise: Type.Optional(safeInteger({ minimum: ROOM_RISE_MIN })) });
 export const hotRooms = strictObject({ rows: denseArray(hotRoom, { maxItems: ROOM_TOP_LIMIT }) });
 export const roomLease = strictObject({ key: Type.Union([roomKey, Type.Null()]), count, slowUntil: timestamp, slowMs: count });
@@ -26,11 +26,9 @@ export const roomPeople = strictObject({ count, people: denseArray(person, { max
 export const keyQuery = strictObject({ key: roomKey });
 export const messageInput = strictObject({ key: roomKey, id });
 export type RoomMessage = Static<typeof roomMessage>;
-export type RoomProfile = Static<typeof roomProfile>;
 export type HotRooms = Static<typeof hotRooms>;
 
 export type { RoomKey } from './rules.ts';
-export type RoomProfileInput = Static<typeof roomProfileInput>;
 export type Stance = Static<typeof stance>;
 export type StanceCounts = Static<typeof stanceCounts>;
 export type RoomStance = Static<typeof roomStance>;

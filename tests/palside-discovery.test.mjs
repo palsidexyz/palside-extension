@@ -2,7 +2,7 @@ import { RECRUITMENT_TTL_MS, APPLICATION_TTL_MS } from '@palside/shared/rules/te
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { publicTeams, isRecruiting, publishRecruitment, requestIsActive } from '../apps/extension/src/domain/teams/lobby-values.ts';
-import { siteCatalog, siteForUrl } from '../apps/extension/src/features/palside/settings/site-catalog.ts';
+import { siteAt, siteCatalog, siteForUrl, siteOf } from '../apps/extension/src/features/palside/settings/site-catalog.ts';
 import { sites, siteCategories as registryCategories } from '../packages/shared/src/sites/index.ts';
 
 test('lobby only exposes published teams and filters without changing publication order or the source list', () => {
@@ -16,6 +16,23 @@ test('lobby only exposes published teams and filters without changing publicatio
   assert.deepEqual(teams.map(team => team.id), ['hidden', 'old', 'new']);
   const edited = teams.map(team => team.id === 'old' ? { ...team, description: 'edited' } : team);
   assert.deepEqual(publicTeams(edited, '', 100).map(team => team.id), ['new', 'old']);
+});
+
+test('every site face resolves one way: catalog art, then the icon kept on this device, then the page favicon, then the letter', () => {
+  const gmgn = siteCatalog.find(site => site.id === 'gmgn');
+  const kept = { src: 'data:image/png;base64,AAAA', plate: 'light' };
+  const directory = { sites: siteCatalog, live: { siteIcons: { 'custom.example': kept, 'gmgn.ai': { src: 'data:image/png;base64,BBBB' } } } };
+  const favicon = 'data:image/png;base64,CCCC';
+  // A friend's favicon never replaces the catalog's normalized art, so the capsule and a 共享在看 page draw the same image.
+  assert.equal(siteOf(directory, 'gmgn.ai', favicon), gmgn);
+  assert.deepEqual(siteOf(directory, 'custom.example', favicon), { id: 'custom.example', name: 'custom.example', domain: 'custom.example', logo: kept.src, plate: 'light' });
+  assert.deepEqual(siteOf(directory, 'other.example', favicon), { id: 'other.example', name: 'other.example', domain: 'other.example', logo: favicon });
+  assert.deepEqual(siteOf(directory, 'other.example'), { id: 'other.example', name: 'other.example', domain: 'other.example' });
+  assert.equal(siteAt(directory, 'https://gmgn.ai/robinhood/token/abc', favicon), gmgn);
+  assert.equal(siteAt(directory, 'https://custom.example/page')?.logo, kept.src);
+  assert.equal(siteAt(directory, 'javascript:alert(1)'), undefined);
+  assert.equal(siteAt(directory, 'not a URL'), undefined);
+  assert.equal(siteAt(directory, undefined), undefined);
 });
 
 test('site presets match exact public hosts and never silently authorize added sites or lookalike subdomains', () => {

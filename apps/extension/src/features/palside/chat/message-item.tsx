@@ -2,9 +2,9 @@
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { clockTime, localeOrEnglish, message as uiMessage } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
-import { useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type MouseEvent, type Ref, type RefObject } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { CircleAlert, CircleSlash, Flag, MoreHorizontal, Pencil, Quote, Reply, RotateCcw, Trash2, X } from 'lucide-react';
+import { CircleAlert, CircleSlash, Copy, Flag, Link, MoreHorizontal, Pencil, Quote, Reply, RotateCcw, Trash2, X } from 'lucide-react';
 import { motionPresets } from '@palside/design/motion';
 import { useText } from '../ui/text';
 import { AssetCard } from '../assets/asset-card';
@@ -18,7 +18,7 @@ import { characterLength, emojiOnly, quotedFragment, type Message, type QuoteRan
 import { quotedText } from './quotes';
 import { Action, PersonAvatar } from '../ui/primitives';
 import { IconButton } from '@palside/ui/button';
-import { Menu, MenuTrigger, MenuContent, MenuItem } from '@palside/ui/menu';
+import { Menu, MenuTrigger, MenuContent, MenuItem, MenuOpener, type MenuOpenerHandle } from '@palside/ui/menu';
 import menuStyles from './message-item.module.css';
 import { SendFlightContext, playFlight } from './send-flight';
 import { dissolve, fade } from './recall-dissolve';
@@ -90,6 +90,7 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
   const stack = useRef<HTMLDivElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
   const text = useRef<HTMLParagraphElement>(null);
+  const menu = useRef<MessageMenuHandle>(null);
   const textId = useId();
   const key = message.clientId ?? message.id;
   // A row that a send flight will carry in skips its own entrance.
@@ -175,7 +176,7 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
     <div className={s.messageContent}>
       {!self && !grouped && <div className={`${s.messageMeta} ${taking ? s.takeOver : ''}`}><strong>{person.name}</strong></div>}
       <div className={s.messageLine}>
-        <div ref={stack} className={s.messageStack} data-sending={message.status === 'sending' && !queued} data-queued={queued ? true : undefined} aria-busy={message.status === 'sending'}>
+        <div ref={stack} className={s.messageStack} onPointerDownCapture={event => { if (event.button === 2) menu.current?.press(); }} onContextMenu={event => menu.current?.openAt(event)} data-sending={message.status === 'sending' && !queued} data-queued={queued ? true : undefined} aria-busy={message.status === 'sending'}>
           {(message.ref || message.replyTo || message.text) && <div ref={bubble} className={`${s.messageBubble} ${jumbo ? s.jumbo : ''}`} data-link={linkOnly || undefined} data-editing={editing || undefined} data-size={jumbo ? Math.min(characterLength(message.text.replace(/\s+/g, '')), 2) : undefined}>
             {queued?.head && !reduced && !jumbo && <QueueFill key={queued.at} at={queued.at} />}
             {message.ref && <MessageRef c={c} message={{ ...message, ref: message.ref }} />}
@@ -197,7 +198,7 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
           {/* The day label above already names the day, so the time here stays a short clock and every bubble gets the same width. */}
           <time dateTime={message.timestamp !== undefined ? new Date(message.timestamp).toISOString() : undefined} title={message.time}>{message.timestamp !== undefined ? clockTime(message.timestamp, localeOrEnglish(locale)) : message.time}</time>
           {message.edited && <small>{t('extension.copy.edited')}</small>}
-          <span className={`${s.messageMenu} ${menuStyles.menuTrigger}`}>{c.canWrite && message.status === 'sent' && !leaving && <MessageMenu c={c} message={message} text={text} onReply={onReply} />}</span>
+          <span className={`${s.messageMenu} ${menuStyles.menuTrigger}`}>{c.canWrite && message.status === 'sent' && !leaving && <MessageMenu ref={menu} c={c} message={message} text={text} stack={stack} onReply={onReply} />}</span>
         </div>
       </div>
       {message.status === 'sending' && !leaving && <VisuallyHidden role="status">{queued ? t('extension.reading.queued') : t('extension.copy.sending')}</VisuallyHidden>}
@@ -252,26 +253,54 @@ function LinkedText({ c, message }: { c: PalsideController; message: Message }) 
 
 const opensMenu = (target: EventTarget) => target instanceof Element && Boolean(target.closest('[aria-haspopup]'));
 
-/** Text selected inside the message when its menu opens turns Reply into a quote of that part. */
-function MessageMenu({ c, message, text, onReply }: { c: PalsideController; message: Message; text: RefObject<HTMLElement | null>; onReply: (range?: QuoteRange) => void }) {
+type MessageMenuHandle = { press: () => void; openAt: (event: MouseEvent) => void };
+
+/**
+ * One menu per message, opened from its ⋯ or by right-clicking the message (at the pointer, replacing the browser's menu there).
+ * Text selected inside the message when it opens turns Reply into a quote of that part and Copy into a copy of that part; a link
+ * right-clicked adds Copy link. The message is ringed while its menu is open.
+ */
+function MessageMenu({ ref, c, message, text, stack, onReply }: { ref: Ref<MessageMenuHandle>; c: PalsideController; message: Message; text: RefObject<HTMLElement | null>; stack: RefObject<HTMLElement | null>; onReply: (range?: QuoteRange) => void }) {
   const t = useTranslations();
   const self = message.author === c.data.self;
+  const opener = useRef<MenuOpenerHandle>(null);
   const [selected, setSelected] = useState<QuoteRange>();
+  const [link, setLink] = useState<string>();
+  // Set by a right-button press: the selection was read before the browser could select the word under the pointer.
+  const pressed = useRef(false);
   // Read on the press that opens the menu, before focus moves; a selection of the whole text is a plain reply.
   function capture() {
     const offsets = text.current ? selectionOffsets(text.current, message.text) : undefined;
     setSelected(offsets && (offsets[0] > 0 || offsets[1] < message.text.length) ? { start: offsets[0], end: offsets[1], base: message.editedAt ?? 0 } : undefined);
+    setLink(undefined);
   }
+  useImperativeHandle(ref, () => ({
+    press() { capture(); pressed.current = true; },
+    openAt(event) {
+      event.preventDefault();
+      const target = event.target instanceof Element ? event.target : null;
+      if (!pressed.current) capture();
+      pressed.current = false;
+      setLink(target?.closest<HTMLAnchorElement>('a[href]')?.href);
+      // A menu key press carries no pointer position: open at the start of what was focused.
+      const box = !event.clientX && !event.clientY ? (target ?? stack.current)?.getBoundingClientRect() : undefined;
+      opener.current?.openAt(box ? box.left : event.clientX, box ? box.bottom : event.clientY, event.buttons !== 0);
+    },
+  }));
+  const copyText = selected ? message.text.slice(selected.start, selected.end) : message.text;
   const summary = message.text.slice(0, 15) || (message.attachment?.kind === 'image' ? t('extension.copy.image') : t('extension.copy.tokenCard'));
   function report() {
     const image = message.attachment?.kind === 'image' && message.attachment.src ? { src: message.attachment.src, name: message.attachment.name } : undefined;
     c.setReportTarget({ kind: 'message', targetId: message.id, author: message.author, image, preview: messageReportPreview(message, t) });
     c.go('report');
   }
-  return <span className={s.menuCapture} onPointerDownCapture={event => { if (opensMenu(event.target)) capture(); }} onKeyDownCapture={event => { if ((event.key === 'Enter' || event.key === ' ') && opensMenu(event.target)) capture(); }}><Menu boundarySelector="[data-palside-app]" align="end">
+  return <span className={s.menuCapture} onPointerDownCapture={event => { if (opensMenu(event.target)) capture(); }} onKeyDownCapture={event => { if ((event.key === 'Enter' || event.key === ' ') && opensMenu(event.target)) capture(); }}><Menu boundarySelector="[data-palside-app]" align="end" onOpenChange={open => stack.current?.toggleAttribute('data-menu', open)}>
+    <MenuOpener ref={opener} />
     <MenuTrigger asChild><IconButton label={t('extension.dynamic.messageActions', { content: summary })} size="xs" variant="quiet"><MoreHorizontal size={16} /></IconButton></MenuTrigger>
     <MenuContent aria-label={t('extension.dynamic.messageActions', { content: summary })} className={menuStyles.menu}>
       <MenuItem className={menuStyles.item} icon={selected ? <Quote size={16} /> : <Reply size={16} />} onClick={() => { onReply(selected); getSelection()?.removeAllRanges(); }}>{selected ? t('extension.reading.quoteSelection') : t('extension.copy.reply')}</MenuItem>
+      {copyText && <MenuItem className={menuStyles.item} icon={<Copy size={16} />} onClick={() => void c.copy(copyText)}>{selected ? t('extension.reading.copySelection') : t('extension.reading.copyText')}</MenuItem>}
+      {link && <MenuItem className={menuStyles.item} icon={<Link size={16} />} onClick={() => void c.copy(link)}>{t('extension.copy.copyLink')}</MenuItem>}
       {c.live && !self && <MenuItem className={menuStyles.item} icon={<Flag size={16} />} onClick={report}>{t('extension.copy.reportMessage')}</MenuItem>}
       {self && <MenuItem className={menuStyles.item} icon={<Pencil size={16} />} onClick={() => { c.edit(message); }}>{t('extension.copy.edit')}</MenuItem>}
       {(self || c.team.owner === c.data.self) && <MenuItem className={menuStyles.item} icon={<Trash2 size={16} />} tone="danger" onClick={() => { c.recall(message); }}>{self ? t('extension.copy.recall') : t('extension.copy.remove')}</MenuItem>}

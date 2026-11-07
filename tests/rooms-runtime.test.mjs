@@ -18,7 +18,7 @@ const key = 'token:Solana:So11111111111111111111111111111111111111112', otherKey
 const peer = { id: 'peer', nickname: 'Peer', avatarId: null }, self = { id: 'self', nickname: 'Self', avatarId: null };
 const message = (id, author = peer, patch = {}) => ({ id, key, author, text: `Message ${id}`, createdAt: Date.now(), ...patch });
 const stance = (mine = null) => ({ bull: 3, hold: 2, bear: 1, mine });
-const summary = (room = key, patch = {}) => ({ key: room, profile: { name: 'Token', logo: null, site: 'gmgn' }, count: 2, stance: stance(), faces: [peer], ...patch });
+const summary = (room = key, patch = {}) => ({ key: room, site: 'gmgn', count: 2, stance: stance(), faces: [peer], ...patch });
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 function fixture(t, rows = new Map()) {
@@ -57,7 +57,7 @@ function fixture(t, rows = new Map()) {
     }, async roomAvatar(room, account) { avatarCalls.push({ key: room, account }); return new Blob(['avatar'], { type: 'image/png' }); } },
     storage: { async get(id) { return structuredClone(rows.get(id)?.value); }, async put(id, account, kind, value) { const row = { account, kind, value: structuredClone(value) }; rows.set(id, row); writes.push({ id, ...row }); }, async remove(id) { rows.delete(id); } },
     sharing: { async savePreferences() { saved++; } },
-    tokens: new TokenProfiles(),
+    tokens: new TokenProfiles(), directory: { clear() {}, show() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
     dispatch: { mutate(id, options) { return runtime.api.request(id, { ...options, key: 'operation-key-0001' }); } },
     async refresh() { refreshed++; runtime.state.remoteTeams = [{ id: 'team', joined: true }]; },
     emit() { service.prune(); emits++; },
@@ -69,12 +69,12 @@ function fixture(t, rows = new Map()) {
   return { runtime, service, calls, count, handlers, rows, writes, avatarCalls, created, revoked, enter, invalidate: () => generation++, emits: () => emits, saved: () => saved, refreshed: () => refreshed, invites: value => { pendingInvites = value; } };
 }
 
-test('lease target follows the tab, pin overrides it, close follows the latest tab; profile accompanies renewal', async t => {
-  const f = fixture(t), profile = { name: 'SOL', site: 'gmgn', logo: 'https://example.test/logo.png' };
-  await f.service.tabChanged({ asset: key.slice(6), profile }); assert.equal(f.count('POST /rooms/lease'), 0);
+test('lease target follows the tab, pin overrides it, close follows the latest tab; the tab site accompanies renewal', async t => {
+  const f = fixture(t);
+  await f.service.tabChanged({ asset: key.slice(6), site: 'gmgn' }); assert.equal(f.count('POST /rooms/lease'), 0);
   await f.service.panelChanged(true); assert.equal(f.runtime.state.rooms.leased, key);
-  assert.equal(f.runtime.state.rooms.current.slowUntil, 500); assert.equal(f.runtime.state.rooms.current.profile.name, 'Token');
-  assert.deepEqual(f.calls.find(call => call.path === '/rooms/lease').options.body, { key, profile });
+  assert.equal(f.runtime.state.rooms.current.slowUntil, 500); assert.equal(f.runtime.state.rooms.current.site, 'gmgn');
+  assert.deepEqual(f.calls.find(call => call.path === '/rooms/lease').options.body, { key, site: 'gmgn' });
   await f.service.open({ key }); await f.service.tabChanged({ asset: otherKey.slice(6) }); assert.equal(f.runtime.state.rooms.current.key, key);
   await f.service.close(); assert.equal(f.runtime.state.rooms.current.key, otherKey);
   await f.service.tabChanged({ asset: null }); assert.equal(f.runtime.state.rooms.current, undefined); assert.equal(f.runtime.state.rooms.leased, undefined);

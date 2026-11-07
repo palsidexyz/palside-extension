@@ -26,6 +26,7 @@ import { SendFlightContext, SendFlights, captureComposer } from './send-flight';
 import { clearSearchMarks, setSearchMarks, textRanges } from './text-highlights';
 import { personFor } from '../../../domain/account/model';
 import { type Message, type QuoteRange } from '../../../domain/chat/model';
+import { interleaveTimed } from '../../../domain/chat/order';
 import type { PalsideController } from '../app/use-palside';
 import navigation from './chat-navigation.module.css';
 import s from '../app/palside.module.css';
@@ -147,17 +148,23 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
   const stopLabel = (index: number) => index === 0 ? originLabel ?? t('extension.reading.origin') : nameOf(stops[index]!);
   const days: { key: string; label?: string; items: ReactNode[] }[] = [];
   const dayOf = new Map<string, string>();
-  const entries = [...c.currentMessages.map(message => ({ id: message.id, timestamp: message.timestamp, message })), ...payments.map(payment => ({ id: payment.id, timestamp: payment.timestamp, payment }))].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  // Messages arrive in the runtime's chat order and are never re-sorted here: a pending send's written time and a confirmed
+  // one's service time are not comparable, so sorting by time would move rows as they confirm.
+  const entries = interleaveTimed(c.currentMessages, payments);
   let previous: Message | undefined;
+  // Days only move forward: a pending send written just before midnight still joins the day its confirmed neighbours are in.
+  let dayAt = -Infinity;
   entries.forEach(entry => {
-    const key = dayKey(entry.timestamp) || 'undated';
+    const time = 'entry' in entry ? entry.entry.timestamp : entry.message.timestamp;
+    const timestamp = time === undefined ? undefined : (dayAt = Math.max(dayAt, time));
+    const key = dayKey(timestamp) || 'undated';
     if (days.at(-1)?.key !== key) {
-      days.push({ key, label: entry.timestamp === undefined ? t('extension.copy.today') : dayLabel(entry.timestamp, locale, t('extension.copy.today')), items: [] });
+      days.push({ key, label: timestamp === undefined ? t('extension.copy.today') : dayLabel(timestamp, locale, t('extension.copy.today')), items: [] });
       previous = undefined;
     }
     const day = days[days.length - 1]!;
-    if ('payment' in entry) {
-      day.items.push(<TeamPaymentCard key={`payment-${entry.id}`} c={c} item={entry.payment} />);
+    if ('entry' in entry) {
+      day.items.push(<TeamPaymentCard key={`payment-${entry.entry.id}`} c={c} item={entry.entry} />);
       previous = undefined;
       return;
     }

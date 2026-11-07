@@ -27,6 +27,7 @@
     "./signal-art": "./src/signal-art/index.ts",
     "./models/*": "./src/models/*.ts",
     "./units": "./src/units.ts",
+    "./tokens": "./src/tokens.ts",
     "./rules/*": "./src/rules/*.ts"
   },
   "scripts": {

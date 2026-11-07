@@ -11,4 +11,6 @@ export type Viewing = {
   color: string;
   glyph: string;
   logo?: string;
+  /** A token page whose URL names a pool (`pool`) or a contract without its chain (`address`): the token was found by the server. */
+  via?: 'pool' | 'address';
 };

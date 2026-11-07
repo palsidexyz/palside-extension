@@ -50,7 +50,7 @@ function fixture() {
     '../ui/icons': {}, '../settings/signal-settings': {},
     '../assets/asset-discussion': { relativeTime: () => '' },
     '../assets/site-logo': { SiteLogo: icon },
-    '../settings/site-catalog': { siteForUrl: () => undefined },
+    '../settings/site-catalog': { siteForUrl: () => undefined, siteAt: () => undefined },
     '../settings/access': { withTargetAccess: (_, __, action) => action() },
     '../rooms/rooms': { tabView, roomKeyFor: () => undefined, roomsOn: () => false },
     '../chat/composer-social': { composerStyles: {}, RefLine: icon },

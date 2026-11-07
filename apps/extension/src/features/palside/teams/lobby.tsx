@@ -12,6 +12,7 @@ import { Button, IconButton } from '@palside/ui/button';
 import { Tooltip } from '@palside/ui/tooltip';
 import { Field, Input, Textarea, CharacterCount } from '@palside/ui/field';
 import { Switch } from '@palside/ui/switch';
+import { useSavingSwitch } from '../ui/use-saving-switch';
 import { SettingControl, settingRows as rows } from '../settings/setting-rows';
 import { PersonAvatar } from '../ui/primitives';
 import { Tabs } from '../ui/sub-rows';
@@ -117,13 +118,15 @@ export function RecruitmentSettings({ c }: { c: PalsideController }) {
   const locale = useLocale();
   const active = isRecruiting(c.team, c.now);
   const expired = !active && Boolean(c.team.recruitmentExpiresAt);
+  const saving = useSavingSwitch(active);
+  const save = (on: boolean) => void saving.save(on, () => c.setRecruitment(on));
   // Ending is immediate; a first listing is confirmed because it makes the team public; an ended one is listed again directly.
-  return <SettingControl icon={<Megaphone size={16} />}><Switch className={rows.switch} label={t('extension.copy.lobbyRecruitment')} checked={active}
+  return <SettingControl icon={<Megaphone size={16} />}><Switch className={rows.switch} label={t('extension.copy.lobbyRecruitment')} checked={saving.checked} pending={saving.pending} refused={saving.refused}
     status={active ? t('extension.dynamic.recruitmentUntil', { date: deadlineTime(c.team.recruitmentExpiresAt!, localeOrEnglish(locale), c.now) }) : expired ? t('extension.copy.ended') : undefined}
     onChange={event => {
-      if (!event.target.checked) { c.setRecruitment(false); return; }
-      if (expired) { c.setRecruitment(true); return; }
-      c.setConfirmation({ title: uiMessage('extension.copy.publishRecruitmentTitle'), description: uiMessage('extension.copy.publishRecruitmentDescription'), action: uiMessage('extension.copy.publishRecruitment'), confirm: () => c.setRecruitment(true) });
+      if (!event.target.checked) { save(false); return; }
+      if (expired) { save(true); return; }
+      c.setConfirmation({ title: uiMessage('extension.copy.publishRecruitmentTitle'), description: uiMessage('extension.copy.publishRecruitmentDescription'), action: uiMessage('extension.copy.publishRecruitment'), confirm: () => save(true) });
     }} /></SettingControl>;
 }
 

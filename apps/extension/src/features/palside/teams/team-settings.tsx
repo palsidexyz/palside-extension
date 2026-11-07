@@ -9,6 +9,7 @@ import { ArrowRightLeft, Bell, ChevronRight, Clock, LogOut, Trash2, Users, UserP
 import { Button } from '@palside/ui/button';
 import { Switch } from '@palside/ui/switch';
 import { Count } from '../ui/motion-details';
+import { useSavingSwitch } from '../ui/use-saving-switch';
 import { TeamAvatar } from './team-avatar';
 import { AvatarEditor } from '../account/avatar-editor';
 import { InvitationPanel } from './invitation-panel';
@@ -26,6 +27,8 @@ export function TeamSettings({ c }: { c: PalsideController }) {
   const owner = c.team.owner === c.data.self && c.canWrite;
   const requests = c.requests.filter(request => request.teamId === c.current).length;
   const remote = c.live?.state.remoteTeams.find(team => team.id === c.current);
+  const invite = useSavingSwitch(Boolean(remote?.membersCanInvite));
+  const mute = useSavingSwitch(c.team.muted);
   const transfer = remote?.transfer;
   const receiving = transfer?.toId === c.data.self;
   const retention = c.team.retentionDays ?? defaultRetentionDays;
@@ -73,14 +76,14 @@ export function TeamSettings({ c }: { c: PalsideController }) {
     {owner && <SettingGroup title={t('extension.copy.joiningGroup')}>
       <InvitationPanel key={c.current} c={c} />
       <RecruitmentSettings c={c} />
-      {c.live && <SettingControl icon={<UserPlus size={16} />}><Switch className={r.switch} label={t('extension.invite.membersCan')} checked={Boolean(remote?.membersCanInvite)} onChange={event => void c.run('team-invite-permission', { teamId: c.current, on: event.currentTarget.checked })} /></SettingControl>}
+      {c.live && <SettingControl icon={<UserPlus size={16} />}><Switch className={r.switch} label={t('extension.invite.membersCan')} checked={invite.checked} pending={invite.pending} refused={invite.refused} onChange={event => { const on = event.currentTarget.checked, teamId = c.current; void invite.save(on, async () => await c.run('team-invite-permission', { teamId, on }) !== undefined); }} /></SettingControl>}
     </SettingGroup>}
 
     <SettingGroup title={t('extension.copy.messagesGroup')}>
       {owner
         ? <SettingControl icon={<Clock size={16} />}><label className={r.label} htmlFor="team-retention">{t('extension.copy.messageRetention')}</label><ValueSelect id="team-retention" value={retentionKey(retention)} disabled={retentionBusy} onChange={event => changeRetention(retentionFromKey(event.target.value))} options={retentionOptions.map(days => [retentionKey(days), text(retentionPeriod(days))] as const)} /></SettingControl>
         : <SettingItem icon={<Clock size={16} />} title={t('extension.copy.messageRetention')} end={text(retentionPeriod(retention))} />}
-      <SettingControl icon={<Bell size={16} />}><Switch className={r.switch} label={t('extension.copy.muteMessages')} checked={c.team.muted} onChange={event => { if (c.live) void c.run('team-preferences', { teamId: c.current, muted: event.target.checked }); else c.setTeams(old => old.map(team => team.id === c.current ? { ...team, muted: event.target.checked } : team)); }} /></SettingControl>
+      <SettingControl icon={<Bell size={16} />}><Switch className={r.switch} label={t('extension.copy.muteMessages')} checked={mute.checked} pending={mute.pending} refused={mute.refused} onChange={event => { const muted = event.target.checked, teamId = c.current; if (c.live) void mute.save(muted, async () => await c.run('team-preferences', { teamId, muted }) !== undefined); else c.setTeams(old => old.map(team => team.id === c.current ? { ...team, muted: event.target.checked } : team)); }} /></SettingControl>
     </SettingGroup>
 
     {owner && <SettingGroup><SettingItem icon={<ArrowRightLeft size={16} />} title={t('extension.copy.transferTeam')} disabled={Boolean(transfer)} onClick={() => { c.setMemberFilter(undefined); c.setSelectingOwner(true); c.go('members'); }} /></SettingGroup>}

@@ -1,15 +1,17 @@
-.logo { --logo-size:28px; position:relative; display:inline-block; flex:0 0 var(--logo-size); width:var(--logo-size); height:var(--logo-size); min-width:var(--logo-size); max-width:var(--logo-size); min-height:var(--logo-size); max-height:var(--logo-size); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); overflow:hidden; vertical-align:middle; background:var(--ui-control-surface); color:var(--ui-text-secondary); }
-.logo img { position:absolute; inset:0; display:block; width:var(--logo-size); height:var(--logo-size); min-width:var(--logo-size); max-width:var(--logo-size); object-fit:contain; }
+.logo { --logo-size:28px; position:relative; display:inline-block; flex:0 0 var(--logo-size); width:var(--logo-size); height:var(--logo-size); min-width:var(--logo-size); max-width:var(--logo-size); min-height:var(--logo-size); max-height:var(--logo-size); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); overflow:hidden; vertical-align:middle; background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
+.logo img { position:absolute; inset:0; display:block; width:var(--logo-size); height:var(--logo-size); min-width:var(--logo-size); max-width:var(--logo-size); object-fit:contain; opacity:0; transition:opacity .18s var(--ui-ease-feedback); }
+/* A logo fades in once loaded, so a slow one never pops in or shows a broken frame. */
+.logo img[data-ready] { opacity:1; }
 .logo svg { position:absolute; width:65%; height:65%; inset:17.5%; }
-.logo[data-size="sm"] { --logo-size:20px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
-.logo[data-size="xs"] { --logo-size:16px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
-.logo[data-size="lg"] { --logo-size:40px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+.logo[data-size="sm"] { --logo-size:20px; font-size:var(--ui-type-caption); border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
+.logo[data-size="xs"] { --logo-size:16px; font-size:var(--ui-type-caption); border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
+.logo[data-size="lg"] { --logo-size:40px; font-size:var(--ui-type-headline); border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+/* The letter takes the tile's font size, so a wrapper that resizes the tile (`.wrapper > span`) sizes its letter too. */
+.logo .letter { position:absolute; inset:0; display:grid; place-items:center; font-size:inherit; font-weight:600; line-height:1; }
 /* A site already 开启 in 添加网站: the logo greys out. */
-.logo .letter { position:absolute; inset:0; display:grid; place-items:center; font-size:var(--ui-type-footnote); font-weight:600; line-height:1; }
-.logo[data-size="lg"] .letter { font-size:var(--ui-type-headline); }
-.logo[data-size="sm"] .letter, .logo[data-size="xs"] .letter { font-size:var(--ui-type-caption); }
 .logo[data-off] .letter { opacity:.5; }
-.logo[data-off] img { filter:grayscale(1); opacity:.45; }
+.logo[data-off] img[data-ready] { filter:grayscale(1); opacity:.45; }
 .logo[data-off] svg { opacity:.5; }
 .logo[data-plate="light"] { background:var(--ui-logo-plate-light); }
 .logo[data-plate="dark"] { background:var(--ui-logo-plate-dark); }
+@media (prefers-reduced-motion:reduce) { .logo img { transition:none; } }

@@ -1,5 +1,5 @@
 import { DAY_MS as DAY, MINUTE_MS } from '@palside/shared/units';
-import { resolveTokenMetadata,tokenName } from '../viewing/token-page';
+import { resolveTokenMetadata,tokenName } from '../viewing/token-name';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { imageExpiry, messageExpiry } from '../chat/message-expiry';
 import { retainedViews } from '../viewing/view-retention';
@@ -188,9 +188,9 @@ export class LocalDataRuntime {
   }
   upsertView(view: Viewing) {
     const runtime = this.runtime;
-    if (view.kind === 'asset' && view.address && !tokenName(view.name)) view = { ...view, name: resolveTokenMetadata({ address: view.address }).name! };
-    // Learn a real name, or fill a placeholder from the memory-only token cache.
-    if (!runtime.tokens.remember(view)) view = runtime.tokens.apply(view);
+    if (view.kind === 'asset' && view.address && !tokenName(view.name)) view = { ...view, name: resolveTokenMetadata({ address: view.address }).name };
+    // A snapshot's real name fills in until the directory answers; the token record then names every copy.
+    runtime.tokens.remember(view); view = runtime.tokens.apply(view);
     const index = runtime.state.data.views.findIndex(v => v.id === view.id);
     if (index < 0) runtime.state.data.views = [...runtime.state.data.views, view];
     else runtime.state.data.views = runtime.state.data.views.map(v => v.id === view.id ? view : v); }

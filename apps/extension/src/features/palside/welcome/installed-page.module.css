@@ -1,0 +1,41 @@
+/* The install tab: the onboarding sky as the backdrop, one solid card in the middle carrying the action and both
+   states, and a bold arrow toward Chrome's toolbar until Palside is pinned. Flat: the card has no border or shadow. */
+.page { position:relative; isolation:isolate; height:100%; min-height:520px; overflow:auto; display:grid; place-items:center; padding:24px 16px; }
+.sky { position:fixed; inset:0; z-index:-1; overflow:hidden; animation:artIn .9s var(--ui-ease-feedback) both; }
+.sky::before { content:""; position:absolute; inset:-6%; background:url('/art/team.webp') center 30% / cover no-repeat; animation:drift 26s ease-in-out infinite alternate; }
+
+.card { width:100%; max-width:400px; padding:32px 32px 20px; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); display:flex; flex-direction:column; align-items:center; text-align:center; }
+.logo { display:block; width:60px; height:60px; }
+.title { margin:16px 0 0; font-size:var(--ui-type-display); line-height:32px; font-weight:600; letter-spacing:-.01em; color:var(--ui-text-primary); }
+
+.lights { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; margin-top:22px; }
+.light { display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 10px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); font-size:var(--ui-type-callout); color:var(--ui-text-secondary); transition:color .3s; }
+.light[data-on] { color:var(--ui-text-primary); font-weight:600; }
+.lamp { display:grid; place-items:center; width:44px; height:44px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-secondary); transition:background .3s, color .3s; }
+.light[data-on] .lamp { background:var(--ui-accent); color:var(--ui-on-accent); }
+
+.slot { display:grid; place-items:center; width:100%; height:48px; margin-top:22px; }
+.open { width:100%; }
+.continue { display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:none; font:inherit; font-size:var(--ui-type-headline); font-weight:600; color:var(--ui-text-primary); cursor:pointer; animation:rise .35s var(--ui-ease-feedback) both; }
+.continue:hover { background:var(--ui-control-surface); }
+.continue:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.continue svg { animation:toPanel 1.2s var(--ui-ease-feedback) infinite; }
+.failed { margin:10px 0 0; font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); }
+.links { display:flex; gap:20px; margin-top:16px; font-size:var(--ui-type-footnote); }
+.links a { color:var(--ui-text-secondary); text-decoration:none; transition:color .2s; }
+.links a:hover { color:var(--ui-text-primary); }
+
+/* A straight arrow, tilted toward the top right: it ends well below the toolbar and left of the window edge, so it reads
+   as a direction (the extensions menu is up there) rather than pointing at one control. */
+.arrowWrap { position:fixed; top:clamp(44px, 7vh, 72px); right:clamp(80px, 8vw, 150px); z-index:1; pointer-events:none; }
+.arrow { display:block; width:156px; height:66px; rotate:-38deg; animation:push 1.3s cubic-bezier(.5, 0, .2, 1) infinite; }
+.arrow path { fill:var(--ui-accent); stroke:var(--ui-on-accent); stroke-width:3; stroke-linejoin:round; }
+
+/* Narrow or short windows bring the card close to the top; the arrow rises and shrinks to stay clear of it. */
+@media (max-width:960px), (max-height:720px) { .arrowWrap { top:36px; right:clamp(72px, 9vw, 120px); } .arrow { width:120px; height:51px; } }
+@keyframes artIn { from { opacity:0; } }
+@keyframes drift { from { transform:translate3d(-1.5%, 0, 0) scale(1.02); } to { transform:translate3d(1.5%, -1%, 0) scale(1.05); } }
+@keyframes push { 0%, 100% { translate:0 0; } 45% { translate:12px -10px; } }
+@keyframes toPanel { 0%, 100% { translate:0 0; } 50% { translate:5px 0; } }
+@keyframes rise { from { opacity:0; translate:0 6px; } }
+@media (prefers-reduced-motion: reduce) { .sky, .sky::before, .arrow, .continue, .continue svg { animation:none; } }

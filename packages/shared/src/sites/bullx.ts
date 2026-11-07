@@ -1,15 +1,7 @@
-import { chartSelectors, defineSitePages, dexScreenerImages } from './define.ts';
+import { chartSelectors, defineSitePages } from './define.ts';
 
 export default defineSitePages({
   id: 'bullx',
-  identify: {
-    chains: ['Solana', 'BNB Chain', 'Ethereum', 'Base'],
-    routes: [{
-      kind: 'token', path: '^/terminal/?$',
-      chain: { query: 'chainId', map: { '1399811149': 'Solana', '1': 'Ethereum', '56': 'BNB Chain', '8453': 'Base' } },
-      id: { query: 'address' }, url: '/terminal?chainId={chain}&address={id}',
-    }],
-  },
-  profile: { inline: 'span,strong', images: [dexScreenerImages] },
+  tokenUrl: { path: '/terminal?chainId={chain}&address={id}', chains: { Solana: '1399811149', Ethereum: '1', 'BNB Chain': '56', Base: '8453' } },
   layout: { chart: chartSelectors },
 });

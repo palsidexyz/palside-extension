@@ -50,13 +50,13 @@ for (const logo of logos) {
   } catch { errors.push(`Missing local site logo: ${logo.file}`); }
 }
 }
-for (const path of [manifest.side_panel?.default_path, manifest.background?.service_worker, 'offscreen.html', 'image.html']) {
+for (const path of [manifest.side_panel?.default_path, manifest.background?.service_worker, 'offscreen.html', 'image.html', 'welcome.html']) {
   if (!path) continue;
   try { await access(new URL(path, root)); } catch { errors.push(`Missing build asset: ${path}`); }
 }
 try { await access(new URL('content-scripts/page.js', root)); errors.push('Page-reading script found in the artifact'); } catch { /* No automatic page script is allowed. */ }
 try { await access(new URL('page-layer.js', root)); } catch { errors.push('Missing page-layer.js build asset'); }
-const pages = await Promise.all(['sidepanel.html', 'image.html', 'offscreen.html'].map(async path => ({ path, html: await readFile(new URL(path, root), 'utf8') })));
+const pages = await Promise.all(['sidepanel.html', 'image.html', 'offscreen.html', 'welcome.html'].map(async path => ({ path, html: await readFile(new URL(path, root), 'utf8') })));
 let fontCount = 0;
 for (const entry of await readdir(new URL("assets/", root))) {
   if (!entry.endsWith(".css")) continue;

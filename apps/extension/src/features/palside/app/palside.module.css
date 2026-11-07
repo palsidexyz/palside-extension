@@ -158,7 +158,7 @@
 @media(forced-colors:active) { .composer:focus-within { outline:2px solid Highlight; outline-offset:-1px; } }
 
 /* Words sit in the bubble; token, page and image attachments follow as their own equal-width cards. */
-.messageStack { display:flex; flex-direction:column; align-items:flex-start; gap:4px; flex:0 1 auto; min-width:0; max-width:100%; }
+.messageStack { display:flex; flex-direction:column; align-items:flex-start; gap:4px; flex:0 1 auto; min-width:0; max-width:100%; transition:opacity .24s var(--ui-ease-feedback); }
 .selfMessage .messageStack { align-items:flex-end; }
 .messageStack > .assetCard { width:272px; max-width:100%; margin:0; padding:10px 12px; background:var(--ui-control-surface); border:0; box-shadow:none; }
 .messageStack > :not(.messageBubble, .assetCard) { max-width:min(100%, 272px); }
@@ -176,20 +176,32 @@
 
 .tokenFace>img { position:absolute; inset:0; display:block; width:var(--token-size); height:var(--token-size); min-width:var(--token-size); max-width:var(--token-size); object-fit:contain; border-radius:inherit; transition:opacity .18s var(--ui-ease-feedback); }
 .tokenFace[data-fallback="true"] { background:var(--ui-control-recess); color:var(--ui-text-secondary); }
+/* Waiting: one light sweep across the face, in step with the name bar (token-name.module.css); never a "?" that reads as an error.
+   A name being read sweeps until it is known; an icon on its way sweeps for ~10s, then the initial settles in and the push swaps the logo in later. */
+.tokenFace[data-waiting] { background:linear-gradient(100deg, var(--ui-control-recess) 30%, color-mix(in srgb, var(--ui-control-recess) 45%, var(--ui-canvas)) 50%, var(--ui-control-recess) 70%) 0 0 / 300% 100%; animation:tokenSweep 1.6s linear infinite; }
+.tokenFace[data-waiting="logo"] { animation-iteration-count:6; }
+.tokenFace[data-waiting="logo"] > .tokenFallback { animation:tokenSettle .18s var(--ui-ease-feedback) 9.6s both; }
+@keyframes tokenSweep { from { background-position:100% 0; } to { background-position:-50% 0; } }
+@keyframes tokenSettle { from { opacity:0; } to { opacity:1; } }
 .tokenInitial { display:block; max-width:80%; overflow:hidden; color:var(--ui-text-primary); font-size:calc(var(--token-size) * .42); font-weight:600; line-height:1; text-align:center; }
 .token[data-token-size="xs"] { --token-size:16px; }
 .token[data-token-size="sm"] { --token-size:24px; }
 .token[data-token-size="card"] { --token-size:36px; }
-/* A page favicon sits small on a neutral tile, like a browser tab icon, instead of filling the token circle. */
-.token[data-kind=website] .tokenFace { border-radius:calc(var(--token-size) * .28); background:var(--ui-canvas); box-shadow:none; }
-.token[data-kind=website] .tokenFace>img { inset:22%; width:56%; height:56%; min-width:0; max-width:none; border-radius:2px; }
+/* Any other page shows its site's face (SiteLogo) at the token's size, edged like the page capsule's logo. */
+.token[data-kind=website] > span { --logo-size:var(--token-size); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); }
+.token[data-kind=website][data-token-size="xs"] > span { border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-caption); }
+.token[data-kind=website][data-token-size="sm"] > span { border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
+.token[data-kind=website][data-token-size="lg"] > span { border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-headline); }
+.token[data-kind=website] > span:has(img[data-ready])::after { content:''; position:absolute; inset:0; border-radius:inherit; corner-shape:inherit; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ui-text-primary) 10%, transparent); pointer-events:none; }
 .token[data-token-size="lg"] { --token-size:54px; }
 
 .sharedUrl { min-width: 0; overflow-wrap: anywhere; text-align: left; }
 
 /* Quiet metadata stays in place, so revealing it never shifts the bubble. */
-.messageStack[data-sending="true"] { animation:bubbleSending 1.6s ease-in-out infinite; }
-@keyframes bubbleSending { 50% { opacity:.6; } }
+/* Sending: the message rests a little faded while a sheen crosses its bubble, so it reads as on its way; it settles when confirmed. */
+.messageStack[data-sending="true"] { opacity:.78; }
+.messageStack[data-sending="true"] > .messageBubble:not(.jumbo)::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none; --sheen:light-dark(rgb(255 255 255 / 75%), rgb(255 255 255 / 22%)); background:linear-gradient(100deg, transparent 30%, var(--sheen) 50%, transparent 70%); background-size:250% 100%; animation:bubbleSheen 1.15s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes bubbleSheen { from { background-position:130% 0; } to { background-position:-30% 0; } }
 /* A paced message waits in the neutral colour; the next one out fills with the sent colour from its trailing edge. */
 .selfMessage .messageStack[data-queued] .messageBubble:not(.jumbo) { background:var(--ui-control-surface); }
 .queueFill { position:absolute; inset:0; z-index:-1; background:var(--ui-bubble-self); transform-origin:right center; animation:queueFill linear both; }
@@ -269,8 +281,6 @@
 
 
 .tokenFallback { display:grid; place-items:center; width:100%; height:100%; transition:opacity .18s var(--ui-ease-feedback); }
-.token[data-token-size="sm"] .tokenFallback>svg { width:16px; height:16px; }
-.token[data-token-size="xs"] .tokenFallback>svg { width:11px; height:11px; }
 .actionButton[aria-pressed=true] { background:var(--ui-control-recess); color:var(--ui-text-primary); }
 .composer[data-dragging] { background:var(--ui-accent-soft); border:1px dashed var(--ui-ink-accent); }
 
@@ -298,7 +308,12 @@ span.takeOver { display:flex; flex-shrink:0; }
 .menuCapture { display:contents; }
 
 @media (prefers-reduced-motion:reduce) {
+  .tokenFace[data-waiting],.tokenFace[data-waiting] > .tokenFallback { animation:none; }
   .app[data-from=room] > .chat:not([hidden]),.secondary,.failureActions,.composer .assetCard,.imageDraft,.mentionPicker,.personCard[open] { animation:none; }
-  .messageStack[data-sending="true"] { animation:none; opacity:.6; }
+  .messageStack { transition:none; }
+  .messageStack[data-sending="true"] { opacity:.6; }
+  .messageStack[data-sending="true"] > .messageBubble::after { animation:none; background:none; }
   .stateGlyph,.teamSelect,.teamSelect>svg,.composer::after,.row,.messageMenu,.messageText[data-toggled],.messageMeta time,.messageMeta small,.sharedTabs>button,.tokenFallback,.tokenFace>img { transition:none; }
 }
+/* A message whose menu is open is ringed, so the menu at the pointer clearly acts on it. */
+.messageStack[data-menu] > :is(.messageBubble:not(.jumbo), .assetCard, .assetGone) { box-shadow:0 0 0 2px var(--ui-canvas), 0 0 0 4px color-mix(in srgb, var(--ui-accent) 55%, transparent); }

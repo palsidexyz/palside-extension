@@ -9,7 +9,7 @@ import { requestSitesAccess, requestTabs } from '../../../runtime/browser/permis
 import { pageFavicon, tabIcon } from '../../../runtime/viewing/viewing';
 import { capability } from '../settings/access';
 import { captureSocialUi } from '../annotations/social-state';
-import { SiteLogo } from '../assets/site-logo';
+import { SiteFace } from '../assets/site-logo';
 import { useGrants } from '../settings/use-grants';
 import { ShareToggle, shareShown } from './page-toggles';
 import { siteOf, type Site } from '../settings/site-catalog';
@@ -50,16 +50,15 @@ export function siteState(c: PalsideController, waiting?: string): SiteState {
   return siteAllows(c.siteInteraction, c.pageHost) ? 'on' : 'off';
 }
 
-/** The tab's site from the catalog, else its own icon (Chrome's cached copy, else the tab's icon address), else the icon kept for it, else nothing (the letter tile draws it). */
+/**
+ * The tab's site, resolved like every other site face (see `siteOf`), with the tab's own icon as the last resort: Chrome's cached
+ * copy, else the tab's icon address. Known from the address alone, so it is drawn while the page is still loading.
+ */
 export function pageSite(c: PalsideController): Site | undefined {
   const host = c.pageHost;
   if (!host) return;
   const page = c.live?.page;
-  const site = siteOf(c, host);
-  if (c.sites.includes(site)) return site;
-  // The tab's own icon is the freshest; the kept one covers a tab whose icon Palside cannot read.
-  const logo = pageFavicon(page?.favicon) ?? tabIcon(page?.icon);
-  return logo ? { id: host, name: host, domain: host, logo } : site;
+  return siteOf(c, host, pageFavicon(page?.favicon) ?? tabIcon(page?.icon));
 }
 
 /** Chrome names the tab, and it is no website Palside can work on: a browser page, a local file, or a local, private or ported address. */
@@ -67,13 +66,6 @@ export function pageUnusable(c: PalsideController) {
   const page = c.live?.page;
   if (!page) return false;
   return capability(c, 'pick').state === 'blocked' || Boolean(page.url && !c.pageHost);
-}
-
-/** The site's logo at any size: catalog art or favicon, a letter tile for a site with neither, the globe without a site. */
-export function SiteFace({ site, off, className }: { site?: Site; off?: boolean; className?: string }) {
-  return <span className={className}>{site && !site.logo
-    ? <span className={s.letter} aria-hidden="true">{site.name.replace(/^www\./, '').charAt(0).toUpperCase()}</span>
-    : <SiteLogo site={site} off={off} />}</span>;
 }
 
 /**
@@ -91,9 +83,11 @@ export function openSiteSheet(c: PalsideController, tabs: boolean) {
 }
 
 /**
- * The left half of the page capsule: the tab's site, opening its 网页互动 sheet. The logo keeps its own colours; a neon corner badge says
+ * The left half of the page capsule: the tab's site, opening its 网页互动 sheet. The logo keeps its own colours; a corner badge says
+ * 网页互动 can run here — grey while it is off or Chrome has not allowed the site yet, neon once it runs, so the feature is always found
  * 网页互动 runs here. A globe while Palside does not know the site (pressing it asks Chrome first), an empty dashed tile on a page
- * Palside can never use, a sheen while the page is read or Chrome's prompt is open.
+ * Palside can never use. While the page loads or Chrome's prompt is open, a sheen crosses the tile — over the site's logo once the
+ * address names the site, since the logo needs only the address; the badge and the sheet wait for the page.
  */
 function SiteKey({ c }: { c: PalsideController }) {
   const t = useTranslations();
@@ -101,7 +95,7 @@ function SiteKey({ c }: { c: PalsideController }) {
   const grants = useGrants(c);
   const unusable = pageUnusable(c);
   const state = unusable ? 'none' : siteState(c, waiting);
-  const site = state === 'none' || state === 'blind' || state === 'loading' ? undefined : pageSite(c);
+  const site = state === 'none' || state === 'blind' ? undefined : pageSite(c);
   const name = site?.name ?? t('extension.web.thisSite');
   const label = unusable ? t('extension.web.pageUnusable') : {
     none: t('extension.web.siteNone'),
@@ -119,10 +113,10 @@ function SiteKey({ c }: { c: PalsideController }) {
       <span className={s.slot}>
         {state === 'none' ? <i className={s.empty} aria-hidden="true" />
           : state === 'blind' || (state === 'asking' && !site) ? <span className={s.globe} aria-hidden="true"><Globe /></span>
-          : state !== 'loading' && <SiteFace key={site?.domain} site={site} className={s.face} />}
+          : site && <SiteFace key={site.domain} site={site} className={s.face} />}
         {(state === 'loading' || state === 'asking') && <i className={s.sheen} aria-hidden="true" />}
       </span>
-      {state === 'on' && <i className={s.badge} aria-hidden="true"><Layers /></i>}
+      {(state === 'on' || state === 'off' || state === 'lock') && <i className={s.badge} data-idle={state !== 'on' || undefined} aria-hidden="true"><Layers /></i>}
     </button>
   </Tooltip>;
 }

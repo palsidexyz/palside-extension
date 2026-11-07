@@ -412,12 +412,12 @@ test('different targets coexist but disconnected or missing references release t
   } finally { overlay.stop(); env.restore(); }
 });
 
-test('chart area falls back to top, top ignores charts, and full covers the viewport', () => {
+test('danmaku area takes its share of the viewport height from the top and ignores charts', () => {
   const env = fixture();
   try {
-    assert.deepEqual(measureDanmakuArea('chart'), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.25 });
-    assert.deepEqual(measureDanmakuArea('top'), measureDanmakuArea('chart'));
-    assert.deepEqual(measureDanmakuArea('full'), { top: 0, left: 0, width: innerWidth, height: innerHeight });
+    assert.deepEqual(measureDanmakuArea(), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.25 });
+    assert.deepEqual(measureDanmakuArea(50), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.5 });
+    assert.deepEqual(measureDanmakuArea(100), { top: 0, left: 0, width: innerWidth, height: innerHeight });
   } finally { env.restore(); }
 });
 

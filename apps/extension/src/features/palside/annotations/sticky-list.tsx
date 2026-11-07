@@ -17,7 +17,7 @@ import { Sheet } from '@palside/ui/sheet';
 import { Button, IconButton } from '@palside/ui/button';
 import { Menu, MenuTrigger, MenuContent, MenuItem } from '@palside/ui/menu';
 import { SiteLogo } from '../assets/site-logo';
-import { siteForUrl } from '../settings/site-catalog';
+import { siteAt } from '../settings/site-catalog';
 import { Action, PersonAvatar, Token } from '../ui/primitives';
 import type { PalsideController } from '../app/use-palside';
 import { useText } from '../ui/text';
@@ -183,7 +183,7 @@ export function NoteSheet({ c }: { c: PalsideController }) {
   const request = useSocialUi().stickies; const asset = request?.asset; const url = request?.url;
   const page = c.live?.page;
   const view = (asset ? c.data.views.find(item => viewAsset(item) === asset) : undefined) ?? (url ? c.data.views.find(item => pageScopeUrl(item.url) === pageScopeUrl(url)) : undefined) ?? (url && pageScopeUrl(url) === pageScopeUrl(page?.url) ? tabView(page, asset) : undefined);
-  const site = siteForUrl(url ?? view?.url ?? '', c.sites);
+  const site = siteAt(c, url ?? view?.url, view?.kind === 'website' ? view.logo : undefined);
   const name = view && !looksLikeAddress(view.name) ? view.name : site?.name ?? hostOf(url ?? view?.url) ?? '';
   const count = request ? shownStickyCount(c, url ? { url } : { asset }) : 0;
   const close = () => setSocialUi({ stickies: undefined });

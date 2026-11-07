@@ -2,7 +2,7 @@
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ChevronRight, Coins, Globe2, Layers, Plus } from 'lucide-react';
+import { ChevronRight, Globe2, Layers, Plus } from 'lucide-react';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
 import { Switch } from '@palside/ui/switch';
 import { Tooltip } from '@palside/ui/tooltip';
@@ -100,11 +100,6 @@ export function SiteDetail({ c, host }: { c: PalsideController; host: string }) 
       </span>
     </div>
     {!all && <SiteFeatures c={c} host={host} />}
-    {!all && siteTags(host).profile && <SettingGroup>
-      <div className={s.row}><span className={s.icon} aria-hidden="true"><Coins size={16} /></span>
-        <Switch className={settingRows.switch} label={t('extension.sites.tokenData')} help={{ label: t('extension.settings.aboutFeature', { name: t('extension.sites.tokenData') }), content: t('extension.sites.tokenDataHint') }} checked={!c.tokenOff.includes(host)} onChange={event => c.setTokenData(host, event.currentTarget.checked)} />
-      </div>
-    </SettingGroup>}
     <SettingDanger onClick={remove}>{t(all ? 'extension.sites.removeAll' : 'extension.sites.remove')}</SettingDanger>
   </div>;
 }

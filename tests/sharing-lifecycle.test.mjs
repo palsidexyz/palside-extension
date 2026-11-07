@@ -20,12 +20,12 @@ import { teamSendGuard } from '../apps/extension/src/runtime/account/crypto-iden
 import { encryptedCrypto } from './helpers/encrypted-room.mjs';
 import { startedTeams } from '../apps/extension/src/runtime/teams/onboarding.ts';
 import { TokenProfiles } from '../apps/extension/src/runtime/viewing/token-profiles.ts';
-import { readFavorites, readHosts, readSiteInteractions } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { readFavorites, readSiteInteractions } from '../apps/extension/src/domain/annotations/interaction.ts';
 
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const plain = value => JSON.parse(JSON.stringify(value));
-const context = { ...languageGlobals, ...contractLimits, ...contractCommon, readFavorites, readHosts, readSiteInteractions, startedTeams, sharingWork, clearTimeout, URL, trustedDeviceMessages, teamSendGuard };
+const context = { ...languageGlobals, ...contractLimits, ...contractCommon, readFavorites, readSiteInteractions, startedTeams, sharingWork, clearTimeout, URL, trustedDeviceMessages, teamSendGuard };
 const load = productionModules(context);
 const { SharingRuntime } = load('apps/extension/src/runtime/viewing/sharing.ts');
 const { RuntimeCommands } = load('apps/extension/src/runtime/composition/dispatch.ts');
@@ -35,7 +35,7 @@ function fixture() {
   value.runtime = value; value.auth = value; value.sharing = value; value.dispatch = value; value.tokens = new TokenProfiles();
   value.scope = () => sessionScope(() => true, () => Error('session changed'));
   const requests=[]; const stored=new Map(); const snapshots=[];
-  value.state={account:{}, preferences:{current:'team',share:true,siteInteraction:{'x.com':{on:true}},tokenOff:['x.com'],notifications:'off'}, remoteTeams:[{id:'team',joined:true,people:[{id:'self',matrixId:'@self'}],memberIds:['self']}],data:{teams:[]}};
+  value.state={account:{}, preferences:{current:'team',share:true,siteInteraction:{'x.com':{on:true}},notifications:'off'}, remoteTeams:[{id:'team',joined:true,people:[{id:'self',matrixId:'@self'}],memberIds:['self']}],data:{teams:[]}};
   value.requireConnection=()=>{}; value.preloadHistory=async()=>{};
   value.initialise=async()=>{};value.preferencesQueue=Promise.resolve();
   value.pageObservation=0;value.viewingSequence=0;value.viewingOrder=1;
@@ -75,10 +75,10 @@ test('stalled crypto work times out, late completion stays discarded and a fresh
 test('preference persistence captures each revision and never rewinds newer in-memory intent',async()=>{
   const {value}=fixture();const first=deferred();const writes=[];value.preferencesQueue=Promise.resolve();
   value.storage.put=async(_key,_account,_kind,preferences)=>{writes.push(preferences);if(writes.length===1)await first.promise;};
-  value.state.preferences={tokenOff:['x.com']};const old=value.savePreferences();await tick();
-  value.state.preferences={tokenOff:[]};const latest=value.savePreferences();await tick();
-  assert.deepEqual(value.state.preferences.tokenOff,[]);assert.equal(writes.length,1);
-  first.resolve();await Promise.all([old,latest]);assert.deepEqual(writes.map(p=>p.tokenOff),[['x.com'],[]]);assert.deepEqual(value.persistedPreferences.tokenOff,[]);
+  value.state.preferences={hiddenStickies:['x.com']};const old=value.savePreferences();await tick();
+  value.state.preferences={hiddenStickies:[]};const latest=value.savePreferences();await tick();
+  assert.deepEqual(value.state.preferences.hiddenStickies,[]);assert.equal(writes.length,1);
+  first.resolve();await Promise.all([old,latest]);assert.deepEqual(writes.map(p=>p.hiddenStickies),[['x.com'],[]]);assert.deepEqual(value.persistedPreferences.hiddenStickies,[]);
 });
 
 test('turning 网页互动 off for a site leaves independent shared viewing active',async()=>{
@@ -92,40 +92,18 @@ test('turning 网页互动 off for a site leaves independent shared viewing acti
 const save = (value, patch) => value.execute({ name: 'preferences', payload: { accountId: 'self', ...patch } });
 const toggle = (value, payload) => value.execute({ name: 'toggle', payload });
 
-test('token-data preference commands invalidate pending metadata while message and draft snapshots stay frozen', async () => {
-  const { value } = fixture(); const read = deferred();
-  const url = 'https://gmgn.ai/eth/token/0x0000000000000000000000000000000000000001';
-  const target = { tabId: 1, windowId: 10 };
-  value.tokenPage = async () => ({ name: 'FROZEN' });
-  const frozen = await value.prepareView(url, undefined, target);
-  const attachment = { kind: 'asset', assetId: frozen.id, view: frozen };
-  value.state.data.messages = [{ id: 'message', teamId: 'team', author: 'self', text: '', time: '12:00', status: 'sent', timestamp: Date.now(), attachment }];
-  value.state.drafts = { team: { text: '', attachment: structuredClone(attachment) } };
-  const messages = plain(value.state.data.messages), drafts = plain(value.state.drafts);
-  value.tokenPage = () => read.promise;
-  const pending = value.prepareView(url, undefined, target);
-  await save(value, { tokenOff: ['gmgn.ai'] });
-  await save(value, { tokenOff: [] });
-  read.resolve({ name: 'STALE' });
-  assert.notEqual((await pending).name, 'STALE');
-  assert.deepEqual(plain(value.state.data.messages), messages);
-  assert.deepEqual(plain(value.state.drafts), drafts);
-  value.tokenPage = async () => ({ name: 'FRESH' });
-  assert.equal((await value.prepareView(url, undefined, target)).name, 'FRESH');
-});
-
 test('concurrent preference saves apply in order over the latest preferences and wait for their own ordered writes', async () => {
   const { value, stored } = fixture(); const disk = deferred(); const writes = []; const put = value.storage.put;
   value.storage.put = async (...args) => { writes.push(structuredClone(args[3])); if (writes.length === 1) await disk.promise; return put(...args); };
   let settled = false;
-  const first = save(value, { tokenOff: ['EXAMPLE.COM.'] }).then(() => { settled = true; }); await tick();
-  const second = save(value, { tokenOff: ['example.com', 'other.com'] });
+  const first = save(value, { hiddenStickies: ['example.com'] }).then(() => { settled = true; }); await tick();
+  const second = save(value, { hiddenStickies: ['example.com', 'other.com'] });
   await tick();
   assert.equal(settled, false); assert.equal(writes.length, 1);
-  assert.deepEqual(plain(value.state.preferences.tokenOff), ['example.com', 'other.com']);
+  assert.deepEqual(plain(value.state.preferences.hiddenStickies), ['example.com', 'other.com']);
   disk.resolve(); await Promise.all([first, second]);
   assert.equal(writes.length, 2);
-  assert.deepEqual(plain(writes.map(row => row.tokenOff)), [['example.com'], ['example.com', 'other.com']]);
+  assert.deepEqual(plain(writes.map(row => row.hiddenStickies)), [['example.com'], ['example.com', 'other.com']]);
   assert.deepEqual(plain(stored.get('self:preferences')), plain(value.state.preferences));
 });
 
@@ -142,27 +120,27 @@ test('latest failed preference write rolls back to the last committed value with
 test('older failed write cannot rewind a newer intent and later writes remain usable', async () => {
   const { value, stored } = fixture(); const first = deferred(); const put = value.storage.put; let count = 0;
   value.storage.put = async (...args) => { if (++count === 1) await first.promise; return put(...args); };
-  const older = assert.rejects(save(value, { tokenOff: ['example.com'] }), /disk full/); await tick();
-  const newer = save(value, { tokenOff: ['example.com', 'x.com'] }); await tick();
+  const older = assert.rejects(save(value, { hiddenStickies: ['example.com'] }), /disk full/); await tick();
+  const newer = save(value, { hiddenStickies: ['example.com', 'x.com'] }); await tick();
   first.reject(Error('disk full')); await Promise.all([older, newer]);
-  assert.deepEqual(plain(value.state.preferences.tokenOff), ['example.com', 'x.com']);
-  assert.deepEqual(plain(stored.get('self:preferences').tokenOff), plain(value.state.preferences.tokenOff));
+  assert.deepEqual(plain(value.state.preferences.hiddenStickies), ['example.com', 'x.com']);
+  assert.deepEqual(plain(stored.get('self:preferences').hiddenStickies), plain(value.state.preferences.hiddenStickies));
 });
 
 test('failed newest write retains the earlier successful update even when both were submitted together', async () => {
   const { value } = fixture(); const disk = deferred(); let writes = 0;
   value.storage.put = async () => { if (++writes === 1) await disk.promise; else throw Error('disk full'); };
-  const earlier = save(value, { tokenOff: ['example.com'] }); await tick();
-  const latest = assert.rejects(save(value, { tokenOff: [] }), /disk full/); await tick();
+  const earlier = save(value, { hiddenStickies: ['example.com'] }); await tick();
+  const latest = assert.rejects(save(value, { hiddenStickies: [] }), /disk full/); await tick();
   disk.resolve(); await Promise.all([earlier, latest]);
-  assert.deepEqual(plain(value.state.preferences.tokenOff), ['example.com']);
+  assert.deepEqual(plain(value.state.preferences.hiddenStickies), ['example.com']);
 });
 
 test('queued preference writes from an old session cannot overwrite the replacement account or its state', async () => {
   const { value, stored } = fixture(); const queue = deferred();
   value.preferencesQueue = queue.promise;
   value.scope = () => { const session = value.session; return sessionScope(() => value.session === session, () => Error('session changed')); };
-  const pending = assert.rejects(save(value, { tokenOff: ['example.com'] }), /session changed/); await tick();
+  const pending = assert.rejects(save(value, { hiddenStickies: ['example.com'] }), /session changed/); await tick();
   value.session = { account: { id: 'replacement' } };
   const replacement = { current: 'new', share: true, siteInteraction: { 'x.com': { on: false } }, notifications: 'off' };
   value.state.preferences = replacement;
@@ -172,9 +150,9 @@ test('queued preference writes from an old session cannot overwrite the replacem
 
 test('preference and switch commands validate account and every field before mutating state', async () => {
   const { value, stored } = fixture(); const before = plain(value.state.preferences);
-  for (const patch of [{ accountId: 'other', tokenOff: [] }, { siteRules: {} }, { allowedSites: [] }, { notificationPreview: 'yes' }, { sitesChosen: true },
+  for (const patch of [{ accountId: 'other', hiddenStickies: [] }, { siteRules: {} }, { allowedSites: [] }, { notificationPreview: 'yes' }, { sitesChosen: true },
     ...[undefined, null, [], { 'https://x.com': { on: true } }, { 'x.com': { signal: 'yes' } }, { 'x.com': { on: true, extra: true } }].map(siteInteraction => ({ siteInteraction })),
-    ...['https://x.com', '*.x.com', 'printer.local', ''].map(host => ({ tokenOff: [host] })), { tokenOff: 'x.com' }]) {
+    { tokenOff: ['x.com'] }, { hiddenStickies: 'x' }]) {
     await assert.rejects(value.execute({ name: 'preferences', payload: { accountId: 'self', ...patch } }), error => !['ReferenceError', 'TypeError'].includes(error?.name), JSON.stringify(patch));
   }
   for (const payload of [{ share: 'yes' }, { interact: 1 }]) await assert.rejects(toggle(value, payload), error => !['ReferenceError', 'TypeError'].includes(error?.name), JSON.stringify(payload));
@@ -182,13 +160,6 @@ test('preference and switch commands validate account and every field before mut
   await save(value, { notificationPreview: false, hiddenStickies: ['saved'] });
   assert.equal(stored.get('self:preferences').notificationPreview, false);
   assert.deepEqual(plain(stored.get('self:preferences').hiddenStickies), ['saved']);
-});
-
-test('one command sets several token-data hosts, normalised and deduplicated', async () => {
-  const { value, stored } = fixture();
-  await save(value, { tokenOff: ['gmgn.ai', 'Axiom.Trade', 'axiom.trade.'] });
-  assert.deepEqual(plain(value.state.preferences.tokenOff), ['gmgn.ai', 'axiom.trade']);
-  assert.deepEqual(plain(stored.get('self:preferences').tokenOff), plain(value.state.preferences.tokenOff));
 });
 
 test('switching 共享在看 off clears local and remote viewing at once', async () => {

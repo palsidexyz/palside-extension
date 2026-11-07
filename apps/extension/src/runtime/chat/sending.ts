@@ -12,13 +12,14 @@ import type { RoomMessageEventContent } from 'matrix-js-sdk/lib/@types/events';
 import { ApiError } from '../transport/api';
 import type { RevisionedDraft } from '../storage/storage';
 import { validateView,readView } from '../viewing/view-snapshot';
-import { SendPacer,THROTTLE_RETRIES,throttleWait } from './send-pacer';
+import { SendLanes,SendPacer,THROTTLE_RETRIES,throttleWait } from './send-pacer';
 import { readMessageRefTarget,readRefCaption } from '../../domain/annotations/social';
 import { assetView } from '../../domain/assets/model';
 import { canSend,emptyDraft,readQuoteRange,type Draft,type Message } from '../../domain/chat/model';
 import type { Outgoing } from './outgoing';
 import type { RuntimeDevice } from '../account/device';
 import { publishSendQueue } from './messages';
+import { orderMessages } from '../../domain/chat/order';
 import type { PalsideService } from '../composition/core';
 import { liveMembers } from '../../domain/teams/model.ts';
 
@@ -31,13 +32,15 @@ export class SendingRuntime {
   editOriginals = new Map<string, { id: string; baseEditedAt: number }>();
   readonly pacer = new SendPacer();
   queued = new Map<string, { teamId: string; at: number }>();
+  readonly lanes = new SendLanes();
   async send(message: Message, revision: number): Promise<unknown> {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     const key = `${message.teamId}:${revision >= 0 ? revision : message.id}`;
     const running = this.sendRequests.get(key); if (running) return running;
     const existing = revision >= 0 ? [...this.outgoing.values()].find(p => p.message.teamId === message.teamId && p.draftRevision === revision) : undefined;
-    const request = this.doSend(existing?.message ?? message, revision); this.sendRequests.set(key, request);
+    const lane = this.lanes.take(message.teamId);
+    const request = this.doSend(existing?.message ?? message, revision, lane).finally(lane.release); this.sendRequests.set(key, request);
     try { return await scope.wait(request); } finally { if (scope.current()) { this.sendRequests.delete(key); } }
   }
   async pace(teamId: string, messageId: string, guard: () => void) {
@@ -77,7 +80,20 @@ export class SendingRuntime {
     if (!await scope.wait(runtime.storage.clearSentDraft(session.account.id, teamId, revision, emptyDraft)) || runtime.auth.session !== session) return;
     const draft = await scope.wait(runtime.storage.get<RevisionedDraft<Draft>>(`${session.account.id}:draft:${teamId}`)); if (draft) { runtime.state.drafts[teamId] = draft; runtime.emit(); }
   }
-  async doSend(message: Message, revision: number) {
+  /**
+   * Retires a confirmed send: its pending row, its stored packet and the draft revision it was written from. Both the send
+   * itself and the timeline's arrival of the same event can finish first; whichever comes second finds nothing left to do.
+   */
+  async settle(session: RuntimeDevice, teamId: string, clientId: string, draftRevision: number) {
+    const runtime = this.runtime;
+    const scope = runtime.auth.scope();
+    this.outgoing.delete(clientId);
+    runtime.state.data.messages = runtime.state.data.messages.filter(m => m.id !== clientId || m.status === 'sent');
+    await scope.wait(runtime.storage.remove(`${session.account.id}:outgoing:${clientId}`));
+    if (runtime.auth.session !== session) return;
+    await scope.wait(this.releaseDraft(session, teamId, draftRevision));
+  }
+  async doSend(message: Message, revision: number, lane: { ready: Promise<void>; release: () => void } = { ready: Promise.resolve(), release: () => {} }) {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     const session = runtime.auth.session; const client = runtime.auth.client;
@@ -113,14 +129,16 @@ export class SendingRuntime {
         const asset = candidate;
         const attachment = asset && message.attachment?.kind === 'asset' ? { ...message.attachment, view: { ...asset, id: message.attachment.assetId } } : message.attachment;
         const now = Date.now();
-        packet = { draftRevision: revision, message: { ...message, attachment, replyRange: message.replyTo ? readQuoteRange(message.replyRange) : undefined, author: session.account.id, timestamp: now, expiresAt: messageExpiry(undefined, now, team.retentionDays) }, asset, createdAt: now };
+        // Pending order is writing order, not the order preparation happens to finish in.
+        const written = Math.min(message.timestamp ?? now, now);
+        packet = { draftRevision: revision, message: { ...message, attachment, replyRange: message.replyTo ? readQuoteRange(message.replyRange) : undefined, author: session.account.id, timestamp: written, expiresAt: messageExpiry(undefined, now, team.retentionDays) }, asset, createdAt: now };
         if (message.attachment?.kind === 'asset' && !packet.asset) throw new MessageError(uiMessage('extension.runtime.removeInvalidToken'));
         await scope.wait(runtime.storage.put(`${session.account.id}:outgoing:${message.id}`, session.account.id, 'outgoing', packet, packet.createdAt + DAY)); this.outgoing.set(message.id, packet);
       }
       if (packet.createdAt + DAY <= Date.now()) throw new MessageError(uiMessage('extension.runtime.outgoingExpired'));
       message = packet.message;
       if (message.ref) runtime.cache.upsertView(message.ref.view);
-      runtime.state.data.messages = [...runtime.state.data.messages.filter(m => m.id !== message.id), { ...message, failure: undefined, status: 'sending' }]; runtime.emit();
+      runtime.state.data.messages = orderMessages([...runtime.state.data.messages.filter(m => m.id !== message.id), { ...message, failure: undefined, status: 'sending' }]); runtime.emit();
       await scope.wait(this.releaseDraft(session, team.id, packet.draftRevision ?? revision)); guard();
       const mentions = liveMembers(team).filter(p => message.mentionIds?.includes(p.id)).map(p => p.matrixId);
       const content: RoomMessageEventContent & Record<string, unknown> = { 'm.mentions': { user_ids: mentions }, msgtype: MsgType.Text, body: message.text, 'com.palside.asset': packet.asset, ...(message.ref ? { 'com.palside.ref': message.ref } : {}), ...(message.replyTo ? { 'm.relates_to': { 'm.in_reply_to': { event_id: message.replyTo } }, ...(message.replyRange ? { 'com.palside.reply_range': message.replyRange } : {}) } : {}) };
@@ -139,6 +157,7 @@ export class SendingRuntime {
       }
       runtime.auth.requireConnection();
       if (!packet.eventId) {
+        await scope.wait(lane.ready); guard();
         await scope.wait(requireEncryptedSend(client, team.roomId, people, guard));
         guard();
         await scope.wait(this.pace(team.id, message.id, guard));
@@ -151,8 +170,9 @@ export class SendingRuntime {
           return pending?.status === EventStatus.SENT && pending.getId() ? { event_id: pending.getId()! }
             : pending ? client.resendEvent(pending, room)
             : client.sendEvent(team.roomId, EventType.RoomMessage, content, message.id);
-        })); guard(); packet.eventId = result.event_id;
-        packet.receivedAt = (result as typeof result & { receivedAt?: number }).receivedAt ?? packet.createdAt;
+        })); lane.release(); guard(); packet.eventId = result.event_id;
+        // Until the event itself is read back, the moment the service accepted it is the closest estimate of its service time.
+        packet.receivedAt = (result as typeof result & { receivedAt?: number }).receivedAt ?? Date.now();
         await scope.wait(runtime.storage.put(`${session.account.id}:outgoing:${message.id}`, session.account.id, 'outgoing', packet, packet.createdAt + DAY));
       }
       guard(); if (packet.uploadId) await scope.wait(runtime.api.request('media.attach', { params: { id: packet.uploadId }, body: { eventId: packet.eventId } }));
@@ -160,13 +180,15 @@ export class SendingRuntime {
       try { const event = await scope.wait(client.fetchRoomEvent(team.roomId, confirmedId)); guard(); await scope.wait(runtime.timeline.consume(new (await scope.wait(import('matrix-js-sdk'))).MatrixEvent({ ...event, room_id: team.roomId }))); }
       catch { scope.check();
         guard(); if (!runtime.state.data.messages.some(m => m.id === confirmedId)) {
-          const confirmed: Message = { ...packet.message, clientId: packet.message.id, id: packet.eventId, status: 'sent' }; runtime.cache.eventTimes.set(confirmed.id, packet.receivedAt ?? packet.createdAt); runtime.state.data.messages.push(confirmed); await scope.wait(runtime.cache.cacheMessage(confirmed, packet.receivedAt ?? packet.createdAt));
+          // The confirmed row replaces the pending one in the same step: one row, one key, the service time as its time.
+          const at = packet.receivedAt ?? Date.now();
+          const confirmed: Message = { ...packet.message, clientId: packet.message.id, id: confirmedId, status: 'sent', timestamp: at };
+          runtime.cache.eventTimes.set(confirmedId, at);
+          runtime.state.data.messages = orderMessages([...runtime.state.data.messages.filter(m => m.id !== message.id), confirmed]);
+          await scope.wait(runtime.cache.cacheMessage(confirmed, at));
         }
       }
-      guard(); runtime.state.data.messages = runtime.state.data.messages.filter(m => m.id !== message.id);
-      this.outgoing.delete(message.id); await scope.wait(runtime.storage.remove(`${session.account.id}:outgoing:${message.id}`));
-      await scope.wait(runtime.storage.clearSentDraft(session.account.id, team.id, packet.draftRevision ?? revision, emptyDraft));
-      const draft = await scope.wait(runtime.storage.get<RevisionedDraft<Draft>>(`${session.account.id}:draft:${team.id}`)); if (draft) runtime.state.drafts[team.id] = draft;
+      guard(); await scope.wait(this.settle(session, team.id, message.id, packet.draftRevision ?? revision));
       runtime.emit();
       void completeTeamStart(runtime, team.id).catch(error => runtime.diagnosticErrors.record(error));
       return { eventId: packet.eventId };

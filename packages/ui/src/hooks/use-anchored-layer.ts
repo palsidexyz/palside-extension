@@ -8,11 +8,14 @@ export function useAnchoredLayer({ align = "start", side = "bottom", boundarySel
   const anchorRef = useRef<HTMLButtonElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const disposeRef = useRef<(() => void) | null>(null);
+  /** Set while the layer was opened at a pointer (a context menu) instead of under its trigger. */
+  const pointRef = useRef<{ x: number; y: number } | null>(null);
   const position = useCallback(() => {
     const anchor = anchorRef.current;
     const layer = layerRef.current;
     if (!anchor || !layer?.matches(":popover-open")) return;
-    const rect = anchor.getBoundingClientRect();
+    const point = pointRef.current;
+    const rect = point ? { left: point.x, right: point.x, top: point.y, bottom: point.y, width: 0, height: 0 } : anchor.getBoundingClientRect();
     const view = window.visualViewport;
     let viewport = { left: view?.offsetLeft ?? 0, top: view?.offsetTop ?? 0, width: view?.width ?? window.innerWidth, height: view?.height ?? window.innerHeight };
     const boundary = boundarySelector ? anchor.closest(boundarySelector)?.getBoundingClientRect() : undefined;
@@ -23,14 +26,16 @@ export function useAnchoredLayer({ align = "start", side = "bottom", boundarySel
       const bottom = Math.min(viewport.top + viewport.height, boundary.bottom);
       viewport = { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
     }
-    if (!anchor.checkVisibility() || viewport.width <= 0 || viewport.height <= 0 || rect.right <= viewport.left || rect.left >= viewport.left + viewport.width || rect.bottom <= viewport.top || rect.top >= viewport.top + viewport.height) {
+    if ((!point && !anchor.checkVisibility()) || viewport.width <= 0 || viewport.height <= 0 || rect.right <= viewport.left || rect.left >= viewport.left + viewport.width || rect.bottom <= viewport.top || rect.top >= viewport.top + viewport.height) {
       layer.hidePopover();
       return;
     }
     layer.style.maxWidth = `${Math.max(0, viewport.width - 16)}px`;
     layer.style.setProperty("--anchored-layer-width", layer.style.maxWidth);
     const measured = layer.getBoundingClientRect();
-    const result = overlayPosition(rect, { width: measured.width, height: layer.scrollHeight }, viewport, align, side);
+    // At a pointer the layer opens beside it, toward the side with room; under a trigger it keeps its alignment.
+    const pointAlign = point && point.x + measured.width > viewport.left + viewport.width - 8 ? "end" : "start";
+    const result = overlayPosition(rect, { width: measured.width, height: layer.scrollHeight }, viewport, point ? pointAlign : align, point ? "bottom" : side, point ? 2 : 8);
     layer.style.left = `${result.left}px`;
     layer.style.top = `${result.top}px`;
     layer.style.maxHeight = `${result.maxHeight}px`;
@@ -45,10 +50,17 @@ export function useAnchoredLayer({ align = "start", side = "bottom", boundarySel
   const onBeforeToggle = useCallback((event: ToggleEvent<HTMLDivElement>) => {
     if (event.newState === "open") event.currentTarget.style.visibility = "hidden";
   }, []);
+  /** Opens the layer at a viewport point, as a context menu; it closes when the content under it scrolls. */
+  const openAt = useCallback((x: number, y: number) => {
+    const layer = layerRef.current;
+    if (!layer) return;
+    pointRef.current = { x, y };
+    if (layer.matches(":popover-open")) position(); else layer.showPopover();
+  }, [position]);
   const onToggle = useCallback(() => {
     disposeRef.current?.();
     disposeRef.current = null;
-    if (!layerRef.current?.matches(":popover-open")) return;
+    if (!layerRef.current?.matches(":popover-open")) { pointRef.current = null; return; }
     position();
     if (!layerRef.current?.matches(":popover-open")) return;
     const observer = new ResizeObserver(position);
@@ -56,14 +68,15 @@ export function useAnchoredLayer({ align = "start", side = "bottom", boundarySel
     if (layerRef.current) observer.observe(layerRef.current);
     const boundary = boundarySelector ? anchorRef.current?.closest(boundarySelector) : null;
     if (boundary) observer.observe(boundary);
+    const scrolled = () => { if (pointRef.current) layerRef.current?.hidePopover(); else position(); };
     window.addEventListener("resize", position);
-    document.addEventListener("scroll", position, true);
+    document.addEventListener("scroll", scrolled, true);
     window.visualViewport?.addEventListener("resize", position);
     window.visualViewport?.addEventListener("scroll", position);
     disposeRef.current = () => {
       observer.disconnect();
       window.removeEventListener("resize", position);
-      document.removeEventListener("scroll", position, true);
+      document.removeEventListener("scroll", scrolled, true);
       window.visualViewport?.removeEventListener("resize", position);
       window.visualViewport?.removeEventListener("scroll", position);
     };
@@ -72,5 +85,5 @@ export function useAnchoredLayer({ align = "start", side = "bottom", boundarySel
     onToggle();
     return () => { disposeRef.current?.(); disposeRef.current = null; };
   }, [onToggle]);
-  return { anchorRef, layerRef, close, onBeforeToggle, onToggle };
+  return { anchorRef, layerRef, close, onBeforeToggle, onToggle, openAt };
 }

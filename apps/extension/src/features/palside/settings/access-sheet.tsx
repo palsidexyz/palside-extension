@@ -4,7 +4,7 @@ import { Button, IconButton } from '@palside/ui/button';
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Coins, Globe2, KeyRound, Layers, Plus, Scissors, Search, X } from 'lucide-react';
+import { Check, Globe2, KeyRound, Layers, Plus, Scissors, Search, X } from 'lucide-react';
 import { Switch } from '@palside/ui/switch';
 import { Input } from '@palside/ui/field';
 import { siteInteraction } from '../../../domain/annotations/interaction';
@@ -13,11 +13,11 @@ import { requestAllSites, requestSitesAccess } from '../../../runtime/browser/pe
 import { normalizeSiteHost } from '../../../domain/assets/site-host';
 import { CountText } from '../ui/motion-details';
 import { siteRequestId } from './access';
-import { askSiteAccess, pageSite, pageUnusable, SiteFace, useAsking } from '../viewing/page-key';
+import { askSiteAccess, pageSite, pageUnusable, useAsking } from '../viewing/page-key';
 import { ChromeMark, DanmakuIcon } from '../ui/icons';
 import { captureSocialUi, useSocialUi } from '../annotations/social-state';
 import { Sheet } from '@palside/ui/sheet';
-import { SiteLogo } from '../assets/site-logo';
+import { SiteFace, SiteLogo } from '../assets/site-logo';
 import { siteCategories, siteCategory, siteOf, siteTags, type Site, type SiteCategory } from './site-catalog';
 import { Tooltip } from '@palside/ui/tooltip';
 import { siteAllowed, useGrants } from './use-grants';
@@ -260,7 +260,6 @@ export function AllSitesSheet({ c }: { c: PalsideController }) {
       <Group title={t('extension.sites.allowAllAnywhere')}>
         <Fact icon={<Layers size={16} />}>{t('extension.settings.interaction')}</Fact>
         <Fact icon={<DanmakuIcon size={16} />}>{t('extension.room.pageDanmaku')}</Fact>
-        <Fact icon={<Coins size={16} />}>{t('extension.sites.tokenData')}</Fact>
         <Fact icon={<Scissors size={16} />}>{t('extension.sites.allowAllShot')}</Fact>
       </Group>
       <Group title={t('extension.access.chrome')}>

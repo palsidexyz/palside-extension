@@ -22,8 +22,6 @@ export function livePanelData({ data, scenario, initialTeam }: PanelDataInput): 
     setLocalShare: () => {},
     localSites: ['gmgn.ai', 'dexscreener.com'],
     setLocalSites: () => {},
-    localTokenOff: [],
-    setLocalTokenOff: () => {},
     localOffline: scenario === 'offline',
     setOffline: () => {},
     localViewingId: data.people.find(p => p.id === data.self)?.viewing,

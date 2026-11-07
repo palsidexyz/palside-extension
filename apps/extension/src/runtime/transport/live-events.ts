@@ -17,6 +17,7 @@ type LiveEventsOptions = {
   onChainConfig?: (config: ChainClientConfig) => void;
   onChain?: (event: ChainEvent) => void;
   onBanned?: (ban: { expiresAt: number | null }) => void;
+  onTokens?: (entries: EventPayload<'tokens'>['tokens']) => void;
   onState?: (open: boolean) => void;
   onUnauthorized?: () => void;
 };
@@ -105,6 +106,7 @@ export function connectLiveEvents(options: LiveEventsOptions): () => void {
             if (decoded.event === 'account-banned') options.onBanned?.(decoded.data);
             if (decoded.event === 'team-invites') options.onTeamInvites?.(decoded.data.pending);
             if (decoded.event === 'presence') options.onPresence?.(decoded.data.account, decoded.data.state);
+            if (decoded.event === 'tokens') options.onTokens?.(decoded.data.tokens);
           } catch {}
         }
       }

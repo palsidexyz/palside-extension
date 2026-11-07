@@ -35,12 +35,12 @@ const pages = {
   'retention-review': { check: true, run: true, allow: [/^blob:/] },
   storage: { check: true, run: true },
   'team-avatar-review': { allow: [/\/team-avatars\/missing-image\.webp$/] },
-  'token-logo-display': { allow: [/metadata\.mobula\.io\/assets\/logos\/0{64}\.png/] },
+  'token-logo-display': { allow: [/api\.palside\.test\/tokens\/logo\/robinhood\/0x39dbed3a2bd333467115de45665cc57f813c4571\?v=2$/] },
   'ui-review': { variants: ['', ...scenes('empty', 'history', 'menus', 'offline')] },
 };
 // External images a page renders on purpose, answered locally so the check never leaves this machine.
 const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-const externalFixtures = new Set(['https://metadata.mobula.io/assets/logos/f03b6095dc83bde168cab16013205334941f599c7405682cced179242df940f8.png']);
+const externalFixtures = new Set(['https://metadata.mobula.io/assets/logos/f03b6095dc83bde168cab16013205334941f599c7405682cced179242df940f8.png', 'https://api.palside.test/tokens/logo/robinhood/0x39dbed3a2bd333467115de45665cc57f813c4571?v=1']);
 
 const filter = process.argv[2] ?? '';
 const files = (await readdir(reviewRoot)).filter(file => file.endsWith('.html') && file !== 'index.html').map(file => file.slice(0, -5)).sort();

@@ -1,5 +1,5 @@
 /* 红包: the packet's own colours are an illustration, the same in both themes; everything around it uses product tokens. */
-.envelope, .card, .envDialog, .env, .banner, .stack { --packet:#E2543F; --packet-hover:#D94D39; --packet-dim:light-dark(#EFA597, #8E4236); --packet-deep:#C8432F; --packet-flap:#EC6A53; --seal:#F5C55B; --seal-ink:#7A4A06; --packet-ink:#FFF6EA; --packet-scrim:rgb(15 16 20 / 32%); --packet-hover-veil:rgb(255 255 255 / 14%); }
+.envelope, .card, .envDialog, .env, .banner, .stack, .coins { --packet:#E2543F; --packet-hover:#D94D39; --packet-dim:light-dark(#EFA597, #8E4236); --packet-deep:#C8432F; --packet-flap:#EC6A53; --seal:#F5C55B; --seal-ink:#7A4A06; --packet-ink:#FFF6EA; --packet-scrim:rgb(15 16 20 / 32%); --packet-hover-veil:rgb(255 255 255 / 14%); --pals-coin:#F2FFCC; }
 
 /* The envelope drawing: body, curved flap, seal. */
 .envelope { position:relative; flex:none; display:inline-block; width:28px; height:36px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--packet); overflow:hidden; }
@@ -41,6 +41,11 @@
 .envLink { position:absolute; bottom:22px; left:50%; translate:-50% 0; padding:4px 8px; border:0; background:none; color:var(--packet-ink); font:inherit; font-size:var(--ui-type-footnote); opacity:.9; white-space:nowrap; cursor:pointer; }
 .envLink:hover:not(:disabled) { text-decoration:underline; text-underline-offset:3px; }
 .envLink:disabled { cursor:default; }
+
+/* 散开 · 落袋: PALS coins in their own top-layer popover, over the envelope and then the result sheet; never interactive. */
+.coins { position:fixed; inset:0; width:100%; height:100%; max-width:none; max-height:none; margin:0; padding:0; border:0; background:transparent; overflow:hidden; pointer-events:none; }
+.coin { position:absolute; left:0; top:0; display:grid; place-items:center; width:32px; height:32px; margin:-16px 0 0 -16px; border-radius:50%; background:var(--pals-coin); opacity:0; will-change:transform, opacity; }
+.coin img { width:64%; height:64%; }
 
 /* Result: who sent it, the wish, what I got rolling up, then the claims. */
 .result { position:relative; gap:20px; }

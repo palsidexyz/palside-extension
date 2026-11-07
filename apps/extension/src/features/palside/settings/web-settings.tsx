@@ -5,6 +5,7 @@ import { useTranslations } from 'use-intl';
 import type { CSSProperties, ReactNode } from 'react';
 import { Ban, EyeOff, UserPlus } from 'lucide-react';
 import { Switch } from '@palside/ui/switch';
+import { useSavingSwitch } from '../ui/use-saving-switch';
 import { defaultDanmakuSettings, type DanmakuSettings } from '../../../runtime/browser/page-protocol';
 import { CountText } from '../ui/motion-details';
 import { DanmakuIcon, featureIcons } from '../ui/icons';
@@ -52,19 +53,21 @@ function DanmakuTab({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const rooms = c.live?.state.rooms;
   const off = Boolean(c.live?.state.preferences.rooms?.off);
+  const danmaku = useSavingSwitch(!off);
+  const invites = useSavingSwitch(rooms?.acceptInvites ?? true);
   const blocked = rooms?.blocked.length ?? 0;
   const why = off ? t('extension.settings.roomsOff') : undefined;
   return <>
     <SettingGroup>
       <SettingControl icon={<DanmakuIcon size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.room.name')} checked={!off} onChange={event => void c.run('room-settings', { off: !event.currentTarget.checked })} />
+        <Switch className={settingRows.switch} label={t('extension.room.name')} checked={danmaku.checked} pending={danmaku.pending} refused={danmaku.refused} onChange={event => { const on = event.currentTarget.checked; void danmaku.save(on, async () => await c.run('room-settings', { off: !on }) !== undefined); }} />
       </SettingControl>
     </SettingGroup>
     <SettingGroup title={t('extension.settings.onPages')} aside={why} dim={Boolean(why)}><DanmakuStyle c={c} /></SettingGroup>
     <SettingGroup title={t('extension.settings.groupStrangers')} dim={off}>
       <SettingItem icon={<Ban size={16} />} title={t('extension.room.blocked')} value={blocked ? <CountText text={t('extension.dynamic.peopleCount', { count: blocked })} value={blocked} /> : t('extension.room.blockedNone')} onClick={() => c.go('blocked')} />
       <SettingControl icon={<UserPlus size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.settings.acceptInvites')} checked={rooms?.acceptInvites ?? true} onChange={event => void c.run('invite-settings', { accept: event.currentTarget.checked })} />
+        <Switch className={settingRows.switch} label={t('extension.settings.acceptInvites')} checked={invites.checked} pending={invites.pending} refused={invites.refused} onChange={event => { const accept = event.currentTarget.checked; void invites.save(accept, async () => await c.run('invite-settings', { accept }) !== undefined); }} />
       </SettingControl>
     </SettingGroup>
   </>;
@@ -75,7 +78,8 @@ const previewSize = { sm: 14, md: 16, lg: 19 } as const;
 /** The preview draws as many lines as the density allows, in the lanes of the chosen area. */
 const previewLines = ['sampleA', 'sampleB', 'sampleC', 'sampleD'] as const;
 const previewCount = { low: 2, mid: 3, high: 4 } as const;
-const previewLanes = { top: [6, 30, 54, 6], chart: [40, 66, 92, 40], full: [8, 40, 72, 100] } as const;
+// Lane tops within the 132px preview, so each area shows lines only in its share of the height.
+const previewLanes = { 25: [4, 4, 18, 18], 50: [6, 6, 36, 36], 75: [8, 40, 72, 8], 100: [8, 40, 72, 100] } as const;
 const previewLeft = [20, 150, 80, 210] as const;
 
 /** How 弹幕 look on pages: a still preview, then 数量, 字号, 位置, 速度 and 透明度. */
@@ -91,7 +95,7 @@ function DanmakuStyle({ c }: { c: PalsideController }) {
     </div>
       <Sub label={t('extension.style.density')}><Seg label={t('extension.style.density')} value={danmaku.density} options={[['low', t('extension.style.low')], ['mid', t('extension.style.mid')], ['high', t('extension.style.high')]]} onChange={density => set({ density })} /></Sub>
       <Sub label={t('extension.center.fontSize')}><Seg label={t('extension.center.fontSize')} value={danmaku.size} options={[['sm', t('extension.center.small')], ['md', t('extension.center.medium')], ['lg', t('extension.center.large')]]} onChange={size => set({ size })} /></Sub>
-      <Sub label={t('extension.style.area')}><Seg label={t('extension.style.area')} value={danmaku.area} options={[['chart', t('extension.style.chart')], ['top', t('extension.style.top')], ['full', t('extension.style.full')]]} onChange={area => set({ area })} /></Sub>
+      <Sub label={t('extension.style.area')}><Seg label={t('extension.style.area')} value={danmaku.area} options={[[25, t('extension.style.quarter')], [50, t('extension.style.half')], [75, t('extension.style.threeQuarters')], [100, t('extension.style.full')]]} onChange={area => set({ area })} /></Sub>
       <Sub label={t('extension.overlay.speed')}><Seg label={t('extension.overlay.speed')} value={danmaku.speed} options={[[110, t('extension.overlay.slow')], [144, t('extension.overlay.medium')], [190, t('extension.overlay.fast')]]} onChange={speed => set({ speed })} /></Sub>
       <Sub label={t('extension.overlay.opacity')}><Range label={t('extension.overlay.opacity')} min={30} max={100} value={danmaku.opacity} onChange={opacity => set({ opacity })} /></Sub>
   </div>;

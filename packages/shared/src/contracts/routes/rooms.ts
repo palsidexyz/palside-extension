@@ -4,9 +4,9 @@ import { id } from '../common.ts';
 import { person } from '../profiles.ts';
 import { ROOM_TEXT_MAX } from '../../rules/rooms.ts';
 import { endpoint, jsonBody, jsonResponse, binaryResponse } from '../endpoint.ts';
-import { roomKey, roomProfileInput, stance, roomStance, roomSendResult, roomMessage, roomPage, hotRooms, roomLease, roomSummary, roomPeople, keyQuery, messageInput } from '../rooms.ts';
+import { roomKey, roomSite, stance, roomStance, roomSendResult, roomMessage, roomPage, hotRooms, roomLease, roomSummary, roomPeople, keyQuery, messageInput } from '../rooms.ts';
 export const roomEndpoints = [
-  endpoint({ id: 'rooms.lease', method: 'POST', path: '/rooms/lease', rateLimits: ['roomLease'], body: jsonBody(strictObject({ key: Type.Union([roomKey, Type.Null()]), profile: Type.Optional(roomProfileInput) })), response: jsonResponse(roomLease), errors: ['TEXT_NOT_ALLOWED'] }),
+  endpoint({ id: 'rooms.lease', method: 'POST', path: '/rooms/lease', rateLimits: ['roomLease'], body: jsonBody(strictObject({ key: Type.Union([roomKey, Type.Null()]), site: Type.Optional(roomSite) })), response: jsonResponse(roomLease) }),
   endpoint({ id: 'rooms.summary', method: 'GET', path: '/rooms/summary', rateLimits: ['roomSummary'], query: keyQuery, response: jsonResponse(roomSummary) }),
   endpoint({ id: 'rooms.people', method: 'GET', path: '/rooms/people', rateLimits: ['roomPeople'], query: keyQuery, response: jsonResponse(roomPeople) }),
   endpoint({ id: 'rooms.hot', method: 'GET', path: '/rooms/hot', rateLimits: ['roomHot'], response: jsonResponse(hotRooms) }),

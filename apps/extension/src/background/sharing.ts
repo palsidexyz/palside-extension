@@ -1,21 +1,17 @@
-import { MINUTE_MS } from '@palside/shared/units';
 import { DEVICE_IDLE_SECONDS } from '@palside/shared/rules/accounts';
 import type { DeviceState } from '@palside/shared/contracts/presence';
 import { MessageError,errorMessage } from '@palside/i18n';
 import type { Browser } from 'wxt/browser';
 import { identifyPage,matchesSharedPage,publicShareUrl,websiteIdentity } from '@palside/shared/navigation';
-import { siteProfile } from '@palside/shared/sites';
+import { tokenPage,type LookupPage } from '../runtime/viewing/page-resolver.ts';
 import { connectionStatus } from '../runtime/transport/connection.ts';
-import { accessStatus } from '../runtime/browser/permissions.ts';
 import { hasPanelForWindow } from '../runtime/browser/panel-context.ts';
 import { pageName } from '../runtime/viewing/page-title.ts';
 import { createTabObserver,type ObservationPolicy } from '../runtime/browser/tab-observer.ts';
-import { matchesTokenPage,readVisibleToken,resolveTokenMetadata,tokenName,type TokenPageMetadata,type TokenPageRequest } from '../runtime/viewing/token-page.ts';
-import { validateTokenLogo } from '../runtime/viewing/token-logo.ts';
+import { resolveTokenMetadata } from '../runtime/viewing/token-name.ts';
 import { pageView } from '../runtime/viewing/view-snapshot.ts';
 import type { Background } from './index.ts';
 import type { Tab } from './context.ts';
-import type { Preferences } from '../domain/account/preferences.ts';
 
 /**
  * 共享在看: while it is 启用 and switched on, a joined team is current and the service is connected, the focused panel window's
@@ -28,7 +24,6 @@ export function sharing(bg: Background) {
   let reported: DeviceState | undefined;
   /** When a resume, enable or preference change replied before its state arrived: the sharing policy that follows within 10 s claims this device. */
   let claimAt = 0;
-  const tokenMetadata = new Map<string, { value?: TokenPageMetadata; attempts: number; at: number; policy: number; preferences: Preferences | undefined }>();
 
   function observationPolicy(): ObservationPolicy | undefined {
     const state = bg.state;
@@ -55,56 +50,12 @@ export function sharing(bg: Background) {
     clear: async (preparing = false) => { if (bg.state?.authenticated) await bg.run({ name: 'page', payload: { clear: true, preparing } }).catch(() => {}); },
     activity: () => observe({ activity: true }),
     failed: () => observe({ failed: true }),
-    metadata: (identity, page) => observe({ identity, host: identity.host, metadata: true, context: { tabId: page.tabId, windowId: page.windowId } }),
-    preview: async (identity, page) => observe({ identity, host: identity.host, preview: true, title: page.title, favicon: await bg.favicon(page.url), context: { tabId: page.tabId, windowId: page.windowId } }),
-    publish: async (identity, page) => observe({ identity, host: identity.host, stable: true, title: page.title, favicon: await bg.favicon(page.url), context: { tabId: page.tabId, windowId: page.windowId } }),
+    preview: async (identity, page) => observe({ identity, host: identity.host, preview: true, title: page.title, favicon: await bg.favicon(page.url) }),
+    publish: async (identity, page) => observe({ identity, host: identity.host, stable: true, title: page.title, favicon: await bg.favicon(page.url) }),
   });
 
-  /** The token's name and icon from the page: only registry token sites with a page profile, with this site's access and 代币数据 on. */
-  async function readTokenPage(request: TokenPageRequest) {
-    if (!request?.identity || !request.context || !['viewing', 'share'].includes(request.purpose)) return;
-    if (!siteProfile(request.identity.host)) return;
-    // Preference snapshots and Chrome policy versions identify the policy revision.
-    const preferences = bg.state?.preferences, version = bg.policyVersion, document = bg.tabVersions.get(request.context.tabId);
-    const accountId = bg.state?.account?.id, policy = observationPolicy()?.key;
-    const eligible = () => bg.policyVersion === version && bg.tabVersions.get(request.context.tabId) === document && bg.state?.preferences === preferences && !preferences?.tokenOff?.includes(request.identity.host) &&
-      bg.state?.authenticated && bg.state.account?.id === request.accountId && bg.state.preferences.current === request.teamId && bg.state.remoteTeams.some(team => team.id === request.teamId && team.joined) &&
-      (request.purpose === 'share' || observationPolicy()?.key === policy);
-    if (!eligible() || request.purpose === 'viewing' && !policy) return;
-    const page = async () => {
-      const window = await browser.windows.getLastFocused();
-      if (!window.focused || window.incognito || window.id !== request.context.windowId || ![...bg.panels.values()].includes(window.id)) return;
-      if (await browser.idle.queryState(DEVICE_IDLE_SECONDS) === 'locked') return;
-      const tab = await bg.activeTab(window.id);
-      return tab?.id === request.context.tabId && !tab.incognito && tab.status !== 'loading' && tab.url && matchesTokenPage(tab.url, request.identity) ? tab : undefined;
-    };
-    const tab = await page();
-    if (tab?.id === undefined || !tab.url || !(await accessStatus(tab.url, browser)).site || !eligible() || accountId !== bg.state?.account?.id) return;
-    const key = JSON.stringify([accountId, request.teamId, request.context.windowId, tab.id, document, tab.url, request.identity.host, request.identity.chain, request.identity.address]);
-    let saved = tokenMetadata.get(key);
-    if (!saved || saved.policy !== version || saved.preferences !== preferences || Date.now() - saved.at > MINUTE_MS) {
-      saved = { attempts: 0, at: Date.now(), policy: version, preferences }; tokenMetadata.set(key, saved);
-      if (tokenMetadata.size > 100) tokenMetadata.delete(tokenMetadata.keys().next().value!);
-    }
-    if (saved.value) return saved.value;
-    if (saved.attempts >= 3) return;
-    saved.attempts++;
-    try {
-      // Chrome also checks site access when executing this isolated read.
-      const results = await browser.scripting.executeScript({ target: { tabId: tab.id }, world: 'ISOLATED', func: readVisibleToken, args: [{ href: tab.url, host: request.identity.host, address: request.identity.address, chain: request.identity.chain }, siteProfile(request.identity.host) ?? null] });
-      const after = await page();
-      if (!after || after.url !== tab.url || !(await accessStatus(tab.url, browser)).site || !eligible()) return;
-      const result = results.find(result => result.frameId === 0)?.result;
-      const name = tokenName(result?.name);
-      const logo = await validateTokenLogo(result?.logo);
-      if (!eligible()) return;
-      if (name) saved.value = { name, logo };
-      return saved.value;
-    } catch { return; }
-  }
-
   return {
-    observer, observationPolicy, readTokenPage,
+    observer, observationPolicy,
     /** 活跃: an open panel or recent input on this device; reported once per change. */
     updateDeviceState(value?: DeviceState) {
       if (value) idle = value;
@@ -132,7 +83,7 @@ export function sharing(bg: Background) {
       if (!hasPanelForWindow(contexts, [...bg.panels].map(([port, windowId]) => ({ documentId: port.sender?.documentId, documentUrl: port.sender?.url, windowId })), page.windowId)) return false;
       return matchesSharedPage(page.url, url as string);
     },
-    /** Panel `link-card`: a token or website card for a pasted link, using the active tab's title and token read when it is that page. */
+    /** Panel `link-card`: a token or website card for a pasted link, using the active tab's title when it is that page. Token names come from the directory in the panel. */
     async linkCard(windowId: number, senderUrl: string, value: unknown) {
       const input = typeof value === 'string' ? value.trim() : '';
       const url = publicShareUrl(input);
@@ -146,13 +97,12 @@ export function sharing(bg: Background) {
       const current = tab?.url === input;
       const title = current ? pageName(tab?.title, host) : undefined;
       const favicon = await bg.favicon(current ? tab?.url : url);
-      const source = identity.kind === 'pool' ? websiteIdentity(url, 'page') : identity;
+      // A pool or chainless contract page is a token card once the runtime has found its token; until then, a website card.
+      const lookup = identity.kind === 'pool' || identity.kind === 'address' ? identity : undefined;
+      const found = lookup ? bg.state?.pages?.[lookup.url] : undefined;
+      const source = lookup ? found ? tokenPage(lookup, found) : websiteIdentity(url, 'page') : identity as Exclude<typeof identity, LookupPage>;
       if (!source) return {};
-      const accountId = bg.state?.account?.id;
-      const confirmed = source.kind === 'asset' && current && tab?.id !== undefined && accountId
-        ? await readTokenPage({ identity: source, context: { tabId: tab.id, windowId }, accountId, teamId: bg.state!.preferences.current, purpose: 'share' })
-        : undefined;
-      const view = pageView(source, source.kind === 'asset' ? resolveTokenMetadata(source, confirmed) : { name: title ?? host, logo: favicon });
+      const view = pageView(source, source.kind === 'asset' ? resolveTokenMetadata(source, bg.state?.tokens?.[`${source.chain}:${source.address}`]) : { name: title ?? host, logo: favicon }, lookup && found ? lookup.kind : undefined);
       if (view.kind === 'website') view.source = host;
       return { attachment: { kind: 'asset', assetId: view.id, view } };
     },

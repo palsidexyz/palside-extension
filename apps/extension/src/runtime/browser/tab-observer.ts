@@ -14,7 +14,6 @@ type ObserverHost = {
   preview?: (identity: PageIdentity, page: ActivePage) => Promise<unknown> | unknown;
   publish: (identity: PageIdentity, page: ActivePage) => Promise<unknown>;
   activity: () => Promise<unknown>;
-  metadata?: (identity: Extract<PageIdentity, { kind: 'asset' }>, page: ActivePage) => Promise<unknown>;
 };
 
 /** Real navigation clears immediately; harmless repeated notifications keep the current generation. */
@@ -24,10 +23,8 @@ export function createTabObserver(host: ObserverHost, settleMs = SECOND_MS) {
   let observed: string | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
-  let metadataTimer: ReturnType<typeof setTimeout> | undefined;
-  let lastMetadata = 0;
   function invalidate(preparing: boolean) {
-    generation++; observed = undefined; clearTimeout(timer); clearTimeout(metadataTimer); metadataTimer = undefined; lastMetadata = 0;
+    generation++; observed = undefined; clearTimeout(timer);
     void host.clear(preparing).catch(() => {});
   }
   async function refresh(activity = false, preserve = false) {
@@ -72,21 +69,5 @@ export function createTabObserver(host: ObserverHost, settleMs = SECOND_MS) {
       schedule();
     } catch { if (check === checks && !disposed) { invalidate(false); void host.failed?.().catch(() => {}); } }
   }
-  function metadataChanged() {
-    if (disposed || !host.metadata || metadataTimer || Date.now() - lastMetadata < 1500) return;
-    const revision = generation;
-    metadataTimer = setTimeout(() => {
-      metadataTimer = undefined; lastMetadata = Date.now();
-      void (async () => {
-        const policy = host.policy();
-        if (!policy || disposed || revision !== generation) return;
-        const page = await host.activePage();
-        const identity = page && identifyPage(page.url);
-        if (!page || page.loading || identity?.kind !== 'asset' || disposed || revision !== generation || host.policy()?.key !== policy.key) return;
-        const key = JSON.stringify([policy.context ?? policy.key, page.windowId, page.tabId, identity.url]);
-        if (key === observed) await host.metadata!(identity, page);
-      })().catch(() => {});
-    }, settleMs);
-  }
-  return { refresh, metadataChanged, dispose() { disposed = true; checks++; invalidate(false); } };
+  return { refresh, dispose() { disposed = true; checks++; invalidate(false); } };
 }

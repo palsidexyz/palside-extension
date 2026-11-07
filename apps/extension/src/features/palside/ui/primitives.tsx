@@ -2,10 +2,11 @@
 
 import { useTranslations } from 'use-intl';
 import { use, useState, type ReactNode, type ComponentProps, type CSSProperties } from 'react';
-import { Globe2, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { ChainBadge } from '../assets/chain-identity';
 import { tokenImageFailures } from '../assets/token-image-failures';
-import { siteForUrl } from '../settings/site-catalog';
+import { siteAt, SiteDirectoryContext } from '../settings/site-catalog';
+import { SiteLogo } from '../assets/site-logo';
 import { motion } from 'motion/react';
 import { StateGlyph } from './motion-details';
 import { Avatar } from '@palside/ui/avatar';
@@ -15,22 +16,30 @@ import type { Person } from '../../../domain/account/model';
 import type { Viewing } from '../../../domain/assets/model';
 import s from '../app/palside.module.css';
 
-function TokenFace({ logo, fallback }: { logo?: string; fallback: ReactNode }) {
+/** Logos already decoded in this panel: shown at once on the next mount instead of fading in from the initial again. */
+const decodedLogos = new Set<string>();
+function TokenFace({ logo, fallback, waiting }: { logo?: string; fallback: ReactNode; waiting?: 'name' | 'logo' }) {
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => Boolean(logo && decodedLogos.has(logo)));
   const ready = loaded && !failed;
   const blocked = Boolean(logo && !ready && (failed || tokenImageFailures.has(logo)));
-  return <span className={s.tokenFace} data-fallback={!ready}>
-    <span className={s.tokenFallback} style={{ opacity: ready ? 0 : 1 }}>{fallback}</span>
-    {logo && !blocked && <motion.img src={logo} style={{ opacity: ready ? 1 : 0 }} referrerPolicy="no-referrer" alt="" draggable={false} onLoad={() => { tokenImageFailures.forget(logo); setLoaded(true); }} onError={() => { tokenImageFailures.remember(logo); setFailed(true); }} />}
+  return <span className={s.tokenFace} data-fallback={!ready} data-waiting={!ready && waiting || undefined}>
+    <span className={s.tokenFallback} style={{ opacity: ready || waiting === 'name' ? 0 : 1 }}>{fallback}</span>
+    {logo && !blocked && <motion.img src={logo} style={{ opacity: ready ? 1 : 0 }} referrerPolicy="no-referrer" alt="" draggable={false} onLoad={event => { tokenImageFailures.forget(logo); const done = () => { decodedLogos.add(logo); setLoaded(true); }; void event.currentTarget.decode().then(done, done); }} onError={() => { tokenImageFailures.remember(logo); setFailed(true); }} />}
   </span>;
 }
-export function Token({ view, size = 'md' }: { view: Viewing; size?: 'xs' | 'sm' | 'md' | 'card' | 'lg' }) {
+/**
+ * What a page is about: a token's own logo (round, with its chain), or for any other page the face of its site — the same face the
+ * page capsule, settings and 收藏 draw (see `SiteLogo`), with the favicon the page carried as the last resort. `waiting` (see `tokenWaiting`)
+ * draws the face as a light sweep instead of a placeholder initial while the name or icon is on its way.
+ */
+export function Token({ view, size = 'md', waiting }: { view: Viewing; size?: 'xs' | 'sm' | 'md' | 'card' | 'lg'; waiting?: 'name' | 'logo' }) {
+  const directory = use(SiteDirectoryContext);
+  if (view.kind === 'website') return <span className={s.token} data-token-size={size} data-kind="website" aria-hidden="true"><SiteLogo site={siteAt(directory, view.url, view.logo)} /></span>;
   const fallbackName = view.name.trim();
   const initial = fallbackName === view.address || /^0x[\da-f.\u2026]+$/i.test(fallbackName) ? '?' : (fallbackName.match(/\p{L}/u)?.[0] ?? '?').toLocaleUpperCase();
-  const logo = view.logo ?? (view.kind === 'website' ? siteForUrl(view.url)?.logo : undefined);
   return <span className={s.token} data-token-size={size} data-kind={view.kind} style={{ '--token-color': view.color } as CSSProperties} aria-hidden="true">
-    <TokenFace key={logo ?? ''} logo={logo} fallback={view.kind === 'website' ? <Globe2 size={18} strokeWidth={1.6} /> : <span className={s.tokenInitial}>{initial}</span>} />
+    <TokenFace key={view.logo ?? ''} logo={view.logo} fallback={<span className={s.tokenInitial}>{initial}</span>} waiting={waiting} />
     {view.kind === 'asset' && view.chain && size !== 'xs' && <ChainBadge chain={view.chain} />}
   </span>;
 }

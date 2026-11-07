@@ -17,7 +17,7 @@ const hooks = registerHooks({
       if (specifier === 'use-intl') return stub('export const useTranslations = () => key => key;');
       if (specifier === 'motion/react') return stub('export const AnimatePresence = null, motion = { div: null }, useReducedMotion = () => true;');
       if (specifier.endsWith('.css')) return stub('export default {};');
-      if (specifier === '../assets/token-name') return stub('export const TokenName = () => null, tokenLabel = view => view.name;');
+      if (specifier === '../assets/token-name') return stub('export const TokenName = () => null, tokenLabel = view => view.name, tokenWaiting = () => undefined;');
       if (specifier === '../assets/token-data') return stub('export const tokenStats = () => undefined, liveView = (_c, view) => view;');
       if (!['./rooms', '../../../runtime/rooms/token-sites', '@palside/design/motion'].includes(specifier) && !specifier.startsWith('@palside/shared/')) return stub('export const Check = null, ChevronDown = null, Flame = null, Layers = null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = null, InlineFeedback = null, Count = null, CountText = null, Tooltip = null, Token = null, ChainLogo = null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;');
     }
@@ -87,7 +87,7 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
       '/chain/recovery': { items: [], nextCursor: null },
       '/chain/config': { enabled: false, version: 1, deployment: null, dailySponsoredLimit: 0, quickPay: { single: '250', daily: '1000' }, minimumLiquidity: '0', updatedAt: Date.now() },
       '/rooms/lease': { key: body.key, count: 1, slowUntil: 0, slowMs: 5000 },
-      '/rooms/summary': { key, profile: null, count: roomServer.count, faces: [], stance: { bull: 0, hold: 0, bear: 0, mine: null } },
+      '/rooms/summary': { key, site: null, count: roomServer.count, faces: [], stance: { bull: 0, hold: 0, bear: 0, mine: null } },
       '/rooms/messages': { messages: [], hasMore: false },
     };
     assert.ok(path in values, path);
@@ -96,7 +96,7 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
     return new Response(value, { headers: { 'content-type': 'application/json' } });
   });
   const runtime = {
-    state: emptyState(), api: new Api('https://service.test'), emit() {}, initialise: async () => {}, tokens: { clear() {}, put() {}, get() {}, apply: view => view, remember: () => false },
+    state: emptyState(), api: new Api('https://service.test'), emit() {}, initialise: async () => {}, tokens: { clear() {}, put() {}, get() {}, apply: view => view, remember: () => false }, directory: { clear() {}, show() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
     storage: { get: async () => { if (gates.has('storage')) await gates.get('storage'); }, rows: async () => [], remove: async () => {}, put: async () => {}, cache: async () => [] },
     sharing: { restoreToggles: async () => {}, savePreferences: async () => {}, peerViewing: new Map() },
     cache: { expireLocalContent: async () => {}, evictCachedContent() {}, pruneMedia() {}, eventTimes: new Map(), preparedViews: new Map(), expiresAt: message => message.expiresAt, cacheMessage: async message => { cachedMessages.push(message); } },

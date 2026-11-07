@@ -5,7 +5,8 @@ import { NICKNAME_LENGTH, PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { errorMessage, message as uiMessage, type TextValue } from '@palside/i18n';
 import { ENGLISH_WORDS } from '@palside/shared/identity';
 import { useTranslations } from 'use-intl';
-import { Count } from '../ui/motion-details';
+import { Count, DrawnCheck, Swap } from '../ui/motion-details';
+import type { SignupPhase } from '../../../runtime/composition/runtime-state';
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowLeft, Check, Copy, Eye, ShieldAlert, Users } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
@@ -72,15 +73,26 @@ function Step({ title, lead, help, hero, footer, children, onSubmit }: { title: 
   return onSubmit ? <form className={o.step} onSubmit={event => { event.preventDefault(); onSubmit(); }}>{body}</form> : <div className={o.step}>{body}</div>;
 }
 
-/** Registering and connecting has no honest steps to name, so it is one quiet line that only appears if it takes a moment. */
-function Working({ flow }: { flow: 'create' | 'restore' }) {
+const signupPhases: SignupPhase[] = ['seal', 'register', 'connect', 'wallet'];
+const phaseTitle = { seal: 'phaseSeal', register: 'phaseRegister', connect: 'phaseConnect', wallet: 'phaseWallet' } as const;
+
+/** Registration names the part the runtime reports it is in; nothing advances on a timer. Four segments say how many parts are left, not how long. */
+function Working({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
+  const done = c.working === 'done';
+  const index = done ? signupPhases.length : Math.max(0, signupPhases.indexOf(c.live?.state?.signupPhase ?? 'seal'));
+  const phase = signupPhases[index];
+  const title = done ? t(c.flow === 'create' ? 'extension.copy.createDone' : 'extension.copy.restoreDone')
+    : phase === 'register' && c.flow === 'restore' ? t('extension.copy.phaseAddDevice') : t(`extension.copy.${phaseTitle[phase ?? 'seal']}`);
   return <div className={o.working} role="status" aria-live="polite">
-    <span className={o.workingMark} aria-hidden="true"><img src="/brand/palside.svg" alt="" draggable={false} /></span>
-    <h1 ref={heading} tabIndex={-1}>{t(flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')}</h1>
-    <span className={o.track} aria-hidden="true"><i /></span>
+    <Swap k={done ? 'done' : 'mark'} className={o.workingSlot}>{done ? <DrawnCheck /> : <span className={o.workingMark} aria-hidden="true"><img src="/brand/palside.svg" alt="" draggable={false} /></span>}</Swap>
+    <h1 ref={heading} tabIndex={-1}><Swap k={title}>{title}</Swap></h1>
+    <ol className={o.phases} aria-label={t(c.flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')}>
+      {signupPhases.map((step, at) => <li key={step} data-state={at < index ? 'done' : at === index ? 'current' : 'upcoming'} />)}
+    </ol>
+    {c.live?.state?.signupWaiting && <p className={o.waiting}>{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>}
   </div>;
 }
 
@@ -351,7 +363,6 @@ function PasswordSetup({ c }: { c: PalsideController }) {
     <div className={o.pinBlock}>
       <PinInput outlined reveal aria-label={t('extension.copy.password')} aria-invalid={Boolean(error)} aria-describedby={error ? 'pin-error' : undefined} autoComplete="off" autoFocus value={pin} disabled={c.authBusy} onValueChange={value => { setPin(value); setError(''); }} />
       {error && <p id="pin-error" className={edge.error} role="alert">{text(error)}</p>}
-      {c.live?.state?.signupWaiting && <p className={o.waiting} role="status">{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>}
     </div>
   </Step>;
 }
@@ -395,9 +406,9 @@ export function Onboarding({ c }: { c: PalsideController }) {
       {c.live && <LanguageSetting compact />}
     </header>
     <Steps c={c} />
-    {c.working && <div className={o.body}><Working flow={c.flow} /></div>}
+    {c.working && <div className={o.body}><Working c={c} /></div>}
     {/* The step stays mounted underneath so a failed request returns to the same answers and error. */}
-    <div className={o.body} key={c.screen} hidden={c.working} data-palside-panel-scroll>
+    <div className={o.body} key={c.screen} hidden={Boolean(c.working)} data-palside-panel-scroll>
       {c.screen === 'welcome' ? <Welcome c={c} />
         : c.screen === 'new-account' ? <NewPhrase c={c} />
         : c.screen === 'confirm-phrase' ? <ConfirmPhrase key={`${c.flow}:${c.phrase.join(' ')}`} c={c} />

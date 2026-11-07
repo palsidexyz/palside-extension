@@ -62,7 +62,7 @@ test('status derives effective 互动 from 设置, the site grant and the per-fe
   const granted = { site: true }, active = { site: false, active: true };
   let status = pageStatus(1, tab, [], granted, state);
   assert.equal(status.interactive, true); assert.equal(status.stickyEnabled, true); assert.equal(status.signalEnabled, true);
-  assert.equal(status.tokenProfile, true); assert.equal('tokenLocked' in status, false); assert.equal(status.connected, false);
+  assert.equal('tokenProfile' in status, false); assert.equal('tokenLocked' in status, false); assert.equal(status.connected, false);
   assert.equal(status.title, 'Token');
   status = pageStatus(1, tab, [], active, state);
   assert.equal(status.granted, false); assert.equal(status.interactive, false, 'the site grant is part of effective 互动');
@@ -78,5 +78,4 @@ test('status derives effective 互动 from 设置, the site grant and the per-fe
   assert.equal(none.interactive, true, 'the site remains on even when signals and stickies are disabled');
   assert.equal(none.stickyEnabled, false); assert.equal(none.signalEnabled, false);
   assert.equal(pageStatus(1, tab, [], granted, { ...state, preferences: { ...state.preferences, siteInteraction: { 'gmgn.ai': { on: false, danmaku: true, signal: true, sticky: true } } } }).interactive, false);
-  assert.equal(pageStatus(1, { id: 2, url: 'https://x.com/home', status: 'complete' }, [], granted, state).tokenProfile, false);
 });

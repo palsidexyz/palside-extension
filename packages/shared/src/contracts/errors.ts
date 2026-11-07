@@ -24,6 +24,7 @@ export const errors = {
   ACCOUNT_BANNED: definition(403, strictObject({ expiresAt: Type.Union([timestamp, Type.Null()]) })),
   TEXT_NOT_ALLOWED: definition(400, empty),
   CHAIN_UNAVAILABLE: definition(503, empty),
+  TOKENS_UNAVAILABLE: definition(503, empty),
   CHAIN_RELAY_UNAVAILABLE: definition(503, empty),
   CHAIN_INDEX_UNAVAILABLE: definition(503, empty),
   CHAIN_DISABLED: definition(503, empty),

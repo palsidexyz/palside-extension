@@ -3,7 +3,7 @@ import { requestSitesAccess,revokeAllSitesKeepingHosts,revokeSiteAccess } from '
 import { emptyFavorites,readFavorites,readSiteInteractions,siteInteraction,type Favorites,type SiteInteraction } from '../../../domain/annotations/interaction';
 import type { PanelState } from '../app/use-panel-state';
 import type { PanelActions } from '../app/panel-actions';
-export function createLivePageActions(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'setSite' | 'setFavorites' | 'toggle' | 'enableSites' | 'removeSite' | 'setTokenData'> {
+export function createLivePageActions(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'setSite' | 'setFavorites' | 'toggle' | 'enableSites' | 'removeSite'> {
 const { view: { setNotice }, preferences } = state;
 const live = state.view.live!;
 
@@ -54,11 +54,5 @@ async function removeSite(host: string | 'all') {
     } catch (error) { if (preferences.current()) setNotice(errorMessage(error)); }
 }
 
-/** 代币数据 for one 已授权网站 with a token profile; on unless switched off here. */
-function setTokenData(host: string, on: boolean) {
-
-    const next = (list: string[]) => on ? list.filter(item => item !== host) : [...new Set([...list, host])];
-    void preferences.update('tokenOff', old => next(old ?? []))?.catch(() => { });
-}
-  return { setSite, setFavorites, toggle, enableSites, removeSite, setTokenData };
+  return { setSite, setFavorites, toggle, enableSites, removeSite };
 }

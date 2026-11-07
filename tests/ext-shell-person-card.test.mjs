@@ -58,7 +58,7 @@ async function fixture(t) {
     '../annotations/social-state': { useSocialUi: () => ({}), setSocialUi() {} },
     '../ui/primitives': { Action: ({ label, children, ...props }) => h('button', { ...props, 'aria-label': label }, children), PersonAvatar: () => null, Token: () => null },
     './account-label': { accountLabel: id => id },
-    '../assets/token-name': { TokenName: ({ view }) => view.name },
+    '../assets/token-name': { TokenName: ({ view }) => view.name, tokenWaiting: () => undefined },
     '../assets/token-data': { liveView: (_c, view) => view },
     '../../../domain/account/profile-tags': { tagKey: tag => tag, tagLabel: tag => tag },
     '../wallet/payment-sheet': { openTransfer() {} },

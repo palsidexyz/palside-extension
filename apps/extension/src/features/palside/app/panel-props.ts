@@ -5,5 +5,7 @@ import { type Dataset } from '../../../runtime/composition/dataset';
 import { type Scenario } from './panel-model';
 import type { PanelAdapter } from './panel-adapter';
 /** Setting the password registers this device and connects; the account remounts the session midway, so this outlives it. */
-export type OnboardingState = { working: boolean; setWorking: (working: boolean) => void; flow: 'create' | 'restore'; setFlow: (flow: 'create' | 'restore') => void };
+/** `done` holds the finished registration on screen for a beat before the next step. */
+export type Working = boolean | 'done';
+export type OnboardingState = { working: Working; setWorking: (working: Working) => void; flow: 'create' | 'restore'; setFlow: (flow: 'create' | 'restore') => void };
 export type PalsideProps = { live?: LivePort; adapter?: PanelAdapter; data: Dataset; scenario?: Scenario; sites: Site[]; deliver: (message: Message) => Promise<void>; onboarding?: OnboardingState };

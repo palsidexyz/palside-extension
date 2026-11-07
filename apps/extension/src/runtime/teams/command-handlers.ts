@@ -155,6 +155,13 @@ export async function teamPreferencesCommand(this: RuntimeCommands, command: Ext
     const scope = runtime.auth.scope();
  const teamId = text('teamId' in p ? p.teamId : undefined);
 await scope.wait(runtime.api.request('teams.preferences', { params: { id: teamId }, body: { muted: p.muted, readIds: p.readIds } }));
+    // A saved mute settles the switch now; the wider refresh follows without holding it.
+    if (typeof p.muted === 'boolean') {
+      const muted = p.muted, remote = runtime.state.remoteTeams.find(t => t.id === teamId);
+      if (remote) remote.preferences = { ...remote.preferences, muted };
+      runtime.state.data.teams = runtime.state.data.teams.map(t => t.id === teamId ? { ...t, muted } : t); runtime.emit();
+      void runtime.refresh().catch(() => {}); return { done: true };
+    }
     await scope.wait(runtime.refresh()); return { done: true };
 }
 

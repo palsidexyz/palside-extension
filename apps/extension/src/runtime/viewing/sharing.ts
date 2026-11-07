@@ -5,17 +5,20 @@ import type { MatrixEvent } from 'matrix-js-sdk';
 import { sharingWork } from './sharing-work';
 import { trustedDeviceMessages } from './viewing-targets';
 import { teamSendGuard } from '../account/crypto-identity';
-import { resolveTokenMetadata,tokenName,type TokenIdentity,type TokenPageMetadata,type TokenPageContext } from './token-page';
+import { resolveTokenMetadata,type TokenIdentity } from './token-name';
 import { pageView,readView } from './view-snapshot';
 import { assetKey } from '../../domain/annotations/interaction.ts';
-import { siteByDomain } from '@palside/shared/sites';
 import type { Viewing } from '../../domain/assets/model';
 import { identifyPage,publicShareUrl,websiteIdentity } from '@palside/shared/navigation';
 import { pageName } from './page-title';
 import type { Preferences } from '../../domain/account/preferences';
 import type { RuntimeDevice } from '../account/device';
 import { pageFavicon } from './viewing';
+import { tokenPage,type LookupPage } from './page-resolver.ts';
 import type { PalsideService } from '../composition/core';
+
+/** How long 共享在看 and link cards wait for the token directory before using the short address. */
+export const TOKEN_NAME_WAIT_MS = 3000;
 
 export class SharingRuntime {
   readonly runtime: PalsideService;
@@ -39,54 +42,35 @@ export class SharingRuntime {
   ownViewing?: { view: Viewing; teamId: string; expiresAt: number };
   peerViewing = new Map<string, { view: Viewing; teamId: string; expiresAt: number }>();
   peerViewingVersions = new Map<string, number>();
-  async localTokenMetadata(identity: TokenIdentity, context: unknown, purpose: 'viewing' | 'share', signal?: AbortSignal, attempts = 3): Promise<TokenPageMetadata | undefined> {
+  /** The token's display name: waits up to `TOKEN_NAME_WAIT_MS` for the directory, then the best name known. */
+  /** A pool or chainless contract page's token, waiting up to `TOKEN_NAME_WAIT_MS` for the server; undefined when it has none or is late. */
+  async pageToken(page: LookupPage, signal?: AbortSignal) {
     const runtime = this.runtime;
-    const scope = runtime.auth.scope();
-    const session = runtime.auth.session; const teamId = runtime.state.preferences.current;
-    const target = context as TokenPageContext | undefined;
-    if (!session || signal?.aborted || !target || !Number.isInteger(target.tabId) || !Number.isInteger(target.windowId)) return;
-    const preferences = runtime.state.preferences;
-    const eligible = () => !signal?.aborted && runtime.auth.session === session && runtime.state.preferences.current === teamId &&
-      runtime.state.preferences === preferences && !preferences.tokenOff?.includes(identity.host);
-    for (let attempt = 0; attempt < attempts && eligible(); attempt++) {
-      // The background owns the document-bound cache and read budget; late headers get two bounded retries.
-      if (attempt) await scope.wait(new Promise(resolve => setTimeout(resolve, 300)));
-      if (!eligible()) return;
-      let timer: ReturnType<typeof setTimeout> | undefined; let cancel: (() => void) | undefined;
-      try {
-        const result = await scope.wait(Promise.race([
-          runtime.tokenPage({ identity, context: target, accountId: session.account.id, teamId, purpose }).catch(() => undefined),
-          new Promise<undefined>(resolve => { cancel = () => resolve(undefined); timer = setTimeout(cancel, 400); signal?.addEventListener('abort', cancel, { once: true }); if (signal?.aborted) cancel(); }),
-        ]));
-        if (!eligible()) return;
-        if (!result || !tokenName(result.name)) continue;
-        const checked = await scope.wait(readView(pageView(identity, resolveTokenMetadata(identity, result))));
-        if (!checked || !eligible()) return;
-        runtime.tokens.put(assetKey(identity.chain, identity.address), { ...checked, site: siteByDomain(identity.host)?.id }, 'page');
-        return { name: checked.name, logo: checked.logo };
-      } finally { clearTimeout(timer); if (cancel) signal?.removeEventListener('abort', cancel); }
+    let asset = runtime.pages.get(page.url);
+    if (asset === undefined) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      asset = await runtime.auth.scope().wait(Promise.race([
+        runtime.pages.resolve(page),
+        new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), TOKEN_NAME_WAIT_MS); signal?.addEventListener('abort', () => resolve(undefined), { once: true }); }),
+      ])).finally(() => clearTimeout(timer));
     }
+    return asset ? tokenPage(page, asset) : undefined;
   }
-  /** A remembered name, unless 代币数据 is off for this site: then the page stays identified by its address. */
-  cachedToken(identity: TokenIdentity) {
-    return this.runtime.state.preferences.tokenOff?.includes(identity.host) ? undefined : this.runtime.tokens.get(assetKey(identity.chain, identity.address));
-  }
-  async refreshTokenMetadata(identity: TokenIdentity, context: unknown) {
-    const runtime = this.runtime;
-    const page = this.page; const observation = this.pageObservation;
-    if (!page || page.kind !== 'asset' || page.url !== identity.url || !this.mayObserve()) return;
-    const local = await this.localTokenMetadata(identity, context, 'viewing', this.pageRequest?.signal);
-    if (!local || this.page !== page || observation !== this.pageObservation || !this.mayObserve()) return;
-    const view = pageView(identity, resolveTokenMetadata(identity, local));
-    if (view.name === page.name && view.logo === page.logo) return;
-    this.page = view; runtime.cache.upsertView(view); runtime.emit();
-    void this.publishViewing().catch(() => {});
+  async tokenView(identity: TokenIdentity, signal?: AbortSignal, via?: Viewing['via']) {
+    const runtime = this.runtime, asset = assetKey(identity.chain, identity.address)!;
+    if (!runtime.tokens.answered(asset)) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await runtime.auth.scope().wait(Promise.race([
+        runtime.directory.ensure(asset),
+        new Promise<void>(resolve => { timer = setTimeout(resolve, TOKEN_NAME_WAIT_MS); signal?.addEventListener('abort', () => resolve(), { once: true }); }),
+      ])).finally(() => clearTimeout(timer));
+    }
+    return pageView(identity, resolveTokenMetadata(identity, runtime.tokens.get(asset)), via);
   }
 
   async prepareView(
     url: string,
     signal?: AbortSignal,
-    context?: unknown,
     title?: unknown,
     favicon?: unknown,
   ): Promise<Viewing | undefined> {
@@ -96,14 +80,14 @@ export class SharingRuntime {
     const identity = identifyPage(parsedUrl, undefined, 'page');
     if (!identity) return;
     const logo = pageFavicon(favicon);
-    if (identity.kind !== 'asset') {
-      const website = identity.kind === 'pool' ? websiteIdentity(parsedUrl, 'page') : identity;
+    const token = identity.kind === 'pool' || identity.kind === 'address' ? await this.pageToken(identity, signal) : identity.kind === 'asset' ? identity : undefined;
+    if (signal?.aborted) return;
+    if (!token) {
+      const website = identity.kind === 'website' ? identity : websiteIdentity(parsedUrl, 'page');
       if (!website) return;
       return { ...pageView(website, { name: pageName(title, host) ?? host, logo }), source: host };
     }
-    if (signal?.aborted) return;
-    const local = await this.localTokenMetadata(identity, context, 'share', signal);
-    return pageView(identity, resolveTokenMetadata(identity, local ?? this.cachedToken(identity)));
+    return await this.tokenView(token, signal, identity.kind === 'pool' || identity.kind === 'address' ? identity.kind : undefined);
   }
   clearRemoteViewing() {
     const runtime = this.runtime;

@@ -26,17 +26,19 @@ async function run() {
     const team: TeamSnapshot = { reason: null, revision: 0, inviteSuspended: false, id: 'team', name: 'fixture', description: '', ownerId: 'fixture', roomId: '!fixture:local.test', avatarId: null, memberCount: 1, joined: true, publishedAt: null, recruitmentExpiresAt: null, retentionDays: 7, memberIds: ['fixture'], people: [{ bio: '', tags: [], deleted: false, id: 'fixture', nickname: 'fixture', avatarId: null, matrixId: session.matrix.userId }], periods: [{ joinedAt: 0, leftAt: null }], preferences: { muted: false, readIds: [], revision: 0 }, requests: [], bans: [], transfer: null, membersCanInvite: false };
     service.state.remoteTeams = [team];
     const url = 'https://gmgn.ai/robinhood/token/0x020bfc650a365f8bb26819deaabf3e21291018b4';
-    const canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;const ctx=canvas.getContext('2d')!;ctx.fillStyle='#ccff00';ctx.fillRect(0,0,32,32);
+    const canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;
     const address=url.split('/').at(-1)!;
-    const view = validateView({ version: 1, kind: 'asset', chain: 'Robinhood', address, url, name:'TEST', logo:canvas.toDataURL('image/png') }); check(view?.kind === 'asset' && view.logo?.startsWith('data:image/png;base64,'), 'Local PNG snapshot did not survive validation');
+    // The directory has already answered for this token, so the page never asks the real service.
+    service.directory.push([{ chain: 'robinhood', address, name: 'Test token', symbol: 'TEST', decimals: 18, logo: null, logoPending: false }]);
+    const view = validateView({ version: 1, kind: 'asset', chain: 'Robinhood', address, url, name:'TEST', logo:canvas.toDataURL('image/png') }); check(view?.kind === 'asset' && view.name === 'TEST' && !('logo' in view), 'Token snapshot kept an icon or lost its name');
     for (const wrong of [{ chain: 'Base' }, { address: '0x'+'1'.repeat(40) }, { kind: 'website' }]) check(!validateView({ ...view, ...wrong }), 'Conflicting identity was accepted');
     check(!validateView({ ...view, logo: 'https://example.test/logo.png' })?.logo, 'Remote logo was accepted');
-    checks.push('Contract, network and kind match the source; embedded PNG is accepted and remote image URLs are dropped');
+    checks.push('Contract, network and kind match the source; token snapshots carry no icon, embedded or remote (icons come only from the token directory)');
     service.state.data.views = [view];
     await service.command({ name: 'attach', payload: { accountId: session.account.id, teamId: team.id, attachment: { kind: 'asset', assetId: view.id } } });
     const draft = service.state.drafts[team.id]!;
     service.state.data.views = [{ ...view, name: 'Later page metadata', logo: undefined }];
-    check(assetView(draft.value.attachment)?.logo === view.logo, 'Draft lost its chosen logo');
+    check(assetView(draft.value.attachment)?.name === view.name, 'Draft lost its chosen name');
     const sent: Record<string, unknown>[] = [];
     const room = { hasEncryptionStateEvent: () => true, getEventForTxnId: () => undefined, getEncryptionTargetMembers: async () => [] };
     auth.client = { getRoom: () => room, getCrypto: () => ({ isEncryptionEnabledInRoom: async () => true, getUserVerificationStatus: async () => ({ needsUserApproval: false, wasCrossSigningVerified: () => false, isCrossSigningVerified: () => false }), userHasCrossSigningKeys: async () => false }), sendEvent: async (_room: string, _type: string, content: Record<string, unknown>) => { sent.push(content); return { event_id: '$fixture-sent' }; }, fetchRoomEvent: async () => { throw new Error('Controlled missing acknowledgement body'); }, stopClient: () => {}, clearStores: async () => {} } as unknown as MatrixClient;
@@ -44,11 +46,11 @@ async function run() {
     const wireAsset = sent[0]?.['com.palside.asset'] as Viewing;
     check(wireAsset.name === view.name && wireAsset.logo === view.logo && wireAsset.address === view.address, 'Send replaced the chosen snapshot');
     const cached = await storage.get<{message: Message}>('fixture:cache:$fixture-sent');
-    check(assetView(cached?.message.attachment)?.logo === view.logo, 'Acknowledgement fallback lost the persisted card');
-    checks.push('Attach, send, acknowledgement fallback and IndexedDB preserve the chosen contract/name/logo despite later page updates');
+    check(assetView(cached?.message.attachment)?.name === view.name, 'Acknowledgement fallback lost the persisted card');
+    checks.push('Attach, send, acknowledgement fallback and IndexedDB preserve the chosen contract and name despite later page updates');
     await service.timeline.consume(await decryptedEvent({ event_id: '$fixture-received', type: 'm.room.message', sender: session.matrix.userId, room_id: team.roomId, origin_server_ts: Date.now(), content: { msgtype: 'm.text', body: '', 'com.palside.asset': wireAsset } }));
     const received = service.state.data.messages.find(message => message.id === '$fixture-received');
-    check(assetView(received?.attachment)?.logo === view.logo, 'Receive lost embedded logo');
+    check(assetView(received?.attachment)?.name === view.name && !assetView(received?.attachment)?.logo, 'Receive lost the snapshot name or kept an icon');
     checks.push('Received card retains its validated per-message snapshot without relying on live page metadata');
   } catch (error) { result.error = error instanceof Error ? error.message : String(error); }
   finally {

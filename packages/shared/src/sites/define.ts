@@ -4,25 +4,26 @@ export type SiteCategory = 'terminal' | 'dex' | 'perp' | 'prediction' | 'exchang
 /** A route capture (`group`) or one unrepeated query parameter (`query`), optionally mapped to a network. */
 export type RouteValue = { group: number } | { query: string; map?: Readonly<Record<string, Network>> };
 /**
- * The first route whose `path` matches decides the page: a valid chain and id give an asset or pool, anything else a website.
- * `url` is the canonical source path: `{chain}` is the raw chain key, `{chain:lower}` its lowercase form,
- * `{id}` the normalized contract and `{path}` the matched pathname without a trailing slash.
+ * A trading-pool page: the server maps the pool to the one token it trades. The first matching route decides the page.
+ * `url` is the canonical source path: `{chain}` is the raw chain key, `{id}` the pool and `{path}` the matched pathname
+ * without a trailing slash. A route without a chain is read on Solana when the pool is a Solana account.
  */
-export type SiteRoute = { kind: 'token' | 'pool'; path: string; flags?: string; chain: RouteValue; id: RouteValue; url: string; idIsAddress?: boolean };
-/** One public image location: the reader accepts the `path` prefix, receivers the full `path` + `file` pattern. */
-export type SiteImage = { host: string; path: string; file: string };
+export type SiteRoute = { path: string; flags?: string; chain: RouteValue; id: RouteValue; url: string };
+/** Where a token's page is on a site, for jumps from 热门 and 详情: `{chain}` is the site's key for that network, `{id}` the contract. */
+export type TokenUrl = { path: string; chains: Readonly<Partial<Record<Network, string>>> };
 /**
- * 代币资料: plain data passed as an `executeScript` argument, so it must stay JSON-serializable.
- * `title.match` recognizes the site's title format and `title.name` captures the symbol in group 1;
- * `strip` removes decorations before validation. `inline` lists leaf labels that may repeat the title symbol.
+ * How Palside reads one catalog site's pages, keyed by the catalog id. Token pages on crypto sites are read by the generic URL
+ * parser (address, chain parameter, chain path segment); a site needs an entry only for what the parser cannot know.
  */
-export type SiteProfile = { title?: { match: string; flags?: string; name: string; strip?: string }; inline: string; images: readonly SiteImage[] };
-/** How Palside reads one catalog site's pages, keyed by the catalog id. Sites without it are shared by name only. */
 export type SitePages = {
   id: string;
-  /** Route coverage; adding a chain or route also requires real route evidence in docs/reference/sites.md. */
-  identify?: { chains: readonly Network[]; routes: readonly SiteRoute[] };
-  profile?: SiteProfile;
+  /** Pool routes; adding one also requires real route evidence in docs/reference/sites.md. */
+  pools?: { chains: readonly Network[]; routes: readonly SiteRoute[] };
+  /** The one chain every token on the site lives on; `none` when that chain is not one Palside reads, so no address is looked up. */
+  chain?: Network | 'none';
+  /** Hosts that serve the same pages, such as an old domain that now redirects. Only URL reading uses them. */
+  aliases?: readonly string[];
+  tokenUrl?: TokenUrl;
   /** Page-layer layout hints. Sites without them use the generic adapter. */
   layout?: { chart: readonly string[] };
 };
@@ -33,5 +34,3 @@ export function defineSitePages<const T extends SitePages>(pages: T): T { return
 
 /** Chart-like blocks on the supported trading pages; generated class names change too often for exact selectors. */
 export const chartSelectors = ['[class*="chart" i]', '[data-testid*="chart" i]', 'canvas'] as const;
-/** DEX Screener's public CDN, which several token pages reuse for logos. */
-export const dexScreenerImages: SiteImage = { host: 'cdn.dexscreener.com', path: '/cms/images/', file: '[a-zA-Z0-9_-]{1,256}(?:\\.(?:png|jpe?g|webp))?' };

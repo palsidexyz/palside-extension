@@ -35,7 +35,7 @@ const down = (message: PageDown) => listeners.forEach(listener => listener(messa
 (window as unknown as { pageUp: PageUp[] }).pageUp = [];
 startPageLayer({ postMessage: message => { (window as unknown as { pageUp: PageUp[] }).pageUp.push(message); }, onMessage: { addListener: listener => { listeners.push(listener); } } });
 const labels = { quote: t('extension.sticky.quote'), mark: t('extension.sticky.add'), saved: t('extension.sticky.saved'), openMark: t('extension.sticky.viewMark'), cancel: t('common.cancel'), refEdge: t('extension.page.refEdge', { name: '{name}' }), above: t('extension.page.above'), below: t('extension.page.below'), you: t('extension.page.you'), locale: 'zh-CN' };
-down({ type: 'config', labels, danmaku: { density: 'high', enabled: true, area: 'chart', speed: 144, size: 'md', opacity: 90 } });
+down({ type: 'config', labels, danmaku: { density: 'high', enabled: true, area: 25, speed: 144, size: 'md', opacity: 90 } });
 const people = [{ name: 'Kai' }, { name: 'Robin' }, { name: 'Mia' }];
 const lines = ['这根量有点猛', '我先上车了', '止盈设好没', '持有人涨得好快', '等回调', '看这个大单'];
 if (scene === 'danmaku' || scene === 'hidden') {

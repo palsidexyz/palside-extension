@@ -14,13 +14,14 @@
 .face > span { border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
 /* The hairline that keeps a pale logo off the grey sits inside the 24px tile, so the logo's edge is exactly the share tile's edge. */
 .face > span:has(img)::after { content:''; position:absolute; inset:0; border-radius:inherit; corner-shape:inherit; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--ui-text-primary) 10%, transparent); pointer-events:none; }
-.letter { display:grid; place-items:center; width:var(--logo-size, 24px); height:var(--logo-size, 24px); border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); font-weight:600; line-height:1; }
 /* Palside does not know the site yet: a globe on the canvas. A page it can never use: an empty dashed tile, so the row never shifts. */
 .globe { display:grid; place-items:center; width:24px; height:24px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-secondary); animation:logoIn .34s var(--ui-ease-feedback) both; }
 .globe > svg { width:15px; height:15px; }
 .empty { display:block; width:24px; height:24px; border:1.4px dashed color-mix(in srgb, var(--ui-text-secondary) 55%, transparent); border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); animation:logoIn .34s var(--ui-ease-feedback) both; }
-/* 网页互动 runs on this site: a neon corner badge with the layers glyph, the same neon as the share key. Off is simply the logo. */
-.badge { position:absolute; right:1px; bottom:1px; display:grid; place-items:center; width:15px; height:15px; border-radius:50%; background:var(--ui-accent); color:var(--ui-on-accent); box-shadow:0 0 0 2px var(--ui-control-surface); animation:badgeIn .32s cubic-bezier(.3, 1.6, .5, 1) both; pointer-events:none; }
+/* 网页互动 on this site: a corner badge with the layers glyph. Neon (the share key's neon) while it runs; grey on the canvas while it
+   could run but does not (switched off, or Chrome has not allowed the site), so the way in is always visible. Turning on fills it. */
+.badge { position:absolute; right:1px; bottom:1px; display:grid; place-items:center; width:15px; height:15px; border-radius:50%; background:var(--ui-accent); color:var(--ui-on-accent); box-shadow:0 0 0 2px var(--ui-control-surface); animation:badgeIn .32s cubic-bezier(.3, 1.6, .5, 1) both; pointer-events:none; transition:background-color .22s var(--ui-ease-feedback), color .22s var(--ui-ease-feedback); }
+.badge[data-idle] { background:var(--ui-canvas); color:var(--ui-text-secondary); }
 .badge > svg { width:9px; height:9px; stroke-width:2.6; }
 /* Reading the page, or waiting for Chrome's prompt: a sheen crosses the tile. */
 .sheen { position:absolute; inset:0; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:linear-gradient(100deg, var(--ui-control-recess) 30%, color-mix(in srgb, var(--ui-control-recess) 35%, var(--ui-canvas)) 50%, var(--ui-control-recess) 70%); background-size:250% 100%; animation:sheen 1.1s linear infinite; }
@@ -29,5 +30,5 @@
 @keyframes logoIn { from { opacity:0; filter:blur(3px); transform:scale(.9); } }
 @keyframes badgeIn { from { opacity:0; transform:scale(.3); } }
 @keyframes sheen { from { background-position:100% 0; } to { background-position:-150% 0; } }
-@media (prefers-reduced-motion:reduce) { .site { transition:none; } .face, .globe, .empty, .sheen, .badge { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .site, .badge { transition:none; } .face, .globe, .empty, .sheen, .badge { animation:none; } }
 @media (forced-colors:active) { .badge { outline:1px solid Highlight; } }

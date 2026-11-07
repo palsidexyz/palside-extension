@@ -1,11 +1,10 @@
 import type { ApiResult } from '../transport/api';
-import type { HotRooms as HotRoomsDto,RoomMessage as RoomMessageDto,RoomProfile as RoomProfileDto } from '@palside/shared/contracts/rooms';
+import type { HotRooms as HotRoomsDto,RoomMessage as RoomMessageDto } from '@palside/shared/contracts/rooms';
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
 export type HotRooms = Mutable<HotRoomsDto>;
 export type RoomMessage = Mutable<RoomMessageDto>;
-export type RoomProfile = Mutable<RoomProfileDto>;
 export type { InviteOptions, TeamInvite } from '@palside/shared/contracts/invites';
-export type { RoomKey, RoomProfileInput, RoomStance, Stance, StanceCounts } from '@palside/shared/contracts/rooms';
+export type { RoomKey, RoomStance, Stance, StanceCounts } from '@palside/shared/contracts/rooms';
 export type { RoomPerson } from '@palside/shared/contracts/profiles';
 export type { RoomEvent } from '@palside/shared/contracts/events';
 export type RoomSummary = Mutable<ApiResult<'rooms.summary'>>;

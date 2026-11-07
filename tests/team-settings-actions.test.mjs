@@ -55,6 +55,7 @@ function fixture({ retention = 7, live = true } = {}) {
       if (name === 'use-intl') return { useTranslations: () => key => key };
       if (name === '../ui/text') return { useText: () => text };
       if (name === './retention') return retentionRules;
+      if (name === '../ui/use-saving-switch') return { useSavingSwitch: checked => ({ checked, pending: false, busy: false, refused: 0, save: async () => {} }) };
       if (name.endsWith('.css')) return { default: {} };
       return new Proxy({}, { get: (_, key) => key === 'settingRows' ? {} : key });
     },

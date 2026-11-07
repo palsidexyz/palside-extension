@@ -3,6 +3,8 @@ import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { PanelState } from '../app/use-panel-state';
 import type { PanelActions } from '../app/panel-actions';
 
+const DONE_HOLD_MS = 700;
+
 export function useAccountFlow(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'startCreate' | 'previewInvite' | 'createAccount' | 'restoreAccount' | 'setPassword'> {
   const { view: { authBusy, live, setNotice, data, phrase, flow, screen, ownsScreen }, setAuthBusy, mounted, setFlow, setPhrase, setScreen, setWorking } = state;
   const generation = useMemo(() => ({ phrase, flow }), [phrase, flow]);
@@ -37,6 +39,7 @@ async function previewInvite(url: string) {
   // The quiz is keyed by the phrase, so the words are dropped only once the runtime has moved on to the password step.
   useLayoutEffect(() => { if (screen === 'password' && flow === 'create' && phrase.length) setPhrase([]); }, [screen, flow, phrase, setPhrase]);
 const restoreAccount = (words: string[]) => { activeGeneration.current = undefined; setFlow('restore'); return identityStep(() => live!.command('account-login', { words: words.map(word => word.trim().toLowerCase()) })); };
-const setPassword = (password: string) => identityStep(async () => { setWorking(true); try { await live!.command('password-set', { password }); } finally { setWorking(false); } if (data.pendingInvite) getActions().openInvitation(); else getActions().go('chat'); });
+// A finished registration stays on screen as a drawn check for a beat; failures return to the password step at once.
+const setPassword = (password: string) => identityStep(async () => { setWorking(true); try { await live!.command('password-set', { password }); setWorking('done'); await new Promise(resolve => setTimeout(resolve, DONE_HOLD_MS)); } finally { setWorking(false); } if (data.pendingInvite) getActions().openInvitation(); else getActions().go('chat'); });
   return { startCreate, previewInvite, createAccount, restoreAccount, setPassword };
 }

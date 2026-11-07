@@ -38,9 +38,9 @@ import { offlineDirectory } from '../apps/extension/src/runtime/account/offline-
 import { retainedViews } from '../apps/extension/src/runtime/viewing/view-retention.ts';
 import { notificationTarget } from '../apps/extension/src/runtime/chat/notification-policy.ts';
 import { languageGlobals } from './helpers/language-host.mjs';
-import { resolveTokenMetadata, tokenName } from '../apps/extension/src/runtime/viewing/token-page.ts';
+import { resolveTokenMetadata, tokenName } from '../apps/extension/src/runtime/viewing/token-name.ts';
 import { imageSource } from '../apps/extension/src/runtime/media/image-sessions.ts';
-import { readFavorites, readHosts } from '../apps/extension/src/domain/annotations/interaction.ts';
+import { readFavorites } from '../apps/extension/src/domain/annotations/interaction.ts';
 
 const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const pin = '123456';
@@ -57,7 +57,7 @@ function fixture({ stored = new Map(), hasKeys = false, verified = false, ready 
   const context = {
     parseCommand: input => parseCommand(JSON.parse(JSON.stringify(input))), ...languageGlobals, ...contractLimits, ...contractCommon, ...identity, ...social, ...rooms, resolveTokenMetadata, tokenName, imageSource, TextEncoder, uniqueMediaIds, offlineDirectory, retainedViews, pruneTeamItems, notificationTarget, assetView, canSend, emptyDraft, readQuoteRange, readView, validateView, pageView, messageExpiry, publishSendQueue, throttleWait, THROTTLE_RETRIES, readonlyNotice, sendFailure, Api, ApiError, API_URL: 'https://service.test', crypto, Date, Uint8Array, URL, URLSearchParams, Headers, Blob, AbortController, setTimeout, clearTimeout, setInterval: callback => { intervals.push(callback); return intervals.length; },
     deviceKeyPublication, ensureCryptoIdentity, ownDeviceSigned, secretStorageCallbacks, OnlySignedDevicesIsolationMode, connectionBlock, connectionStatus, commandError, SERIAL_COMMANDS, sessionGuard, sessionScope, DeviceCleanup, within,
-    emptyItems, readFavorites, readHosts, deviceLabel: () => 'Test', usableDirectory: () => undefined,
+    emptyItems, readFavorites, deviceLabel: () => 'Test', usableDirectory: () => undefined,
     SendPacer, requireEncryptedSend, teamSendGuard, createPatchSliceCache, diffState, teamUnreadCounts,
     fetch: async (_input, init) => { const keys = JSON.parse(init.body).device_keys; if (keys?.user_id === session.matrix.userId && keys?.device_id === session.matrix.deviceId) server.devicePublished = true; return new Response('{}'); },
     EventType: { RoomMessage: 'm.room.message' }, EventStatus: { NOT_SENT: 'not_sent', SENT: 'sent' }, MsgType: { Text: 'm.text' }, DiagnosticErrors: class { observe() {} record() {} },

@@ -29,9 +29,10 @@ async function createTeam(name: string, description = '', avatar?: string) {
 function setRecruitment(active: boolean) {
 
     if (!team.joined || team.readonly || team.owner !== data.self)
-        return;
+        return Promise.resolve(false);
     setTeams(old => old.map(t => t.id === current ? active ? publishRecruitment(t, Date.now()) : { ...t, published: false } : t));
     setNotice(active ? uiMessage('extension.copy.recruitmentPublished') : uiMessage('extension.copy.recruitmentStopped'));
+    return Promise.resolve(true);
 }
 
 function requestTeam(id: string, text: string) {

@@ -74,8 +74,10 @@ test('signal identity allows catalog coin-route tokens and ordinary public param
     assert.equal(readSignal({ ...base(), url }, now).url, url);
     const target = spot({ kind: 'element', tag: 'a', href: url, nth: 0, of: 1, x: .5, y: .5 });
     assert.deepEqual(readSignal({ ...base(), target }, now).target, target);
-    assert.equal(signalIdentityUrl('https://gmgn.ai/article' + suffix), undefined);
-    assert.equal(signalIdentityUrl(`https://dexscreener.com/base/${address}${suffix}`), undefined);
+    // On token sites a `token` parameter holding a contract address is page identity, not a credential.
+    assert.equal(signalIdentityUrl('https://gmgn.ai/article' + suffix), 'https://gmgn.ai/article' + suffix);
+    assert.equal(signalIdentityUrl(`https://dexscreener.com/base/${address}${suffix}`), `https://dexscreener.com/base/${address}${suffix}`);
+    assert.equal(signalIdentityUrl('https://gmgn.ai/article?token=secret-session-value'), undefined);
   }
   const url = 'https://example.com/article?author=alice&tokenSymbol=PALS#/page?x=1';
   assert.equal(signalIdentityUrl(url), url);

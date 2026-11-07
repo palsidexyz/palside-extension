@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ComponentPropsWithRef } from "react";
+import { useEffect, useId, useRef, type ComponentPropsWithRef } from "react";
 import { clsx } from "clsx";
 import { describedBy } from "../../internal/form-values";
 import { HelpTip } from "../tooltip";
@@ -15,21 +15,31 @@ export type SwitchProps = Omit<ComponentPropsWithRef<"input">, "type" | "role" |
   help?: { label: string; content: string };
   /** Keeps the label for assistive technology only; the switch stands alone (e.g. at the end of a row that already names it). */
   hideLabel?: boolean;
+  /** The new position is shown but not yet saved: a spinner turns in the thumb and presses wait. */
+  pending?: boolean;
+  /** Bumped each time a save is refused; the switch has gone back and shakes once. */
+  refused?: number;
 };
 
-export function Switch({ label, status, help, hideLabel = false, className, id, ...props }: SwitchProps) {
+export function Switch({ label, status, help, hideLabel = false, pending = false, refused = 0, className, id, ...props }: SwitchProps) {
   const generatedId = useId();
   const controlId = id ?? generatedId;
   const statusId = `${controlId}-status`;
   const helpId = `${controlId}-help`;
+  const track = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!refused || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    track.current?.animate([{ translate: "0" }, { translate: "-3px" }, { translate: "3px" }, { translate: "-2px" }, { translate: "0" }], { duration: 360, easing: "ease-out" });
+  }, [refused]);
   return <label className={clsx(styles.choice, styles.switchRow, className)} htmlFor={controlId} data-slot="switch" data-label={hideLabel ? "hidden" : undefined}>
-    <input {...props} id={controlId} type="checkbox" role="switch" className={styles.nativeChoice} aria-label={props["aria-label"] ?? label}
+    <input {...props} id={controlId} type="checkbox" role="switch" className={styles.nativeChoice} aria-label={props["aria-label"] ?? label} aria-busy={pending || undefined}
+      onClick={event => { if (pending) event.preventDefault(); else props.onClick?.(event); }}
       aria-describedby={describedBy(props["aria-describedby"], status ? statusId : undefined, help ? helpId : undefined)} />
     <span className={clsx(styles.choiceText, hideLabel && hidden.visuallyHidden)}>
       <span className={styles.choiceLabel}><span>{label}</span>{help && <HelpTip label={help.label} content={help.content} />}</span>
       {status && <span id={statusId} className={styles.status}>{status}</span>}
       {help && <span id={helpId} className={hidden.visuallyHidden}>{help.content}</span>}
     </span>
-    <span className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb} /></span>
+    <span ref={track} className={styles.switchTrack} aria-hidden="true"><span className={styles.switchThumb}><svg className={styles.pending} viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.25" /></svg></span></span>
   </label>;
 }

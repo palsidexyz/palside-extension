@@ -2,18 +2,12 @@ import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import Danmaku from 'danmaku/dist/esm/danmaku.dom.js';
 import type { PageDanmaku,PageDown,PageUp,DanmakuSettings } from '../runtime/browser/page-protocol';
 import { defaultDanmakuSettings,normalizeDanmakuSettings,danmakuLimits } from '../runtime/browser/page-protocol';
-import { adapterFor,genericChart } from './adapters';
-import { fallbackDanmakuArea,createMediaClock,pruneDanmaku,activeDanmaku,removeDanmaku } from './danmaku-helpers';
+import { danmakuAreaRect,createMediaClock,pruneDanmaku,activeDanmaku,removeDanmaku } from './danmaku-helpers';
 import type { DanmakuAreaRect,Flight } from './danmaku-helpers';
 import type { OverlayHost } from './overlay-host';
 import { face } from './overlay-host';
-export function measureDanmakuArea(area: DanmakuSettings['area'] = 'chart'): DanmakuAreaRect {
-  if (area === 'full') return { top: 0, left: 0, width: innerWidth, height: innerHeight };
-  if (area === 'top') return fallbackDanmakuArea(innerWidth, innerHeight, area);
-  const chart = (adapterFor().chart ?? genericChart)();
-  const rect = chart?.getBoundingClientRect();
-  if (rect && rect.width > 0 && rect.height > 0) return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
-  return fallbackDanmakuArea(innerWidth, innerHeight);
+export function measureDanmakuArea(area: DanmakuSettings['area'] = 25): DanmakuAreaRect {
+  return danmakuAreaRect(innerWidth, innerHeight, area);
 }
 export function createDanmakuRenderer(context: OverlayHost, send: (message: PageUp) => void) {
   const { host, stage, motion, later } = context;
@@ -210,11 +204,10 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
   }
 
   window.addEventListener('resize', scheduleDanmakuArea, { passive: true });
-  window.addEventListener('scroll', scheduleDanmakuArea, { passive: true, capture: true });
   syncDanmakuArea();
 
 
-  return { area: danmakuArea, scheduleArea: scheduleDanmakuArea,
+  return { area: danmakuArea,
     setDanmakuSettings(value: DanmakuSettings) {
       danmakuSettings = normalizeDanmakuSettings(value);
       danmaku.speed = danmakuSettings.speed;
@@ -256,7 +249,6 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
       if (areaFrame !== undefined) cancelAnimationFrame(areaFrame);
       motion.removeEventListener('change', syncMotion);
       window.removeEventListener('resize', scheduleDanmakuArea);
-      window.removeEventListener('scroll', scheduleDanmakuArea, true);
       release(); media.pause(); danmaku.destroy();
     },
   };
