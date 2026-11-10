@@ -1,7 +1,7 @@
 import { overlayStyles } from './overlay-style';
 import { avatarTints } from './palette';
 import type { PageLabels,PagePerson } from '../runtime/browser/page-protocol';
-export const defaultLabels: PageLabels = { quote: '', mark: '', saved: '', openMark: '', cancel: '', refEdge: '{name}', above: '', below: '', you: '', locale: 'en' };
+export const defaultLabels: PageLabels = { you: '', locale: 'en' };
 export function face(person: PagePerson) {
   const element = document.createElement('span');
   element.className = 'avatar';
@@ -38,7 +38,18 @@ export function createOverlayHost() {
 
 
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  const context = { host, shadow, stage, documentLayer, motion, labels: { ...defaultLabels }, picking: false, reducedMotion: motion.matches, disposed: false, timers: new Set<number>(), later, documentPoint, isControl };
+  const pageListeners = new Set<(changes: MutationRecord[]) => void>();
+  /** One observer for everything that follows the page; changes inside this layer never count. */
+  const pageChanges = new MutationObserver(records => {
+    const changes = records.filter(record => !host.contains(record.target));
+    if (changes.length) for (const listener of [...pageListeners]) listener(changes);
+  });
+  pageChanges.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['id', 'class', 'style', 'hidden', 'aria-hidden', 'inert', 'contenteditable', 'role', 'data-private', 'data-trade-panel', 'aria-label', 'data-testid', 'autocomplete'] });
+  function onPageChange(listener: (changes: MutationRecord[]) => void) {
+    pageListeners.add(listener);
+    return () => { pageListeners.delete(listener); };
+  }
+  const context = { host, shadow, stage, documentLayer, motion, labels: { ...defaultLabels }, reducedMotion: motion.matches, disposed: false, timers: new Set<number>(), later, documentPoint, isControl, onPageChange, stopPageChanges: () => pageChanges.disconnect() };
   host.toggleAttribute('data-reduced', context.reducedMotion);
   function later(callback: () => void, delay: number) {
     const timer = window.setTimeout(() => { context.timers.delete(timer); if (!context.disposed) callback(); }, delay);
@@ -51,7 +62,7 @@ export function createOverlayHost() {
     if (!event.composedPath().includes(host)) return false;
     const point = event as MouseEvent;
     const element = event.type.startsWith('key') ? shadow.activeElement : shadow.elementFromPoint(point.clientX, point.clientY);
-    return Boolean(element?.closest('button,input,form,.sticky-card,.dm,.capture-editor'));
+    return Boolean(element?.closest('button,input,form,.dm,.capture-editor'));
   }
   for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'auxclick', 'dblclick', 'contextmenu', 'dragstart', 'keydown', 'keyup']) {
     shadow.addEventListener(type, event => event.stopPropagation());

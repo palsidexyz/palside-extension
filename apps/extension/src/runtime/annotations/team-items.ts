@@ -1,19 +1,5 @@
-import { expired } from '../../domain/chat/expiry.ts';
-import {
-POKE_DISPLAY,
-type Poke,
-type TeamItems,
-} from '../../domain/annotations/social.ts';
-
-type StickyItems = Pick<TeamItems, 'stickies'>;
-
-export function upsertTeamItem(items: StickyItems, item: NonNullable<TeamItems['stickies']>[number]): StickyItems {
-  return { stickies: [...(items.stickies ?? []).filter(existing => existing.id !== item.id), item].sort((a, b) => a.timestamp - b.timestamp) };
-}
-
-export function pruneTeamItems(items: StickyItems, now = Date.now(), readable: (teamId: string) => boolean = () => true): StickyItems {
-  return { stickies: (items.stickies ?? []).filter(item => !expired(item.expiresAt, now) && readable(item.teamId)) };
-}
+import { samePage } from '../../domain/annotations/interaction.ts';
+import { POKE_DISPLAY,type Poke } from '../../domain/annotations/social.ts';
 
 export function mergePoke(
   pokes: Poke[] | undefined,
@@ -22,7 +8,7 @@ export function mergePoke(
 ): Poke[] {
   const live = (pokes ?? []).filter((item) => item.at + POKE_DISPLAY > now);
   const found = live.find(
-    (item) => item.teamId === poke.teamId && item.from === poke.from && item.view.url === poke.view.url,
+    (item) => item.teamId === poke.teamId && item.from === poke.from && samePage(item.view.url, poke.view.url),
   );
   if (found) {
     found.count += 1;

@@ -1,9 +1,12 @@
 import { translator } from '@palside/i18n';
 import { pageKey,shortAddress } from '@palside/shared/navigation';
 import { viewingKey,type Viewing } from '../../../domain/assets/model.ts';
+import { pageKey as samePageKey } from '../../../domain/annotations/interaction.ts';
 import { type Person } from '../../../domain/account/model.ts';
 export type WatchSource = { key: string; url: string; view: Viewing; members: Person[] };
 export type WatchGroup = { key: string; view: Viewing; members: Person[]; sources: WatchSource[] };
+/** One 在看 card: a token across its sites, a website page by its address; a site-only share stands for its site. */
+export const watchKey = (view: Viewing) => view.kind === 'website' && view.disclosure === 'page' ? `page:${samePageKey(view.url) ?? view.url}` : viewingKey(view);
 /** Each account contributes once. Sender snapshots stay separate from the derived group label. */
 export function watchGroups(people: Person[], views: Viewing[]): WatchGroup[] {
   const lookup = new Map(views.map(view => [view.id, view]));
@@ -12,7 +15,7 @@ export function watchGroups(people: Person[], views: Viewing[]): WatchGroup[] {
     if (seen.has(person.id)) continue; seen.add(person.id);
     const view = person.viewing ? lookup.get(person.viewing) : undefined; if (!view) continue;
     const url = pageKey(view.url); if (!url) continue;
-    const key = viewingKey(view); const group = groups.get(key) ?? { key, view, members: [], sources: [] };
+    const key = watchKey(view); const group = groups.get(key) ?? { key, view, members: [], sources: [] };
     group.members.push(person);
     const sourceKey = `${view.kind === 'website' ? view.disclosure ?? 'site' : 'asset'}:${url}`;
     let source = group.sources.find(item => item.key === sourceKey);
@@ -72,16 +75,23 @@ export function overtake(slots: WatchSlot[], items: { key: string; members: unkn
 }
 
 /** The faces a chip shows, at most `max`, kept by position: a face stays while that person is still here; when they
- *  leave, the next person takes the same place. The user leads when they are here. `members` are in team order. */
-export function stickyFaces(previous: string[], members: string[], self: string, max = 2): string[] {
+ *  leave, the next person takes the same place. The user leads when they are here, then the teammate they follow (跟看).
+ *  `members` are in team order. */
+export function stickyFaces(previous: string[], members: string[], self: string, max = 2, followed?: string): string[] {
   const here = new Set(members);
   let faces: (string | undefined)[] = previous.slice(0, max).map(id => here.has(id) ? id : undefined);
-  if (here.has(self) && !faces.includes(self)) faces = faces.length < max ? [self, ...faces] : [self, ...faces.slice(1)];
+  // Leaders take a face when they arrive: the followed teammate, then the user in front of them.
+  for (const leader of [followed, self]) {
+    if (!leader || !here.has(leader) || faces.includes(leader)) continue;
+    if (faces.length < max) { faces = [leader, ...faces]; continue; }
+    // Full: the leader takes the first face that is not a leader; the other face keeps its place.
+    const at = faces.findIndex(id => id !== self && id !== followed);
+    if (at >= 0) faces[at] = leader;
+  }
   const pool = members.filter(id => !faces.includes(id));
   faces = faces.map(id => id ?? pool.shift());
   while (faces.length < max && pool.length) faces.push(pool.shift());
   const shown = faces.filter((id): id is string => id !== undefined);
-  const at = shown.indexOf(self);
-  if (at > 0) [shown[0], shown[at]] = [shown[at]!, shown[0]!];
-  return shown;
+  // The user first, then whom they follow.
+  return [...shown.filter(id => id === self), ...shown.filter(id => id === followed && id !== self), ...shown.filter(id => id !== self && id !== followed)];
 }

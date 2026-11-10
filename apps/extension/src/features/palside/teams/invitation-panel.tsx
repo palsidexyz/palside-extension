@@ -1,5 +1,5 @@
 'use client';
-import { deadlineTime, errorMessage, localeOrEnglish, message as uiMessage } from '@palside/i18n';
+import { deadlineTime,localeOrEnglish,message as uiMessage,failureText } from '@palside/i18n';
 
 import { useTextState } from '../ui/text';
 
@@ -26,7 +26,7 @@ export function InvitationPanel({ c }: { c: PalsideController }) {
   useEffect(() => {
     if (!command) return;
     let active = true;
-    void command('invitation', { teamId }).catch(failure => { if (active) setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.inviteLoadFailed')); }).finally(() => { if (active) setBusy(false); });
+    void command('invitation', { teamId }).catch(failure => { if (active) setError(failureText(failure, 'extension.copy.inviteLoadFailed')); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, [command, teamId, setError]);
   const invitation = c.live?.state.invitations[c.current];
@@ -36,7 +36,7 @@ export function InvitationPanel({ c }: { c: PalsideController }) {
     try {
       if (command) await command('invitation', { teamId, ...(regenerate ? { action: 'regenerate' } : {}) });
       else { c.setInviteActive(true); c.setInviteVersion(v => v + 1); }
-    } catch (failure) { setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.inviteLoadFailed')); }
+    } catch (failure) { setError(failureText(failure, 'extension.copy.inviteLoadFailed')); }
     finally { setBusy(false); }
   }
   const expiry = invitation ? t('extension.dynamic.inviteUntil', { date: deadlineTime(new Date(invitation.expiresAt ?? 0).getTime(), localeOrEnglish(locale)) }) : t('extension.copy.inviteLifetime');

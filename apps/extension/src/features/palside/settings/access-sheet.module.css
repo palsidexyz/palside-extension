@@ -55,9 +55,6 @@
 .actions .soft { margin-top:0; }
 
 .primary, .soft { width:100%; }
-.primary { background:var(--ui-solid); color:var(--ui-on-solid); }
-.primary:hover:not(:disabled) { background:var(--ui-solid-hover); }
-.primary:disabled { background:var(--ui-control-surface); color:var(--ui-text-secondary); cursor:default; }
 .soft { margin-top:14px; }
 .chips button:focus-visible, .tile:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 @media (prefers-reduced-motion:reduce) { .tile { transition:none; } .swap > * { animation:none; } }
@@ -67,17 +64,15 @@
 .headLogo, .headLogo > span { --logo-size:32px; }
 .headLogo > span { border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-callout); }
 .note { margin:0 4px 6px; font-size:var(--ui-type-callout); line-height:20px; color:var(--ui-text-secondary); }
-/* A row with its own switch: the switch, in its own dd so the list stays a list, takes a third column across both lines. */
-.facts > div[data-switch] { grid-template-columns:16px minmax(0, 1fr) auto; }
-.facts > div[data-switch] > dd[data-control] { display:flex; grid-column:3; grid-row:1 / 3; }
 .facts > div + div { box-shadow:inset 0 1px 0 var(--ui-border-soft); }
-/* Chrome's permission for the site, under 网页互动: Chrome's mark and its own words in the secondary size, the state as a dot and a word. */
-.facts > div.chromeRow { grid-template-columns:16px minmax(0, 1fr) auto; }
-.chromeRow > dd:nth-of-type(1) { font-size:var(--ui-type-footnote); line-height:18px; color:var(--ui-text-secondary); }
-.chromeRow > dd:nth-of-type(2) { display:flex; grid-column:3; grid-row:1 / 3; }
-.state { display:inline-flex; flex:none; align-items:center; gap:5px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; white-space:nowrap; }
-.state::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.7; }
-.state[data-on] { color:var(--ui-ink-accent); font-weight:500; }
-.state[data-on]::before { opacity:1; }
-/* The site's 弹幕, 信号 and 便利贴 as tiles under the 网页互动 switch, past the card's hairline. */
-.facts > div.tilesRow { display:block; padding:12px 0 14px; }
+/* The site's card: 网页互动 with its switch, the site's tiles under it. Only the switch and the lit icon discs carry neon. */
+.siteCard { padding:0 14px 14px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.siteMaster { display:flex; align-items:center; gap:12px; min-height:48px; font-size:var(--ui-type-body); line-height:20px; font-weight:500; }
+.siteMaster > svg { flex:none; color:var(--ui-text-secondary); }
+.siteMaster > span { flex:1; min-width:0; }
+/* Chrome's permission for the site, off the card: it asks nothing of the reader once allowed. */
+.siteAccess { display:flex; align-items:center; gap:8px; min-height:20px; margin:0 4px 12px; font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); }
+.siteAccess > svg { flex:none; }
+.siteAccess > span { flex:1; min-width:0; }
+.siteAccess > b { flex:none; font-weight:400; white-space:nowrap; transition:color .2s var(--ui-ease-feedback); }
+.siteAccess > b[data-on] { font-weight:500; color:var(--ui-text-primary); }

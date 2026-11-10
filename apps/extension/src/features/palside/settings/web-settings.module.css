@@ -1,0 +1,30 @@
+/* 网页互动: the master switch is the page's heading — a lit disc and title-size name, no card — so it reads above the three feature cards it governs. */
+.master { display:flex; align-items:center; gap:14px; min-height:56px; padding:4px 12px 4px 14px; }
+.masterIcon { flex:none; display:grid; place-items:center; width:40px; height:40px; border-radius:50%; background:var(--ui-control-surface); color:var(--ui-text-secondary); transition:background-color .22s var(--ui-ease-feedback), color .22s var(--ui-ease-feedback); }
+.master[data-on] .masterIcon { background:var(--ui-accent); color:var(--ui-on-accent); }
+.masterName { flex:1; min-width:0; font-size:var(--ui-type-title); line-height:22px; font-weight:600; }
+
+/* One card per feature; the open one shows its options under the name. Master off: every card greys. */
+.cards { display:flex; flex-direction:column; gap:10px; transition:opacity .2s var(--ui-ease-feedback); }
+.cards[data-dim] { opacity:.45; }
+.card { --ui-field-surface:var(--ui-canvas); border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; }
+.head { display:flex; align-items:center; gap:8px; min-height:56px; padding-right:12px; }
+.toggle { flex:1; align-self:stretch; display:flex; align-items:center; gap:12px; min-width:0; padding:0 0 0 14px; border:0; background:none; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-body); line-height:20px; font-weight:500; text-align:left; cursor:pointer; }
+.toggle:disabled { cursor:default; }
+.toggle:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:calc(-1 * var(--ui-focus-width)); }
+.icon { flex:none; display:grid; place-items:center; width:20px; height:20px; color:var(--ui-text-secondary); }
+.name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chevron { flex:none; color:var(--ui-text-secondary); transition:transform .24s var(--ui-ease-feedback); }
+.card[data-open] .chevron { transform:rotate(90deg); }
+/* The options slide open and shut on a 0fr → 1fr track. */
+.body { display:grid; grid-template-rows:0fr; transition:grid-template-rows .28s var(--ui-ease-feedback); }
+.card[data-open] .body { grid-template-rows:1fr; }
+.inner { min-height:0; overflow:hidden; box-shadow:inset 0 1px 0 var(--ui-border-soft); opacity:0; transition:opacity .2s var(--ui-ease-feedback); }
+.card[data-open] .inner { opacity:1; }
+.inner [data-dim] { opacity:.45; transition:opacity .2s var(--ui-ease-feedback); }
+
+/* 弹幕: 在网页上显示 and its look, then the rows of 参与弹幕 and strangers. */
+.section { padding-top:12px; }
+.label { display:block; margin:0 14px; font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); }
+.rows { box-shadow:inset 0 1px 0 var(--ui-border-soft); }
+@media (prefers-reduced-motion:reduce) { .masterIcon, .cards, .chevron, .body, .inner, .inner [data-dim] { transition:none; } }

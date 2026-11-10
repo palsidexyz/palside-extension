@@ -12,6 +12,6 @@ export function viewingKey(view: Viewing) { return view.kind === 'asset' && view
 export function relatedMessages(messages: Message[], assetId: string, views: Viewing[] = []) {
   const target = views.find(v => v.id === assetId); const key = target ? viewingKey(target) : assetId;
   const matching = new Set(views.filter(v => viewingKey(v) === key).map(v => v.id)); matching.add(assetId);
-  const originals = new Set(messages.filter(m => !m.recalled && (m.attachment?.kind === 'asset' && matching.has(m.attachment.assetId) || Boolean(m.ref && target && viewingKey(m.ref.view) === key))).map(m => m.id));
+  const originals = new Set(messages.filter(m => !m.recalled && (m.attachment?.kind === 'asset' && matching.has(m.attachment.assetId))).map(m => m.id));
   return messages.filter(m => !m.recalled && (originals.has(m.id) || Boolean(m.replyTo && originals.has(m.replyTo))));
 }

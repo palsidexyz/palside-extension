@@ -6,12 +6,12 @@ import bullx from './bullx.ts';
 import dexscreener from './dexscreener.ts';
 import fomo from './fomo.ts';
 import gmgn from './gmgn.ts';
-import { multiChainExplorers, siteChains } from './chains.ts';
+import { multiChainExplorers, siteAliases, siteChains } from './chains.ts';
 
 export * from './define.ts';
 export { siteCategories } from './catalog.ts';
 
-const pages: readonly SitePages[] = [axiom, birdeye, bullx, dexscreener, fomo, gmgn, ...siteChains];
+const pages: readonly SitePages[] = [axiom, birdeye, bullx, dexscreener, fomo, gmgn, ...siteChains, ...siteAliases];
 
 /**
  * All per-site knowledge: the catalog (display, exact host, category) joined with page reading where it exists —

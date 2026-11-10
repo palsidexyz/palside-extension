@@ -51,7 +51,11 @@ export interface WalletControllerPort {
   receive(amount?: string): string;
 }
 const PENDING_POLL_MS = 3000, PENDING_FAST_MS = 2 * MINUTE_MS, PENDING_MAX_POLL_MS = 30_000;
-const code = (error: unknown) => error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : error instanceof Error ? error.message : 'WALLET_ERROR';
+const code = (error: unknown) => {
+  // The relay checks the latest on-chain balance before anything is sent: spent elsewhere is a balance problem, not an unknown submission.
+  if (error && typeof error === 'object' && 'code' in error && error.code === 'CHAIN_RELAY_REJECTED' && 'reason' in error && error.reason === 'insufficient_unreserved_pals') return 'INSUFFICIENT_BALANCE';
+  return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : error instanceof Error ? error.message : 'WALLET_ERROR';
+};
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, item: unknown) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 /** One instance belongs to one account generation in the offscreen runtime. */
@@ -148,10 +152,14 @@ export class WalletController implements WalletControllerPort {
       await this.savePayment(); this.emit(); return structuredClone(this.state.payment);
     } finally { this.busy = false; }
   }
-  async refresh(): Promise<WalletState> {
+  /**
+   * Config, balance and price. Refreshes run side by side and the newest wins, so a stalled older read never holds up a newer one.
+   * `known` is a config the service just pushed: it applies at once without asking for it again.
+   */
+  async refresh(known?: ChainClientConfig): Promise<WalletState> {
     const generation = this.generation, version = ++this.refreshVersion;
     try {
-      const config = await this.options.api.config(); this.check(generation);
+      const config = known ?? await this.options.api.config(); this.check(generation);
       if (version !== this.refreshVersion || this.state.config && config.version < this.state.config.version) return this.snapshot();
       await this.applyConfig(config); this.check(generation);
       if (!config.enabled || !config.deployment) return this.snapshot();
@@ -178,6 +186,9 @@ export class WalletController implements WalletControllerPort {
     if (previous?.deployment && config.deployment && (previous.deployment.chainId !== config.deployment.chainId || !same(previous.deployment.token, config.deployment.token))) {
       this.state.balance = undefined; this.state.records = { items: [], nextCursor: null };
     }
+    // A balance cached before a restart may belong to another deployment; it is never shown under this one.
+    const balance = this.state.balance;
+    if (balance && config.deployment && (!same(balance.token, config.deployment.token) || balance.chainId !== config.deployment.chainId)) this.state.balance = undefined;
     if (!config.enabled || !config.deployment) { this.state.availability = 'closed'; this.state.price = null; }
     else {
       if (this.state.availability === 'closed') this.state.availability = 'loading';
@@ -192,7 +203,7 @@ export class WalletController implements WalletControllerPort {
   offline() { this.check(); this.state.availability = this.state.config?.enabled ? 'offline' : 'closed'; this.emit(); }
   async handleEvent(event: ChainEvent): Promise<void> {
     this.check();
-    if (event.type === 'config') { await this.applyConfig(event.config); if (event.config.enabled) await this.refresh(); }
+    if (event.type === 'config') await this.refresh(event.config);
     else if (event.type === 'order' && event.accountId === this.options.accountId) {
       if (event.order.id === this.state.payment?.order.id) await this.acceptOrder(event.order);
       if (event.order.status === 'confirmed') await this.refresh();
@@ -347,7 +358,7 @@ export class WalletController implements WalletControllerPort {
     if (order.accountId !== this.options.accountId || !same(order.payer, this.state.address)) throw new Error('ORDER_MISMATCH');
     const immutable = (value: ChainOrder) => canonical({ id: value.id, accountId: value.accountId, payer: value.payer, recipient: value.recipient, kind: value.kind, amount: value.amount, createdAt: value.createdAt, expiresAt: value.expiresAt, deployment: value.deployment, payload: value.payload, configVersion: value.configVersion });
     if (immutable(order) !== immutable(payment.order)) throw new Error('ORDER_MISMATCH');
-    // Ignore stale SSE/query responses after a terminal result.
+    // Ignore stale pushed/query responses after a terminal result.
     if (terminalPayment(payment.phase)) return;
     if (order.status === 'quoted' && payment.phase === 'pending') return;
     payment.order = structuredClone(order);

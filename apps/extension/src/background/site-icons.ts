@@ -12,6 +12,13 @@ const ICON_BYTES = 1_048_576;
 const TIMEOUT_MS = 8 * SECOND_MS;
 /** A tab's icon replaces the stored one at most this often, unless it changed. */
 const TAB_REFRESH_MS = DAY_MS;
+/** Icons read from Chrome's own favicon cache, for sites that were never added: marked so revoking a grant keeps them. */
+const CHROME = 'chrome';
+/** At most this many such icons are kept; the least recently refreshed go first. */
+const CHROME_LIMIT = 200;
+
+/** The largest icon a shared page carries, the limit its receivers accept. */
+const SHARED_ICON_LENGTH = 8192;
 
 type Stored = SiteIcon & { at: number; from?: string };
 export type IconImage = (blob: Blob) => Promise<SiteIcon | undefined>;
@@ -53,9 +60,11 @@ export const rasterizeIcon: IconImage = async blob => {
 };
 
 /**
- * Icons of sites added outside the catalog, kept on this device in `storage.local` and never sent anywhere. Taken when Chrome
- * grants the site — one request to that site for its homepage and the icon it declares, without cookies — and refreshed from the
- * tab's own icon when the site is open. Removing the site, or 清除本地数据, drops its icon.
+ * Icons of sites outside the catalog, kept on this device in `storage.local`, so every view of a site shows the same logo; the
+ * page a person shares carries this same icon in the encrypted 共享在看 message, so teammates fetch nothing from the site. An added site's icon is taken when Chrome grants it — one request to that site for its homepage and the icon
+ * it declares, without cookies — and refreshed from the tab's own icon. Any other site's icon comes from Chrome's favicon cache
+ * (the optional icon permission of 共享在看) when its tab is open; Chrome's default globe is never kept. Removing an added site drops
+ * its fetched icon; 清除本地数据 drops all.
  */
 export function siteIcons(bg: Background, image: IconImage = rasterizeIcon) {
   let icons: Record<string, Stored> = {};
@@ -69,6 +78,9 @@ export function siteIcons(bg: Background, image: IconImage = rasterizeIcon) {
   }).catch(() => {});
   let writes: Promise<unknown> = loaded;
   const loading = new Map<string, Promise<void>>();
+  /** Reads of Chrome's own favicon cache, kept apart from site downloads: a read is local and quick, so a page's status may wait for
+   *  it, never for a download from the site. */
+  const reading = new Map<string, Promise<void>>();
   /** Bumped by 清除本地数据 and revocation, so a load that started before stops. */
   let epoch = 0;
 
@@ -112,6 +124,21 @@ export function siteIcons(bg: Background, image: IconImage = rasterizeIcon) {
     void reader.cancel().catch(() => {});
     return text;
   }
+  /** Chrome's cached icon for a page, unless it is Chrome's default globe or the icon permission is missing. */
+  let globe: Promise<string | undefined> | undefined;
+  async function fromChrome(url: string) {
+    if (!await bg.browser.permissions.contains({ permissions: ['favicon'] }).catch(() => false)) return;
+    const bytes = async (pageUrl: string) => {
+      const response = await bg.fetch(bg.browser.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=64` as '/'));
+      if (!response.ok) return;
+      const blob = await response.blob();
+      return { blob, key: base64(new Uint8Array(await blob.arrayBuffer())) };
+    };
+    globe ??= bytes('https://palside.invalid/').then(value => value?.key, () => { globe = undefined; return undefined; });
+    const [icon, fallback] = await Promise.all([bytes(url), globe]);
+    if (!icon || !fallback || icon.key === fallback) return;
+    return image(icon.blob);
+  }
   async function fromUrl(url: string) {
     const response = await get(url);
     if (Number(response.headers.get('content-length')) > ICON_BYTES) return;
@@ -147,27 +174,52 @@ export function siteIcons(bg: Background, image: IconImage = rasterizeIcon) {
     loading.set(host, work);
     return work;
   }
+  /** Keeps Chrome's cached icon of a site; the oldest of these go past the limit. A download from the site that lands later wins. */
+  function takeFromChrome(host: string, url: string) {
+    const running = reading.get(host);
+    if (running) return running;
+    const started = epoch;
+    const work = (async () => {
+      const icon = await fromChrome(url).catch(() => undefined);
+      if (!icon || started !== epoch || (icons[host] && icons[host].from !== CHROME)) return;
+      await change(next => {
+        const all = { ...next, [host]: { ...icon, at: Date.now(), from: CHROME } };
+        const chrome = Object.entries(all).filter(([, entry]) => entry.from === CHROME).sort(([, a], [, b]) => a.at - b.at);
+        for (const [old] of chrome.slice(0, Math.max(0, chrome.length - CHROME_LIMIT))) delete all[old];
+        return all;
+      });
+    })().catch(() => {}).finally(() => { if (reading.get(host) === work) reading.delete(host); });
+    reading.set(host, work);
+    return work;
+  }
   /** Keeps only the icons of sites Chrome still allows one by one. */
   async function prune() {
     await loaded;
     const granted = await grantedHosts();
-    if (Object.keys(icons).some(host => !granted.has(host))) { epoch++; await change(next => Object.fromEntries(Object.entries(next).filter(([host]) => granted.has(host)))); }
+    const kept = (host: string) => granted.has(host) || icons[host]?.from === CHROME;
+    if (Object.keys(icons).some(host => !kept(host))) { epoch++; await change(next => Object.fromEntries(Object.entries(next).filter(([host, entry]) => granted.has(host) || entry.from === CHROME))); }
   }
 
   return {
     ready: loaded, send, fetchIcon, prune,
     /** Chrome granted origins: take the icon of every new non-catalog site among them. */
     added(origins: readonly string[] | undefined) {
-      for (const host of new Set((origins ?? []).map(grantedHost).filter(custom))) void fetchIcon(host);
+      return Promise.all([...new Set((origins ?? []).map(grantedHost).filter(custom))].map(fetchIcon));
     },
-    /** The open tab of an allowed non-catalog site shows its icon: keep it when it changed or the stored one is a day old. */
+    /** The open tab of a non-catalog site shows its icon: keep it when it changed or the stored one is a day old. A site that was
+     *  never added takes Chrome's cached icon instead (its own address cannot be read without the site's grant). */
     async tab(tab: Tab) {
       const host = pageUrlHost(tab.url), from = tab.favIconUrl;
-      if (!custom(host) || !from || !/^(?:https:|data:image\/)/.test(from) || from.length > ICON_BYTES) return;
+      if (!custom(host) || tab.incognito) return;
       await loaded;
       const stored = icons[host];
+      if (!(await grantedHosts()).has(host)) {
+        if (stored && Date.now() - stored.at < TAB_REFRESH_MS) return;
+        return takeFromChrome(host, tab.url!);
+      }
+      if (!from || !/^(?:https:|data:image\/)/.test(from) || from.length > ICON_BYTES) return;
       if (stored?.from === from && Date.now() - stored.at < TAB_REFRESH_MS) return;
-      if (loading.has(host) || !(await grantedHosts()).has(host)) return;
+      if (loading.has(host)) return;
       const started = epoch;
       const work = (async () => {
         const icon = await fromUrl(from).catch(() => undefined);
@@ -177,6 +229,15 @@ export function siteIcons(bg: Background, image: IconImage = rasterizeIcon) {
       })().catch(() => {}).finally(() => { if (loading.get(host) === work) loading.delete(host); });
       loading.set(host, work);
       await work;
+    },
+    /** The icon a shared page carries: the one this device shows for the site. A catalog site has none, everyone has its artwork. */
+    async shareable(url: string) {
+      const host = pageUrlHost(url);
+      if (!custom(host)) return;
+      await loaded;
+      if (!icons[host]) await takeFromChrome(host, url);
+      const src = icons[host]?.src;
+      return src && src.length <= SHARED_ICON_LENGTH ? src : undefined;
     },
     /** 清除本地数据: every icon goes; an allowed site takes its icon again the next time it is open. */
     clear() { epoch++; return change(() => ({})); },

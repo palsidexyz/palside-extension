@@ -1,0 +1,19 @@
+/* 跟看 is the user's own mode, so running takes the accent tint; paused and being followed stay neutral. */
+/* The same width, edges and corners as the cards under it. The gap lives inside the clip, so it opens and closes with the bar. */
+.clip { flex:none; overflow:hidden; padding:0 16px 8px; }
+.row { display:flex; align-items:center; gap:6px; height:36px; padding:0 6px 0 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-footnote); line-height:16px; white-space:nowrap; background:var(--ui-control-surface); color:var(--ui-text-primary); transition:background-color .2s var(--ui-ease-feedback); }
+.row[data-follow-bar=on] { background:var(--ui-accent-soft); }
+.mark { flex:none; color:var(--ui-text-secondary); }
+.row[data-follow-bar=on] .mark { color:var(--ui-ink-accent); }
+.text { flex:none; min-width:0; max-width:60%; overflow:hidden; text-overflow:ellipsis; }
+.text b { font-weight:600; }
+/* The page gives way first; who you follow and the buttons do not. */
+.place { flex:1; min-width:0; overflow:hidden; color:var(--ui-text-secondary); }
+.page { display:inline-flex; align-items:center; gap:4px; max-width:100%; min-width:0; vertical-align:top; }
+.page > :first-child { flex:none; }
+.page > :first-child[data-token-size] { --token-size:16px; }
+.pageName { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.actions { flex:none; display:flex; align-items:center; margin-inline-start:auto; }
+.row .action { height:26px; min-height:26px; padding:0 8px; border-radius:var(--ui-radius-pill); font:inherit; font-weight:600; background:transparent; color:var(--ui-text-primary); }
+.row .action:not(:disabled):hover { background:var(--ui-control-hover); }
+.row[data-follow-bar=on] .action:not(:disabled):hover { background:color-mix(in srgb, var(--ui-text-primary) 8%, var(--ui-accent-soft)); }

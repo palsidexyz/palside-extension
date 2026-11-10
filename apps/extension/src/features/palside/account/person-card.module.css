@@ -17,12 +17,11 @@
 .watchingRow b { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:var(--ui-type-body); line-height:20px; font-weight:600; white-space:nowrap; }
 .watchingRow em { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-style:normal; font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); }
 .watchingRow svg { flex-shrink:0; color:var(--ui-text-secondary); }
-.actions { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; }
-.actions[data-single] { grid-template-columns:1fr; }
-.actions:has(> :nth-child(4)) { grid-template-columns:repeat(4,minmax(0,1fr)); }
+/* Columns follow the visible tiles (1–4) so the row always fills edge to edge; closed tooltip layers are display:none and take no cell. */
+.actions { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); gap:8px; }
 .actions > * { min-width:0; }
 .action { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; width:100%; height:56px; padding:0 4px; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-footnote); line-height:16px; font-weight:500; cursor:pointer; }
-.actions[data-single] .action { flex-direction:row; height:40px; gap:8px; font-size:var(--ui-type-callout); }
+.actions:not(:has(> .action ~ .action)) .action { flex-direction:row; height:40px; gap:8px; font-size:var(--ui-type-callout); }
 .action span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .action:hover:not([aria-disabled]) { background:var(--ui-control-hover); }
 .action[aria-disabled] { color:var(--ui-text-secondary); cursor:default; }

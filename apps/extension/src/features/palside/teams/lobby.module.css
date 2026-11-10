@@ -60,5 +60,4 @@
 @container(max-width:350px) { .card{padding:15px;gap:13px}.cardHeading{gap:10px}.cardHeading strong{font-size:var(--ui-type-body)} }
 @media(prefers-reduced-motion:reduce) { .card,.lobbyTabs [role="tab"] { transition:none; } }
 
-.acceptInvite { background:var(--ui-solid); color:var(--ui-on-solid); }
 .more { min-height: 32px; display: grid; place-items: center; color: var(--ui-text-secondary); font-size: var(--ui-type-footnote); }

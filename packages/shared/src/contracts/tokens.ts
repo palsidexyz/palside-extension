@@ -25,7 +25,8 @@ export const tokenResolveInput = strictObject({
 /**
  * `token`: exactly one chain holds this token. `choice`: several chains do, the person picks.
  * `missing`: no supported chain has a token here. `invalid`: the address does not fit the chain.
- * `unavailable`: a chain could not be read now; ask again later. A pool answers for its token; `missing` there also means
+ * `unavailable`: a chain could not be read now; ask again later. `tokens` then holds the chains that were read, so a page can
+ * show one of them meanwhile without losing the unread chain from the choice. A pool answers for its token; `missing` there also means
  * the pool holds no single token (two quote coins, or two tokens).
  */
 const resolutionStatus = Type.Union([Type.Literal('token'), Type.Literal('choice'), Type.Literal('missing'), Type.Literal('invalid'), Type.Literal('unavailable')]);
@@ -41,4 +42,3 @@ export const tokenLogoQuery = strictObject({ v: Type.Optional(Type.Decode(contra
 
 export type TokenEntry = Static<typeof tokenEntry>;
 export type TokenResolution = Static<typeof tokenResolution>;
-export type TokenResolveInput = Static<typeof tokenResolveInput>;

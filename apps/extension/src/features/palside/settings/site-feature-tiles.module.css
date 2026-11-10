@@ -1,13 +1,16 @@
-/* A site's features as equal tiles on the card: canvas when off, Robin Neon when on — the same neon as the header's 网页互动 badge and
-   share key. Flat: no raise, press or sink. */
+/* A site's features as equal canvas tiles on the card. Only the icon disc lights: Robin Neon when on, the same neon as the header's
+   网页互动 badge and share key, so the 网页互动 switch above stays the loudest control. */
 .tiles { display:grid; grid-template-columns:repeat(var(--count, 3), minmax(0, 1fr)); gap:8px; }
-.tile { display:grid; justify-items:center; align-content:center; gap:6px; min-width:0; height:64px; padding:0 6px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); line-height:16px; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background-color .22s var(--ui-ease-feedback), color .2s var(--ui-ease-feedback), opacity .2s var(--ui-ease-feedback); }
-.tile > svg { width:18px; height:18px; }
-.tile > span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tile { display:grid; justify-items:center; gap:6px; min-width:0; padding:10px 6px 9px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-canvas); color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); line-height:16px; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:color .2s var(--ui-ease-feedback), opacity .2s var(--ui-ease-feedback); }
+.disc { display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--ui-control-surface); transition:background-color .22s var(--ui-ease-feedback), color .2s var(--ui-ease-feedback), transform .28s var(--ui-ease-feedback); }
+.disc > svg { width:16px; height:16px; }
+.name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tile:hover:not(:disabled) { color:var(--ui-text-primary); }
-.tile[aria-pressed="true"] { background:var(--ui-accent); color:var(--ui-on-accent); font-weight:500; }
+.tile:active:not(:disabled) .disc { transform:scale(.92); }
+.tile[aria-pressed="true"] { color:var(--ui-text-primary); font-weight:500; }
+.tile[aria-pressed="true"] .disc { background:var(--ui-accent); color:var(--ui-on-accent); }
 .tile:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 .tile:disabled { cursor:default; }
-.tiles[data-dim] .tile { opacity:.45; }
-@media (prefers-reduced-motion:reduce) { .tile { transition:none; } }
+.tiles[data-dim] .tile { opacity:.5; }
+@media (prefers-reduced-motion:reduce) { .tile, .disc { transition:none; } .tile:active:not(:disabled) .disc { transform:none; } }
 @media (forced-colors:active) { .tile[aria-pressed="true"] { outline:2px solid Highlight; } }

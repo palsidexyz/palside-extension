@@ -10,7 +10,7 @@ function snapshot(account='alice') { return { authenticated:true,connection:{net
 function fixture() {
   const records={}, active={}, created=[], commands=[]; const controls={permission:async()=>true,read:async()=>{},write:async()=>{},create:async()=>{}};
   const browser={
-    runtime:{id:'qa',getURL:p=>`chrome-extension://qa${p}`,getContexts:async()=>[{}],sendMessage:async({command})=>{commands.push(command);return{ok:true};},onMessage:event(),onMessageExternal:event(),onConnect:event(),onInstalled:event()},
+    runtime:{id:'qa',getURL:p=>`chrome-extension://qa${p}`,getContexts:async()=>[{}],sendMessage:async({command})=>{commands.push(command);return{ok:true};},onMessage:event(),onMessageExternal:event(),onConnect:event(),onInstalled:event(), onUpdateAvailable: event()},
     tabs:{onActivated:event(),onUpdated:event(),onRemoved:event()},windows:{onRemoved:event(),onFocusChanged:event(),getLastFocused:async()=>({id:10})},sidePanel:{setPanelBehavior:async()=>{},open:async()=>{}},action:{onClicked:event()},idle:{onStateChanged:event(),queryState:async()=>'active'},
     permissions:{contains:()=>controls.permission(),onAdded:event(),onRemoved:event()},storage:{local:{set:async value=>{await controls.write();Object.assign(records,value);},get:async id=>{await controls.read();return{[id]:records[id]};},remove:async id=>{delete records[id];}}},
     notifications:{create:async(id,options)=>{created.push({id,options});await controls.create();active[id]={};return id;},getAll:async()=>({...active}),clear:async id=>{delete active[id];return true;},onClicked:event(),onClosed:event()},

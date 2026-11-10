@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { clipImageText } from '../apps/extension/src/domain/images/drawing.ts';
 import assert from 'node:assert/strict';
 import { ImageDocument, readImageDocument, fitImageViewport, imagePoint, zoomImageViewport, resizeImageViewport, imageCrop, imageCropHandle } from '../apps/extension/src/domain/images/image-document.ts';
 
@@ -67,6 +68,9 @@ test('image documents enforce 500 text characters and 10000 total pen points', (
   const text = { kind: 'text', x: 1, y: 1, color: '#FF4D4F', value: 'x'.repeat(500) };
   assert.equal(document.add(text), true);
   assert.equal(document.add({ ...text, value: text.value + 'x' }), false);
+  assert.equal(document.add({ ...text, value: '👍🏽'.repeat(500) }), true, 'an emoji counts as one character, as people see it');
+  assert.equal(document.add({ ...text, value: '👍🏽'.repeat(501) }), false);
+  assert.equal(clipImageText('😀'.repeat(600)), '😀'.repeat(500), 'clipping never splits an emoji');
   const pen = { kind: 'pen', color: '#FF4D4F', points: Array.from({ length: 5000 }, () => ({ x: 1, y: 1 })) };
   assert.equal(document.add(pen), true);
   assert.equal(document.add(pen), true);

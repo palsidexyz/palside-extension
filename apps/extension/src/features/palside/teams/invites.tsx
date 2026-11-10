@@ -47,6 +47,6 @@ function InviteCard({ c, invite }: { c: PalsideController; invite: TeamInvite })
     <TeamAvatar team={{ id: invite.team.id, name: invite.team.name, avatar }} size="sm" />
     <span><strong>{invite.team.name}</strong><small><PersonAvatar person={from} size="xs" /><CountText last text={t('extension.invite.from', { name: from.name, count: invite.team.memberCount })} value={invite.team.memberCount} /></small></span>
     <Button size="sm" disabled={busy} onClick={() => void run('invite-ignore')}>{t('extension.invite.ignore')}</Button>
-    <Button size="sm" variant="surface" className={l.acceptInvite} disabled={busy} onClick={() => void run('invite-accept')}>{t('extension.invite.accept')}</Button>
+    <Button size="sm" variant="solid" disabled={busy} onClick={() => void run('invite-accept')}>{t('extension.invite.accept')}</Button>
   </div></Tooltip>;
 }

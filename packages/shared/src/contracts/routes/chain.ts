@@ -34,7 +34,6 @@ export const chainEndpoints = [
   endpoint({ id: 'chain.recovery', method: 'GET', path: '/chain/recovery', query: strictObject({ cursor: Type.Optional(Type.String({ pattern: '^[0-9]{1,16}:0x[0-9a-fA-F]{64}$' })), orderId: Type.Optional(chainHash) }), response: jsonResponse(chainRecovery), errors: serviceErrors }),
   endpoint({ id: 'chain.config', method: 'GET', path: '/chain/config', response: jsonResponse(chainClientConfig), errors: serviceErrors }),
   endpoint({ id: 'chain.wallet', method: 'GET', path: '/chain/wallet', response: jsonResponse(nullable(walletBinding)), errors: serviceErrors }),
-  endpoint({ id: 'chain.walletPeer', method: 'GET', path: '/chain/wallet/:id', params: strictObject({ id }), response: jsonResponse(nullable(walletBinding)), errors: [...serviceErrors, 'ACCOUNT_UNAVAILABLE'] }),
   endpoint({ id: 'chain.person', method: 'GET', path: '/chain/people/:id', params: strictObject({ id }), response: jsonResponse(walletPerson), errors: [...serviceErrors, 'ACCOUNT_UNAVAILABLE'] }),
   endpoint({ id: 'chain.walletChallenge', method: 'POST', path: '/chain/wallet/challenge', ...write, body: jsonBody(strictObject({ address: chainAddress })), response: jsonResponse(walletChallenge), errors: [...walletWriteErrors, 'CHAIN_NOT_CONFIGURED'] }),
   endpoint({ id: 'chain.walletBind', method: 'POST', path: '/chain/wallet/bind', ...write, body: jsonBody(walletBindInput), response: jsonResponse(walletBinding), errors: [...walletWriteErrors, 'CHAIN_CHALLENGE_INVALID', 'CHAIN_SIGNATURE_INVALID', 'CHAIN_CHALLENGE_EXPIRED', 'CHAIN_WALLET_BOUND'] }),

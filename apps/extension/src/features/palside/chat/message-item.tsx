@@ -8,7 +8,6 @@ import { CircleAlert, CircleSlash, Copy, Flag, Link, MoreHorizontal, Pencil, Quo
 import { motionPresets } from '@palside/design/motion';
 import { useText } from '../ui/text';
 import { AssetCard } from '../assets/asset-card';
-import { MessageRef } from '../annotations/message-ref';
 import { ReplyLine } from './composer-social';
 import { MessageImage } from '../media/message-image';
 import { messageParts } from '../../../domain/chat/mentions';
@@ -68,7 +67,7 @@ export function MessageItem(props: Props) {
   return <MessageBody {...props} />;
 }
 
-const changed = (a: Message, b: Message) => a.id !== b.id || a.text !== b.text || a.attachment !== b.attachment || a.ref !== b.ref || a.replyTo !== b.replyTo || a.editedAt !== b.editedAt || a.status !== b.status || a.time !== b.time;
+const changed = (a: Message, b: Message) => a.id !== b.id || a.text !== b.text || a.attachment !== b.attachment || a.replyTo !== b.replyTo || a.editedAt !== b.editedAt || a.status !== b.status || a.time !== b.time;
 
 function Tombstone({ message, from, reduced }: { message: Message; from?: number; reduced: boolean }) {
   const t = useTranslations();
@@ -105,9 +104,10 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
   const original = c.currentMessages.find(m => m.id === message.replyTo);
   const editing = c.editing === message.id;
   const fragment = quotedFragment(original, message.replyRange, message.replyToExpiresAt);
-  const jumbo = !editing && !message.ref && !message.replyTo && !message.attachment && emojiOnly(message.text);
+  const jumbo = !editing && !message.replyTo && !message.attachment && emojiOnly(message.text);
   // A message that is only the address its token card came from: one bubble, the address shortened to one line above the card.
-  const linkOnly = !editing && Boolean(asset) && !message.ref && !message.replyTo && LONE_LINK.test(message.text);
+  const loneAddress = Boolean(asset?.address) && message.text.trim().toLowerCase() === asset?.address?.toLowerCase();
+  const linkOnly = !editing && Boolean(asset) && !message.replyTo && (LONE_LINK.test(message.text) || loneAddress);
   const long = useLongText(text, Boolean(message.text) && !editing && !jumbo && !linkOnly, message.text, message.editedAt);
   const folded = long && !expanded;
 
@@ -177,14 +177,15 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
       {!self && !grouped && <div className={`${s.messageMeta} ${taking ? s.takeOver : ''}`}><strong>{person.name}</strong></div>}
       <div className={s.messageLine}>
         <div ref={stack} className={s.messageStack} onPointerDownCapture={event => { if (event.button === 2) menu.current?.press(); }} onContextMenu={event => menu.current?.openAt(event)} data-sending={message.status === 'sending' && !queued} data-queued={queued ? true : undefined} aria-busy={message.status === 'sending'}>
-          {(message.ref || message.replyTo || message.text) && <div ref={bubble} className={`${s.messageBubble} ${jumbo ? s.jumbo : ''}`} data-link={linkOnly || undefined} data-editing={editing || undefined} data-size={jumbo ? Math.min(characterLength(message.text.replace(/\s+/g, '')), 2) : undefined}>
+          {(message.replyTo || message.text) && <div ref={bubble} className={`${s.messageBubble} ${jumbo ? s.jumbo : ''}`} data-link={linkOnly || undefined} data-editing={editing || undefined} data-size={jumbo ? Math.min(characterLength(message.text.replace(/\s+/g, '')), 2) : undefined}>
             {queued?.head && !reduced && !jumbo && <QueueFill key={queued.at} at={queued.at} />}
-            {message.ref && <MessageRef c={c} message={{ ...message, ref: message.ref }} />}
             {message.replyTo && <button type="button" className={refStyles.refChip} data-reply-quote onClick={() => original && onQuote(original.id, fragment ? message.replyRange : undefined)}>
               <ReplyLine c={c} original={original} text={quotedText(original, message.replyToExpiresAt, undefined, t)} fragment={fragment} />
             </button>}
             {linkOnly && asset ? <>
-              <p ref={text} id={textId} className={s.messageLink} data-message-text><a href={message.text.trim()} target="_blank" rel="noreferrer noopener" title={message.text.trim()}>{shortLink(message.text.trim())}</a></p>
+              <p ref={text} id={textId} className={s.messageLink} data-message-text>{loneAddress
+                ? <span title={message.text.trim()}>{message.text.trim()}</span>
+                : <a href={message.text.trim()} target="_blank" rel="noreferrer noopener" title={message.text.trim()}>{shortLink(message.text.trim())}</a>}</p>
               <AssetCard view={asset} onOpen={() => c.selectAsset(asset.id)} />
             </> : message.text && <p ref={text} id={textId} className={s.messageText} data-message-text data-folded={folded || undefined} data-toggled={toggled || undefined}><LinkedText c={c} message={message} /></p>}
             {long && !editing && <button type="button" className={s.foldToggle} aria-expanded={expanded} aria-controls={textId} onClick={() => { setToggled(true); if (expanded) collapse(); else setExpanded(true); }}>{expanded ? t('extension.reading.collapse') : t('extension.reading.expand')}</button>}

@@ -1,4 +1,4 @@
-import { SECOND_MS, DAY_MS } from '@palside/shared/units';
+import { SECOND_MS, MINUTE_MS, DAY_MS } from '@palside/shared/units';
 import React, { useLayoutEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createTranslator } from 'use-intl';
@@ -7,7 +7,6 @@ import { IntegrationIntl } from './intl';
 import { palsideFixtures, demoSites, remoteTeam } from './fixtures';
 import { autoRun, reviewStatus } from './review-harness';
 import { verifyRuntimeBoundaries } from './baseline-runtime';
-import { MessageRef } from '../src/features/palside/annotations/message-ref';
 import { PalsideApp } from './preview-app';
 import { usePalside, type PalsideController } from '../src/features/palside/app/use-palside';
 import { ChatHeader } from '../src/features/palside/chat/chat-header';
@@ -20,8 +19,9 @@ import { HistoryMore } from '../src/features/palside/chat/history-scope';
 import { AwayDivider, useAway } from '../src/features/palside/chat/away-divider';
 import { WatchStrip } from '../src/features/palside/viewing/watch-strip';
 import { useTopCard } from '../src/features/palside/annotations/reminders';
+import { PageHintRow, usePageHints } from '../src/features/palside/annotations/page-hint';
+import { FollowBar } from '../src/features/palside/annotations/follow-bar';
 import { ReactionStage } from '../src/features/palside/annotations/reaction-picker';
-import { StancePoll } from '../src/features/palside/rooms/stance-poll';
 import { DanmakuView, RoomPersonSheet } from '../src/features/palside/rooms/danmaku-view';
 import { Settings, NotificationSettings } from '../src/features/palside/settings/settings';
 import { Privacy, ReadSheet } from '../src/features/palside/settings/privacy';
@@ -35,7 +35,6 @@ import { viewingKey } from '../src/domain/assets/model';
 import { type Message } from '../src/domain/chat/model';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
-import type { RoomStance } from '@palside/shared/contracts/rooms';
 import { Toaster, toast } from '@palside/ui/toast';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
@@ -54,7 +53,6 @@ let mode = 'header';
 let generation = 0;
 let state: RuntimeState;
 let page: LivePort['page'];
-let stance: RoomStance = { bull: 2, hold: 1, bear: 1, mine: null };
 let openPending: (() => void) | undefined;
 let delayOpen = false;
 let phrase = 'abandon ability able about above absent absorb abstract absurd abuse access accident'.split(' ');
@@ -73,7 +71,7 @@ chromeHost.chrome.permissions = {
 /** The background's permission commands, answered from the same grants. */
 chromeHost.chrome.runtime = {
   sendMessage: async ({ command }: { command: { name: string; payload?: { kind?: string } } }) => {
-    if (command.name === 'permissions-get') return { ok: true, value: { origins: [...grants.origins], tabs: grants.permissions.includes('tabs'), notifications: grants.permissions.includes('notifications'), site: false } };
+    if (command.name === 'permissions-get') return { ok: true, value: { origins: [...grants.origins], tabs: grants.permissions.includes('tabs'), notifications: grants.permissions.includes('notifications'), tabGroups: false , site: false } };
     if (command.name === 'permissions-sync') return { ok: true };
     if (command.name === 'permissions-remove' && (command.payload?.kind === 'tabs' || command.payload?.kind === 'notifications')) {
       const removing = command.payload.kind === 'tabs' ? ['tabs', 'favicon'] : ['notifications'];
@@ -113,16 +111,22 @@ const command: LivePort['command'] = async <T,>(name: string, payload?: Record<s
   if (name === 'clear-cache') result = { bytes: 0 };
   if (name === 'diagnostics') result = { text: 'Synthetic diagnostics' };
   if (name === 'capture-shortcut') result = 'Alt+Shift+S';
-  if (name === 'room-find') result = { found: Boolean(state.rooms.current?.messages.some(message => message.id === payload?.id)) };
   return result as T;
 };
+/** 跟看 requests the panel sent, and the background's status as the review drives it. */
+const follows: Parameters<NonNullable<LivePort['follow']>>[0][] = [];
+const followListeners = new Set<(status: { paused: boolean; ended?: true }) => void>();
+const follow: NonNullable<LivePort['follow']> = async request => { follows.push(request); };
+const onFollowStatus: NonNullable<LivePort['onFollowStatus']> = listener => { followListeners.add(listener); return () => { followListeners.delete(listener); }; };
+const followStatus = (status: { paused: boolean; ended?: true }) => { for (const listener of followListeners) listener(status); };
 const openPage: LivePort['openPage'] = async url => { opened.push(url); if (delayOpen) await new Promise<void>(resolve => { openPending = resolve; }); };
 function Away({ controller }: { controller: PalsideController }) { const away = useAway(controller); return <div data-first={away.first}>{away.first && <AwayDivider c={controller} views={away.views} />}</div>; }
-function Top({ controller }: { controller: PalsideController }) { const top = useTopCard(controller); return <div data-top={top?.key}><WatchStrip c={controller} top={top} /></div>; }
+// The 跟看 bar, the top row, and the chat hints that 喊你来看 and signals put in the timeline.
+function Top({ controller }: { controller: PalsideController }) { const top = useTopCard(controller); const hints = usePageHints(controller); return <><FollowBar c={controller} /><div data-top={top?.key}><WatchStrip c={controller} top={top} /></div><div data-hints>{hints.map(item => <PageHintRow key={item.id} c={controller} item={item.hint} />)}</div></>; }
 function Theme() { const value = useAppearance(); return <div data-theme={value}><AppearanceSetting /></div>; }
 function observe(controller: PalsideController, shared: ReturnType<typeof useSocialUi>) { c = controller; social = shared; }
 function Surface() {
-  const c = usePalside({ data: state.data, sites: demoSites, live: { state, page, command, openPage }, deliver: async () => {} });
+  const c = usePalside({ data: state.data, sites: demoSites, live: { state, page, command, openPage, follow, onFollowStatus }, deliver: async () => {} });
   const shared = useSocialUi();
   useLayoutEffect(() => { observe(c, shared); });
   let content: ReactNode;
@@ -137,8 +141,7 @@ function Surface() {
     case 'watch': content = <WatchStrip c={c} />; break;
     case 'top': content = <Top controller={c} />; break;
     case 'rain': content = <ReactionStage c={c}><span>Conversation</span></ReactionStage>; break;
-    case 'poll': content = <StancePoll c={c} roomKey="token:Robinhood:0x020bfc650a365f8bb26819deaabf3e21291018b4" stance={stance} />; break;
-    case 'room': content = <>{c.screen === 'chat' && state.data.messages.filter(message => message.ref).map(message => <MessageRef key={message.id} c={c} message={message as Message & { ref: NonNullable<Message['ref']> }} />)}<DanmakuView c={c} /></>; break;
+    case 'room': content = <DanmakuView c={c} />; break;
     case 'settings': content = <Settings c={c} />; break;
     case 'notifications': content = <NotificationSettings c={c} />; break;
     case 'privacy': content = <><Privacy c={c} /><ReadSheet c={c} /></>; break;
@@ -150,11 +153,11 @@ function Surface() {
   }
   return <div data-palside-app style={{ height: '100%', containerType: 'inline-size' }}>{content}{c.personId && <PersonCard key={c.personId} c={c} />}<RoomPersonSheet c={c} /><Toaster label="Notices" closeLabel="Dismiss notice" /></div>;
 }
-function render() { root.render(<IntegrationIntl>{mode === 'app' ? <PalsideApp key={generation} data={state.data} sites={demoSites} live={{ state, page, command, openPage }} deliver={async () => {}} /> : <SocialSession key={`${generation}:${state.data.self}`} accountId={state.data.self}><Surface /></SocialSession>}</IntegrationIntl>); }
+function render() { root.render(<IntegrationIntl>{mode === 'app' ? <PalsideApp key={generation} data={state.data} sites={demoSites} live={{ state, page, command, openPage, follow, onFollowStatus }} deliver={async () => {}} /> : <SocialSession key={`${generation}:${state.data.self}`} accountId={state.data.self}><Surface /></SocialSession>}</IntegrationIntl>); }
 async function reset(next: string, configure?: () => void) {
   // Sonner keeps toasts in module state; each check starts without the previous check's notices.
   toast.dismiss(); root.render(null); await wait(20);
-  mode = next; generation++; calls.length = 0; opened.length = 0; delayOpen = false; page = undefined;
+  mode = next; generation++; calls.length = 0; opened.length = 0; follows.length = 0; delayOpen = false; page = undefined;
   host.style.width = '400px'; host.style.height = '760px';
   state = {
     revision: 0, ready: true, authenticated: true,
@@ -163,7 +166,7 @@ async function reset(next: string, configure?: () => void) {
     data: structuredClone(palsideFixtures), drafts: {},
     preferences: { current: 'night', share: false, notifications: 'all', notificationPreview: true, toured: true },
     rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} },
-    remoteTeams: [], config: { websiteUrl: 'https://example.test', signupDifficulty: 0 }, invitations: {}, items: { stickies: [] },
+    remoteTeams: [], config: { websiteUrl: 'https://example.test', signupDifficulty: 0 }, invitations: {},
     history: { night: { loaded: true, loading: false, missingKeys: 0 } },
   };
   configure?.(); render(); await wait(180);
@@ -176,11 +179,11 @@ async function headerChecks() {
     await reset('header', () => { state.data.people.forEach((p, i) => { p.presence = i <= count ? i === 1 ? 'away' : 'active' : undefined; }); });
     // One line: after the squad name, who is here — online faces (two, then +N) or the member count; it gives way to the name and finally folds into a badge on the avatar.
     const member = host.querySelector<HTMLButtonElement>('header button[data-kind]');
-    assert(member?.dataset.kind === (count ? 'online' : 'members') && member.getAttribute('aria-label')?.includes(`${count}`), `The header exposes ${count} online teammates excluding the current user`);
+    assert(member?.dataset.kind === (count ? 'online' : 'members') && member.getAttribute('aria-label')?.includes(`${count ? count + 1 : 1}`), `The header counts ${count} online teammates plus the current user`);
     if (!member) throw Error('Online member control missing');
-    assert(await settled(() => member.querySelectorAll('img').length === Math.min(count, 2)), `The header draws the correct number of faces for ${count} teammates`);
+    assert(await settled(() => member.querySelectorAll('img').length === Math.min(count ? count + 1 : 0, 2)), `The header draws the correct number of faces for ${count} teammates`);
     if (count >= 2) assert(member.querySelector('[data-person-avatar]')?.getAttribute('title')?.startsWith('Mia'), 'Active teammates appear before away teammates');
-    if (count === 4) assert(member.querySelector('[data-person-avatar] ~ :not([data-person-avatar])')?.textContent?.startsWith('+2'), 'Four online teammates show two faces and a plus two count');
+    if (count === 4) assert(member.querySelector('[data-person-avatar] ~ :not([data-person-avatar])')?.textContent?.startsWith('+3'), 'Four online teammates and you show two faces and a plus three count');
     member.click(); await wait(); assert(c.screen === 'members' && c.memberFilter === undefined, 'The header opens the unfiltered member list');
   }
   await reset('header', () => { state.data.teams[0]!.memberIds = ['you']; });
@@ -232,6 +235,11 @@ async function copyChecks() {
 async function onboardingChecks() {
   await reset('onboarding', () => { state.authenticated = false; });
   assert(text().includes('CASHCAT') && text().includes('PONS') && host.querySelectorAll('h1 [aria-hidden="true"] > span').length > 3, 'Welcome shows example viewing cards and a character by character heading');
+  const appearance = query<HTMLSelectElement>(`header select[aria-label="${t('extension.copy.appearance')}"]`);
+  const glyph = () => appearance.parentElement?.querySelector('[aria-hidden="true"] > svg')?.getAttribute('class');
+  const before = glyph(); appearance.value = 'dark'; appearance.dispatchEvent(new Event('change', { bubbles: true })); await wait();
+  assert(localStorage.getItem('palside:appearance') === 'dark' && before?.includes('monitor') && glyph()?.includes('moon') && appearance.closest('header')?.querySelectorAll('select').length === 2, 'The signed-out header chooses appearance beside language and its glyph names the choice');
+  appearance.value = 'system'; appearance.dispatchEvent(new Event('change', { bubbles: true })); await wait();
   await clickKey('extension.copy.haveAccount');
   assert(c.screen === 'restore' && host.querySelectorAll('ol li[data-state]').length === 2, 'Recovery begins with two steps and the phrase step is current');
   await clickKey('common.back'); await clickKey('extension.copy.createAccount');
@@ -411,31 +419,61 @@ async function watchChecks() {
 
 function pageFixture(index = 0): NonNullable<LivePort['page']> {
   const view = state.data.views[index]!;
-  return { windowId: 1, tabId: 1, url: view.url, asset: viewAsset(view), title: view.name, host: new URL(view.url).hostname, access: { site: true }, granted: true, interactive: true, stickyEnabled: true, signalEnabled: true, connected: true, capabilities: { capture: { state: 'ready' }, pick: { state: 'ready' }, danmaku: { state: 'ready' }, signal: { state: 'ready' }, share: { state: 'ready' } } };
+  return { windowId: 1, tabId: 1, url: view.url, asset: viewAsset(view), title: view.name, host: new URL(view.url).hostname, access: { site: true }, granted: true, interactive: true, signalEnabled: true, connected: true, capabilities: { capture: { state: 'ready' }, interact: { state: 'ready' }, danmaku: { state: 'ready' }, signal: { state: 'ready' }, share: { state: 'ready' } } };
 }
 async function reminderChecks() {
   await reset('top', () => { page = pageFixture(2); });
+  const hint = (text: string) => buttons().find(b => b.textContent?.includes(text));
   c.setPersonId('mia'); await wait(); await clickKey('extension.web.followShort');
-  assert(social.follow?.personId === 'mia' && opened.length === 0 && !recorded('poke').length, 'Following a teammate stays local and does not open a page or notify them');
-  state.data.people.find(p => p.id === 'mia')!.viewing = 'cashcat'; await refresh();
-  assert(query('[data-top]').getAttribute('data-top')?.includes('follow-mia-cashcat') && opened.length === 0 && button(t('extension.top.go')), 'A followed teammate changing tokens shows a suggestion without navigation');
-  await clickKey('extension.top.go'); assert(opened[0] === state.data.views[0]!.url, 'Following navigates only after the user chooses go');
-  page = pageFixture(); await refresh(); assert(!buttons().some(b => b.textContent === t('extension.top.go')), 'Following the current page suppresses the go suggestion');
+  const mia = state.data.people.find(p => p.id === 'mia')!;
+  assert(social.follow?.personId === 'mia' && opened.length === 0 && !recorded('poke').length, 'Following a teammate opens no ordinary page and sends no invitation');
+  assert(recorded('follow-watch').at(-1)?.payload?.on === true, 'Following tells the followed teammate');
+  assert(!host.querySelector('[data-top]'), 'Following takes no card: the 在看 row stays as it is');
+  const first = follows.find(item => item.op === 'go');
+  assert(first?.op === 'go' && first.start === true && first.url === state.data.views.find(view => view.id === mia.viewing)?.url, 'Starting asks the background for the follow tab, in front, on their page');
+  mia.viewing = 'cashcat'; await refresh(); await refresh();
+  assert(query('[data-follow]').getAttribute('data-watch-key') === viewingKey(state.data.views[0]!), 'The followed teammate\'s chip takes the follow mark');
+  const moved = follows.at(-1);
+  assert(moved?.op === 'go' && !moved.start && moved.url === state.data.views[0]!.url && opened.length === 0, 'A followed teammate changing pages moves the follow tab without focus');
+  const bar = () => host.querySelector('[data-follow-bar=on], [data-follow-bar=paused]')?.textContent ?? '';
+  assert(bar().includes('正在跟看 Mia'), 'The bar says who you follow while it runs');
+  button(t('extension.top.followPause'))!.click(); await wait();
+  assert(follows.at(-1)?.op === 'pause', 'The bar pauses');
+  followStatus({ paused: true }); await refresh();
+  assert(social.follow?.paused === true && bar().includes('跟看 Mia 已暂停') && query('[data-follow]').hasAttribute('data-follow-paused'), 'Taking over the follow tab pauses: the bar says so and the ring goes quiet');
+  const sentBefore = follows.length; mia.viewing = state.data.views[1]!.id; await refresh();
+  assert(follows.length === sentBefore && bar().includes('跟看 Mia 已暂停'), 'A paused follow does not move the tab');
+  button(t('extension.top.followContinue'))!.click(); await wait();
+  const resumed = follows.at(-1);
+  assert(resumed?.op === 'resume' && resumed.url === state.data.views[1]!.url, 'The bar continues, to where they are now');
+  followStatus({ paused: false }); await refresh(); assert(bar().includes('正在跟看 Mia'), 'Continuing returns the bar to running');
+  assert(!host.querySelector('[data-hints] [data-follow-hint]'), 'The chat takes no 跟看 line');
+  button(t('extension.top.end'))!.click(); await wait(); assert(!social.follow && follows.at(-1)?.op === 'stop', 'The bar ends following');
+  c.setPersonId('mia'); await wait(); await clickKey('extension.web.followShort');
+  followStatus({ paused: false, ended: true }); await refresh(); assert(!social.follow, 'Closing the last follow tab ends following');
+  c.setPersonId('mia'); await wait(); await clickKey('extension.web.followShort');
+  state.followers = [{ teamId: 'night', personId: 'kai', since: Date.now(), until: Date.now() + MINUTE_MS }]; await refresh();
+  const followers = () => host.querySelector('[data-follow-bar=followers]')?.textContent ?? '';
+  assert(followers().includes('Kai 在跟着你'), 'Being followed shows who follows you, in the bar');
+  state.followers = [...state.followers, { teamId: 'night', personId: 'robin', since: Date.now(), until: Date.now() + MINUTE_MS }]; await refresh();
+  assert(followers().includes('2'), 'More than one follower is counted');
+  state.followers = []; await refresh(); await wait(400); assert(!followers(), 'It leaves when they stop');
   c.setPersonId('robin'); await wait(); await clickKey('extension.web.followShort'); assert(social.follow?.personId === 'robin', 'Choosing another teammate replaces the single follow target');
+  page = pageFixture(2);
   state.pokes = [{ id: 'older', teamId: 'night', from: 'mia', view: state.data.views[1]!, at: Date.now() - SECOND_MS, count: 1 }, { id: 'newest', teamId: 'night', from: 'kai', view: state.data.views[1]!, at: Date.now(), count: 1 }]; await refresh();
-  assert(query('[data-top]').getAttribute('data-top')?.startsWith('follow'), 'Following takes priority over invitations to view a token');
-  state.connection.networkOnline = false; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'connection-network-offline', 'Offline status takes priority over following');
-  state.connection.networkOnline = true; state.data.teams[0]!.readonly = true; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'readonly', 'Read only team status takes priority over following');
-  assert(social.follow?.personId === 'robin', 'A read only team currently suppresses the follow card while retaining its local target');
-  state.data.teams[0]!.readonly = false; await refresh(); await clickKey('extension.top.end');
-  assert(!social.follow && query('[data-top]').getAttribute('data-top') === 'poke-newest', 'Ending following reveals the latest invitation to view');
+  assert(!host.querySelector('[data-top]') && Boolean(hint('Kai 喊你来看')) && Boolean(hint('Mia 喊你来看')), 'Invitations to view are chat hints and leave the 在看 row alone');
+  state.connection.networkOnline = false; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'connection-network-offline', 'Offline status takes the row');
+  state.connection.networkOnline = true; state.data.teams[0]!.readonly = true; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'readonly', 'Read only team status takes the row');
+  assert(social.follow?.personId === 'robin', 'A read only team keeps the local follow target');
+  state.data.teams[0]!.readonly = false; await refresh();
   const before = JSON.stringify({ messages: state.data.messages, unread: state.data.teams.map(team => team.unread) });
-  await clickKey('extension.top.ignore'); assert(recorded('dismiss-poke').at(-1)?.payload?.id === 'newest' && query('[data-top]').getAttribute('data-top') === 'poke-older', 'Ignoring an invitation reveals the next waiting invitation');
-  delayOpen = true; await clickKey('extension.top.open'); assert(!recorded('dismiss-poke').some(call => call.payload?.id === 'older'), 'Opening an invitation waits for the page open command to finish before dismissing');
+  const ignore = hint('Kai 喊你来看')!.parentElement!.querySelector<HTMLButtonElement>(`[aria-label="${t('extension.top.ignore')}"]`)!;
+  ignore.click(); await wait(); assert(recorded('dismiss-poke').at(-1)?.payload?.id === 'newest', 'Ignoring an invitation dismisses that invitation');
+  delayOpen = true; hint('Mia 喊你来看')!.click(); await wait(); assert(!recorded('dismiss-poke').some(call => call.payload?.id === 'older'), 'Opening an invitation waits for the page open command to finish before dismissing');
   openPending?.(); await wait(); assert(recorded('dismiss-poke').some(call => call.payload?.id === 'older'), 'A resolved page open command dismisses its invitation');
   assert(JSON.stringify({ messages: state.data.messages, unread: state.data.teams.map(team => team.unread) }) === before, 'Viewing invitations do not change chat messages or unread counts');
-  state.pokes = [{ id: 'arrived', teamId: 'night', from: 'mia', view: state.data.views[0]!, at: Date.now(), count: 1 }]; await refresh();
-  assert(recorded('dismiss-poke').some(call => call.payload?.id === 'arrived') && !host.querySelector('[data-top]'), 'An invitation disappears when the current page already matches its token');
+  state.pokes = [{ id: 'arrived', teamId: 'night', from: 'mia', view: state.data.views[0]!, at: Date.now(), count: 1 }]; page = pageFixture(); await refresh();
+  assert(recorded('dismiss-poke').some(call => call.payload?.id === 'arrived'), 'An invitation disappears when the current page already matches its token');
   setSocialUi({ follow: { teamId: 'night', personId: 'mia' } }); state.data.teams[0]!.memberIds = state.data.teams[0]!.memberIds.filter(id => id !== 'mia'); await refresh(); assert(!social.follow, 'Following clears when the teammate leaves the team');
   setSocialUi({ follow: { teamId: 'night', personId: 'robin' } }); state.preferences.current = 'weekend'; await refresh(); assert(!social.follow, 'Following clears when the current team changes');
 }
@@ -444,16 +482,9 @@ async function roomChecks() {
   await reset('room', () => {
     const key = `token:${viewAsset(state.data.views[0]!)}`;
     state.data.teams[1]!.memberIds.push('alice');
-    state.rooms.current = { key, site: 'gmgn', count: 3, stance: { bull: 0, hold: 0, bear: 0, mine: null }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
+    state.rooms.current = { key, site: 'gmgn', count: 3, likes: { line1: { count: 2, liked: true }, line3: { count: 1, liked: false } }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
   });
-  state.data.messages = [{ id: 'room-reference', teamId: 'night', author: 'mia', text: '', time: '12:00', status: 'sent', ref: { view: state.data.views[0]!, caption: 'Quoted room text', target: { kind: 'danmaku', id: 'line0', author: 'mia', name: 'Mia', at: Date.now() } } }]; await refresh();
-  await click(t('extension.composer.findRef', { caption: 'Quoted room text' }));
-  assert(recorded('room-open').length === 1 && c.screen === 'room', 'Clicking a chat room reference opens the referenced token room');
-  assert(social.roomLine === 'line0', 'A quoted room target waits until the room finishes loading');
-  state.rooms.current!.loading = false; await refresh();
-  assert(recorded('room-find').length === 1 && recorded('room-find')[0]!.payload?.id === 'line0' && !social.roomLine && !host.querySelector('[data-focus="true"]') && await settled(() => noticeShown()), 'A quoted room line outside the loaded rows is looked up in retained history and reports when it is gone');
-  state.rooms.current!.hasMore = false; await refresh(); setSocialUi({ roomLine: 'line20' }); await wait(180);
-  assert(query('[data-room-line="line20"]').getAttribute('data-focus') === 'true' && !social.roomLine, 'A loaded quoted room line receives focus and consumes its target');
+  state.rooms.pinned = state.rooms.current!.key; state.rooms.current!.loading = false; state.rooms.current!.hasMore = false; c.go('room'); await refresh();
   assert(query('[data-room-line="line1"]').getAttribute('data-mate') === 'true' && !query('[data-room-line="line2"]').hasAttribute('data-mate'), 'Room authors in any joined team are marked as teammates');
   const ring = query('[data-room-line="line1"] > button'); assert(getComputedStyle(ring).boxShadow !== 'none', 'Room teammates have a visible avatar ring');
   ring.dispatchEvent(new MouseEvent('click', { bubbles: true })); await wait(); assert(query('dialog[open]').textContent?.includes('Alice'), 'A teammate from another joined team opens the member card');
@@ -468,18 +499,15 @@ async function roomChecks() {
   assert(!buttons(query('[popover]:popover-open', ownLine)).some(b => b.textContent === t('extension.copy.report')) && button(t('extension.copy.recall'), ownLine), 'A room author can retract their own line but cannot report it');
 }
 
-async function pollChecks() {
-  await reset('poll');
-  for (const [votes, expected] of [[{ bull: 2, hold: 1, bear: 1, mine: null }, null], [{ bull: 2, hold: 2, bear: 1, mine: null }, [40, 40, 20]], [{ bull: 2, hold: 2, bear: 2, mine: 'bull' }, [34, 33, 33]]] as const) {
-    stance = { ...votes }; await refresh();
-    const poll = query('[role="radiogroup"]'), box = poll.closest('[data-stance-poll]')!; const labels = [...poll.querySelectorAll('button b')].map(b => b.textContent);
-    if (!expected) assert(labels.every(label => label === '—') && !box.hasAttribute('data-shares'), 'Four votes hide all percentages');
-    else assert(labels.join(',') === expected.map(n => `${n}%`).join(',') && expected.reduce((a, b) => a + b, 0) === 100, 'Five or more votes show integer percentages totaling one hundred');
-    assert(box.querySelectorAll(':scope > span > span').length === 3 && poll.hasAttribute('data-voted') === Boolean(votes.mine), 'The proportion bar persists and only a cast vote enables selected colors');
-    const target = query<HTMLButtonElement>('button[data-stance="bull"]'); target.focus(); await wait(800);
-    assert(document.body.textContent?.includes(t('extension.stance.votes', { count: votes.bull + votes.hold + votes.bear })), 'The stance tooltip exposes the total number of votes');
-  }
-  query<HTMLButtonElement>('button[data-stance="bull"]').click(); await wait(); assert(recorded('room-stance').at(-1)?.payload?.value === null, 'Selecting the chosen stance withdraws that vote');
+async function likeChecks() {
+  await roomChecks();
+  const liked = query<HTMLButtonElement>('[data-room-line="line1"] button[aria-pressed]');
+  assert(liked.getAttribute('aria-pressed') === 'true' && liked.textContent?.includes('2'), 'A line liked by you shows the count and the pressed state');
+  liked.click(); await wait(); assert(recorded('room-like').at(-1)?.payload?.liked === false && recorded('room-like').at(-1)?.payload?.id === 'line1', 'Pressing a liked line takes the like back');
+  query<HTMLButtonElement>('[data-room-line="line5"] button[aria-pressed]').click(); await wait();
+  assert(recorded('room-like').at(-1)?.payload?.liked === true && recorded('room-like').at(-1)?.payload?.id === 'line5', 'Pressing an unliked line likes it');
+  const own = query('[data-room-line="line3"]');
+  assert(!own.querySelector('button[aria-pressed]') && own.querySelector(`[aria-label="${t('extension.room.likes', { count: 1 })}"]`), 'Your own line shows its likes but cannot be liked');
 }
 
 async function reactionChecks() {
@@ -512,12 +540,12 @@ async function reactionChecks() {
 async function settingsChecks() {
   await reset('settings');
   assert(button(t('extension.copy.editPersonalProfile')) && host.querySelectorAll('input[type="checkbox"]').length === 0, 'Settings begins with a profile card and shows 网页 as states, without switches');
-  const expected = ['extension.web.share', 'extension.settings.sites', 'extension.settings.interactionOptions', 'extension.settings.notifications', 'extension.shot.shortcut', 'extension.settings.privacy', 'extension.copy.security', 'extension.copy.aboutPalside', 'extension.copy.signOut'];
+  const expected = ['extension.web.share', 'extension.settings.interaction', 'extension.settings.sites', 'extension.settings.notifications', 'extension.shot.shortcut', 'extension.settings.privacy', 'extension.copy.security', 'extension.copy.aboutPalside', 'extension.copy.signOut'];
   const rendered = buttons(host).map(b => b.textContent ?? '');
   let previous = -1;
   for (const label of expected) { const index = rendered.findIndex(value => value.startsWith(t(label))); assert(index > previous, `Settings places ${t(label)} in its current flat order`); previous = index; }
   assert(host.querySelector('#appearance') && host.querySelector('#language') && buttons(host).at(-1)?.textContent === t('extension.copy.signOut'), 'Settings includes appearance and language selectors and ends with sign out');
-  for (const [label, screen] of [['extension.settings.sites', 'sites'], ['extension.settings.interactionOptions', 'interaction'], ['extension.settings.notifications', 'notifications'], ['extension.settings.privacy', 'privacy'], ['extension.copy.security', 'security'], ['extension.copy.aboutPalside', 'about']]) {
+  for (const [label, screen] of [['extension.settings.sites', 'sites'], ['extension.settings.interaction', 'interaction'], ['extension.settings.notifications', 'notifications'], ['extension.settings.privacy', 'privacy'], ['extension.copy.security', 'security'], ['extension.copy.aboutPalside', 'about']]) {
     const target = buttons(host).find(b => b.textContent?.startsWith(t(label!)))!; target.click(); await wait(); assert(c.screen === screen, `The ${t(label!)} setting opens its screen`);
   }
   await reset('notifications');
@@ -548,10 +576,10 @@ async function appearanceChecks() {
 async function privacyChecks() {
   await reset('privacy');
   assert(text().includes(t('extension.web.siteCount', { count: 2 })), 'Privacy displays the current granted website count');
-  for (const feature of ['share', 'token', 'quote', 'signal', 'sticky', 'room', 'shot', 'presence', 'notify'] as ReadKey[]) {
+  for (const feature of ['share', 'token', 'signal', 'chart', 'room', 'shot', 'presence', 'notify'] as ReadKey[]) {
     await click(t(`extension.privacy.feature_${feature}`)); await wait(200);
     const drawer = query('dialog[open], [role="dialog"][aria-modal="true"]', document);
-    if (feature === 'share') assert(drawer.textContent?.includes('不保存，30 秒后失效'), 'The sharing disclosure currently says viewing expires after thirty seconds');
+    if (feature === 'share') assert(drawer.textContent?.includes('不存储，30 秒后失效'), 'The sharing disclosure currently says viewing expires after thirty seconds');
     for (const part of ['line', 'who', 'keep', 'no']) assert(drawer.textContent?.includes(t(`extension.privacy.read.${feature}.${part}`)), `The ${feature} disclosure shows its ${part} explanation`);
     assert(button(t('common.close'), drawer) && buttons(drawer).every(b => [t('common.close'), t('extension.privacy.revoke')].includes(b.getAttribute('aria-label') ?? b.textContent?.trim() ?? '')), 'Feature disclosures offer only close and, for a granted permission, 收回');
     if (feature === 'room') assert(drawer.textContent?.includes(t('extension.privacy.perm_sites')) && !drawer.textContent.includes(t('extension.privacy.perm_tabs')) && !drawer.textContent.includes(t('extension.privacy.perm_active')), 'Room disclosure names only site access');
@@ -569,7 +597,7 @@ async function privacyChecks() {
 
 async function runtimeChecks() {
   await reset('top');
-  await verifyRuntimeBoundaries(state, assert, async snapshot => { state = snapshot; await refresh(); assert(Boolean(host.querySelector('[data-top]')) === Boolean(snapshot.pokes?.length), 'The reminder card follows the runtime invitation lifetime'); });
+  await verifyRuntimeBoundaries(state, assert, async snapshot => { state = snapshot; await refresh(); assert(buttons().some(b => b.textContent?.includes('喊你来看')) === Boolean(snapshot.pokes?.length), 'The invitation hint follows the runtime invitation lifetime'); });
 }
 
 async function run() {
@@ -578,7 +606,7 @@ async function run() {
     ['Account onboarding and phrase verification', onboardingChecks], ['Profile tag editing', profileChecks], ['Member cards and filtering', memberChecks],
     ['Message author grouping', chatChecks], ['Current token card presentation', assetChecks], ['Unread and history controls', readingChecks],
     ['Current viewing strip layout', watchChecks], ['Following and viewing invitations', reminderChecks],
-    ['Room references and member cards', roomChecks], ['Vote threshold and proportions', pollChecks], ['Received emoji reactions', reactionChecks],
+    ['Room references and member cards', roomChecks], ['Likes on 弹幕 lines', likeChecks], ['Received emoji reactions', reactionChecks],
     ['Current settings hierarchy and notification preview', settingsChecks], ['Browser appearance preferences', appearanceChecks], ['Privacy disclosures and local data', privacyChecks], ['Runtime history and invitation boundaries', runtimeChecks],
   ];
   for (const [name, execute] of cases) await test(name, execute);

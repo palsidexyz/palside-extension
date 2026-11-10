@@ -1,4 +1,3 @@
-import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -21,7 +20,6 @@ const rootPath = 'apps/extension/src/features/palside/';
 const passthrough = ({ children }) => children;
 const icon = () => null;
 const button = props => h('button', { ...Object.fromEntries(Object.entries(props).filter(([key]) => !['label', 'size', 'variant'].includes(key))), 'aria-label': props.label });
-const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 function fixture() {
   const social = productionModules()(rootPath + 'annotations/social-state.ts');
   const feedback = productionModules()(rootPath + 'annotations/locate-feedback.ts');
@@ -43,7 +41,6 @@ function fixture() {
     '../../../runtime/viewing/token-profiles': { tokenNamed },
     '../assets/token-data': { liveView: (_c, view) => view },
     '../annotations/social-state': social, './social-state': social, './locate-feedback': feedback,
-    '../annotations/sticky-list': { shownStickyCount: () => 0 },
     '../ui/motion-details': { Count: () => null, CountText: () => null },
     '../ui/primitives': { PersonAvatar: icon, Token: icon, Action: button },
     '../ui/text': { useText: () => x => x },
@@ -53,7 +50,6 @@ function fixture() {
     '../settings/site-catalog': { siteForUrl: () => undefined, siteAt: () => undefined },
     '../settings/access': { withTargetAccess: (_, __, action) => action() },
     '../rooms/rooms': { tabView, roomKeyFor: () => undefined, roomsOn: () => false },
-    '../chat/composer-social': { composerStyles: {}, RefLine: icon },
   };
   function load(file) {
     const source = readFileSync(rootPath + file, 'utf8');
@@ -69,7 +65,7 @@ function fixture() {
   return { social, load, modules };
 }
 const page = (url, extra = {}) => ({ url, host: new URL(url).hostname, title: 'Unshared origin', windowId: 1, interactive: true, ...extra });
-const a = 'https://example.com/a', b = 'https://example.com/b';
+const b = 'https://example.com/b';
 const snapshot = social => social.captureSocialUi().snapshot();
 
 async function dom(t) {
@@ -95,7 +91,7 @@ test('session replacement clears every transient field and rejects earlier owner
   const endA = social.beginSocialSession({ accountId: 'a' });
   const old = social.captureSocialUi();
   let calls = 0;
-  social.setSocialUi({ follow: { teamId: 'team', personId: 'mate' }, stickies: { url: a }, site: { accountId: 'a', then: () => calls++ }, grant: 'interact', allSites: true, read: 'share', settingsTab: 'sticky', people: 'token', roomPerson: 'person', roomPersonMessage: 'message', roomLine: 'line', invite: 'invite' });
+  social.setSocialUi({ follow: { teamId: 'team', personId: 'mate' }, site: { accountId: 'a', then: () => calls++ }, grant: 'interact', allSites: true, read: 'share', settingsTab: 'signal', people: 'token', roomPerson: 'person', roomPersonMessage: 'message', invite: 'invite' });
   const callback = snapshot(social).site.then;
   const endB = social.beginSocialSession({ accountId: 'b' });
   old.set({ invite: 'stale' }); callback(); endA();
@@ -132,39 +128,6 @@ test('current page borrows asset metadata without borrowing the URL or source', 
   const current = currentPage(controller);
   assert.equal(current.url, url); assert.notEqual(current.source, other.source); assert.equal(current.name, 'Known token');
 });
-
-test('message references invoke only the background locate command and keep shared feedback', async t => {
-  const f = fixture(), d = await dom(t); f.social.beginSocialSession({ accountId: 'account' });
-  const { MessageRef } = f.load('annotations/message-ref.tsx');
-  const calls = [], notices = [], pending = deferred();
-  const controller = { current: 'team', ownsScreen: () => true, setNotice: value => notices.push(value), live: { page: page(a), openPage: assert.fail, command: (...args) => { calls.push(args); return pending.promise; } } };
-  await d.render(h(MessageRef, { c: controller, message: { id: 'message', ref: { caption: 'quote', view: { url: b }, target: { kind: 'quote', exact: 'quote' } } } }));
-  await d.click('extension.composer.findRef');
-  assert.deepEqual(calls.map(call => call[0]), ['locate-ref']);
-  await act(() => pending.resolve({ result: 'missing' }));
-  assert.deepEqual(notices, ['extension.composer.refMissing']);
-});
-
-for (const change of ['new-sheet', 'screen', 'account', 'unmount', 'none']) test(`note quote completion respects ${change}`, async t => {
-  const f = fixture(), d = await dom(t); f.social.beginSocialSession({ accountId: 'account' });
-  const { NoteSheet } = f.load('annotations/sticky-list.tsx');
-  const pending = deferred(), navigations = [];
-  let owns = true;
-  const sticky = { id: 'note', teamId: 'team', author: 'mate', timestamp: 1, expiresAt: Date.now() + MINUTE_MS, url: a, text: 'note', target: { kind: 'quote', exact: 'quote' } };
-  const controller = { now: Date.now(), current: 'team', screen: 'chat', ownsScreen: () => owns, data: { self: 'account', views: [] }, people: [], sites: [], canWrite: true, go: value => navigations.push(value), live: { page: page(a), state: { items: { stickies: [sticky] }, preferences: {} }, command: () => pending.promise } };
-  f.social.setSocialUi({ stickies: { url: a } });
-  await d.render(h(NoteSheet, { c: controller }));
-  await d.click('extension.sticky.quote');
-  if (change === 'new-sheet') await act(() => f.social.setSocialUi({ stickies: { url: a, focus: 'note' } }));
-  if (change === 'screen') owns = false;
-  if (change === 'account') await act(() => f.social.beginSocialSession({ accountId: 'other' }));
-  if (change === 'unmount') await d.unmount();
-  const before = snapshot(f.social).stickies;
-  await act(() => pending.resolve());
-  assert.deepEqual(navigations, change === 'none' ? ['chat'] : []);
-  assert.equal(snapshot(f.social).stickies, change === 'none' ? undefined : before);
-});
-
 
 test('app link interception respects an entry that already handled the click', async () => {
   const file = rootPath + 'app/palside-app.tsx';

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect,useRef,useState } from 'react';
-import { broadOrigin,getHostPermissions,grantedHost,notificationsGranted,tabsGranted,watchPermissions } from '../../../runtime/browser/permissions';
+import { broadOrigin,getHostPermissions,grantedHost,notificationsGranted,tabGroupsGranted,tabsGranted,watchPermissions } from '../../../runtime/browser/permissions';
 import type { PalsideController } from '../app/use-palside';
 
 /**
@@ -8,7 +8,7 @@ import type { PalsideController } from '../app/use-palside';
  * `permissions.onAdded/onRemoved`, so a change made in Chrome shows everywhere at once. The preview without a browser counts every site as allowed.
  */
 export function useGrants(c: PalsideController) {
-  const [value, setValue] = useState<{ origins: string[]; notifications: boolean; tabs: boolean; ready?: boolean; error?: boolean }>({ origins: [], notifications: false, tabs: false });
+  const [value, setValue] = useState<{ origins: string[]; notifications: boolean; tabs: boolean; tabGroups: boolean; ready?: boolean; error?: boolean }>({ origins: [], notifications: false, tabs: false, tabGroups: false });
   const live = Boolean(c.live);
   const account = c.data.self;
   const version = useRef(0);
@@ -18,8 +18,8 @@ export function useGrants(c: PalsideController) {
     let active = true;
     const refresh = () => {
       const request = ++version.current;
-      void Promise.all([getHostPermissions(), notificationsGranted(), tabsGranted()]).then(([origins, notifications, tabs]) => {
-        if (active && request === version.current) setValue({ origins, notifications, tabs, ready: !subscriptionError, error: subscriptionError });
+      void Promise.all([getHostPermissions(), notificationsGranted(), tabsGranted(), tabGroupsGranted()]).then(([origins, notifications, tabs, tabGroups]) => {
+        if (active && request === version.current) setValue({ origins, notifications, tabs, tabGroups, ready: !subscriptionError, error: subscriptionError });
       }, () => {
         if (active && request === version.current) setValue(old => ({ ...old, ready: false, error: true }));
       });
@@ -39,6 +39,8 @@ export function useGrants(c: PalsideController) {
     /** The latest completed read succeeded; failed refreshes retain the last verified grants. */
     ready: !live || Boolean(value.ready),
     notifications: !live || value.notifications,
+    /** 查看和管理您的标签页组, which names 跟看's group. */
+    tabGroups: !live || value.tabGroups,
     /** 读取您的浏览记录, which 共享在看 runs on. */
     tabs: !live || value.tabs,
     /** 所有网站 is allowed. */

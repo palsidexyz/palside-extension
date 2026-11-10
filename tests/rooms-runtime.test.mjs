@@ -17,8 +17,7 @@ hooks.deregister();
 const key = 'token:Solana:So11111111111111111111111111111111111111112', otherKey = 'token:Ethereum:0x1111111111111111111111111111111111111111';
 const peer = { id: 'peer', nickname: 'Peer', avatarId: null }, self = { id: 'self', nickname: 'Self', avatarId: null };
 const message = (id, author = peer, patch = {}) => ({ id, key, author, text: `Message ${id}`, createdAt: Date.now(), ...patch });
-const stance = (mine = null) => ({ bull: 3, hold: 2, bear: 1, mine });
-const summary = (room = key, patch = {}) => ({ key: room, site: 'gmgn', count: 2, stance: stance(), faces: [peer], ...patch });
+const summary = (room = key, patch = {}) => ({ key: room, site: 'gmgn', count: 2, faces: [peer], ...patch });
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i = 0; i < 60; i++) await Promise.resolve(); };
 function fixture(t, rows = new Map()) {
@@ -41,10 +40,10 @@ function fixture(t, rows = new Map()) {
       if (route === 'GET /rooms/messages') return { messages: [], hasMore: false };
       if (route === 'POST /rooms/report') return { folded: true };
       if (route === 'POST /rooms/retract') return { retracted: true };
-      if (route === 'POST /rooms/stance') return { ...stance(), mine: options.body.value };
+      if (route === 'POST /rooms/like') return { id: options.body.id, count: options.body.liked ? 1 : 0, liked: options.body.liked };
       if (route === 'GET /rooms/people') return { count: 2, people: [peer] };
+      if (route === 'POST /rooms/likes') return { likes: [] };
       if (route === 'POST /rooms/hot/subscription') return { subscribed: options.body.open };
-      if (route === 'GET /rooms/message') return message(options.query.id);
       if (route === 'POST /rooms/blocks') blocked = options.body.blocked ? [peer] : [];
       if (route.endsWith('/rooms/blocks')) return { people: blocked };
       if (route === 'GET /team-invites') return { invites: pendingInvites };
@@ -57,7 +56,7 @@ function fixture(t, rows = new Map()) {
     }, async roomAvatar(room, account) { avatarCalls.push({ key: room, account }); return new Blob(['avatar'], { type: 'image/png' }); } },
     storage: { async get(id) { return structuredClone(rows.get(id)?.value); }, async put(id, account, kind, value) { const row = { account, kind, value: structuredClone(value) }; rows.set(id, row); writes.push({ id, ...row }); }, async remove(id) { rows.delete(id); } },
     sharing: { async savePreferences() { saved++; } },
-    tokens: new TokenProfiles(), directory: { clear() {}, show() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
+    tokens: new TokenProfiles(), directory: { clear() {}, show() {}, resume() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
     dispatch: { mutate(id, options) { return runtime.api.request(id, { ...options, key: 'operation-key-0001' }); } },
     async refresh() { refreshed++; runtime.state.remoteTeams = [{ id: 'team', joined: true }]; },
     emit() { service.prune(); emits++; },
@@ -92,8 +91,12 @@ test('renew loop runs every twenty seconds, panels close releases and reopening 
 
 test('failed snapshots retry on the renew timer without leaving a permanently loading view', async t => {
   const f = fixture(t); f.handlers.set('GET /rooms/summary', () => { throw Error('offline'); });
-  await assert.rejects(f.enter(), /offline/); assert.equal(f.runtime.state.rooms.current, undefined);
-  f.handlers.delete('GET /rooms/summary'); t.mock.timers.tick(ROOM_RENEW_MS); await settle(); assert.equal(f.runtime.state.rooms.current.loading, false);
+  await assert.rejects(f.enter(), /offline/);
+  // The room stays as 加载失败 (never a permanent 加载中) and retries itself after about one second, then two, four … (±20%)
+  assert.equal(f.runtime.state.rooms.current.loading, false); assert.equal(f.runtime.state.rooms.current.failed, true);
+  t.mock.timers.tick(1200); await settle(); assert.equal(f.runtime.state.rooms.current.failed, true);
+  f.handlers.delete('GET /rooms/summary'); t.mock.timers.tick(2400); await settle();
+  assert.equal(f.runtime.state.rooms.current.loading, false); assert.equal(f.runtime.state.rooms.current.failed, false);
 });
 
 test('rapid lease changes serialize and discard stale snapshots', async t => {
@@ -128,7 +131,7 @@ test('invalid keys, settings, text and signed-out commands never contact the ser
   await assert.rejects(f.service.invites(), { code: 'AUTH_REQUIRED' });
 });
 
-test('send trims Unicode text, deduplicates SSE echoes and retries unknown outcomes with the same operation key', async t => {
+test('send trims Unicode text, deduplicates live echoes and retries unknown outcomes with the same operation key', async t => {
   const f = fixture(t); await f.enter(); let attempts = 0;
   f.handlers.set('POST /rooms/messages', (_path, options) => {
     if (++attempts === 1) throw new ApiError(0, { error: 'RESULT_UNKNOWN' });
@@ -154,7 +157,7 @@ for (const transition of ['snapshot failure', 'panel close', 'room switch', 'par
   await assert.rejects(f.service.send(' hello '), { code: 'RESULT_UNKNOWN' });
   if (transition === 'snapshot failure') {
     f.handlers.set('GET /rooms/summary', () => { throw Error('offline'); });
-    f.service.reconnected(); await settle(); assert.equal(f.runtime.state.rooms.current, undefined);
+    f.service.reconnected(); await settle(); assert.equal(f.runtime.state.rooms.current.failed, true);
     f.handlers.delete('GET /rooms/summary'); await f.enter();
   } else if (transition === 'panel close') {
     await f.service.panelChanged(false); await f.service.panelChanged(true);
@@ -232,15 +235,15 @@ test('ROOM_SLOW is a definite send rejection and the next attempt gets a new key
   const sends = f.calls.filter(call => call.path === '/rooms/messages'); assert.notEqual(sends[0].options.key, sends[1].options.key);
 });
 
-test('snapshot replays in-flight message, folded, retract, count and stance events, preserving mine', async t => {
+test('snapshot replays in-flight message, folded, retract, count and likes events', async t => {
   const f = fixture(t), gate = deferred(); await f.service.panelChanged(true);
-  f.handlers.set('GET /rooms/messages', () => gate.promise); f.handlers.set('GET /rooms/summary', () => summary(key, { stance: stance('bull') }));
+  f.handlers.set('GET /rooms/messages', () => gate.promise); 
   const opening = f.service.open({ key }); await settle();
   f.service.consume({ key, type: 'message', message: message('live') }); f.service.consume({ key, type: 'folded', id: 'live' });
   f.service.consume({ key, type: 'retract', id: 'gone' }); f.service.consume({ key, type: 'count', count: 12 });
-  f.service.consume({ key, type: 'stance', stance: { bull: 9, hold: 8, bear: 7 } });
+  f.service.consume({ key, type: 'likes', id: 'live', count: 4 });
   gate.resolve({ messages: [message('gone')], hasMore: false }); await opening;
-  const room = f.runtime.state.rooms.current; assert.deepEqual(room.messages.map(item => [item.id, item.folded]), [['live', true]]); assert.equal(room.count, 12); assert.deepEqual(room.stance, { bull: 9, hold: 8, bear: 7, mine: 'bull' });
+  const room = f.runtime.state.rooms.current; assert.deepEqual(room.messages.map(item => [item.id, item.folded]), [['live', true]]); assert.equal(room.count, 12); assert.deepEqual(room.likes?.live, { count: 4, liked: false });
   f.service.consume({ key: otherKey, type: 'count', count: 999 }); assert.equal(room.count, 12);
 });
 
@@ -266,21 +269,35 @@ test('messages have no age expiry and keep only the newest ten thousand', async 
   assert.equal(f.runtime.state.rooms.current.messages.length, ROOM_MESSAGE_LIMIT); assert.ok(!f.runtime.state.rooms.current.messages.some(item => item.id === 'ancient'));
 });
 
-test('stance updates optimistically, synchronizes summary, rolls back failure and supports withdrawal', async t => {
-  const f = fixture(t); await f.enter(); await f.service.watchHot({ sourceId: 'one:hot', open: true }); const gate = deferred();
-  f.handlers.set('POST /rooms/stance', () => gate.promise); const pending = f.service.stance(key, 'bull'); await settle();
-  assert.deepEqual(f.runtime.state.rooms.current.stance, { bull: 4, hold: 2, bear: 1, mine: 'bull' });
-  assert.equal(f.runtime.state.rooms.summaries[key].stance.mine, 'bull');
+test('likes update optimistically, roll back failure, take a like back and keep my flag through events', async t => {
+  const f = fixture(t); f.handlers.set('GET /rooms/messages', () => ({ messages: [message('1')], hasMore: false })); await f.enter(); const gate = deferred();
+  f.handlers.set('POST /rooms/like', () => gate.promise); const pending = f.service.like(key, '1', true); await settle();
+  assert.deepEqual(f.runtime.state.rooms.current.likes['1'], { count: 1, liked: true });
   const rejected = assert.rejects(pending, /failed/); gate.reject(Error('failed')); await rejected;
-  assert.deepEqual(f.runtime.state.rooms.current.stance, stance());
-  f.handlers.delete('POST /rooms/stance'); await f.service.stance(key, 'bear'); assert.equal(f.runtime.state.rooms.current.stance.mine, 'bear');
-  await f.service.stance(key, null); assert.equal(f.runtime.state.rooms.current.stance.mine, null);
+  assert.deepEqual(f.runtime.state.rooms.current.likes['1'], { count: 0, liked: false });
+  f.handlers.set('POST /rooms/like', (_, options) => ({ id: '1', count: options.body.liked ? 5 : 4, liked: options.body.liked }));
+  await f.service.like(key, '1', true); assert.deepEqual(f.runtime.state.rooms.current.likes['1'], { count: 5, liked: true });
+  f.service.consume({ key, type: 'likes', id: '1', count: 6 }); assert.deepEqual(f.runtime.state.rooms.current.likes['1'], { count: 6, liked: true });
+  await f.service.like(key, '1', false); assert.deepEqual(f.runtime.state.rooms.current.likes['1'], { count: 4, liked: false });
+  assert.equal(f.count('POST /rooms/lease'), 1, 'a like needs no lease of its own');
+  assert.throws(() => f.service.like(key, '1', 'yes'), { code: 'INVALID_INPUT' });
 });
 
-test('stance needs no lease, and stale summary reads cannot undo a vote', async t => {
-  const f = fixture(t); await f.service.summary(key); const gate = deferred(); f.handlers.set('GET /rooms/summary', () => gate.promise);
-  const reading = f.service.summary(key); await f.service.stance(key, 'bull'); gate.resolve(summary()); await reading;
-  assert.equal(f.runtime.state.rooms.summaries[key].stance.mine, 'bull'); assert.equal(f.count('POST /rooms/lease'), 0);
+test('likes: one batched read per room, events win over a pending answer, and a new room asks again', async t => {
+  const f = fixture(t), answer = deferred(), other = { id: 'other', nickname: 'Other', avatarId: null };
+  f.handlers.set('GET /rooms/messages', () => ({ messages: [message('1'), message('2', self), message('3', other)], hasMore: false }));
+  f.handlers.set('POST /rooms/likes', () => answer.promise);
+  await f.enter(); t.mock.timers.tick(200); await settle();
+  const reads = f.calls.filter(call => call.path === '/rooms/likes');
+  assert.equal(reads.length, 1); assert.deepEqual(reads[0].options.body, { key, ids: ['1', '2', '3'] });
+  f.service.consume({ key, type: 'likes', id: '1', count: 9 });
+  answer.resolve({ likes: [{ id: '1', count: 2, liked: true }, { id: '3', count: 1, liked: false }] }); await settle();
+  assert.deepEqual(f.runtime.state.rooms.current.likes, { 1: { count: 9, liked: false }, 3: { count: 1, liked: false } });
+  f.service.consume({ key, type: 'message', message: message('4') }); f.service.consume({ key, type: 'message', message: message('5') }); t.mock.timers.tick(200); await settle();
+  assert.equal(f.count('POST /rooms/likes'), 2); assert.deepEqual(f.calls.filter(call => call.path === '/rooms/likes')[1].options.body.ids, ['4', '5']);
+  f.handlers.set('POST /rooms/likes', () => ({ likes: [] }));
+  await f.service.tabChanged({ asset: otherKey.slice(6) }); t.mock.timers.tick(200); await settle();
+  assert.equal(f.runtime.state.rooms.current.likes, undefined); assert.equal(f.count('POST /rooms/likes'), 2, 'a room without messages asks nothing');
 });
 
 test('block hides authors, faces and people, revokes avatars; unblock permits author messages again', async t => {
@@ -417,20 +434,6 @@ for (const [method, args, route] of [['summary', [key], '/rooms/summary'], ['peo
   });
 }
 
-for (const method of ['summary']) test(`${method} reads after a vote do not share a stale pre-vote request`, async t => {
-  const f = fixture(t); await f.service.summary(key);
-  const gate = deferred(), route = `GET /rooms/${method}`;
-  f.handlers.set(route, () => gate.promise);
-  const old = f.service[method](...(method === 'summary' ? [key] : []));
-  await f.service.stance(key, 'bull');
-  const current = summary(key, { stance: { bull: 4, hold: 2, bear: 1, mine: 'bull' } });
-  f.handlers.set(route, () => current);
-  const fresh = f.service[method](...(method === 'summary' ? [key] : [])); await settle();
-  gate.resolve(summary());
-  await Promise.all([old, fresh]);
-  assert.equal(f.runtime.state.rooms.summaries[key].stance.bull, 4);
-});
-
 test('read deduplication ends at account replacement and failed reads can be retried', async t => {
   const f = fixture(t), gate = deferred(); f.handlers.set('GET /rooms/summary', () => gate.promise);
   const old = assert.rejects(f.service.summary(key), { code: 'ACCOUNT_CHANGED' });
@@ -452,7 +455,7 @@ test('a new offscreen room service acquires the unchanged host tab with backgrou
   const f = fixture(t), tab = { id: 5, windowId: 10, url: 'https://gmgn.ai/sol/token/So11111111111111111111111111111111111111112' };
   let receiver = f.service; const snapshots = [];
   const bg = {
-    state: f.runtime.state, panels: new Map([[{}, 10]]), activeTab: async () => tab,
+    state: f.runtime.state, panels: new Map([[{}, 10]]), activeTab: async () => tab, panelWindows: { current: () => 10 },
     browser: { windows: { getLastFocused: async () => ({ id: 10 }) }, idle: { queryState: async () => 'active' }, permissions: { contains: async () => true } },
     async run({ name, payload }) {
       snapshots.push({ name, payload });
@@ -460,7 +463,7 @@ test('a new offscreen room service acquires the unchanged host tab with backgrou
       if (name === 'room-panels') await receiver.panelChanged(payload.connected);
       return { ok: true };
     },
-    sharing: { observer: { refresh: async activity => { assert.equal(activity, false); } } },
+    sharing: { observer: { replay: async () => {} } },
     panel: { reportRoomPanels: () => bg.run({ name: 'room-panels', payload: { connected: bg.panels.size > 0 } }) },
   };
   bg.roomTab = roomTab(bg); const sync = stateSync(bg);
@@ -512,14 +515,6 @@ test('summary LRU and expiry preserve all displayed keys and release unreference
   assert.equal(f.runtime.state.rooms.summaries[key], undefined); assert.ok(f.revoked.includes(url));
 });
 
-function history(f, count) {
-  const messages = Array.from({ length: count }, (_, index) => message(`history-${index}`, peer, { createdAt: index }));
-  f.handlers.set('GET /rooms/messages', (_path, options) => {
-    const end = options.query.before ? messages.findIndex(row => row.id === options.query.before) : messages.length;
-    return { messages: messages.slice(Math.max(0, end - 50), end), hasMore: end > 50 };
-  });
-}
-
 test('danmaku runtime accepts sixty composed graphemes and rejects sixty-one before sending', async t => {
   const f = fixture(t); await f.enter();
   for (const glyph of ['👨‍👩‍👧‍👦', '👩🏽‍💻', '🇨🇳', 'e\u0301']) {
@@ -551,7 +546,7 @@ test('hot uses one device subscription across panels, local filters, and no poll
   f.service.consume({ type: 'hot', rooms: { rows } }); assert.equal(f.runtime.state.rooms.hot, undefined);
 });
 
-test('hot reopens after SSE reconnect and closes when participation is disabled', async t => {
+test('hot reopens after live socket reconnect and closes when participation is disabled', async t => {
   const f = fixture(t); await f.enter();
   await f.service.watchHot({ sourceId: 'one:hot', open: true });
   f.service.reconnected(); await settle();
@@ -559,34 +554,6 @@ test('hot reopens after SSE reconnect and closes when participation is disabled'
   await f.service.settings({ off: true }); await settle();
   assert.equal(f.calls.filter(call => call.path === '/rooms/hot/subscription').at(-1).options.body.open, false);
   assert.equal(f.runtime.state.rooms.hot, undefined);
-});
-
-test('quote lookup makes one scoped ID request and preserves the history cursor', async t => {
-  const f = fixture(t); history(f, ROOM_MESSAGE_LIMIT); await f.enter();
-  const initial = f.runtime.state.rooms.current.messages[0].id;
-  f.handlers.set('GET /rooms/message', (_path, options) => message(options.query.id, peer, { createdAt: 0 }));
-  assert.deepEqual(await f.service.find(key, 'history-0'), { found: true });
-  assert.equal(f.count('GET /rooms/messages'), 1); assert.equal(f.count('GET /rooms/message'), 1);
-  assert.ok(f.runtime.state.rooms.current.messages.some(row => row.id === 'history-0'));
-  await f.service.more();
-  assert.equal(f.calls.filter(call => call.path.startsWith('/rooms/messages?')).at(-1).options.query.before, initial);
-});
-
-test('quote lookup handles removal, blocks, room changes, retractions and account replacement', async t => {
-  const f = fixture(t); await f.enter();
-  f.handlers.set('GET /rooms/message', () => { throw new ApiError(404, { error: 'ROOM_MESSAGE_NOT_FOUND' }); });
-  assert.deepEqual(await f.service.find(key, 'missing'), { found: false });
-  f.handlers.set('GET /rooms/message', () => message('blocked')); f.runtime.state.rooms.blocked = [peer];
-  assert.deepEqual(await f.service.find(key, 'blocked'), { found: false }); f.runtime.state.rooms.blocked = [];
-  for (const transition of ['retract', 'room', 'account']) {
-    await f.service.open({ key }); const gate = deferred();
-    f.handlers.set('GET /rooms/message', () => gate.promise); const finding = f.service.find(key, transition);
-    if (transition === 'retract') f.service.consume({ key, type: 'retract', id: transition });
-    if (transition === 'room') await f.service.open({ key: otherKey });
-    if (transition === 'account') { f.invalidate(); f.service.reset(); }
-    const check = transition === 'account' ? assert.rejects(finding, { code: 'ACCOUNT_CHANGED' }) : finding.then(result => assert.deepEqual(result, { found: false }));
-    gate.resolve(message(transition)); await check;
-  }
 });
 
 test('effective server slow interval reaches the composer state', async t => {
@@ -597,16 +564,13 @@ test('effective server slow interval reaches the composer state', async t => {
   assert.equal(f.runtime.state.rooms.current.slowMs, 15_000);
 });
 
-test('hot faces load avatars, respect blocks, and room stance/count updates reach the row', async t => {
+test('hot faces load avatars, respect blocks, and room count updates reach the row', async t => {
   const f = fixture(t); await f.enter();
   await f.service.watchHot({ sourceId: 'one:hot', open: true });
   f.service.consume({ type: 'hot', rooms: { rows: [{ ...summary(), faces: [{ ...peer, avatarId: 'hot-avatar' }] }] } });
   await settle(); assert.equal(f.avatarCalls.length, 1); assert.ok(f.runtime.state.rooms.avatars.peer);
-  await f.service.stance(key, 'bull');
-  assert.deepEqual(f.runtime.state.rooms.hot.rows[0].stance, { bull: 3, hold: 2, bear: 1 });
-  f.service.consume({ key, type: 'stance', stance: { bull: 7, hold: 2, bear: 1 } });
   f.service.consume({ key, type: 'count', count: 8 });
-  assert.equal(f.runtime.state.rooms.hot.rows[0].stance.bull, 7); assert.equal(f.runtime.state.rooms.hot.rows[0].count, 8);
+  assert.equal(f.runtime.state.rooms.hot.rows[0].count, 8);
   await f.service.block(peer.id, true);
   assert.deepEqual(f.runtime.state.rooms.hot.rows[0].faces, []); assert.equal(f.runtime.state.rooms.avatars.peer, undefined);
 });

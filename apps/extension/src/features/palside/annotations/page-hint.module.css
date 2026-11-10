@@ -1,0 +1,26 @@
+/* A centred hint in the timeline: soft round, no border, one quiet sentence. */
+.art { flex:none; }
+.row { display:flex; justify-content:center; margin:12px 0 4px; }
+.note { position:relative; display:inline-flex; align-items:center; max-width:calc(100% - 56px); border-radius:var(--ui-radius-pill); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); transition:background-color .16s var(--ui-ease-feedback), opacity .2s var(--ui-ease-feedback); }
+.note:hover { background:var(--ui-control-hover); }
+.open { display:inline-flex; align-items:center; gap:6px; min-width:0; min-height:30px; padding:5px 14px 5px 9px; border:0; border-radius:inherit; background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); line-height:20px; cursor:pointer; }
+.open:disabled { cursor:default; }
+.open:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+/* One line where only the page name gives way: the person, what they did and the count always read whole. */
+.text { display:flex; align-items:center; min-width:0; overflow:hidden; white-space:pre; }
+.times { flex:none; margin-inline-start:2px; font-variant-numeric:tabular-nums; }
+.place { display:flex; align-items:center; gap:4px; min-width:0; }
+.place [data-token-size] { flex:none; }
+.place b { min-width:0; overflow:hidden; text-overflow:ellipsis; font-weight:600; color:var(--ui-text-primary); }
+.place [data-token-size][data-token-size] { --token-size:14px; }
+.place [data-token-size] > :not(:first-child) { display:none; }
+/* A line this device just sent, until its room event confirms it: quieter, with a small turning ring after the words. */
+.note[data-pending] { opacity:.6; }
+.note[data-pending] .open::after { content:''; flex:none; width:10px; height:10px; margin-inline-start:2px; border-radius:50%; border:1.5px solid currentColor; border-inline-end-color:transparent; animation:pending-turn .8s linear infinite; }
+@keyframes pending-turn { to { transform:rotate(360deg); } }
+/* Ignore sits just outside the hint's end and shows on hover, so the resting hint stays one clean sentence. */
+.ignore { position:absolute; top:50%; left:calc(100% + 4px); display:grid; place-items:center; width:20px; height:20px; padding:0; border:0; border-radius:50%; background:var(--ui-control-surface); color:var(--ui-text-secondary); cursor:pointer; opacity:0; transform:translateY(-50%); transition:opacity .16s var(--ui-ease-feedback), color .16s, background-color .16s; }
+.row:hover .ignore, .ignore:focus-visible { opacity:1; }
+.ignore:hover { color:var(--ui-text-primary); background:var(--ui-control-hover); }
+@media(hover:none) { .ignore { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .note, .ignore { transition:none; } .note[data-pending] .open::after { animation:none; } }

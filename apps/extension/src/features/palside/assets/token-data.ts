@@ -3,7 +3,7 @@ import { siteById } from '@palside/shared/sites';
 import type { Viewing } from '../../../domain/assets/model';
 import { viewAsset } from '../../../domain/annotations/interaction';
 import { tokenNamed,withProfile } from '../../../runtime/viewing/token-profiles';
-import type { RoomKey,RoomPerson,RoomStance } from '../../../runtime/rooms/contract-types';
+import type { RoomKey,RoomPerson } from '../../../runtime/rooms/contract-types';
 import type { PalsideController } from '../app/use-palside';
 
 type Live = Pick<PalsideController, 'live'>;
@@ -29,12 +29,12 @@ export function tokenView(c: Live & Pick<PalsideController, 'data'>, asset: stri
   return { id: asset, kind: 'asset', name, chain, address, source: site?.name ?? '', url: url || '', color: '#e5e6e9', glyph: record ? name.slice(0, 1).toUpperCase() : '?', ...record?.logo ? { logo: record.logo } : {} };
 }
 
-export type TokenStats = { count: number; stance: RoomStance; faces: RoomPerson[] };
+export type TokenStats = { count: number; faces: RoomPerson[] };
 /** A token's public 弹幕 numbers: the open room once loaded, else its latest summary, else its 热门 row; undefined when unknown. */
 export function tokenStats(c: Live, key: RoomKey): TokenStats | undefined {
   const rooms = c.live?.state.rooms;
   if (rooms?.current?.key === key && !rooms.current.loading) return rooms.current;
   const summary = rooms?.summaries[key]; if (summary) return summary;
   const row = rooms?.hot?.rows.find(item => item.key === key);
-  return row ? { count: row.count, stance: { ...row.stance, mine: null }, faces: row.faces } : undefined;
+  return row ? { count: row.count, faces: row.faces } : undefined;
 }

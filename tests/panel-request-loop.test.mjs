@@ -22,7 +22,7 @@ const bundle = await rolldown({
       if (id === 'fixture:services.js') return 'export const API_URL = "https://service.test"; export class SessionRuntime {} export class LocalDataRuntime {} export class SharingRuntime {} export class TimelineRuntime {} export class SendingRuntime {} export class TeamInteractions {} export class RuntimeCommands {} export class SignalService {} export class ClientStorage {}';
       if (id === 'fixture:use-intl.js') return 'export const useTranslations = () => key => key;';
       if (id === 'fixture:motion/react.js') return 'export const AnimatePresence = ({children}) => children, motion = { div: "div" }, useReducedMotion = () => true;';
-      if (id.startsWith('fixture:')) return 'export default {}; export const Check = null, ChevronDown = null, Flame = null, Layers = () => null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = () => null, InlineFeedback = ({children}) => children, Tooltip = ({children}) => children, Count = null, CountText = null, Token = null, TokenName = ({view}) => view.name, tokenStats = () => undefined, ChainLogo = () => null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;';
+      if (id.startsWith('fixture:')) return 'export default {}; export const Check = null, ChevronDown = null, Flame = null, Layers = () => null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = () => null, InlineFeedback = ({children}) => children, Tooltip = ({children}) => children, Count = null, CountText = null, Token = null, TokenName = ({view}) => view.name, tokenStats = () => undefined, ChainLogo = () => null, Faces = null, HotSearchField = () => null, HotSearchResults = () => null, openRoom = null, roomView = null, tabRoomKey = null;';
     },
   }],
 });
@@ -137,25 +137,78 @@ for (const change of ['none', 'navigation', 'account', 'team', 'unmount']) test(
   assert.equal(focused, change === 'none' ? 1 : 0);
 });
 
-for (const command of ['locateRef', 'locateSticky']) test(`${command} reports that it opened the page when page tools fail after opening`, async () => {
-  const load = productionModules({ accessStatus: async () => ({ site: true }), visibleStickies: items => items.stickies });
-  const { stickies } = load('apps/extension/src/background/stickies.ts');
+test('a signal replay reports that it opened the page when page tools fail after opening', async () => {
+  const load = productionModules({ accessStatus: async () => ({ site: true }) });
+  const { refs } = load('apps/extension/src/background/refs.ts');
+  const { locator } = load('apps/extension/src/background/locate.ts');
+  const { MessageError, message } = await import('@palside/i18n');
   const origin = 'https://example.test/a', destination = 'https://example.test/b';
-  const target = { kind: 'quote', exact: 'quote', prefix: '', suffix: '' };
   let active = { id: 1, url: origin, status: 'complete' }, opens = 0;
   const bg = {
-    browser: {}, sessionVersion: 1, policyVersion: 1, teamAvailable: () => true,
+    browser: {}, sessionVersion: 1, policyVersion: 1, teamAvailable: () => true, pagePerson: async () => ({ name: 'Mia' }),
     state: {
-      authenticated: true, account: { id: 'self' }, preferences: { current: 'team' }, remoteTeams: [{ id: 'team', joined: true }],
-      items: { stickies: [{ id: 'sticky', teamId: 'team', url: destination, target }] },
-      data: { messages: [{ id: 'message', teamId: 'team', ref: { view: { kind: 'website', url: destination }, target } }] },
+      authenticated: true, account: { id: 'self' }, preferences: { current: 'team' }, remoteTeams: [{ id: 'team', joined: true }], data: { messages: [] },
+      signalRecords: [{ id: '$record', teamId: 'team', personId: 'mia', url: destination, kind: 'danger', target: { kind: 'page' }, timestamp: 1, expiresAt: 2 }],
     },
     panelTab: async () => ({ tab: active }), activeTab: async () => active,
     openPage: async url => { opens++; active = { ...active, url }; },
-    pages: { openPageTools: async () => { throw Error('page tools unavailable'); } },
+    setTimeout: (callback, delay) => setTimeout(callback, delay),
+    pages: { openPageTools: async () => { throw new MessageError(message('extension.runtime.pageActionFailed')); } },
   };
-  const reply = await stickies(bg)[command]({ windowId: 1, teamId: 'team', messageId: 'message', stickyId: 'sticky' }, 'chrome-extension://panel');
+  bg.locator = locator(bg);
+  const reply = await refs(bg).replaySignal({ windowId: 1, teamId: 'team', recordId: '$record' }, 'chrome-extension://panel');
   assert.equal(reply.value.opened, true);
-  assert.equal(opens, 1); assert.equal(reply.value.result, 'unavailable');
+  assert.equal(opens, 1); assert.equal(reply.value.result, 'blocked');
+});
+
+/** A panel whose locate flow can be interrupted while the page it opened is loading. */
+function locating() {
+  const load = productionModules({ accessStatus: async () => ({ site: true }) });
+  const { refs } = load('apps/extension/src/background/refs.ts');
+  const { locator } = load('apps/extension/src/background/locate.ts');
+  const destination = 'https://example.test/b', target = { kind: 'page' };
+  const shown = [];
+  let active = { id: 1, url: 'https://example.test/a', status: 'complete' }, loaded;
+  const port = {}, info = { url: destination };
+  const bg = {
+    browser: {}, sessionVersion: 1, policyVersion: 1, teamAvailable: () => true, pagePerson: async () => ({ name: 'Mia' }),
+    state: {
+      authenticated: true, account: { id: 'self' }, preferences: { current: 'team' }, remoteTeams: [{ id: 'team', joined: true }], data: { messages: [] },
+      signalRecords: [{ id: '$record', teamId: 'team', personId: 'mia', url: destination, kind: 'danger', target, timestamp: 1, expiresAt: 2 }],
+    },
+    panelTab: async () => ({ tab: active }), activeTab: async () => active,
+    openPage: async url => { active = { ...active, url, status: 'loading' }; loaded?.(); },
+    setTimeout: (callback, delay) => setTimeout(callback, delay),
+    pages: {
+      pagePorts: new Map([[port, info]]),
+      openPageTools: async () => ({ port, info, finish() {} }),
+      locate: async (_, message) => { shown.push(message); return 'shown'; },
+    },
+  };
+  bg.locator = locator(bg);
+  const start = interrupt => {
+    loaded = () => { interrupt(); setTimeout(() => { active = { ...active, status: 'complete' }; }, 100); };
+    return refs(bg).replaySignal({ windowId: 1, teamId: 'team', recordId: '$record' }, 'chrome-extension://panel');
+  };
+  return { bg, shown, start };
+}
+
+test('a signal replays after its page opens, though opening a token page moved the room and so the page policy', async () => {
+  const f = locating();
+  const reply = await f.start(() => { f.bg.policyVersion++; });
+  assert.equal(reply.value.result, 'shown');
+  assert.equal(JSON.stringify(f.shown), JSON.stringify([{ type: 'signal-replay', kind: 'danger', target: { kind: 'page' }, author: { name: 'Mia' } }]));
+});
+
+test('a replay stops when the login or squad changed while its page was opening, and an unknown record shows nothing', async () => {
+  for (const interrupt of [f => { f.bg.sessionVersion++; }, f => { f.bg.state.preferences.current = 'other'; }, f => { f.bg.state.account.id = 'other'; }]) {
+    const f = locating();
+    const reply = await f.start(() => interrupt(f));
+    assert.equal(reply.value.result, 'unavailable');
+    assert.equal(f.shown.length, 0);
+  }
+  const f = locating();
+  f.bg.state.signalRecords = [];
+  assert.equal((await f.start(() => {})).value.result, 'missing');
 });
 

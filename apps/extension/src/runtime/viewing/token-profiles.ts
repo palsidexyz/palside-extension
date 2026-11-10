@@ -52,6 +52,8 @@ const profileOf = (entry: Entry): TokenProfile => ({ name: entry.name, ...(entry
  */
 export class TokenProfiles {
   private entries = new Map<string, Entry>();
+  /** Assets the directory answered are not a token, or could not read: only these show 未识别代币; any other unnamed token is still loading. */
+  private unknown = new Set<string>();
   private readonly changed: () => void;
   private readonly now: () => number;
   private readonly origin: string;
@@ -86,12 +88,26 @@ export class TokenProfiles {
 
   /** The directory's answer replaces any snapshot name: symbol first, then full name, else the short address (also when hidden by an operator). */
   putDirectory(asset: string, entry: TokenEntry | null) {
-    if (!entry) return false;
+    if (!entry) return this.markUnknown(asset);
+    const wasUnknown = this.unknown.delete(asset);
     const network = asset.slice(0, asset.indexOf(':')) as Network, address = asset.slice(asset.indexOf(':') + 1);
     const name = tokenName(entry.symbol) ?? tokenName(entry.name) ?? shortAddress(address);
     const previous = this.fresh(asset), logo = entry.logo ? directoryLogo(this.origin, network, address, entry.logo) : undefined;
-    return this.store(asset, { name, ...(logo ? { logo } : {}), ...(previous?.site ? { site: previous.site } : {}), ...(!logo && entry.logoPending ? { logoPending: true as const } : {}), source: 'directory', at: this.now() }, previous);
+    const stored = this.store(asset, { name, ...(logo ? { logo } : {}), ...(previous?.site ? { site: previous.site } : {}), ...(!logo && entry.logoPending ? { logoPending: true as const } : {}), source: 'directory', at: this.now() }, previous);
+    if (!stored && wasUnknown) { this.changed(); return true; }
+    return stored;
   }
+
+  /** The directory answered this asset is not a token, or the ask failed: without a name it shows as unknown until a later answer names it. */
+  markUnknown(asset: string) {
+    // A token that already has a name keeps it; unknown only matters while there is none.
+    if (this.unknown.has(asset) || this.fresh(asset)) return false;
+    this.unknown.add(asset);
+    while (this.unknown.size > TOKEN_PROFILE_LIMIT) this.unknown.delete(this.unknown.values().next().value!);
+    this.changed(); return true;
+  }
+  /** Which of these assets are known not to load. */
+  unknownOf(assets: Iterable<string>): string[] { return [...new Set(assets)].filter(asset => this.unknown.has(asset)); }
 
   /** Whether the directory has answered for this asset and the answer is still held. */
   answered(asset: string) { return this.fresh(asset)?.source === 'directory'; }
@@ -114,7 +130,7 @@ export class TokenProfiles {
   /** The record's name and icon on a token view, the view keeping its own identity (id, URL, source); any other view is returned as is. */
   apply<T extends Viewing>(view: T): T { return view.kind === 'asset' ? withProfile(view, this.get(viewAsset(view))) : view; }
 
-  clear() { if (!this.entries.size) return; this.entries.clear(); this.changed(); }
+  clear() { if (!this.entries.size && !this.unknown.size) return; this.entries.clear(); this.unknown.clear(); this.changed(); }
 
   /** Records for these assets, newest first within the bound. */
   pick(assets: Iterable<string>): Record<string, TokenProfile> {

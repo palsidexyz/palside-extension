@@ -8,13 +8,13 @@ import { pageScopeUrl } from '../apps/extension/src/domain/annotations/social.ts
 const wait = () => new Promise(resolve => setTimeout(resolve, 30));
 function event() { const listeners = []; return { addListener: fn => listeners.push(fn), emit: (...args) => listeners.map(fn => fn(...args)) }; }
 function fixture({ interact = false, saved = {} } = {}) {
-  const initialSite = { on: interact, danmaku: true, signal: true, sticky: true };
-  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { 'example.com': initialSite }, hiddenStickies: [] }, remoteTeams: [{ id: 'one', joined: true }], data: { people: [], messages: [], views: [] }, items: { danmaku: [], stickies: [] }, drafts: {}, signals: [] };
+  const initialSite = { on: interact, danmaku: true, signal: true };
+  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { 'example.com': initialSite } }, remoteTeams: [{ id: 'one', joined: true }], data: { people: [], messages: [], views: [] }, items: { danmaku: [] }, drafts: {}, signals: [] };
   const control = { focused: true, queued: 1, tab: { id: 1, windowId: 10, active: true, status: 'complete', url: 'https://example.com/article' } };
   const calls = [], pages = [], panels = [], local = structuredClone(saved), storageReads = [];
   const sender = { id: 'qa', url: 'chrome-extension://qa/sidepanel.html' };
   const browser = {
-    runtime: { id: 'qa', getURL: path => `chrome-extension://qa${path}`, getContexts: async () => [{}], onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event(), sendMessage: async ({ command }) => { calls.push(command); return { ok: true, value: command?.name === 'snapshot' ? state : command?.name === 'signal-send' ? { queued: control.queued } : undefined }; } },
+    runtime: { id: 'qa', getURL: path => `chrome-extension://qa${path}`, getContexts: async () => [{}], onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event(), onUpdateAvailable: event(), sendMessage: async ({ command }) => { calls.push(command); return { ok: true, value: command?.name === 'snapshot' ? state : command?.name === 'signal-send' ? { queued: control.queued } : undefined }; } },
     storage: { local: { get: async keys => { storageReads.push(keys); return { ...local }; }, set: async value => Object.assign(local, value), remove: async () => {} } },
     tabs: { query: async () => [{ ...control.tab }], get: async () => ({ ...control.tab }), onActivated: event(), onUpdated: event(), onRemoved: event() },
     windows: { get: async () => ({ id: 10, focused: control.focused }), getLastFocused: async () => ({ id: 10, focused: control.focused }), onRemoved: event(), onFocusChanged: event() },
@@ -44,26 +44,27 @@ test('signals follow 网页互动 and their own switch; settings persist locally
   await f.toggle(true);
   assert.equal(f.pages.at(-1).messages.filter(m => m.type === 'signal-config').at(-1)?.on, true);
   let status = f.panels.filter(m => m.type === 'page').at(-1).status;
-  assert.equal(status.interactive, true); assert.equal(status.signalEnabled, true); assert.equal(status.stickyEnabled, true);
+  assert.equal(status.interactive, true); assert.equal(status.signalEnabled, true);
   await f.features({ signal: false });
   assert.equal(f.pages.at(-1).messages.filter(m => m.type === 'signal-config').at(-1)?.on, false);
   status = f.panels.filter(m => m.type === 'page').at(-1).status;
-  assert.equal(status.signalEnabled, false); assert.equal(status.stickyEnabled, true); assert.equal(status.interactive, true);
+  assert.equal(status.signalEnabled, false); assert.equal(status.interactive, true);
   const saved = await f.command('signal-settings', { expectedAccountId: f.state().account.id, settings: { sound: true, volume: 200 } });
   assert.equal(saved.value.volume, 100); assert.equal((await f.command('signal-settings-get')).value.sound, true);
   assert.equal((await f.command('signal-send', {})).ok, false);
 });
-test('send and receive require focus, current page, enabled switch and permission', async () => {
+test('an unfocused window still sends from its front tab and receives; a moved page, the switch and permission stop it', async () => {
   const f = fixture(); await wait(); await f.toggle(true);
   const page = f.pages.at(-1), send = () => page.port.onMessage.emit({ type: 'signal-send', kind: 'attention', target: { kind: 'page' }, requestId: crypto.randomUUID() });
   send(); await wait(); assert.equal(f.calls.filter(c => c.name === 'signal-send').length, 1);
-  f.control.focused = false; send(); await wait(); assert.equal(f.calls.filter(c => c.name === 'signal-send').length, 1);
-  const received = () => ({ id: crypto.randomUUID(), teamId: 'one', url: pageScopeUrl(f.control.tab.url), sentAt: Date.now(), kind: 'attention', target: { kind: 'page' }, personId: 'bob', at: Date.now() });
-  f.update({ signals: [received()] }); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 0);
-  f.control.focused = true; f.update({ signals: [received()] }); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 1);
-  f.update({}); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 1);
+  f.control.focused = false; send(); await wait(); assert.equal(f.calls.filter(c => c.name === 'signal-send').length, 2);
+  const received = (url = f.control.tab.url) => ({ id: crypto.randomUUID(), teamId: 'one', url: pageScopeUrl(url), sentAt: Date.now(), kind: 'attention', target: { kind: 'page' }, personId: 'bob', at: Date.now() });
+  f.update({ signals: [received()] }); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 1);
+  f.update({ signals: [received(`${f.control.tab.url}#elsewhere`)] }); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 2);
+  f.update({ signals: [received('https://example.com/another-page')] }); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 2);
+  f.update({}); await wait(); assert.equal(page.messages.filter(m => m.type === 'signal').length, 2);
   f.grants.clear(); f.browser.permissions.onRemoved.emit({ origins: ['<all_urls>'] });
-  send(); await wait(); assert.equal(f.calls.filter(c => c.name === 'signal-send').length, 1); assert.equal(page.messages.at(-1).type, 'off');
+  send(); await wait(); assert.equal(f.calls.filter(c => c.name === 'signal-send').length, 2); assert.equal(page.messages.at(-1).type, 'off');
 });
 test('background guard token is offscreen-only and invalidates when the switch closes', async () => {
   const f = fixture(); await wait(); await f.toggle(true);
@@ -112,7 +113,7 @@ test('turning 网页互动 off or switching team stops signals on every open pag
   await f.toggle(true);
   const second = f.pages.at(-1);
   assert.notEqual(second, first);
-  f.update({ preferences: { ...f.state().preferences, current: 'two', siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true, sticky: true } }, hiddenStickies: [] }, remoteTeams: [{ id: 'two', joined: true }] }); await wait();
+  f.update({ preferences: { ...f.state().preferences, current: 'two', siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: false, danmaku: true, signal: true } } }, remoteTeams: [{ id: 'two', joined: true }] }); await wait();
   assert.equal(second.messages.at(-1).type, 'off');
   assert.equal(f.panels.filter(m => m.type === 'page').at(-1).status.signalEnabled, false);
 });
@@ -121,7 +122,7 @@ test('permission loss while turning 互动 on prevents injection', async () => {
   let finish;
   const original = f.browser.permissions.contains, gate = new Promise(resolve => { finish = resolve; });
   f.browser.permissions.contains = options => options.origins ? gate.then(() => original(options)) : original(options);
-  f.update({ preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: true, danmaku: true, signal: true, sticky: true } } } }); await wait();
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { ...f.state().preferences.siteInteraction, 'example.com': { on: true, danmaku: true, signal: true } } } }); await wait();
   f.grants.clear(); f.browser.permissions.onRemoved.emit({ origins: ['<all_urls>'] });
   f.browser.permissions.contains = original; finish(); await wait(); await wait();
   assert.equal(f.pages.length, 0);
@@ -130,11 +131,11 @@ test('fresh signal selection rejects snapshot, wrong team, expired and other can
   const base = { authenticated: true, account: { id: 'alice' }, remoteTeams: [{ id: 'one', joined: true }], preferences: { current: 'one' }, signals: [] };
   const item = { id: crypto.randomUUID(), teamId: 'one', url: 'https://example.com/article', sentAt: 10000, kind: 'attention', target: { kind: 'page' }, personId: 'bob', at: 10000 };
   const next = { ...base, signals: [item] };
-  assert.equal(freshPageSignals(base, next, item.url, 10001).length, 1);
-  assert.equal(freshPageSignals(undefined, next, item.url, 10001).length, 0);
-  assert.equal(freshPageSignals(next, next, item.url, 10001).length, 0);
-  assert.equal(freshPageSignals(base, next, item.url, 15000).length, 0);
-  assert.equal(freshPageSignals(base, next, 'https://example.com/other', 10001).length, 0);
+  assert.equal(freshPageSignals(base, next, item.url, undefined, 10001).length, 1);
+  assert.equal(freshPageSignals(undefined, next, item.url, undefined, 10001).length, 0);
+  assert.equal(freshPageSignals(next, next, item.url, undefined, 10001).length, 0);
+  assert.equal(freshPageSignals(base, next, item.url, undefined, 15000).length, 0);
+  assert.equal(freshPageSignals(base, next, 'https://example.com/other', undefined, 10001).length, 0);
 });
 
 

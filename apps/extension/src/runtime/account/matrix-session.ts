@@ -2,11 +2,13 @@ import { startLiveSync } from './live-sync';
 import { restoreLocalData } from './local-restore';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { connectionStatus } from '../transport/connection';
+import { liveMatrixFetch } from '../transport/matrix-fetch';
 import { isLiveTimelineArrival } from '../chat/timeline-arrival';
 import { createClient,PendingEventOrdering,ClientEvent,RoomEvent,MatrixEventEvent,MatrixScheduler,type MatrixClient,type MatrixEvent,type Room } from 'matrix-js-sdk';
 import { type Identity } from '@palside/shared/identity';
 import { deviceKeyPublication,ensureCryptoIdentity,ownDeviceSigned,secretStorageCallbacks,OnlySignedDevicesIsolationMode } from './crypto-identity';
 import { POKE_EVENT } from '../../domain/annotations/social';
+import { FOLLOW_EVENT } from '../../domain/annotations/follow.ts';
 import type { RuntimeDevice } from './device';
 import { silent } from '../composition/state';
 import { sessionGuard } from './session';
@@ -23,7 +25,7 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     const disposeLive = this.liveDispose as (() => void) | undefined;
     if (disposeLive) disposeLive();
     this.liveDispose = undefined;
-    this.sseOpen = false; this.presenceVersion++; this.snapshotPresence = undefined;
+    this.liveOpen = false; this.presenceVersion++; this.snapshotPresence = undefined;
     runtime.state.data.people = runtime.state.data.people.map(person => ({ ...person, presence: undefined }));
     const previous = this.client; this.client = undefined; previous?.stopClient(); this.cryptoInitialised = false;
     runtime.state.connection.messaging = 'connecting'; runtime.timeline.readyForLiveEvents = false; this.receiveSince = Date.now();
@@ -44,16 +46,17 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     const publication = identity ? deviceKeyPublication(session.matrix.userId, session.matrix.deviceId) : undefined;
     const identityAbort = identity ? new AbortController() : undefined;
     this.identityAbort = identityAbort;
+    // Every Matrix request rides the live socket; an edit names its original and base as the gateway checks them.
+    const matrixFetch = liveMatrixFetch(runtime.api.live, url => {
+      const original = runtime.sending.editOriginals.get(decodeURIComponent(url.pathname.split('/').at(-1) ?? ''));
+      return original ? { original: original.id, editBase: String(original.baseEditedAt) } : undefined;
+    });
     const startOptions = { initialSyncLimit: HISTORY_PAGE_SIZE, disablePresence: true, pendingEventOrdering: PendingEventOrdering.Detached };
-    const client = createClient({ baseUrl: runtime.api.baseUrl, accessToken: session.token, userId: session.matrix.userId, deviceId: session.matrix.deviceId, cryptoCallbacks: secretStorageCallbacks(() => secretStorageKey), logger: silent, scheduler: new MatrixScheduler(() => -1), fetchFn: (input, init) => {
+    const client = createClient({ baseUrl: runtime.api.baseUrl, accessToken: session.token, userId: session.matrix.userId, deviceId: session.matrix.deviceId, cryptoCallbacks: secretStorageCallbacks(() => secretStorageKey), logger: silent, scheduler: new MatrixScheduler(() => -1), fetchFn: async (input, init) => {
+      const response = await matrixFetch(input, init);
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      const transactionId = decodeURIComponent(new URL(url).pathname.split('/').at(-1) ?? '');
-      const original = runtime.sending.editOriginals.get(transactionId);
-      const headers = new Headers(init?.headers); if (original) { headers.set('X-Palside-Original', original.id); headers.set('X-Palside-Edit-Base', String(original.baseEditedAt)); }
-      return fetch(input, { ...init, headers }).then(response => {
-        if (scope.current() && this.session === session && new URL(url).pathname.endsWith('/keys/upload')) publication?.observe(init?.body, response);
-        return response;
-      });
+      if (scope.current() && this.session === session && new URL(url).pathname.endsWith('/keys/upload')) publication?.observe(init?.body, response);
+      return response;
     } });
     this.client = client; liveClient = client;
     let identitySyncError: unknown;
@@ -110,7 +113,9 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
       }
       if (!event.isEncrypted() || event.isDecryptionFailure()) return;
       if (event.getType() === 'com.palside.signal') { runtime.signals.consume(event, session); return; }
+      if (event.getType() === 'com.palside.chart_mark') { runtime.signals.consumeMark(event, session); return; }
       if (event.getType() === 'com.palside.reaction') { runtime.interactions.consumeReaction(event, session); return; }
+      if (event.getType() === FOLLOW_EVENT) { runtime.interactions.consumeFollow(event, session); return; }
       if (event.getType() === POKE_EVENT) { void runtime.interactions.consumePoke(event, session).catch(() => {}); return; }
       if (event.getType() !== 'com.palside.viewing') return;
       void runtime.sharing.consumeViewing(event, session).catch(() => {});
@@ -131,13 +136,13 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     }
     if (!scope.current() || this.session !== session || this.client !== client) { client.stopClient(); guard(); throw new MessageError(uiMessage('extension.runtime.connectionChanged')); }
     status.roomsStarted = true;
-    if (this.sseOpen) this.scheduleDeviceStateReport(true);
+    if (this.liveOpen) this.scheduleDeviceStateReport(true);
     if (status.roomCatchUp) runtime.rooms.reconnected();
     void runtime.rooms.start().catch(() => {});
     void this.preloadHistory().catch(() => {});
     } catch (error) {
       liveDispose();
-      if (this.liveDispose === liveDispose) { this.liveDispose = undefined; this.sseOpen = false; }
+      if (this.liveDispose === liveDispose) { this.liveDispose = undefined; this.liveOpen = false; }
       throw error;
     }
   }

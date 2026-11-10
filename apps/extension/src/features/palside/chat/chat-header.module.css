@@ -24,7 +24,11 @@
 header.bar { height:52px; padding-block:0; padding-inline:16px 8px; gap:6px; container:chatHeader / inline-size; }
 header.bar > :last-child { gap:8px; }
 .bar.bar .tool[data-size] { width:36px; height:36px; }
-.bar.bar .menuButton { margin-left:-4px; }
+.bar.bar .menuButton { position:relative; margin-left:-4px; }
+/* A downloaded extension version: a dot on ⋯'s top corner, cut from the bar by a ring of its background, that pops in. */
+.updateDot { position:absolute; top:7px; right:7px; width:7px; height:7px; border-radius:50%; background:var(--ui-text-primary); box-shadow:0 0 0 2px var(--ui-canvas); pointer-events:none; animation:updateDot .32s var(--ui-ease-feedback) both; }
+@keyframes updateDot { from { transform:scale(0); } }
+@media (prefers-reduced-motion:reduce) { .updateDot { animation:none; } }
 /* A name that does not fit is clipped and fades over its last 16px (data-cut, set in chat-header.tsx) instead of an ellipsis, so the
    unread dot, the chevron or the faces after it stay attached to the last character. */
 .bar.bar [data-header-name] { text-overflow:clip; }

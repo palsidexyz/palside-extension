@@ -5,9 +5,12 @@ export type Connection = {
   service: 'connecting' | 'ready' | 'unavailable';
   messaging: 'connecting' | 'ready' | 'unavailable' | 'failed';
   retrying: boolean;
+  /** The service refused this extension version: nothing works until the newer one is installed. */
+  outdated?: boolean;
 };
-export type ConnectionStatus = 'connected' | 'network-offline' | 'service-unavailable' | 'messaging-unavailable' | 'initialization-failed' | 'connecting';
+export type ConnectionStatus = 'connected' | 'update-required' | 'network-offline' | 'service-unavailable' | 'messaging-unavailable' | 'initialization-failed' | 'connecting';
 export function connectionStatus(connection: Connection): ConnectionStatus {
+  if (connection.outdated) return 'update-required';
   if (!connection.networkOnline) return 'network-offline';
   if (connection.service === 'unavailable') return 'service-unavailable';
   if (connection.messaging === 'failed') return 'initialization-failed';
@@ -15,6 +18,7 @@ export function connectionStatus(connection: Connection): ConnectionStatus {
   return connection.service === 'ready' && connection.messaging === 'ready' ? 'connected' : 'connecting';
 }
 export const connectionNotices = {
+  'update-required': { title: uiMessage('extension.runtime.updateRequiredTitle'), detail: uiMessage('extension.runtime.updateRequiredDetail') },
   'network-offline': { title: uiMessage('extension.runtime.networkOfflineTitle'), detail: uiMessage('extension.runtime.networkOfflineDetail') },
   'service-unavailable': { title: uiMessage('extension.runtime.serviceUnavailableTitle'), detail: uiMessage('extension.runtime.serviceUnavailableDetail') },
   'messaging-unavailable': { title: uiMessage('extension.runtime.messagingUnavailableTitle'), detail: uiMessage('extension.runtime.messagingUnavailableDetail') },

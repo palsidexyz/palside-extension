@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import type { Connection } from '../transport/connection';
 
 type ErrorCode = { code: string; at: number };
@@ -30,12 +31,40 @@ export class DiagnosticErrors {
   }
 }
 
+/** Channels whose arrival delay is measured on the receiving device. */
+export type LatencyChannel = 'viewing' | 'signal' | 'danmaku' | 'message';
+type LatencySummary = Partial<Record<LatencyChannel, { count: number; median: number; p90: number }>>;
+
+/**
+ * Arrival delay per realtime channel: receive time minus the sender's (or server's) timestamp, last 20 samples each.
+ * It includes the clock difference between the two machines, so it is a comparison between channels, not an exact figure.
+ */
+export class DiagnosticLatency {
+  private samples = new Map<LatencyChannel, number[]>();
+  record(channel: LatencyChannel, sentAt: unknown, now = Date.now()) {
+    if (typeof sentAt !== 'number' || !Number.isFinite(sentAt)) return;
+    const delay = now - sentAt;
+    if (Math.abs(delay) > MINUTE_MS) return;
+    const list = this.samples.get(channel) ?? [];
+    list.push(delay); this.samples.set(channel, list.slice(-20));
+  }
+  snapshot(): LatencySummary {
+    const summary: LatencySummary = {};
+    for (const [channel, list] of this.samples) {
+      const sorted = [...list].sort((a, b) => a - b), at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
+      summary[channel] = { count: sorted.length, median: at(0.5), p90: at(0.9) };
+    }
+    return summary;
+  }
+}
+
 export type RuntimeDiagnostics = {
   connection: Connection;
   sync: string | null;
-  sseOpen: boolean;
+  liveOpen: boolean;
   teams: number;
   errors: ErrorCode[];
+  latency: LatencySummary;
 };
 
 type DiagnosticsInput = RuntimeDiagnostics & {
@@ -60,14 +89,19 @@ export function diagnostics(input: DiagnosticsInput): { text: string } {
     `Messaging: ${lineValue(connection.messaging)}`,
     `Retrying: ${connection.retrying === true}`,
     `Sync: ${lineValue(input.sync ?? 'STOPPED')}`,
-    `SSE open: ${input.sseOpen === true}`,
+    `Live socket open: ${input.liveOpen === true}`,
     `Access tabs: ${input.access.tabs === true}`,
     `Access site: ${input.access.site === true}`,
     `Page layer enabled: ${input.pageLayer.enabled === true}`,
     `Page layer registered: ${input.pageLayer.registered === true}`,
     `Teams: ${input.teams}`,
-    'Errors:',
   ];
+  const latency = Object.entries(input.latency ?? {});
+  if (latency.length) {
+    lines.push('Latency (median / p90 ms, includes clock difference):');
+    for (const [channel, value] of latency) lines.push(`  ${channel}: ${value.median} / ${value.p90} (${value.count})`);
+  }
+  lines.push('Errors:');
   for (const error of input.errors) {
     lines.push(`${new Date(error.at).toISOString()} ${error.code}`);
   }

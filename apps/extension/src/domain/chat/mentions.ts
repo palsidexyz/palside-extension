@@ -24,3 +24,8 @@ export function messageParts(text: string, people: Person[], ids: string[] = [])
   }
   flush(); return parts;
 }
+
+/** The mentioned people still written as `@name` in an edited text: an edit keeps those of the original and adds none. */
+export function keptMentions(text: string, people: Person[], ids: string[]) {
+  return [...new Set(messageParts(text, people, ids).flatMap(part => part.personId ? [part.personId] : []))];
+}

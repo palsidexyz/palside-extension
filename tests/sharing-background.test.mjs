@@ -6,7 +6,7 @@ const wait=()=>new Promise(resolve=>setTimeout(resolve,35));
 const until=async(ready,ms=1000)=>{const end=Date.now()+ms;while(!ready()&&Date.now()<end)await wait();};
 function event(){const listeners=[];return{addListener:fn=>listeners.push(fn),emit:(...args)=>listeners.map(fn=>fn(...args))};}
 // 网页互动 stays off on the token site, so only the token reads under test call executeScript; a test may set its own sites.
-const off={on:false,danmaku:false,signal:false,sticky:false};
+const off={on:false,danmaku:false,signal:false};
 const quiet={'gmgn.ai':off,'fomo.family':off};
 function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,favicon=true}={}){
  const calls=[]; const controls={focused:true,locked:false,site,favicon,permissionChecks:[],tab:{id:1,windowId:10,active:true,status:'complete',url:'https://x.com/secret-post?tracking=private',title:'PRIVATE TITLE'}};
@@ -14,7 +14,7 @@ function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,fav
  const panelSender={id:'qa',url:'chrome-extension://qa/sidepanel.html',documentId:'panel'};
  const backgroundSender={id:'qa',url:'chrome-extension://qa/offscreen.html'};
  const browser={
-  runtime:{id:'qa',getURL:path=>`chrome-extension://qa${path}`,getManifest:()=>({manifest_version:3}),getContexts:async({contextTypes}={})=>contextTypes?.includes('SIDE_PANEL')?[{contextType:'SIDE_PANEL',documentId:'panel',documentUrl:'chrome-extension://qa/sidepanel.html',windowId:10,incognito:false}]:[{}],onMessage:event(),onMessageExternal:event(),onConnect:event(),onInstalled:event(),sendMessage:async({command})=>{calls.push(command);if(command.name==='snapshot')return snapshot ? snapshot() : {ok:true,value:state};return{ok:true};}},
+  runtime:{id:'qa',getURL:path=>`chrome-extension://qa${path}`,getManifest:()=>({manifest_version:3}),getContexts:async({contextTypes}={})=>contextTypes?.includes('SIDE_PANEL')?[{contextType:'SIDE_PANEL',documentId:'panel',documentUrl:'chrome-extension://qa/sidepanel.html',windowId:10,incognito:false}]:[{}],onMessage:event(),onMessageExternal:event(),onConnect:event(),onInstalled:event(), onUpdateAvailable: event(),sendMessage:async({command})=>{calls.push(command);if(command.name==='snapshot')return snapshot ? snapshot() : {ok:true,value:state};return{ok:true};}},
   tabs:{query:async()=>[{...controls.tab}],onActivated:event(),onUpdated:event(),onRemoved:event()},
   windows:{getLastFocused:async()=>({id:10,focused:controls.focused}),get:async()=>({id:10,focused:controls.focused}),onRemoved:event(),onFocusChanged:event()},
   idle:{queryState:async()=>controls.locked?'locked':'active',onStateChanged:event()},
@@ -24,7 +24,7 @@ function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,fav
  };
  let observer;
   const {grantedOrigins}=addBackgroundHost(browser,{origins:site?['<all_urls>']:[]});
- startWorker(browser,{createTabObserver:host=>{observer=createTabObserver(host,5);return observer;},fetch:async()=>({ok:true,arrayBuffer:async()=>new Uint8Array([1]),headers:{get:()=> 'image/png'}})});
+ startWorker(browser,{createTabObserver:host=>{observer=createTabObserver(host,5);return observer;},iconImage:async()=>({src:'data:image/png;base64,AQ=='}),fetch:async url=>({ok:true,blob:async()=>new Blob([new Uint8Array([/palside\.invalid|globe\.example/.test(String(url))?0:1])],{type:'image/png'}),arrayBuffer:async()=>new Uint8Array([/palside\.invalid|globe\.example/.test(String(url))?0:1]),headers:{get:()=> 'image/png'}})});
  // Keep page-status traffic separate from the lifecycle messages these tests inspect.
  const messages=[],pageMessages=[];
  const port={name:'palside/panel',sender:panelSender,onMessage:event(),onDisconnect:event(),postMessage:message=>(message.type==='page'?pageMessages:messages).push(message)};
@@ -35,14 +35,21 @@ function fixture({broadcastState=true,helloActivity=true,snapshot,site=false,fav
 }
 test('worker restart restores observation from the runtime snapshot without claiming fresh device activity',async t=>{
  const f=fixture({broadcastState:false,helloActivity:false});t.after(f.dispose);await until(()=>f.identities().length>=2);
- assert.equal(f.identities().length,2);assert.equal(f.identities()[0].payload.identity.url,'https://x.com');
+ assert.equal(f.identities().length,2);assert.equal(f.identities()[0].payload.identity.url,'https://x.com/secret-post?tracking=private');
  assert.equal(f.activities().length,0);
 });
-test('initial panel activity waits for hydration but a background window cannot claim device selection',async t=>{
+test('initial panel activity waits for hydration; an unfocused panel window keeps sharing but cannot claim device selection',async t=>{
  const opened=fixture({broadcastState:false});t.after(opened.dispose);await wait();
  assert.equal(opened.identities().length,2);assert.equal(opened.activities().length,1);
  const hidden=fixture({broadcastState:false});t.after(hidden.dispose);hidden.controls.focused=false;await wait();
- assert.equal(hidden.identities().length,0);assert.equal(hidden.activities().length,0);
+ assert.equal(hidden.identities().length,2);assert.equal(hidden.activities().length,0);
+});
+test('focus moving to another app or back keeps the shared page without clearing or republishing it',async t=>{
+ const f=fixture();t.after(f.dispose);await wait();const count=f.identities().length,clears=f.calls.filter(c=>c.payload?.clear).length;
+ f.controls.focused=false;f.browser.windows.onFocusChanged.emit(-1);await wait();
+ f.controls.focused=true;f.browser.windows.onFocusChanged.emit(10);await wait();
+ f.browser.idle.onStateChanged.emit('idle');await wait();
+ assert.equal(f.identities().length,count);assert.equal(f.calls.filter(c=>c.payload?.clear).length,clears);
 });
 test('late startup snapshot cannot replace newer logout state or revive a disconnected panel',async t=>{
  let finish;
@@ -59,9 +66,9 @@ test('late startup snapshot cannot replace newer logout state or revive a discon
 });
 test('actual worker observes only an eligible foreground URL without any injection or website request',async t=>{
  const f=fixture();t.after(f.dispose);await wait();
- assert.equal(f.identities().length,2);assert.equal(f.identities()[0].payload.identity.url,'https://x.com');
+ assert.equal(f.identities().length,2);assert.equal(f.identities()[0].payload.identity.url,'https://x.com/secret-post?tracking=private');
  assert.equal(f.identities()[0].payload.title,'PRIVATE TITLE');
- assert.doesNotMatch(JSON.stringify(f.identities()),/secret-post|tracking/);
+ assert.match(JSON.stringify(f.identities()),/"disclosure":"page"/);
  const count=f.identities().length;f.update({preferences:{current:'one',share:false}});await wait();assert.equal(f.identities().length,count);
  assert.equal(f.calls.at(-1).payload.clear,true);
 });
@@ -75,12 +82,16 @@ test('automatic observation needs no site grant and no tabs check of its own: th
  assert.equal(f.identities().length, 4);
  assert.equal(f.controls.permissionChecks.includes('tabs'), false);
 });
-test('SPA navigation refreshes identity without claiming device activity; locked and closed panels publish nothing',async t=>{
+test('an in-page anchor keeps the shared page; another page replaces it; a locked screen and a closed panel clear it',async t=>{
  const f=fixture();t.after(f.dispose);await wait();const activities=f.activities().length;
- f.controls.tab.url='https://x.com/another';f.browser.tabs.onUpdated.emit(1,{url:f.controls.tab.url},f.controls.tab);await wait();
- assert.equal(f.activities().length,activities);assert.equal(f.identities().length,4);
- f.controls.locked=true;f.browser.idle.onStateChanged.emit('locked');await wait();assert.equal(f.identities().length,4);
- f.controls.locked=false;f.port.onDisconnect.emit();await wait();assert.equal(f.identities().length,4);
+ const clears=()=>f.calls.filter(c=>c.name==='page'&&c.payload?.clear).length,before=clears();
+ f.controls.tab.url='https://x.com/secret-post?tracking=private#top';f.browser.tabs.onUpdated.emit(1,{url:f.controls.tab.url},f.controls.tab);await wait();
+ assert.equal(f.activities().length,activities);assert.equal(f.identities().length,2);assert.equal(clears(),before);
+ f.controls.tab.url='https://example.org/';f.browser.tabs.onUpdated.emit(1,{url:f.controls.tab.url},f.controls.tab);await wait();
+ assert.equal(f.identities().length,4);assert.equal(clears(),before);
+ f.controls.locked=true;f.browser.idle.onStateChanged.emit('locked');await wait();assert.equal(f.identities().length,4);assert.equal(clears(),before+1);
+ f.controls.locked=false;f.browser.idle.onStateChanged.emit('active');await wait();assert.equal(f.identities().length,6);
+ f.port.onDisconnect.emit();await wait();assert.equal(f.identities().length,6);assert.equal(clears(),before+2);
 });
 test('service unavailability stops automatic sharing without claiming device offline',async t=>{
  const f=fixture();t.after(f.dispose);await wait();
@@ -99,6 +110,9 @@ test('link-card builds token and website cards locally and rejects non-http URLs
  assert.equal(site.value.attachment.view.name,'example.com');
  assert.equal(site.value.attachment.view.source,'example.com');
  assert.match(site.value.attachment.view.logo,/^data:image\/png/);
+ // Chrome's default globe (what it serves for a site it has no icon for) is never used as a site's logo.
+ const globe=await f.command('link-card',{url:'https://globe.example/'});
+ assert.equal(globe.value.attachment.view.logo,undefined);
  // Without 共享在看's icon permission the website card carries no page icon.
  f.controls.favicon=false;
  const plain=await f.command('link-card',{url:'https://example.org/articles/1'});

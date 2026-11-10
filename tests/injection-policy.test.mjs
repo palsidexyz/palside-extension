@@ -10,6 +10,8 @@ test('Chrome grants alone determine automatic registrations while 网页互动 r
   const broad = pageScript(pageMatches(state, ['<all_urls>', 'https://custom.example.com/*']));
   assert.deepEqual(broad.matches, ['http://*/*', 'https://*/*'], 'a grant from Chrome menu covers every site');
   assert.deepEqual(validatePageLayerRegistration(broad), []);
+  const paused = { ...state, preferences: { current: 't', siteInteraction: { '*': { on: false, danmaku: true, signal: true, chart: true } } } };
+  assert.deepEqual(pageMatches(paused, ['<all_urls>', 'https://custom.example.com/*'], true), [], 'the master switch off registers no site, not even for 弹幕');
   assert.equal(script.persistAcrossSessions, false);
   assert.ok(validatePageLayerRegistration({ ...script, matches: ['<all_urls>'] }).length);
   assert.ok(validatePageLayerRegistration({ ...script, allFrames: true }).length);
@@ -30,8 +32,9 @@ test('registration requires 网页互动 on for a joined current team and never 
   const origins = ['https://example.com/*'];
   assert.deepEqual(pageMatches(state, origins), ['https://example.com/*']);
   for (const patch of [{ authenticated: false }, { remoteTeams: [] }, { remoteTeams: [{ id: 't', joined: false }] }, { preferences: { ...state.preferences, current: 'other' } },
-    { preferences: { ...state.preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } },
-    { preferences: { ...state.preferences, siteInteraction: { 'example.com': { on: true, danmaku: true, signal: false, sticky: false } } } }]) assert.deepEqual(pageMatches({ ...state, ...patch }, origins), [], JSON.stringify(patch));
+    { preferences: { ...state.preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true } } } }]) assert.deepEqual(pageMatches({ ...state, ...patch }, origins), [], JSON.stringify(patch));
+  // 引用 has no switch of its own, so the layer stays registered with 信号 off.
+  assert.deepEqual(pageMatches({ ...state, preferences: { ...state.preferences, siteInteraction: { 'example.com': { on: true, danmaku: true, signal: false } } } }, origins), ['https://example.com/*']);
 });
 
 test('page layer registrations allow only the isolated execution world', () => {

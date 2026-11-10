@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerHooks } from 'node:module';
 import { createClient, EventStatus, MatrixEvent, MatrixScheduler, MemoryStore, Room } from 'matrix-js-sdk';
-import { requireEncryptedSend } from '../apps/extension/src/runtime/account/crypto-identity.ts';
+import { requireEncryptedSend, teamSendGuard } from '../apps/extension/src/runtime/account/crypto-identity.ts';
 import { encryptedCrypto, encryptedRoom } from './helpers/encrypted-room.mjs';
 const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier === 'wxt/browser') return { url: 'data:text/javascript,export const browser = {}', shortCircuit: true };
@@ -21,10 +21,10 @@ function fixture(client) {
   const calls = [];
   const team = { id: 'team', roomId: '!room:test', joined: true, memberIds: ['self', 'peer'], people: [{ id: 'self', matrixId: '@self:test', nickname: 'Self' }, { id: 'peer', matrixId: '@peer:test', nickname: 'Peer' }], retentionDays: 7 };
   const runtime = {
-    state: { authenticated: true, remoteTeams: [team], preferences: { current: 'team', share: true }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, data: { teams: [], people: [{ id: 'peer', presence: 'active' }] }, items: { stickies: [] } },
+    state: { authenticated: true, remoteTeams: [team], preferences: { current: 'team', share: true }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, data: { teams: [], people: [{ id: 'peer', presence: 'active' }] } },
     auth: { session: { account: { id: 'self' }, matrix: { userId: '@self:test', deviceId: 'SELF' } }, client, requireConnection() {}, scope: () => ({ check() {}, current: () => true, wait: value => value }) },
     api: { async request(path, options) { calls.push({ path, options }); return { selected: true, expiresAt: Date.now() + 30_000, delivered: 1 }; } },
-    storage: { cache: async () => [] }, cache: { evictCachedContent() {}, pruneViews() {} }, foreground: async () => true, emit() {},
+    signals: { serviceNow: () => Date.now(), toLocal: time => time }, storage: { cache: async () => [] }, cache: { evictCachedContent() {}, pruneViews() {} }, foreground: async () => true, emit() {},
   };
   runtime.sharing = new SharingRuntime(runtime);
   runtime.sharing.page = { kind: 'asset', url: 'https://example.com/token', id: asset };
@@ -34,7 +34,7 @@ function fixture(client) {
   return { runtime, calls, team, interactions: new TeamInteractions(runtime) };
 }
 
-test('real Matrix SDK transport: custom events and chat require an encrypted room before HTTP', async () => {
+test('real Matrix SDK transport: chat requires an encrypted room before HTTP', async () => {
   const requests = [];
   const client = createClient({ baseUrl: 'https://service.invalid', userId: '@self:test', deviceId: 'SELF', accessToken: 'test', fetchFn: async (url, init) => {
     if (!String(url).includes('/send/')) return new Response(JSON.stringify({ errcode: 'M_NOT_FOUND' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
@@ -44,12 +44,11 @@ test('real Matrix SDK transport: custom events and chat require an encrypted roo
   // In-memory Rust crypto is real; no service, credentials or persistent crypto store is used.
   await client.initRustCrypto({ useIndexedDB: false });
   try {
-    await client.sendEvent('!room:test', 'com.palside.sticky', { text: 'control plaintext' });
+    await client.sendEvent('!room:test', 'com.palside.control', { text: 'control plaintext' });
     assert.equal(requests.length, 1);
     assert.equal(requests[0].body.text, 'control plaintext');
     requests.length = 0;
     const f = fixture(client);
-    await assert.rejects(f.interactions.teamEvent('team', 'sticky', { asset, site: 'example.com', text: 'secret' }), error => error.text.key === 'extension.runtime.syncingEncryption');
     await assert.rejects(new SendingRuntime(f.runtime).doSend({ id: 'message', teamId: 'team', author: 'self', text: 'secret' }, 0), error => error.text.key === 'extension.runtime.syncingEncryption');
     assert.equal(requests.length, 0);
     assert.equal(f.calls.length, 0);
@@ -210,8 +209,8 @@ for (const failure of ['no-state', 'disabled', 'changed-identity', 'hidden-membe
   await assert.rejects(requireEncryptedSend(client, '!room:test', [{ matrixId: '@peer:test', nickname: 'Peer' }], () => {}));
 });
 
-for (const change of ['session', 'client', 'membership', 'room', 'readonly']) test(`custom event rejects ${change} change during encryption eligibility`, async () => {
-  const room = encryptedRoom(); let f, sends = 0;
+for (const change of ['none', 'session', 'client', 'membership', 'room', 'readonly']) test(`send eligibility ${change === 'none' ? 'passes without changes' : `rejects ${change} change`} during encryption check`, async () => {
+  const room = encryptedRoom(); let f;
   const api = encryptedCrypto({ isEncryptionEnabledInRoom: async () => {
     if (change === 'session') f.runtime.auth.session = { ...f.runtime.auth.session };
     if (change === 'client') f.runtime.auth.client = { ...client };
@@ -220,10 +219,12 @@ for (const change of ['session', 'client', 'membership', 'room', 'readonly']) te
     if (change === 'readonly') f.runtime.state.data.teams.push({ id: 'team', readonly: true });
     return true;
   } });
-  const client = { getCrypto: () => api, getRoom: () => room, sendEvent: async () => { sends++; return { event_id: '$bad' }; } };
+  const client = { getCrypto: () => api, getRoom: () => room };
   f = fixture(client);
-  await assert.rejects(f.interactions.teamEvent('team', 'sticky', { asset, site: 'example.com', text: 'secret' }));
-  assert.equal(sends, 0);
+  // The pair every room send runs before it hands an event to the SDK.
+  const { check } = teamSendGuard(f.runtime, 'team');
+  const eligible = requireEncryptedSend(client, f.team.roomId, f.team.people, check).then(check);
+  if (change === 'none') await eligible; else await assert.rejects(eligible);
 });
 
 for (const path of ['viewing', 'reaction', 'poke']) {

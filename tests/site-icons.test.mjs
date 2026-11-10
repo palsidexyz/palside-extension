@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { iconCandidates, iconPlate, readSiteIcon } from '../apps/extension/src/domain/assets/site-icon.ts';
+import { iconCandidates, iconFace, iconPlate, readSiteIcon } from '../apps/extension/src/domain/assets/site-icon.ts';
 import { createContext } from '../apps/extension/src/background/context.ts';
 import { siteIcons } from '../apps/extension/src/background/site-icons.ts';
 
@@ -89,6 +89,27 @@ test('a newly allowed non-catalog site keeps the icon its homepage declares, fet
   assert.deepEqual(f.posts.at(-1), { type: 'site-icons', icons: { 'tools.example.com': { src: stored.src, plate: 'light' } } });
 });
 
+test('a shared page never waits for a download from the site: Chrome\'s cached icon goes out, the site\'s lands later', async () => {
+  const f = fixture({ origins: ['https://slow.example.com/*'] });
+  let answer;
+  const homepage = new Promise(resolve => { answer = resolve; });
+  // The site's homepage hangs; Chrome's favicon cache answers at once.
+  f.bg.fetch = async url => {
+    if (String(url).startsWith('chrome-extension://qa/_favicon/')) return new Response(String(url).includes('palside.invalid') ? 'img:globe' : 'img:cached');
+    f.requests.push({ url });
+    if (url === 'https://slow.example.com/') { await homepage; return new Response('<link rel="icon" href="/site.png">', { headers: { 'content-type': 'text/html' } }); }
+    if (url === 'https://slow.example.com/site.png') return new Response('img:site', { headers: { 'content-type': 'image/png' } });
+    return new Response('missing', { status: 404 });
+  };
+  f.bg.browser.permissions.contains = async () => true;
+  const downloads = f.icons.added(['https://slow.example.com/*']);
+  const shared = await f.icons.shareable('https://slow.example.com/page');
+  assert.equal(shared, `data:image/png;base64,${btoa('img:cached')}`);
+  answer();
+  await downloads;
+  assert.equal(await f.icons.shareable('https://slow.example.com/page'), `data:image/png;base64,${btoa('img:site')}`);
+});
+
 test('a failed homepage falls back to /favicon.ico, and a site that is not allowed is never stored', async () => {
   const f = fixture({ origins: ['https://plain.example.org/*'], pages: { 'https://plain.example.org/favicon.ico': { type: 'image/x-icon', body: 'img:ico' } } });
   await f.icons.fetchIcon('plain.example.org');
@@ -120,4 +141,16 @@ test('revoking a site prunes its icon; 清除本地数据 drops every icon until
   // A catalog site's tab never stores anything.
   await f.icons.tab({ url: 'https://gmgn.ai/sol/token/x', favIconUrl: 'https://gmgn.ai/favicon.ico' });
   assert.equal(f.requests.length, count);
+});
+
+test('a site icon with transparent corners is a bare glyph; a nearly all white or black glyph takes a plate', () => {
+  const square = (size, at) => { const out = []; for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) out.push(...at(x, y)); return out; };
+  const inner = (x, y) => x > 1 && y > 1 && x < 6 && y < 6;
+  assert.deepEqual(iconFace(square(8, () => [40, 200, 90, 255]), 8), { glyph: false });
+  assert.deepEqual(iconFace(square(8, (x, y) => inner(x, y) ? [40, 200, 90, 255] : [0, 0, 0, 0]), 8), { glyph: true });
+  assert.deepEqual(iconFace(square(8, (x, y) => inner(x, y) ? [255, 255, 255, 255] : [0, 0, 0, 0]), 8), { glyph: true, plate: 'dark' });
+  assert.deepEqual(iconFace(square(8, (x, y) => inner(x, y) ? [8, 8, 8, 255] : [0, 0, 0, 0]), 8), { glyph: true, plate: 'light' });
+  // Google's G: a coloured mark on a white disc (60% white) reads bare, without a dark plate.
+  const disc = (x, y) => !inner(x, y) ? [0, 0, 0, 0] : (x === 3 || x === 4) && y > 2 ? [66, 133, 244, 255] : [255, 255, 255, 255];
+  assert.deepEqual(iconFace(square(8, disc), 8), { glyph: true });
 });

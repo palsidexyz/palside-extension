@@ -11,7 +11,7 @@ import { siteOf, siteTags, type Site } from './site-catalog';
 import { addSite } from './access';
 import { setSocialUi } from '../annotations/social-state';
 import { SettingControl, SettingDanger, SettingGroup, settingRows } from './setting-rows';
-import { siteFeatures, siteInteraction, type SiteFeature } from '../../../domain/annotations/interaction';
+import { ALL_SITES, allSites, siteFeatures, siteInteraction, type SiteFeature } from '../../../domain/annotations/interaction';
 import { roomsOn } from '../rooms/rooms';
 import { SiteFeatureTiles } from './site-feature-tiles';
 import { allowedSites, siteAllowed, useGrants } from './use-grants';
@@ -19,13 +19,16 @@ import type { PalsideController } from '../app/use-palside';
 import s from '../app/pages.module.css';
 import motion from './settings.module.css';
 
-/** The features that run on a site, in the site sheet's order: 弹幕、信号, or 已关闭. 弹幕 counts only while 弹幕 itself is on. */
+/**
+ * The features that run on a site (`ALL_SITES`: anywhere), in the site sheet's order: 弹幕、信号、共享画线, or 关 — by the master switch and
+ * the site's own. 弹幕 counts only while 弹幕 itself is on.
+ */
 export function useSiteSummary(c: PalsideController) {
   const t = useTranslations();
   return (host: string) => {
-    const setting = siteInteraction(c.siteInteraction, host);
-    if (!setting.on) return t('extension.settings.off');
-    const names = siteFeatures.filter(feature => setting[feature] && (feature !== 'danmaku' || roomsOn(c))).map(feature => featureName(t, feature));
+    const all = allSites(c.siteInteraction), setting = host === ALL_SITES ? all : siteInteraction(c.siteInteraction, host);
+    if (!all.on || !setting.on) return t('extension.settings.off');
+    const names = siteFeatures.filter(feature => all[feature] && setting[feature] && (feature !== 'danmaku' || roomsOn(c))).map(feature => featureName(t, feature));
     return names.join(t('extension.access.separator')) || t('extension.access.none');
   };
 }
@@ -104,14 +107,29 @@ export function SiteDetail({ c, host }: { c: PalsideController; host: string }) 
   </div>;
 }
 
-/** 网页互动 on one allowed site, with its 弹幕, 信号 and 便利贴 tiles under the switch — the same card as the site sheet's. */
+/** 网页互动 on one allowed site, with its feature tiles under the switch — the same card as the site sheet's. */
 function SiteFeatures({ c, host }: { c: PalsideController; host: string }) {
   const t = useTranslations();
-  const setting = siteInteraction(c.siteInteraction, host);
+  const on = siteRunning(c, host);
   return <SettingGroup>
     <SettingControl icon={<Layers size={16} />}>
-      <Switch className={settingRows.switch} label={t('extension.settings.interaction')} checked={setting.on} onChange={event => void c.setSite(host, { on: event.currentTarget.checked })} />
+      <Switch className={settingRows.switch} label={t('extension.settings.interaction')} checked={on} onChange={event => void turnSite(c, host, event.currentTarget.checked)} />
     </SettingControl>
-    <SiteFeatureTiles c={c} host={host} live={setting.on} className={motion.siteTiles} />
+    <SiteFeatureTiles c={c} host={host} live={on} className={motion.siteTiles} />
   </SettingGroup>;
+}
+
+/** 网页互动 runs on the site by its own switch and the master switch in 设置 › 网页互动; Chrome's grant is checked by the caller. */
+export function siteRunning(c: PalsideController, host: string) {
+  return allSites(c.siteInteraction).on && siteInteraction(c.siteInteraction, host).on;
+}
+
+/**
+ * A site's 网页互动 switch. Switching on while the master switch is off turns that back on too — the one click says “run here” — and every
+ * other site returns to its own choice. Switching off touches only this site.
+ */
+export async function turnSite(c: PalsideController, host: string, on: boolean) {
+  const resume = on && !allSites(c.siteInteraction).on;
+  await c.setSite(host, { on });
+  if (resume) await c.setSite(ALL_SITES, { on: true });
 }

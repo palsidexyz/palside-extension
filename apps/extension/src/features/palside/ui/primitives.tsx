@@ -35,7 +35,9 @@ function TokenFace({ logo, fallback, waiting }: { logo?: string; fallback: React
  */
 export function Token({ view, size = 'md', waiting }: { view: Viewing; size?: 'xs' | 'sm' | 'md' | 'card' | 'lg'; waiting?: 'name' | 'logo' }) {
   const directory = use(SiteDirectoryContext);
-  if (view.kind === 'website') return <span className={s.token} data-token-size={size} data-kind="website" aria-hidden="true"><SiteLogo site={siteAt(directory, view.url, view.logo)} /></span>;
+  const site = view.kind === 'website' ? siteAt(directory, view.url, view.logo) : undefined;
+  // A page still loading shows the same sweep as a token instead of a site's first letter.
+  if (view.kind === 'website' && (site?.logo || !waiting)) return <span className={s.token} data-token-size={size} data-kind="website" aria-hidden="true"><SiteLogo site={site} /></span>;
   const fallbackName = view.name.trim();
   const initial = fallbackName === view.address || /^0x[\da-f.\u2026]+$/i.test(fallbackName) ? '?' : (fallbackName.match(/\p{L}/u)?.[0] ?? '?').toLocaleUpperCase();
   return <span className={s.token} data-token-size={size} data-kind={view.kind} style={{ '--token-color': view.color } as CSSProperties} aria-hidden="true">

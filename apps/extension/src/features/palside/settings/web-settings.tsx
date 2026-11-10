@@ -1,75 +1,98 @@
 'use client';
-import { Button } from '@palside/ui/button';
 import { errorMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import type { CSSProperties, ReactNode } from 'react';
-import { Ban, EyeOff, UserPlus } from 'lucide-react';
+import { Ban, ChevronRight, Layers, UserPlus } from 'lucide-react';
 import { Switch } from '@palside/ui/switch';
 import { useSavingSwitch } from '../ui/use-saving-switch';
 import { defaultDanmakuSettings, type DanmakuSettings } from '../../../runtime/browser/page-protocol';
 import { CountText } from '../ui/motion-details';
 import { DanmakuIcon, featureIcons } from '../ui/icons';
-import { SignalOptions } from './signal-settings';
-import { SettingControl, SettingGroup, SettingItem, settingRows } from './setting-rows';
-import { Range, Seg, Sub, Tabs } from '../ui/sub-rows';
-import { setSocialUi, useSocialUi, type SettingsTab } from '../annotations/social-state';
+import { ChartOptions, SignalOptions } from './signal-settings';
+import { ALL_SITES, allSites, siteFeatures, type SiteFeature } from '../../../domain/annotations/interaction';
+import { SettingControl, SettingItem, settingRows } from './setting-rows';
+import { Range, Seg, Sub } from '../ui/sub-rows';
+import { setSocialUi, useSocialUi } from '../annotations/social-state';
 import d from '../rooms/danmaku.module.css';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/pages.module.css';
+import w from './web-settings.module.css';
 
-/** 互动选项: how each feature looks and behaves. Whether it runs is chosen per site, in the site's sheet and 设置 › 网站. */
+/**
+ * 网页互动: the master switch heads the page, for every site; under it 弹幕, 信号 and 共享画线 are one card each — its name and its
+ * switch for every site, with its options opening in place under the name, one card at a time. Master off, nothing runs on any page and
+ * the cards grey; a feature off here is off on every site and leaves the site sheets, while each site keeps its own choice for when it
+ * comes back. 弹幕's card needs the service, so it waits while offline.
+ */
 export function InteractionSettings({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const chosen = useSocialUi().settingsTab ?? 'danmaku';
-  const tab = chosen === 'danmaku' && !c.live ? 'signal' : chosen;
-  const tabs: [SettingsTab, ReactNode][] = [
-    ['danmaku', <><DanmakuIcon size={15} />{t('extension.room.name')}</>],
-    ['signal', <>{featureIcons.signal()}{t('extension.web.signal')}</>],
-    ['sticky', <>{featureIcons.sticky()}{t('extension.web.sticky')}</>],
-  ];
+  const all = allSites(c.siteInteraction);
+  const open = useSocialUi().settingsTab;
+  const features = siteFeatures.filter(feature => feature !== 'danmaku' || c.live);
   return <div className={s.page}>
-    <div className={d.settingsTabs}><Tabs id="interaction" label={t('extension.settings.interactionOptions')} value={tab} tabs={c.live ? tabs : tabs.slice(1)} onChange={settingsTab => setSocialUi({ settingsTab })} /></div>
-    <div role="tabpanel" id="interaction-panel" aria-labelledby={`interaction-tab-${tab}`} className={s.page}>
-      {tab === 'danmaku' && c.live && <DanmakuTab c={c} />}
-      {tab === 'signal' && <SettingGroup><div className={s.options}><SignalOptions c={c} /></div></SettingGroup>}
-      {tab === 'sticky' && <SettingGroup><HiddenNotes c={c} /></SettingGroup>}
+    <div className={w.master} data-on={all.on || undefined}>
+      <span className={w.masterIcon} aria-hidden="true"><Layers size={20} /></span>
+      <strong className={w.masterName}>{t('extension.settings.interaction')}</strong>
+      <Switch hideLabel label={t('extension.settings.interaction')} checked={all.on} onChange={event => void c.setSite(ALL_SITES, { on: event.currentTarget.checked })} />
+    </div>
+    <div className={w.cards} data-dim={!all.on || undefined}>
+      {features.map(feature => <FeatureCard key={feature} c={c} feature={feature} open={open === feature} />)}
     </div>
     {c.preferenceError && <p className={s.error} role="alert">{c.preferenceError}</p>}
   </div>;
 }
 
-function HiddenNotes({ c }: { c: PalsideController }) {
+/** One feature's card: the name opens its options (closing any other), the switch turns it on or off for every site. */
+function FeatureCard({ c, feature, open }: { c: PalsideController; feature: SiteFeature; open: boolean }) {
   const t = useTranslations();
-  const hidden = c.live?.state.preferences.hiddenStickies?.length ?? 0;
-  return <SettingItem icon={<EyeOff size={16} />} title={t('extension.web.hiddenNotes')} value={hidden}
-    end={hidden > 0 ? <Button size="sm" variant="quiet" onClick={() => void c.run('preferences', { accountId: c.data.self, hiddenStickies: [] })}>{t('extension.web.showAll')}</Button> : undefined} />;
+  const all = allSites(c.siteInteraction);
+  const on = all.on && all[feature];
+  const name = t(feature === 'danmaku' ? 'extension.room.name' : `extension.web.${feature}`);
+  const panel = `interaction-${feature}`;
+  const icon: ReactNode = feature === 'danmaku' ? <DanmakuIcon size={16} /> : featureIcons[feature]();
+  return <section className={w.card} data-open={open || undefined} aria-label={name}>
+    <div className={w.head}>
+      <button type="button" className={w.toggle} aria-expanded={open} aria-controls={panel} disabled={!all.on} onClick={() => setSocialUi({ settingsTab: open ? undefined : feature })}>
+        <span className={w.icon} aria-hidden="true">{icon}</span><span className={w.name}>{name}</span><ChevronRight size={15} className={w.chevron} aria-hidden="true" />
+      </button>
+      <Switch hideLabel label={name} checked={on} disabled={!all.on} onChange={event => void c.setSite(ALL_SITES, { [feature]: event.currentTarget.checked })} />
+    </div>
+    <div id={panel} className={w.body} inert={!open || !all.on}>
+      <div className={w.inner}>
+        {feature === 'danmaku' ? <DanmakuOptions c={c} on={on} />
+          : <div className={s.options} data-dim={!on || undefined}>{feature === 'signal' ? <SignalOptions c={c} /> : <ChartOptions c={c} />}</div>}
+      </div>
+    </div>
+  </section>;
 }
 
 /**
- * 弹幕: its switch (the rooms themselves — reading and sending in the panel), then 在网页上显示 — the same 弹幕 crossing the page, with
- * its look; which sites show them is chosen per site — and the strangers 弹幕 brings: who is blocked and whether they may invite you into a squad.
+ * 弹幕's options: 在网页上显示 — how they cross the page, greyed while 弹幕 is off on pages or not joined at all — then 参与弹幕 (the rooms
+ * themselves: reading and sending in the panel) and the strangers it brings: who is blocked and whether they may invite you into a squad.
  */
-function DanmakuTab({ c }: { c: PalsideController }) {
+function DanmakuOptions({ c, on }: { c: PalsideController; on: boolean }) {
   const t = useTranslations();
   const rooms = c.live?.state.rooms;
   const off = Boolean(c.live?.state.preferences.rooms?.off);
-  const danmaku = useSavingSwitch(!off);
+  const joined = useSavingSwitch(!off);
   const invites = useSavingSwitch(rooms?.acceptInvites ?? true);
   const blocked = rooms?.blocked.length ?? 0;
-  const why = off ? t('extension.settings.roomsOff') : undefined;
   return <>
-    <SettingGroup>
+    <div className={w.section} data-dim={!on || off || undefined} inert={!on || off}>
+      <span className={w.label}>{t('extension.settings.onPages')}</span>
+      <DanmakuStyle c={c} />
+    </div>
+    <div className={w.rows}>
       <SettingControl icon={<DanmakuIcon size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.room.name')} checked={danmaku.checked} pending={danmaku.pending} refused={danmaku.refused} onChange={event => { const on = event.currentTarget.checked; void danmaku.save(on, async () => await c.run('room-settings', { off: !on }) !== undefined); }} />
+        <Switch className={settingRows.switch} label={t('extension.settings.joinRooms')} checked={joined.checked} pending={joined.pending} refused={joined.refused} onChange={event => { const join = event.currentTarget.checked; void joined.save(join, async () => await c.run('room-settings', { off: !join }) !== undefined); }} />
       </SettingControl>
-    </SettingGroup>
-    <SettingGroup title={t('extension.settings.onPages')} aside={why} dim={Boolean(why)}><DanmakuStyle c={c} /></SettingGroup>
-    <SettingGroup title={t('extension.settings.groupStrangers')} dim={off}>
-      <SettingItem icon={<Ban size={16} />} title={t('extension.room.blocked')} value={blocked ? <CountText text={t('extension.dynamic.peopleCount', { count: blocked })} value={blocked} /> : t('extension.room.blockedNone')} onClick={() => c.go('blocked')} />
-      <SettingControl icon={<UserPlus size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.settings.acceptInvites')} checked={invites.checked} pending={invites.pending} refused={invites.refused} onChange={event => { const accept = event.currentTarget.checked; void invites.save(accept, async () => await c.run('invite-settings', { accept }) !== undefined); }} />
-      </SettingControl>
-    </SettingGroup>
+      <div className={w.strangers} data-dim={off || undefined} inert={off}>
+        <SettingItem icon={<Ban size={16} />} title={t('extension.room.blocked')} value={blocked ? <CountText text={t('extension.dynamic.peopleCount', { count: blocked })} value={blocked} /> : t('extension.room.blockedNone')} onClick={() => c.go('blocked')} />
+        <SettingControl icon={<UserPlus size={16} />}>
+          <Switch className={settingRows.switch} label={t('extension.settings.acceptInvites')} checked={invites.checked} pending={invites.pending} refused={invites.refused} onChange={event => { const accept = event.currentTarget.checked; void invites.save(accept, async () => await c.run('invite-settings', { accept }) !== undefined); }} />
+        </SettingControl>
+      </div>
+    </div>
   </>;
 }
 

@@ -11,16 +11,24 @@ import { stateForPanel } from './panel-state.ts';
 import { applyPatch,type StatePatch } from './state-patch.ts';
 import type { DanmakuSettings,PageStatus } from '../browser/page-protocol';
 import { readSiteIcon, type SiteIcon } from '../../domain/assets/site-icon.ts';
+import { readUpdateStatus, type UpdateStatus } from '../browser/extension-update.ts';
 
-type OpenStickyRequest = { id: string; url?: string; teamId?: string };
-const openStickyListeners = new Set<(request: OpenStickyRequest) => void>();
-export function onOpenSticky(listener: (request: OpenStickyRequest) => void) { openStickyListeners.add(listener); return () => { openStickyListeners.delete(listener); }; }
 
 const openRoomListeners = new Set<(key: RoomKey) => void>();
 export function onOpenRoom(listener: (key: RoomKey) => void) { openRoomListeners.add(listener); return () => { openRoomListeners.delete(listener); }; }
 
+/** 跟看's tab, kept by the background for this panel's window. */
+export type FollowStatus = { paused: boolean; ended?: true };
+const followListeners = new Set<(status: FollowStatus) => void>();
+export function onFollowStatus(listener: (status: FollowStatus) => void) { followListeners.add(listener); return () => { followListeners.delete(listener); }; }
+export async function requestFollow(request: { op: 'go'; url: string; start?: boolean; teamId?: string; personId?: string; title?: string } | { op: 'pause' } | { op: 'resume'; url?: string } | { op: 'stop' }) {
+  const windowId = (await browser.windows.getCurrent()).id;
+  const result: Reply = await browser.runtime.sendMessage({ type: 'palside/follow', windowId, request });
+  if (!result?.ok) throw new MessageError(result?.text ?? (result ? errorMessage(result) : uiMessage('common.connectionLost')));
+}
+
 /** Commands about this panel's window and its active tab; the background checks the window against the asking panel. */
-const windowCommands = new Set(['selection-enabled', 'capture', 'link-card', 'locate-ref', 'locate-sticky']);
+const windowCommands = new Set(['capture', 'link-card', 'signal-replay', 'drawing-show']);
 
 let hotSubscription: CommandArgs<'room-hot'>[1];
 const roomWatches = new Map<string, CommandArgs<'room-watch'>[1]>();
@@ -65,10 +73,11 @@ type PanelHandlers = {
   onCaptured: (capture: { src: string; teamId?: string }) => void;
   onDanmaku: (settings: DanmakuSettings) => void;
   onSiteIcons: (icons: Record<string, SiteIcon>) => void;
+  onUpdate?: (status: UpdateStatus) => void;
 };
 
-/** The panel's port to the background: state, language, page status, danmaku settings and site icons in; `hello`, `resync` and activity out. Reconnects on loss. */
-export function observeState({ onState, onError, onLanguage, onDisconnect, onPage, onCaptured, onDanmaku, onSiteIcons }: PanelHandlers) {
+/** The panel's port to the background: state, language, page status, danmaku settings, site icons and the update status in; `hello`, `resync` and activity out. Reconnects on loss. */
+export function observeState({ onState, onError, onLanguage, onDisconnect, onPage, onCaptured, onDanmaku, onSiteIcons, onUpdate }: PanelHandlers) {
   let port: ReturnType<typeof browser.runtime.connect> | undefined;
   let closed = false;
   let firstConnection = true;
@@ -152,9 +161,11 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
       if (message.type === 'open-room' && isRoomKey(message.key)) {
         for (const listener of openRoomListeners) listener(message.key);
       }
-      if (message.type === 'open-sticky' && typeof message.id === 'string') {
-        for (const listener of openStickyListeners) listener({ id: message.id, url: message.url, teamId: message.teamId });
+      if (message.type === 'follow' && message.status && typeof message.status.paused === 'boolean') {
+        const status: FollowStatus = message.status.ended === true ? { paused: message.status.paused, ended: true } : { paused: message.status.paused };
+        for (const listener of followListeners) listener(status);
       }
+      if (message.type === 'update') onUpdate?.(readUpdateStatus(message.status));
       if (message.type === 'danmaku') {
         onDanmaku(message.settings);
       }

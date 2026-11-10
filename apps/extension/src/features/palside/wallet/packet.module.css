@@ -98,7 +98,7 @@
 .totalSub [data-error] { color:var(--ui-ink-error); }
 .dot { margin:0 4px; color:var(--ui-ink-muted); }
 
-/* 弹幕: the packet banner under 看法. */
+/* 弹幕: the packet banner above the lines. */
 .banner { flex:none; overflow:hidden; }
 .bannerIn { display:flex; align-items:center; gap:10px; margin:0 0 6px; padding:8px 8px 8px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:color-mix(in srgb, var(--packet) 10%, var(--ui-canvas)); }
 .bannerIn[data-state=gone] { background:var(--ui-control-surface); }

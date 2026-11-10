@@ -31,9 +31,9 @@ const chainNames: Readonly<Record<string, Network | null>> = {
     'berachain', 'unichain', '130', 'fantom', 'ftm', 'cronos', 'celo', 'gnosis', 'xdai', 'kaia', 'sei', 'starknet', 'bitcoin', 'btc', 'xlayer'].map(name => [name, null])),
 };
 const chainName = (name: string) => Object.hasOwn(chainNames, name) ? chainNames[name] : undefined;
-const networks: Record<string, Network> = Object.fromEntries(Object.entries(chainNames).filter((entry): entry is [string, Network] => entry[1] !== null && !/^\d+$/.test(entry[0])));
 export const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
-export function websiteId(host: string) { return siteDefinitions.find(site => site.domain === host)?.id ?? host; }
+/** A catalog site's id for its domain or any alias, else the host itself: one site, one id, whichever of its hosts a page is on. */
+export function websiteId(host: string) { return siteByDomain(host)?.id ?? host; }
 
 /** URL syntax/origin boundaries only. No login, account, holdings or other page-purpose blacklist. */
 export function websiteUrl(input: string): URL | null {
@@ -76,7 +76,7 @@ export function publicShareUrl(input: string): string | null {
 export function websiteIdentity(input: string, mode: WebsiteMode = 'site'): Extract<PageIdentity, { kind: 'website' }> | null {
   const url = websiteUrl(input); if (!url) return null;
   const page = mode === 'page' ? publicShareUrl(input) : null;
-  return { kind: 'website', site: siteDefinitions.find(site => site.domain === url.hostname)?.name ?? url.hostname, host: url.hostname,
+  return { kind: 'website', site: siteByDomain(url.hostname)?.name ?? url.hostname, host: url.hostname,
     id: `website:${websiteId(url.hostname)}`, url: page ?? url.origin, disclosure: page ? 'page' : 'site' };
 }
 export function normalizeAddress(chain: Network, address: unknown): string | null {
@@ -128,7 +128,9 @@ function poolIdentity(route: SiteRoute, match: RegExpMatchArray, chains: readonl
 
 /** Path segments that are about a person or a transaction, never a token: their addresses are not read or sent anywhere. */
 const PERSONAL = new Set(['address', 'addresses', 'account', 'accounts', 'wallet', 'wallets', 'tx', 'txs', 'transaction', 'transactions', 'block', 'blocks',
-  'portfolio', 'profile', 'profiles', 'user', 'users', 'holder', 'holders', 'trader', 'traders', 'maker', 'makers', 'kol', 'kols', 'dev']);
+  'portfolio', 'profile', 'profiles', 'user', 'users', 'holder', 'holders', 'trader', 'traders', 'maker', 'makers', 'kol', 'kols', 'dev',
+  // Wallet checks on security sites (GoPlus): the address is someone's wallet or its approvals.
+  'address-security', 'approval-security']);
 /** Query parameters naming a person; their values are never read as a token. */
 const PERSONAL_QUERY = new Set(['wallet', 'account', 'user', 'maker', 'trader', 'owner', 'holder', 'from', 'to', 'ref', 'referral', 'inviter', 'invite']);
 const POOL_SEGMENTS = new Set(['pool', 'pools', 'pair', 'pairs', 'pair-explorer', 'lp']);

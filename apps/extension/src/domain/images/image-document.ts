@@ -1,5 +1,5 @@
 import { IMAGE_DOCUMENT_BYTES } from '@palside/shared/rules/media';
-import { IMAGE_TEXT_MAX,IMAGE_PEN_POINTS_MAX,COLORS,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection } from './drawing.ts';
+import { imageTextFits,IMAGE_PEN_POINTS_MAX,COLORS,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection } from './drawing.ts';
 
 export type ImageDocumentSnapshot = { version: 1; width: number; height: number; crop: CaptureSelection; ops: CaptureOp[] };
 export type ImageViewport = { width: number; height: number; scale: number; x: number; y: number };
@@ -48,7 +48,7 @@ export function readImageDocument(value: unknown, width: number, height: number)
   for (const op of input.ops) {
     if (!op || typeof op !== 'object' || !colors.has(op.color as CaptureColor)) return;
     if (op.kind === 'pen') { if (!Array.isArray(op.points) || !op.points.length || op.points.some(p => !point(p)) || (points += op.points.length) > IMAGE_PEN_POINTS_MAX) return; }
-    else if (op.kind === 'text') { if (!point(op) || typeof op.value !== 'string' || !op.value.trim() || op.value.length > IMAGE_TEXT_MAX) return; }
+    else if (op.kind === 'text') { if (!point(op) || typeof op.value !== 'string' || !op.value.trim() || !imageTextFits(op.value)) return; }
     else if (['arrow', 'rectangle', 'mosaic'].includes(op.kind)) {
       if (!point(op) || !finite(op.width) || !finite(op.height) || !point({ x: op.x + op.width, y: op.y + op.height }) || op.kind !== 'arrow' && (op.width < 0 || op.height < 0)) return;
     } else return;

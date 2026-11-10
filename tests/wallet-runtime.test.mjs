@@ -183,6 +183,14 @@ test('failed refresh retains last verified balance and disables spending', async
   assert.equal(f.controller.snapshot().availability, 'offline');
   await assert.rejects(f.controller.review({ kind: 'transfer', recipient, amount: String(unit) }), /CHAIN_DISABLED/);
 });
+test('a balance cached under another deployment is not shown after a restart when the first read fails', async t => {
+  const f = fixture(t);
+  f.values.set('self:wallet-balance', { token: '0x' + '99'.repeat(20), chainId: deployment.chainId, address, balance: String(5n * unit), blockNumber: '1' });
+  f.api.balance = async () => { throw new Error('INDEX_UNAVAILABLE'); };
+  await f.controller.start();
+  assert.equal(f.controller.snapshot().balance, undefined);
+  assert.equal(f.controller.snapshot().availability, 'offline');
+});
 test('USD fraction remains exact and missing price does not disable PALS balances', async t => {
   const f = fixture(t);
   const price = { numerator: '900719925474099312345', denominator: '1000000000000000000', currency: 'USD', source: 'pool', blockNumber: '1', updatedAt: Date.now() };
@@ -260,6 +268,12 @@ test('config disable during balance persistence cannot publish ready availabilit
   assert.ok(states.length > 0);
   assert.ok(states.every(state => state.availability === 'closed'));
 });
+test('a pushed chain config applies as sent and reads only the balance, without asking for the config again', async t => {
+  const f = fixture(t); await f.controller.start();
+  let reads = 0; const config = f.api.config; f.api.config = async () => { reads++; return config(); };
+  await f.controller.handleEvent({ type: 'config', config: { ...f.config, version: f.config.version + 1 } });
+  assert.equal(reads, 0); assert.equal(f.controller.snapshot().config.version, f.config.version + 1); assert.equal(f.controller.snapshot().availability, 'ready');
+});
 test('newer refresh wins when an older balance write finishes last', async t => {
   const f = fixture(t); await f.controller.start();
   const entered = Promise.withResolvers(), released = Promise.withResolvers();
@@ -276,7 +290,7 @@ test('newer refresh wins when an older balance write finishes last', async t => 
   released.resolve(); await refreshing;
   assert.deepEqual(f.controller.snapshot().balance, balance);
 });
-test('SSE cannot replace the amount or destination of the reviewed order', async t => {
+test('live socket cannot replace the amount or destination of the reviewed order', async t => {
   const f = fixture(t); await f.controller.start();
   const payment = await f.controller.review({ kind: 'transfer', teamId: 'team', recipientId: 'peer', amount: String(5n * unit) });
   await assert.rejects(f.controller.handleEvent({ type: 'order', accountId: 'self', order: { ...payment.order, amount: String(500n * unit) } }), /ORDER_MISMATCH/);
@@ -471,7 +485,7 @@ for (const errorCode of ['CHAIN_CONFIG_CHANGED', 'CHAIN_DISABLED']) test(`${erro
   assert.equal(f.counts().signed, 1);
 });
 
-test('SSE disable and deployment changes retain pending signatures and allow final confirmation', async t => {
+test('live socket disable and deployment changes retain pending signatures and allow final confirmation', async t => {
   const f = fixture(t); await f.controller.start();
   await f.controller.review({ kind: 'transfer', recipient, amount: String(unit) });
   await f.controller.confirm(paymentOwner(f), '123456');

@@ -14,7 +14,7 @@ function fixture(t) {
     setTimeout(fn, ms) { const id = {}; timers.set(id, { fn, ms }); return id; }, clearTimeout(id) { timers.delete(id); },
     async roomPagePerson(person) { return { name: person.nickname, mate: false }; } };
   const service = danmaku(bg); t.after(() => service.clear());
-  function page(tabId = 1) { const items = [], port = { postMessage: message => { if (message.type === 'danmaku') items.push(...message.items); } }, info = { tabId, windowId: 1, siteGranted: true, url: `https://gmgn.ai/eth/token/${address}` }; pagePorts.set(port, info); return { items, port, sync: () => service.syncPage(port, info) }; }
+  function page(tabId = 1) { const items = [], port = { postMessage: message => { if (message.type === 'danmaku') items.push(...message.items); } }, info = { tabId, windowId: 1, siteGranted: true, url: `https://gmgn.ai/eth/token/${address}` }; pagePorts.set(port, info); return { items, port, info, sync: () => service.syncPage(port, info) }; }
   const message = (id, age = 0) => ({ id, key, text: id, createdAt: Date.now() - age, author: { id: 'peer', nickname: 'Peer' } });
   async function tick() { for (const [id, timer] of [...timers]) { assert.equal(timer.ms, ROOM_REPLAY_GAP_MS); timers.delete(id); timer.fn(); } await settle(); }
   return { service, state, page, message, tick };

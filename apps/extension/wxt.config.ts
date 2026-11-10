@@ -49,7 +49,7 @@ export default defineConfig({
     externally_connectable: { matches: [websiteOrigin + "/*"] },
     // tabs + favicon: 共享在看 (读取您的浏览记录, which covers the page icon), asked together on its first use.
     // Installing therefore shows no permission warning at all.
-    optional_permissions: ["notifications", "tabs", "favicon"],
+    optional_permissions: ["notifications", "tabs", "favicon", "tabGroups"],
     optional_host_permissions: ["<all_urls>"],
     // Page layers load signal art by a per-session URL (use_dynamic_url; getURL returns it from Chrome 130), so sites cannot probe for Palside.
     web_accessible_resources: [{ resources: ["signals/*"], matches: ["http://*/*", "https://*/*"], use_dynamic_url: true }],

@@ -1,16 +1,16 @@
-const BRIDGE_TEXT_LENGTH = 8192;
 import { parseCommand } from '../runtime/transport/command-map.ts';
 import { MessageError,errorMessage,message as uiMessage,translator } from '@palside/i18n';
 import type { Browser,browser as extensionBrowser } from 'wxt/browser';
 import { createLanguageController } from '../runtime/transport/language.ts';
 import { siteAllows, siteDraws, type InteractionFeature, pageScopeUrl } from '../domain/annotations/interaction.ts';
 import type { CaptureLabels,PageLabels,PagePerson } from '../runtime/browser/page-protocol.ts';
-import { pageUrlHost } from '../runtime/browser/page-layer-host.ts';
+import { pageTeam,pageUrlHost } from '../runtime/browser/page-layer-host.ts';
 import type { Command } from '../runtime/transport/command-map';
 import type { Reply } from '../runtime/transport/reply';
 import type { RuntimeState } from '../runtime/composition/runtime-state';
 import type { createTabObserver } from '../runtime/browser/tab-observer.ts';
-import { defaultAvatar } from '@palside/shared/person-avatars';
+import type { SiteIcon } from '../domain/assets/site-icon.ts';
+import { defaultAvatar,teamDefaultAvatars } from '@palside/shared/person-avatars';
 
 export type Port = Browser.runtime.Port;
 export type Tab = Browser.tabs.Tab;
@@ -23,6 +23,8 @@ export type BackgroundEnv = {
   setTimeout?: typeof setTimeout;
   clearTimeout?: typeof clearTimeout;
   createTabObserver?: typeof createTabObserver;
+  /** How an icon file becomes the kept icon; the default draws it on a canvas. */
+  iconImage?: (blob: Blob) => Promise<SiteIcon | undefined>;
   openPage?: (url: string) => Promise<void>;
 };
 
@@ -62,7 +64,7 @@ export function createContext(env: BackgroundEnv) {
   }
   const responseUrl = (response: Response) => dataUrl(response, response.headers.get('content-type') || 'image/png');
 
-  const favicons = new Map<string, string | undefined>();
+  /** Chrome's globe for sites it has no icon for, read once to tell it apart from a real icon. */
   const avatars = new Map<string, string>();
   const avatarLoads = new Map<string, Promise<string | undefined>>();
   let avatarEpoch = 0;
@@ -70,6 +72,18 @@ export function createContext(env: BackgroundEnv) {
   // 弹幕 authors are mostly strangers: their portraits are cached apart from members', whose cache is pruned to the people list.
   const roomAvatars = new Map<string, Promise<string | undefined>>();
   function clearAvatarCache() { avatarEpoch++; avatars.clear(); avatarLoads.clear(); roomAvatars.clear(); avatarAccount = undefined; }
+  async function roomAvatar(url: string) {
+    const epoch = avatarEpoch;
+    let work = roomAvatars.get(url);
+    if (!work) {
+      work = fetcher(url).then(response => response.ok ? responseUrl(response) : undefined).catch(() => undefined);
+      roomAvatars.set(url, work);
+      while (roomAvatars.size > 64) roomAvatars.delete(roomAvatars.keys().next().value!);
+    }
+    const avatar = await work;
+    if (!avatar) roomAvatars.delete(url);
+    return epoch === avatarEpoch ? avatar : undefined;
+  }
 
   const ctx = {
     env, browser, panels, language, post,
@@ -98,22 +112,6 @@ export function createContext(env: BackgroundEnv) {
       return (await browser.tabs.query({ active: true, windowId }))[0];
     },
     dataUrl,
-    /** Chrome's cached favicon for a page, as a small data URL; none until 共享在看 has been granted the icon permission. */
-    async favicon(url: string | undefined) {
-      if (!url || !await browser.permissions.contains({ permissions: ['favicon'] }).catch(() => false)) return;
-      let origin: string;
-      try { origin = new URL(url).origin; } catch { return; }
-      if (favicons.has(origin)) return favicons.get(origin);
-      try {
-        const response = await fetcher(browser.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32` as '/'));
-        if (!response.ok) return;
-        const value = await responseUrl(response);
-        if (value.length > BRIDGE_TEXT_LENGTH) return;
-        favicons.set(origin, value);
-        while (favicons.size > 32) favicons.delete(favicons.keys().next().value!);
-        return value;
-      } catch { return; }
-    },
     clearAvatarCache,
     /** A member as the page layer draws them: name plus avatar inlined, since pages cannot load extension or media URLs. */
     async pagePerson(id: string): Promise<PagePerson> {
@@ -121,7 +119,17 @@ export function createContext(env: BackgroundEnv) {
       if (avatarAccount !== account) { clearAvatarCache(); avatarAccount = account; }
       const person = ctx.state?.data.people.find(value => value.id === id);
       const name = person?.name || 'Member';
-      if (!account || !person?.avatar) return { name };
+      if (!account) return { name };
+      if (!person?.avatar) {
+        // The same portrait the side panel shows: the open team's default, so two members there never share one.
+        // A portrait is decoration: when it cannot be found the name goes alone, and the command that asked carries on.
+        const avatar = await (async () => {
+          const teamId = pageTeam(ctx.state), team = ctx.state?.remoteTeams.find(value => value.id === teamId);
+          const path = (team?.memberIds && teamDefaultAvatars(team.memberIds).get(id)) ?? defaultAvatar(id);
+          return path ? await roomAvatar(browser.runtime.getURL(path as '/')) : undefined;
+        })().catch(() => undefined);
+        return avatar ? { name, avatar } : { name };
+      }
       const active = new Set(ctx.state?.data.people.map(value => value.avatar));
       for (const url of avatars.keys()) if (!active.has(url)) avatars.delete(url);
       const url = person.avatar, epoch = avatarEpoch;
@@ -155,16 +163,8 @@ export function createContext(env: BackgroundEnv) {
       const path = defaultAvatar(author.id);
       const url = state?.rooms.avatars[author.id] ?? (path && browser.runtime.getURL(path as '/'));
       if (!url) return { name, mate };
-      const epoch = avatarEpoch;
-      let work = roomAvatars.get(url);
-      if (!work) {
-        work = fetcher(url).then(response => response.ok ? responseUrl(response) : undefined).catch(() => undefined);
-        roomAvatars.set(url, work);
-        while (roomAvatars.size > 64) roomAvatars.delete(roomAvatars.keys().next().value!);
-      }
-      const avatar = await work;
-      if (!avatar) roomAvatars.delete(url);
-      return avatar && epoch === avatarEpoch ? { name, avatar, mate } : { name, mate };
+      const avatar = await roomAvatar(url);
+      return avatar ? { name, avatar, mate } : { name, mate };
     },
     /** Page-started commands have no panel request waiting on them, so a refusal goes to that window's panels. */
     notifyWindow(windowId: number, result: Reply) {
@@ -186,7 +186,7 @@ export function createContext(env: BackgroundEnv) {
     /** 网页互动 is on for the page's site with this feature on, from this account's preferences. */
     allows(feature: InteractionFeature, url: string | undefined) { return siteAllows(ctx.state?.preferences.siteInteraction, pageUrlHost(url), feature); },
     /**
-     * 网页互动 runs on a page while its site has 信号 or 便利贴 on, for the current joined team, in a window whose panel is open.
+     * 网页互动 runs on a page while it is on for its site, for the current joined team, in a window whose panel is open.
      * Chrome's grant for the site is checked where a page is injected or admitted.
      */
     interactivePage(info: { url?: string; windowId?: number }) {
@@ -201,9 +201,8 @@ export function createContext(env: BackgroundEnv) {
         copy: t('extension.copy.copy'), copied: t('extension.copy.copied'),
       } as CaptureLabels;
       return {
-        quote: t('extension.sticky.quote'), mark: t('extension.sticky.add'), saved: t('extension.sticky.saved'), openMark: t('extension.sticky.viewMark'), cancel: t('common.cancel'),
         packet: t('extension.wallet.packet'), member: t('common.member'),
-        refEdge: t('extension.page.refEdge', { name: '{name}' }), above: t('extension.page.above'), below: t('extension.page.below'), you: t('extension.page.you'), mate: t('extension.room.mate'), capture, locale,
+        you: t('extension.page.you'), mate: t('extension.room.mate'), capture, locale,
       };
     },
   };

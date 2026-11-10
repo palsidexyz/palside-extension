@@ -1,6 +1,6 @@
 'use client';
 import { AVATAR_BYTES, IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
-import { errorMessage, message as uiMessage, MessageError } from '@palside/i18n';
+import { message as uiMessage,MessageError,failureText } from '@palside/i18n';
 
 import { useTextState } from '../ui/text';
 
@@ -65,7 +65,7 @@ function AvatarPicker({ c, team, onClose }: { c: PalsideController; team: boolea
       const data = await readImage(blob);
       if (alive.current) setChoice({ src: data, data, label: 'extension.copy.uploadedImage' });
     } catch (failure) {
-      if (alive.current) setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.imageReadFailed'));
+      if (alive.current) setError(failureText(failure, 'extension.copy.imageReadFailed'));
     } finally { lock.current = false; if (alive.current) setBusy(false); }
   }
 
@@ -98,7 +98,7 @@ function AvatarPicker({ c, team, onClose }: { c: PalsideController; team: boolea
       }
       if (alive.current) { c.setNotice(live ? uiMessage('extension.copy.avatarUpdated') : uiMessage('extension.copy.avatarDemoUpdated')); onClose(); }
     } catch (failure) {
-      if (alive.current) setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.avatarSaveFailed'));
+      if (alive.current) setError(failureText(failure, 'extension.copy.avatarSaveFailed'));
     } finally { lock.current = false; if (alive.current) setBusy(false); }
   }
 

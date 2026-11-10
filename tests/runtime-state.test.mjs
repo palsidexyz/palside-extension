@@ -290,8 +290,10 @@ function receivers(t) {
     sharing: { observationPolicy() {}, sharingPolicyChanged() {} },
     roomTab: { async refresh() { calls.tab++; } },
     pages: { pagePolicyChanged() {}, restoreAllPages() {}, async routePageState() { calls.page++; }, async pushPageStatus() {} },
-    signals: { async routeSignals() { calls.signals++; } },
+    signals: { async routeSignals() { calls.signals++; }, async routeMarks() {} },
+    follow: { async routeLead() {}, routeScroll() {}, async routeTabs() {} },
     notifications: { notificationState() {} },
+    updates: { stateChanged() {} },
   };
   const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
   Object.defineProperty(globalThis, 'document', { configurable: true, value: Object.assign(new EventTarget(), { visibilityState: 'visible' }) });
@@ -318,7 +320,7 @@ test('two panels and background converge through random entity insertions, edits
   state.rooms.current = { key: 'token:Solana:mint', messages: [], faces: [], count: 0 };
   const random = n => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
   for (let step = 0; step < 240; step++) {
-    const target = [state.data.messages, state.data.people, state.data.views, state.data.teams, state.items.stickies, state.rooms.current.messages][random(6)];
+    const target = [state.data.messages, state.data.people, state.data.views, state.data.teams, state.rooms.current.messages][random(5)];
     const index = random(target.length + 1), action = random(4);
     if (action === 0 || !target.length) target.splice(index, 0, { id: `entity-${step}`, text: `value-${step}` });
     else if (action === 1) target[random(target.length)].text = `edited-${step}`;

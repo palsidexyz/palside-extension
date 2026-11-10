@@ -1,21 +1,28 @@
 import { defaultWheel,signalEmotes,signalKinds,type SignalKind,type WheelEntry } from '@palside/shared/signals';
-import { pageScopeUrl,readRefTarget,type RefTarget } from '../../domain/annotations/social.ts';
+import { identifyPage } from '@palside/shared/navigation';
+import { assetKey,pageScopeUrl,readRefTarget,type RefTarget } from '../../domain/annotations/social.ts';
 
 export const SIGNAL_EVENT = 'com.palside.signal';
+/** The lasting record of a signal in the squad's chat: an encrypted room event, kept and expiring like the squad's messages. */
+export const SIGNAL_RECORD_EVENT = 'com.palside.signal_record';
 /** How long a signal shows, counted from when this device received it. */
 export const SIGNAL_TTL = 5_000;
-/** Members' clocks disagree; a send time this far from ours is still accepted, and nothing older is. */
+/** Records this device holds per squad, newest kept. */
+export const SIGNAL_RECORD_LIMIT = 200;
+/** Records this device writes a minute. Past it a signal still plays, with no line in the chat, so signals cannot use up the squad's chat sends. */
+export const SIGNAL_RECORDS_PER_MINUTE = 20;
+/** A send time in service time this far from ours is still accepted, and nothing older is. */
 export const SIGNAL_CLOCK_SKEW = 15_000;
 export { defaultWheel, signalEmotes, signalKinds, type SignalEmote, type SignalKind, type WheelEntry } from '@palside/shared/signals';
 /**
  * Where a signal points: a few anchors, nearest first. A receiver shows the signal at the first anchor it can find on
  * its own page, so a missing word falls back to the block around it instead of the page edge. Text compares with
- * whitespace collapsed; when an exact match fails, a match that reads the same with every digit as 0 counts if it is
- * the only one, so a ticking price still matches while table rows stay distinct. `nth`/`of` pick one of several
+ * whitespace collapsed; when an exact match fails, a match that reads the same with standalone numbers equal counts if it
+ * is the only one, so a ticking price still matches while table rows stay distinct. `nth`/`of` pick one of several
  * equal matches and only apply when the receiver finds exactly `of` of them. `x`/`y` are the point inside the
- * anchor's box (0–1); a quote points at its own centre.
+ * anchor's box (0–1), for a quote the box around its words: the signal lands where it was pressed, not at the words' centre.
  */
-export type SignalQuoteAnchor = Extract<RefTarget, { kind: 'quote' }> & { nth: number; of: number };
+export type SignalQuoteAnchor = Extract<RefTarget, { kind: 'quote' }> & { nth: number; of: number; x: number; y: number };
 /** `cls` is the class list, used only when nothing else names the element: members load the same site build. */
 export type SignalElementAnchor = { kind: 'element'; tag: string; id?: string; role?: string; label?: string; text?: string; cls?: string; href?: string; src?: string; nth: number; of: number; x: number; y: number };
 export type SignalChartAnchor = { kind: 'chart'; x: number; y: number };
@@ -62,7 +69,7 @@ function readSignalAnchor(value: unknown): SignalAnchor | undefined {
   if (v.kind === 'chart') return unit(v.x) && unit(v.y) ? { kind: 'chart', x: v.x, y: v.y } : undefined;
   if (v.kind === 'element') return readSignalElementAnchor(v);
   const quote = v.kind === 'quote' ? readRefTarget(v) : undefined;
-  return quote?.kind === 'quote' && ordinal(v.nth, v.of) ? { ...quote, nth: v.nth as number, of: v.of as number } : undefined;
+  return quote?.kind === 'quote' && ordinal(v.nth, v.of) && unit(v.x) && unit(v.y) ? { ...quote, nth: v.nth as number, of: v.of as number, x: v.x, y: v.y } : undefined;
 }
 export function readSignalTarget(value: unknown): SignalTarget | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return;
@@ -72,16 +79,33 @@ export function readSignalTarget(value: unknown): SignalTarget | undefined {
   const anchors = v.anchors.map(readSignalAnchor);
   return anchors.every(Boolean) ? { kind: 'spot', anchors: anchors as SignalAnchor[] } : undefined;
 }
-export type SignalPayload = { id: string; teamId: string; url: string; sentAt: number; kind: SignalKind; target: SignalTarget; emote?: string };
+/** `asset` is the token of the sender's page when they know it, so a pool page reads as its token before the receiver looks it up. */
+export type SignalPayload = { id: string; teamId: string; url: string; sentAt: number; kind: SignalKind; target: SignalTarget; emote?: string; asset?: string };
 export type ReceivedSignal = SignalPayload & { personId: string; at: number };
+/**
+ * A signal or emote as the chat keeps it. `id` is its room event, `timestamp` the service's time for that event. A line this device just
+ * sent is `pending` under the signal's own id, at this device's time, until its room event comes back and takes its place.
+ */
+export type SignalRecord = { id: string; teamId: string; personId: string; url: string; kind: SignalKind; target: SignalTarget; emote?: string; asset?: string; timestamp: number; expiresAt: number; pending?: true };
+/** The token a record's page is, as far as the record itself can tell. */
+export function signalAsset(record: { url: string; asset?: string }) {
+  if (record.asset) return record.asset;
+  const identity = identifyPage(record.url);
+  return identity?.kind === 'asset' ? assetKey(identity.chain, identity.address) : undefined;
+}
+const readAsset = (value: unknown) => {
+  if (typeof value !== 'string') return;
+  const split = value.indexOf(':');
+  return split > 0 ? assetKey(value.slice(0, split), value.slice(split + 1)) : undefined;
+};
 /** What a wheel slot can hold: a signal or an emote. */
 export const wheelEntries: readonly WheelEntry[] = [...signalKinds, ...signalEmotes];
 export const WHEEL_SLOTS = 8;
 /** The drag shortcut: the modifiers held exactly, in this order. */
 export const signalModifiers = ['Control', 'Alt', 'Shift'] as const;
 export type SignalModifier = typeof signalModifiers[number];
-export type SignalSettings = { size: 'sm' | 'md' | 'lg'; emoteSize: 'sm' | 'md' | 'lg'; wheelSize: 'sm' | 'md' | 'lg'; sound: boolean; volume: number; key: SignalModifier[]; wheel: WheelEntry[] };
-export const defaultSignalSettings: SignalSettings = { size: 'md', emoteSize: 'md', wheelSize: 'md', sound: true, volume: 30, key: ['Alt'], wheel: [...defaultWheel] };
+export type SignalSettings = { size: 'sm' | 'md' | 'lg'; emoteSize: 'sm' | 'md' | 'lg'; wheelSize: 'sm' | 'md' | 'lg'; sound: boolean; volume: number; key: SignalModifier[]; wheel: WheelEntry[]; chartShare: boolean; chartHideAll: boolean; chartHidden: string[]; chartIntro: boolean; chartOpened: boolean };
+export const defaultSignalSettings: SignalSettings = { size: 'md', emoteSize: 'md', wheelSize: 'md', sound: true, volume: 30, key: ['Alt'], wheel: [...defaultWheel], chartShare: false, chartHideAll: false, chartHidden: [], chartIntro: false, chartOpened: false };
 export const isEmote = (entry: string) => (signalEmotes as readonly string[]).includes(entry);
 /** A wheel entry's still, relative to the extension's signals/ directory. */
 export const wheelIcon = (entry: WheelEntry) => isEmote(entry) ? `thumbs/${entry}.webp` : `art/${entry}.svg`;
@@ -100,7 +124,7 @@ export function normalizeWheel(value: unknown): WheelEntry[] {
 export function normalizeSignalSettings(value: unknown): SignalSettings {
   const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const size = (key: string) => input[key] === 'sm' || input[key] === 'lg' ? input[key] : 'md';
-  return { size: size('size'), emoteSize: size('emoteSize'), wheelSize: size('wheelSize'), sound: input.sound !== false, volume: typeof input.volume === 'number' && Number.isFinite(input.volume) ? Math.max(0, Math.min(100, Math.round(input.volume))) : 30, key: normalizeSignalKey(input.key) ?? ['Alt'], wheel: normalizeWheel(input.wheel) };
+  return { size: size('size'), emoteSize: size('emoteSize'), wheelSize: size('wheelSize'), sound: input.sound !== false, volume: typeof input.volume === 'number' && Number.isFinite(input.volume) ? Math.max(0, Math.min(100, Math.round(input.volume))) : 30, key: normalizeSignalKey(input.key) ?? ['Alt'], wheel: normalizeWheel(input.wheel) , chartShare: input.chartShare === true, chartHideAll: input.chartHideAll === true, chartIntro: input.chartIntro === true, chartOpened: input.chartOpened === true, chartHidden: Array.isArray(input.chartHidden) ? [...new Set(input.chartHidden.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, 200) : [] };
 }
 export function readSignal(value: unknown, now = Date.now()): SignalPayload | undefined {
   if (!value || typeof value !== 'object') return;
@@ -109,5 +133,7 @@ export function readSignal(value: unknown, now = Date.now()): SignalPayload | un
   const target = readSignalTarget(v.target);
   if (!target) return;
   if (v.emote !== undefined && (typeof v.emote !== 'string' || !(signalEmotes as readonly string[]).includes(v.emote))) return;
-  return { id: v.id, teamId: v.teamId, url: v.url, sentAt: v.sentAt, kind: v.kind as SignalKind, target, ...(v.emote !== undefined ? { emote: v.emote as string } : {}) };
+  const asset = readAsset(v.asset);
+  if (v.asset !== undefined && !asset) return;
+  return { id: v.id, teamId: v.teamId, url: v.url, sentAt: v.sentAt, kind: v.kind as SignalKind, target, ...(v.emote !== undefined ? { emote: v.emote as string } : {}), ...(asset ? { asset } : {}) };
 }

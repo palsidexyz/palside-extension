@@ -1,4 +1,4 @@
-import { errorMessage,message as uiMessage } from '@palside/i18n';
+import { failureText } from '@palside/i18n';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PanelState } from '../app/use-panel-state';
 
@@ -30,7 +30,7 @@ export function useDiscovery(state: PanelState) {
       const paging = await command('lobby', { q: tab === 'applications' ? '' : query, sort });
       if (active.current && version === request.current.version) { setLobbyMore(paging?.hasMore ?? noMore); setLobbyMoreFailed(false); }
     }
-    catch (failure) { if (active.current && version === request.current.version) setLobbyError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.teamsUnavailable')); }
+    catch (failure) { if (active.current && version === request.current.version) setLobbyError(failureText(failure, 'extension.copy.teamsUnavailable')); }
     finally { if (active.current && version === request.current.version) setLobbyLoading(false); }
   }, [command, setLobbyLoading, setLobbyError]);
   useEffect(() => {

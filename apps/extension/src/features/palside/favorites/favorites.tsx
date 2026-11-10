@@ -10,7 +10,7 @@ import { SettingGroup } from '../settings/setting-rows';
 import { SiteLogo } from '../assets/site-logo';
 import { siteAt, siteOf, type Site } from '../settings/site-catalog';
 import { Action, Token } from '../ui/primitives';
-import { EmptyState } from '../chat/history-scope';
+import { EmptyState } from '../ui/empty-state';
 import type { Viewing } from '../../../domain/assets/model';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/pages.module.css';
@@ -51,7 +51,7 @@ export function Favorites({ c }: { c: PalsideController }) {
   return <div className={s.page} data-fill>
     {view && site && <div className={s.card}>
       <button type="button" className={s.row} aria-pressed={pageSaved} onClick={() => toggleFavoritePage(c, view)}>
-        <Token view={view} size="sm" /><span className={s.text}><strong>{tokenLabel(view, t)}</strong><small>{t('extension.web.thisPage')}</small></span>{star(pageSaved)}
+        <Token view={view} size="sm" /><span className={s.text}><strong>{tokenLabel(view, t, c)}</strong><small>{t('extension.web.thisPage')}</small></span>{star(pageSaved)}
       </button>
       <button type="button" className={s.row} aria-pressed={siteSaved} onClick={() => toggleFavoriteSite(c, site.domain)}>
         <SiteLogo site={site} size="sm" /><span className={s.text}><strong>{site.name}</strong><small>{t('extension.web.thisSite')}</small></span>{star(siteSaved)}

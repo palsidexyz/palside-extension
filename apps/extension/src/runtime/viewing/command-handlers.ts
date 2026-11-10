@@ -3,7 +3,9 @@ import { pageView } from './view-snapshot';
 import { type Viewing } from '../../domain/assets/model';
 import { identifyPage,websiteIdentity,type PageIdentity } from '@palside/shared/navigation';
 import { resolveTokenMetadata } from './token-name';
-import { TOKEN_NAME_WAIT_MS } from './sharing';
+import { SHARE_NAME_WAIT_MS } from './sharing';
+import { iconDataUrl } from './viewing';
+import { pageLabel,titleNamesAccount } from './page-title';
 import { tokenNamed } from './token-profiles.ts';
 import { assetKey } from '../../domain/annotations/interaction.ts';
 import type { Command } from '../transport/command-map';
@@ -35,7 +37,9 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
       }
       const input = p.identity as PageIdentity | undefined;
       const prefs = runtime.state.preferences;
-      const parsed = input?.url && typeof p.host === 'string' ? identifyPage(input.url, [p.host]) : null;
+      // The observer already decided a link with credentials shares its site: the homepage must not read back as a page.
+      const siteOnly = input?.kind === 'website' && input.disclosure === 'site';
+      const parsed = input?.url && typeof p.host === 'string' ? identifyPage(input.url, [p.host], siteOnly ? 'site' : 'page') : null;
       if (!parsed || !runtime.sharing.mayObserve()) return;
       const preview = p.preview === true;
       runtime.sharing.pagePreview = preview;
@@ -47,17 +51,17 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
       const controller = new AbortController();
       runtime.sharing.pageRequest = controller;
       const current = () => !controller.signal.aborted && runtime.auth.session === session && runtime.sharing.pageObservation === observation && runtime.state.preferences.current === teamId && runtime.sharing.mayObserve();
-      if (!preview && (!await runtime.foreground(parsed.url) || !current())) return;
-      // A pool or chainless contract page is its token once the server answers; a known answer is immediate.
+      // The background has just checked this page against the panel window; publishing checks once more right before sending.
+      // A pool or chainless contract page is its token once the server answers; a known answer is immediate, a late one corrects the card.
       const lookup = parsed.kind === 'pool' || parsed.kind === 'address' ? parsed : undefined;
-      const looked = lookup ? await runtime.sharing.pageToken(lookup, controller.signal) : undefined;
+      const looked = lookup ? await runtime.sharing.pageToken(lookup, controller.signal, SHARE_NAME_WAIT_MS) : undefined;
       if (!current()) return;
+      if (lookup && !looked && !preview) void runtime.pages.resolve(lookup).then(found => { if (found && current()) return pageCommand.call(this, command); }).catch(() => {});
       const identity = looked ?? parsed, via = looked ? lookup!.kind : undefined;
       runtime.sharing.pageSince = Date.now();
-      // Publishing waits up to TOKEN_NAME_WAIT_MS for the token directory, so teammates rarely see the address placeholder first.
+      // Publishing waits up to SHARE_NAME_WAIT_MS for the token directory, so teammates rarely see the address placeholder first.
       const accept = async (view: Viewing | undefined, publish = true) => {
         if (!view || !current()) return;
-        if (!preview && (!await runtime.foreground(identity.url) || !current())) return;
         runtime.sharing.page = view;
         runtime.cache.upsertView(view);
         runtime.state.viewingId = view.id;
@@ -68,12 +72,15 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
           runtime.sharing.viewingTimer = setTimeout(() => { void runtime.sharing.publishViewing().catch(() => {}); }, 5);
         }
       };
-      const fallback = identity.kind === 'asset' || identity.kind === 'website' ? identity : websiteIdentity(identity.url)!;
+      // A title naming an account is someone's own page: only the site is shared.
+      const fallback = identity.kind === 'asset' ? identity : websiteIdentity(identity.url, siteOnly || titleNamesAccount(p.title) ? 'site' : 'page')!;
       const asset = identity.kind === 'asset' ? assetKey(identity.chain, identity.address) : undefined;
       // The token record is keyed by asset, so a token seen earlier shows its name at once.
       const known = asset ? runtime.tokens.get(asset) : undefined;
-      const tokenPage = () => pageView(fallback, identity.kind === 'asset' ? resolveTokenMetadata(identity, runtime.tokens.get(asset)) : undefined, via);
-      const reused = previousPage?.url === fallback.url && previousPage.kind === fallback.kind ? previousPage : undefined;
+      // A website shares its page (title, link without tracking) and the icon Chrome keeps for it, so teammates who never opened it see its logo.
+      const tokenPage = () => pageView(fallback, identity.kind === 'asset' ? resolveTokenMetadata(identity, runtime.tokens.get(asset)) : { name: fallback.kind === 'website' && fallback.disclosure === 'page' ? pageLabel(p.title, fallback.host) : undefined, logo: iconDataUrl(p.favicon) }, via);
+      // A website is rebuilt each time: its icon may have arrived since.
+      const reused = fallback.kind === 'asset' && previousPage?.url === fallback.url && previousPage.kind === fallback.kind ? previousPage : undefined;
       const previewView = reused && (tokenNamed(reused) || !known) ? reused : tokenPage();
       const named = tokenNamed(previewView), answered = !asset || runtime.tokens.answered(asset);
       if (asset && !answered && !named) runtime.state.tokenPending = asset;
@@ -82,7 +89,7 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
       void (async () => {
         const settled = runtime.directory.ensure(asset);
         let timer: ReturnType<typeof setTimeout> | undefined;
-        const late = await Promise.race([settled.then(() => false), new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(true), TOKEN_NAME_WAIT_MS); })]);
+        const late = await Promise.race([settled.then(() => false), new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(true), SHARE_NAME_WAIT_MS); })]);
         clearTimeout(timer);
         if (!current()) return;
         if (runtime.state.tokenPending === asset) runtime.state.tokenPending = undefined;

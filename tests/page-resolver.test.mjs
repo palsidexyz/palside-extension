@@ -19,6 +19,23 @@ test('several chains pick Robinhood first and keep every candidate; answers are 
   now = PAGE_TOKEN_TTL_MS; assert.equal(resolver.get(page.url), undefined); await resolver.resolve(page); assert.equal(calls, 2);
 });
 
+test('a chosen chain moves every page with that address onto it, is remembered for later lookups, and clears with the account', async () => {
+  let changes = 0;
+  const other = { ...page, url: `https://gmgn.ai/token/${evm}`, site: 'gmgn', host: 'gmgn.ai' };
+  const resolver = new PageResolver(async () => ({ address: evm, status: 'choice', tokens: [entry('ethereum'), entry('base'), entry('robinhood')] }), () => {}, () => { changes++; });
+  await resolver.resolve(page);
+  assert.deepEqual(resolver.choices(), { [page.url]: [`Robinhood:${evm}`, `Base:${evm}`, `Ethereum:${evm}`] });
+  assert.equal(resolver.choose(`Base:${evm}`), true);
+  assert.equal(resolver.get(page.url), `Base:${evm}`);
+  assert.deepEqual(resolver.choices()[page.url], [`Base:${evm}`, `Robinhood:${evm}`, `Ethereum:${evm}`], 'the current chain leads the picker');
+  assert.ok(changes >= 2, 'a pick republishes page answers');
+  assert.equal(await resolver.resolve(other), `Base:${evm}`, 'another page with the same address starts on the picked chain');
+  assert.deepEqual(resolver.prefer([`Ethereum:${evm}`, `Robinhood:${evm}`, `Base:${evm}`]), [`Base:${evm}`, `Robinhood:${evm}`, `Ethereum:${evm}`]);
+  assert.equal(resolver.choose(`Solana:${evm}`), false, 'only a candidate can be picked');
+  resolver.clear();
+  assert.deepEqual(resolver.prefer([`Ethereum:${evm}`, `Base:${evm}`, `Robinhood:${evm}`]), [`Robinhood:${evm}`, `Base:${evm}`, `Ethereum:${evm}`]);
+});
+
 test('missing is rechecked after ten minutes, unavailable after thirty seconds, signed out is not remembered', async () => {
   let now = 0, answer = { pool: pool.pool, status: 'missing', tokens: [] }; const items = [];
   const resolver = new PageResolver(async item => { items.push(item); return answer; }, () => {}, () => {}, () => now);
@@ -48,4 +65,14 @@ test('a shared view from a pool or contract page carries how its token was found
   const fromAddress = pageView({ ...asset, site: 'okx', host: page.host, url: page.url }, { name: 'TKN' }, 'address');
   assert.equal(validateView(fromAddress)?.via, 'address');
   assert.equal(validateView({ ...fromAddress, address: '0x3333333333333333333333333333333333333333', id: 'Base:0x3333333333333333333333333333333333333333' }), undefined);
+});
+
+test('a partly read address shows the chains read so far and asks again soon, so an unread chain can join the choice', async () => {
+  let now = 0, answer = { address: evm, status: 'unavailable', tokens: [entry('base')] }; const items = [];
+  const resolver = new PageResolver(async item => { items.push(item); return answer; }, () => {}, () => {}, () => now);
+  assert.equal(await resolver.resolve(page), `Base:${evm}`);
+  now += PAGE_RETRY_MS - 1; await resolver.resolve(page); assert.equal(items.length, 1);
+  now += 1; answer = { address: evm, status: 'choice', tokens: [entry('base'), entry('bnb')] };
+  await resolver.resolve(page);
+  assert.deepEqual(resolver.candidates(page.url), [`Base:${evm}`, `BNB Chain:${evm}`]);
 });

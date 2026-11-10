@@ -43,16 +43,21 @@ export function notifications(bg: Background) {
         if (!id.startsWith(PREFIX) || clicked.has(id)) return;
         clicked.add(id);
         void (async () => {
+          let opened = false;
           try {
             const value = (await browser.storage.local.get(id))[id];
             const stored = value && typeof value === 'object' ? value as NotificationIdentity : undefined;
-            const window = await browser.windows.getLastFocused();
+            // Palside does not run in incognito: a click while an incognito window is in front opens the most recent normal window.
+            let window = await browser.windows.getLastFocused();
+            if (window.incognito) window = (await browser.windows.getAll({ windowTypes: ['normal'] })).find(item => !item.incognito && item.id !== undefined) ?? window;
             if (window.id === undefined || window.incognito) return;
+            opened = true;
             await browser.sidePanel.open({ windowId: window.id });
             const result = await bg.run(parseCommand({ name: 'notification-open', payload: { ...stored, windowId: window.id } }));
             bg.notifyWindow(window.id, result);
           } finally {
-            try { await forget(id, true); } finally { clicked.delete(id); }
+            // Without a normal window the notification stays, so the message can still be reached from it later.
+            try { if (opened) await forget(id, true); } finally { clicked.delete(id); }
           }
         })().catch(() => {});
       });

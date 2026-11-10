@@ -27,16 +27,7 @@ import { usePalside } from '/@fs/${repo}/apps/extension/src/features/palside/app
 import { palsideFixtures, demoSites } from '/@fs/${repo}/apps/extension/integration/fixtures.ts';
 const data = structuredClone(palsideFixtures);
 data.messages = [];
-const ref = {
-  target: {
-    kind: 'quote',
-    exact: 'A public quote',
-    prefix: '',
-    suffix: ''
-  },
-  caption: 'A public quote',
-  view: data.views[0]
-};
+const replyTo = 'earlier-message';
 const base = () => ({
   revision: 0,
   ready: true,
@@ -69,8 +60,7 @@ const base = () => ({
     web: { share: true, interact: true },
     current: 'night',
     notifications: 'all',
-    notificationPreview: true,
-    hiddenStickies: []
+    notificationPreview: true
   },
   remoteTeams: [],
   lobbyTeams: [],
@@ -79,9 +69,7 @@ const base = () => ({
     signupDifficulty: 0
   },
   items: {
-    danmaku: [],
-    stances: [],
-    stickies: []
+    danmaku: []
   },
   invitations: {},
   pokes: []
@@ -128,7 +116,7 @@ async function command(name, payload) {
   const patch = {
     ...p.patch
   };
-  for (const key of ["attachment", "replyTo", "ref", "mentions"]) if (patch[key] === null) patch[key] = undefined;
+  for (const key of ["attachment", "replyTo", "mentions"]) if (patch[key] === null) patch[key] = undefined;
   const next = {
     revision: current.revision + 1,
     value: {
@@ -214,7 +202,7 @@ window.qa = {
   fail() {
     failNext = true;
   },
-  ref
+  replyTo
 };
 createRoot(document.getElementById('root')).render(<IntegrationIntl><div style={{
     display: 'flex',
@@ -278,19 +266,19 @@ createRoot(document.getElementById('root')).render(<IntegrationIntl><div style={
     name: 'normal write syncs both panels',
     state: await ev('({a:controllers.a.draft,b:controllers.b.draft,saved:qa.get().shared.drafts.night})')
   });
-  // Pause local removal; the other panel wins the revision and adds a reference.
-  await ev('qa.hold(true);controllers.a.updateDraft({ref:undefined,text:"local without ref"})');
+  // Pause local removal; the other panel wins the revision and adds a reply.
+  await ev('qa.hold(true);controllers.a.updateDraft({replyTo:undefined,text:"local without reply"})');
   await pause(60);
-  await ev('qa.remote({ref:qa.ref,text:"remote with ref"});qa.hold(false);qa.release()');
+  await ev('qa.remote({replyTo:qa.replyTo,text:"remote with reply"});qa.hold(false);qa.release()');
   await pause(150);
   result.cases.push({
-    name: 'conflict preserves local cleared ref',
+    name: 'conflict preserves local cleared reply',
     state: await ev('({a:controllers.a.draft,conflict:controllers.a.draftConflict,b:controllers.b.draft})')
   });
   await ev('controllers.a.resolveDraftConflict(true)');
   await pause(150);
   result.cases.push({
-    name: 'keep local after clearing ref',
+    name: 'keep local after clearing reply',
     state: await ev('({a:controllers.a.draft,b:controllers.b.draft,saved:qa.get().shared.drafts.night,lastCommand:qa.get().commands.at(-1)})')
   });
   await ev('qa.fail();controllers.a.updateDraft({text:"offline local text"})');
@@ -341,9 +329,9 @@ createRoot(document.getElementById('root')).render(<IntegrationIntl><div style={
   assert.equal(sync.a.text, 'from a');
   assert.deepEqual(sync.a, sync.b);
   assert.equal(conflict.conflict, true);
-  assert.equal(conflict.a.ref, undefined);
-  assert.equal(keep.lastCommand.patch.ref, null);
-  assert.equal(keep.a.ref ?? null, null);
+  assert.equal(conflict.a.replyTo, undefined);
+  assert.equal(keep.lastCommand.patch.replyTo, null);
+  assert.equal(keep.a.replyTo ?? null, null);
   assert.deepEqual(keep.a, keep.b);
   assert.equal(flush.rejected, true);
   assert.equal(flush.draft.text, 'offline local text');

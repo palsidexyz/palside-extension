@@ -19,7 +19,7 @@ const hooks = registerHooks({
       if (specifier.endsWith('.css')) return stub('export default {};');
       if (specifier === '../assets/token-name') return stub('export const TokenName = () => null, tokenLabel = view => view.name, tokenWaiting = () => undefined;');
       if (specifier === '../assets/token-data') return stub('export const tokenStats = () => undefined, liveView = (_c, view) => view;');
-      if (!['./rooms', '../../../runtime/rooms/token-sites', '@palside/design/motion'].includes(specifier) && !specifier.startsWith('@palside/shared/')) return stub('export const Check = null, ChevronDown = null, Flame = null, Layers = null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = null, InlineFeedback = null, Count = null, CountText = null, Tooltip = null, Token = null, ChainLogo = null, Faces = null, StanceMini = null, stanceShares = null, openRoom = null, roomView = null, tabRoomKey = null;');
+      if (!['./rooms', '../../../runtime/rooms/token-sites', '@palside/design/motion'].includes(specifier) && !specifier.startsWith('@palside/shared/')) return stub('export const Check = null, ChevronDown = null, Flame = null, Layers = null, Menu = null, MenuContent = null, MenuItem = null, MenuTrigger = null, EmptyState = null, InlineFeedback = null, Count = null, CountText = null, Tooltip = null, Token = null, ChainLogo = null, Faces = null, HotSearchField = () => null, HotSearchResults = () => null, openRoom = null, roomView = null, tabRoomKey = null;');
     }
     try { return next(specifier, context); } catch (error) {
       if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && context.parentURL?.includes('/apps/extension/')) return next(`${specifier}.ts`, context);
@@ -40,6 +40,7 @@ const { WalletRuntime } = await import('../apps/extension/src/runtime/wallet/run
 const { RuntimeCommands } = await import('../apps/extension/src/runtime/composition/dispatch.ts');
 const { emptyState } = await import('../apps/extension/src/runtime/composition/state.ts');
 const { Api } = await import('../apps/extension/src/runtime/transport/api.ts');
+const { endpointsById, pathFor } = await import('../packages/shared/src/contracts/endpoints.ts');
 const { Hot } = await import('../apps/extension/src/features/palside/rooms/hot.tsx');
 hooks.deregister();
 delete globalThis.chrome;
@@ -72,33 +73,58 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
       },
     };
   };
-  t.mock.method(globalThis, 'fetch', async (url, init) => {
-    const path = new URL(url).pathname, body = init.body ? JSON.parse(new TextDecoder().decode(init.body)) : {};
-    calls.push(`${init?.method ?? 'GET'} ${path}`);
-    if (path === '/events') {
-      eventSignals.push(init.signal); if (gates.has(path)) await gates.get(path);
-      return { ok: true, body: new ReadableStream({ start(controller) { streams.push(controller); } }) };
-    }
+  /** The service's side of every request, whether it arrives over the live socket or HTTP. */
+  async function serve(method, path, body) {
+    calls.push(`${method} ${path}`);
     const values = {
-      '/me': { ...server, serverTime: Date.now() },
+      '/me': { ...server, readAt: Date.now(), serverTime: Date.now() },
       '/rooms/blocks': { people: [] }, '/team-invites': { invites: [] }, '/presence': { ok: true },
       '/rooms/hot/subscription': { subscribed: body.open },
       '/chain/wallet': null,
       '/chain/recovery': { items: [], nextCursor: null },
       '/chain/config': { enabled: false, version: 1, deployment: null, dailySponsoredLimit: 0, quickPay: { single: '250', daily: '1000' }, minimumLiquidity: '0', updatedAt: Date.now() },
       '/rooms/lease': { key: body.key, count: 1, slowUntil: 0, slowMs: 5000 },
-      '/rooms/summary': { key, site: null, count: roomServer.count, faces: [], stance: { bull: 0, hold: 0, bear: 0, mine: null } },
+      '/rooms/summary': { key, site: null, count: roomServer.count, faces: [] },
       '/rooms/messages': { messages: [], hasMore: false },
     };
     assert.ok(path in values, path);
-    const value = JSON.stringify(path === '/me' && init.method === 'POST' ? body : values[path]);
+    const value = path === '/me' && method === 'POST' ? body : values[path];
     if (gates.has(path)) await gates.get(path);
-    return new Response(value, { headers: { 'content-type': 'application/json' } });
+    return value;
+  }
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    const body = init.body ? JSON.parse(new TextDecoder().decode(init.body)) : {};
+    return new Response(JSON.stringify(await serve(init?.method ?? 'GET', new URL(url).pathname, body)), { headers: { 'content-type': 'application/json' } });
   });
+  /** The live socket's service side: `GET /events` marks each connection; `streams` lets a test push to it or drop it. */
+  class FakeSocket {
+    static OPEN = 1;
+    readyState = 0;
+    constructor() {
+      calls.push('GET /events');
+      this.signal = { aborted: false }; eventSignals.push(this.signal);
+      streams.push({ enqueue: text => { if (this.readyState === 1) this.onmessage?.({ data: text }); }, close: () => this.drop(1006) });
+      void (async () => { await gates.get('/events'); if (this.readyState !== 0) return; this.readyState = 1; this.onopen?.(); })();
+    }
+    send(data) {
+      const message = JSON.parse(data);
+      if (message.type === 'auth') { this.onmessage?.({ data: JSON.stringify({ type: 'ready', serverTime: Date.now() }) }); return; }
+      const endpoint = endpointsById[message.endpoint];
+      void serve(endpoint.method, pathFor(endpoint, message.params ?? {}, message.query).split('?')[0], message.body ?? {})
+        .then(body => ({ status: 200, body }), () => ({ status: 503, body: { error: 'SERVICE_UNAVAILABLE' } }))
+        .then(reply => { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify({ type: 'reply', id: message.id, ...reply }) }); });
+    }
+    close(code = 1000) { this.drop(code); }
+    drop(code) { if (this.readyState === 3) return; this.readyState = 3; this.signal.aborted = true; this.onclose?.({ code }); }
+  }
+  const socket = Object.getOwnPropertyDescriptor(globalThis, 'WebSocket');
+  globalThis.WebSocket = FakeSocket;
+  t.after(() => { if (socket) Object.defineProperty(globalThis, 'WebSocket', socket); else delete globalThis.WebSocket; });
   const runtime = {
-    state: emptyState(), api: new Api('https://service.test'), emit() {}, initialise: async () => {}, tokens: { clear() {}, put() {}, get() {}, apply: view => view, remember: () => false }, directory: { clear() {}, show() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
+    state: emptyState(), api: new Api('https://service.test'), emit() {}, initialise: async () => {}, tokens: { clear() {}, put() {}, get() {}, apply: view => view, remember: () => false }, directory: { clear() {}, show() {}, resume() {}, ensure: async () => {} }, pages: { clear() {}, resolve: async () => undefined, get() {} },
     storage: { get: async () => { if (gates.has('storage')) await gates.get('storage'); }, rows: async () => [], remove: async () => {}, put: async () => {}, cache: async () => [] },
     sharing: { restoreToggles: async () => {}, savePreferences: async () => {}, peerViewing: new Map() },
+    signals: { syncClock() {}, restoreRecords() {}, async pruneRecords() { return false; } },
     cache: { expireLocalContent: async () => {}, evictCachedContent() {}, pruneMedia() {}, eventTimes: new Map(), preparedViews: new Map(), expiresAt: message => message.expiresAt, cacheMessage: async message => { cachedMessages.push(message); } },
     sending: { outgoing: new Map() }, interactions: { annotationDeletions: new Map() },
     diagnosticErrors: { record() {} },
@@ -112,14 +138,16 @@ function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
   const advance = async ms => { t.mock.timers.tick(ms); await drain(); };
   const counts = () => Object.fromEntries([...new Set(calls)].sort().map(path => [path, calls.filter(item => item === path).length]));
   const mark = label => { const result = counts(); t.diagnostic(`${label}: ${JSON.stringify(result)}`); calls.length = 0; return result; };
-  const event = async (name, data) => { streams.at(-1).enqueue(new TextEncoder().encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`)); await drain(); };
+  /** A change the service committed after every read so far began. */
+  const change = () => ({ scope: 'me', at: Date.now() + 1 });
+  const event = async (name, data) => { streams.at(-1).enqueue(JSON.stringify({ type: 'event', event: name, data })); await drain(); };
   const mount = source => {
     globalThis.hotEffects = []; globalThis.hotSource = source;
     Hot({ chain: null, c: { data: runtime.state.data, live: { state: runtime.state, command: (name, payload) => runtime.dispatch.execute({ name, payload: { ...payload, sourceId: `${source}:` } }) } } });
     const cleanup = globalThis.hotEffects.map(fn => fn()); return () => cleanup.forEach(fn => fn?.());
   };
   t.after(async () => { runtime.auth.liveDispose?.(); runtime.rooms.reset(); runtime.wallet.reset(); await drain(); delete globalThis.syncClient; delete globalThis.hotEffects; delete globalThis.hotSource; });
-  return { runtime, server, roomServer, calls, streams, eventSignals, gates, starts, cachedMessages, advance, mark, event, mount, connect: async () => { await runtime.rooms.panelChanged(true); await runtime.auth.connect(session, identity); await drain(); await advance(0); } };
+  return { runtime, server, roomServer, calls, streams, eventSignals, gates, starts, cachedMessages, advance, mark, event, change, mount, connect: async () => { await runtime.rooms.panelChanged(true); await runtime.auth.connect(session, identity); await drain(); await advance(0); } };
 }
 
 test('session startup uses an injected event connector and disposes it on failure', async t => {
@@ -135,18 +163,18 @@ test('session startup uses an injected event connector and disposes it on failur
   assert.equal(f.runtime.auth.liveDispose, undefined);
 });
 
-test('session startup and SSE reconnect each load account, blocks and invites once', async t => {
+test('session startup and a live socket reconnect each load account, blocks and invites once', async t => {
   const f = fixture(t); await f.connect();
-  const startup = f.mark('sign-in including SSE open');
+  const startup = f.mark('sign-in including live socket open');
   f.streams.at(-1).close(); await drain(); await f.advance(1000); await f.advance(0);
-  const reconnect = f.mark('SSE reconnect');
+  const reconnect = f.mark('live socket reconnect');
   assert.equal(startup['GET /me'], 1); assert.equal(startup['GET /rooms/blocks'], 1); assert.equal(startup['GET /team-invites'], 1);
   assert.equal(reconnect['GET /me'], 1); assert.equal(reconnect['GET /rooms/blocks'], 1); assert.equal(reconnect['GET /team-invites'], 1);
 });
 
-test('SSE refresh and invite events read only their available contract domains', async t => {
+test('refresh and invite pushes read only their available contract domains', async t => {
   const f = fixture(t); await f.connect(); f.calls.length = 0;
-  await f.event('refresh', { scope: 'me' }); const me = f.mark('refresh me');
+  await f.event('refresh', f.change()); const me = f.mark('refresh me');
   await f.event('team-invites', { pending: 1 }); const invites = f.mark('team-invites');
   await f.event('refresh', { scope: 'blocks' }); const unsupported = f.mark('unsupported refresh scope');
   assert.deepEqual(me, { 'GET /me': 1, 'GET /rooms/blocks': 1 });
@@ -206,17 +234,24 @@ test('Hot to chat to Hot renews the subscription without starting a poll', async
 test('concurrent refresh invalidations merge their domains into one follow-up', async t => {
   const f = fixture(t); await f.connect(); f.calls.length = 0;
   let release; const gate = new Promise(resolve => { release = resolve; }); f.gates.set('/me', gate); f.gates.set('/team-invites', gate);
-  for (let i = 0; i < 10; i++) { await f.event('refresh', { scope: 'me' }); await f.event('team-invites', { pending: i }); }
+  for (let i = 0; i < 10; i++) { await f.event('refresh', f.change()); await f.event('team-invites', { pending: i }); }
   release(); await drain();
   assert.deepEqual(f.mark('concurrent me and invite invalidations'), { 'GET /me': 2, 'GET /rooms/blocks': 2, 'GET /team-invites': 1 });
 });
 
-test('SSE calibration, disconnect fallback and room renewal keep their deadlines', async t => {
-  const f = fixture(t); await f.connect(); await f.runtime.rooms.tabChanged({ asset: key.slice(6) }); f.calls.length = 0;
+test('push calibration, disconnect fallback and room renewal keep their deadlines', async t => {
+  const f = fixture(t); f.runtime.auth.dayRefreshDelay = 0; await f.connect(); await f.runtime.rooms.tabChanged({ asset: key.slice(6) }); f.calls.length = 0;
   for (let i = 0; i < 3; i++) { await f.advance(20_000); await f.event('presence', { account: 'peer', state: 'active' }); await f.runtime.auth.maintainConnection(); await drain(); }
-  assert.equal(f.calls.filter(path => path === 'GET /me').length, 1);
+  assert.equal(f.calls.filter(path => path === 'GET /me').length, 0);
   assert.equal(f.calls.filter(path => path === 'POST /rooms/lease').length, 3);
-  f.runtime.auth.liveDispose(); f.runtime.auth.sseOpen = false; f.calls.length = 0;
+  // With the stream open only a new UTC day (after this device's spread) reads the snapshot again.
+  const auth = f.runtime.auth, day = DAY_MS, at = auth.snapshotAt;
+  const nextDay = (Math.floor((at - auth.dayRefreshDelay) / day) + 1) * day + auth.dayRefreshDelay;
+  assert.equal(auth.snapshotStale(nextDay - 1), false);
+  assert.equal(auth.snapshotStale(nextDay), true);
+  // The stream drops: the snapshot it kept current is already old, so it is read at once, then every 15 s.
+  f.runtime.auth.liveDispose(); f.runtime.auth.liveOpen = false; f.calls.length = 0;
+  await f.runtime.auth.maintainConnection(); await drain(); assert.equal(f.calls.filter(path => path === 'GET /me').length, 1); f.calls.length = 0;
   await f.advance(14_999); await f.runtime.auth.maintainConnection(); assert.equal(f.calls.filter(path => path === 'GET /me').length, 0);
   await f.advance(1); await f.runtime.auth.maintainConnection(); await drain();
   assert.equal(f.calls.filter(path => path === 'GET /me').length, 1);
@@ -233,65 +268,51 @@ test('panel disconnect drops only its Hot subscription and the last panel unsubs
   assert.deepEqual(f.calls, []);
 });
 
-test('a first SSE open after the initial load catches up every domain once', async t => {
+test('reads wait for a slow live socket: its first open carries the initial load once, a reconnect catches up', async t => {
   const f = fixture(t); let release; f.gates.set('/events', new Promise(resolve => { release = resolve; }));
-  await f.connect(); const initial = f.mark('sign-in while SSE is pending');
+  const connecting = f.connect(); await drain(); await f.advance(0);
+  assert.equal(f.calls.includes('GET /me'), false, 'nothing leaves before the socket is ready');
   assert.ok(f.runtime.state.data.people.every(person => person.presence === undefined));
-  release(); await drain(); await f.advance(0); const opened = f.mark('delayed first SSE open');
-  assert.equal(initial['GET /me'], 1); assert.equal(initial['GET /rooms/blocks'], 1); assert.equal(initial['GET /team-invites'], 1);
-  assert.deepEqual(opened, { 'GET /chain/config': 1, 'GET /chain/recovery': 1, 'GET /chain/wallet': 1, 'GET /me': 1, 'GET /rooms/blocks': 1, 'GET /team-invites': 1, 'POST /me': 1, 'POST /rooms/hot/subscription': 1 });
-  assert.equal(f.runtime.state.wallet.availability, 'closed');
-  f.calls.length = 0;
+  release(); await connecting; await drain(); await f.advance(0);
+  const opened = f.mark('slow first open');
+  for (const path of ['GET /me', 'GET /rooms/blocks', 'GET /team-invites']) assert.equal(opened[path], 1, path);
   f.streams.at(-1).close(); await drain(); await f.advance(1000); await f.advance(0);
-  assert.deepEqual(f.mark('wallet catch-up on SSE reconnect'), { 'GET /chain/config': 1, 'GET /events': 1, 'GET /me': 1, 'GET /rooms/blocks': 1, 'GET /team-invites': 1, 'POST /me': 1, 'POST /rooms/hot/subscription': 1 });
+  const reconnect = f.mark('catch-up on reconnect');
+  for (const path of ['GET /events', 'GET /me', 'GET /rooms/blocks', 'GET /team-invites', 'GET /chain/config']) assert.equal(reconnect[path], 1, path);
   assert.equal(f.runtime.state.data.people.find(person => person.id === 'self').presence, 'active');
 });
-
 test('refresh failure drains queued invalidations and leaves the next request usable', async t => {
   const f = fixture(t); await f.connect(); f.calls.length = 0;
   let reject; f.gates.set('/me', new Promise((_, fail) => { reject = fail; }));
-  await f.event('refresh', { scope: 'me' }); await f.event('refresh', { scope: 'me' });
+  await f.event('refresh', f.change()); await f.event('refresh', f.change());
   f.gates.delete('/me'); reject(Error('unreachable')); await drain();
   assert.equal(f.calls.filter(path => path === 'GET /me').length, 2);
   assert.equal(f.runtime.state.connection.service, 'ready'); assert.equal(f.runtime.auth.refreshing, undefined);
   await f.runtime.refresh(); assert.equal(f.calls.filter(path => path === 'GET /me').length, 3);
 });
 
-test('a server change between the initial load and first SSE open is visible after catch-up', async t => {
+test('a server change while the live socket connects is in the first load', async t => {
   const f = fixture(t); let release; f.gates.set('/events', new Promise(resolve => { release = resolve; }));
-  await f.connect(); assert.equal(f.runtime.state.account.nickname, 'Self');
+  const connecting = f.connect(); await drain();
   f.server.account.nickname = 'Updated'; f.server.account.revision++;
-  release(); await drain();
+  release(); await connecting;
   assert.equal(f.runtime.state.account.nickname, 'Updated');
 });
-
-test('SSE opens before the initial request and startup reads each domain once', async t => {
+test('the live socket opens before the initial request and startup reads each domain once', async t => {
   const f = fixture(t); let release; f.gates.set('crypto', new Promise(resolve => { release = resolve; }));
   const connecting = f.connect(); await drain(); await f.advance(0);
-  const open = f.runtime.auth.sseOpen, calls = [...f.calls]; release(); await connecting;
-  const counts = f.mark('SSE open before initial request');
+  const open = f.runtime.auth.liveOpen, calls = [...f.calls]; release(); await connecting;
+  const counts = f.mark('live socket open before initial request');
   assert.equal(open, true); assert.equal(calls.includes('GET /me'), false);
   assert.equal(calls.includes('POST /me'), false);
   for (const path of ['GET /me', 'GET /rooms/blocks', 'GET /team-invites']) assert.equal(counts[path], 1, path);
 });
 
-test('SSE opening during the initial request queues one catch-up per domain', async t => {
-  const f = fixture(t); let open, respond;
-  f.gates.set('/events', new Promise(resolve => { open = resolve; }));
-  f.gates.set('/me', new Promise(resolve => { respond = resolve; }));
-  const connecting = f.connect(); await drain();
-  f.server.account.nickname = 'Updated'; f.server.account.revision++;
-  open(); await drain(); respond(); await connecting;
-  const counts = f.mark('SSE open during initial request');
-  for (const path of ['GET /me', 'GET /rooms/blocks', 'GET /team-invites']) assert.equal(counts[path], 2, path);
-  assert.equal(f.runtime.state.account.nickname, 'Updated');
-});
-
-test('an early SSE open catches up an existing room when room startup resumes', async t => {
+test('an early live socket open catches up an existing room when room startup resumes', async t => {
   const f = fixture(t); await f.runtime.rooms.panelChanged(true); await f.runtime.rooms.tabChanged({ asset: key.slice(6) });
   assert.equal(f.runtime.state.rooms.current.count, 1);
   f.roomServer.count = 9; f.calls.length = 0; await f.connect();
-  const counts = f.mark('existing room on early SSE open');
+  const counts = f.mark('existing room on early live socket open');
   assert.equal(f.runtime.state.rooms.current.count, 9);
   for (const path of ['GET /me', 'GET /rooms/blocks', 'GET /team-invites', 'GET /rooms/summary', 'GET /rooms/messages', 'POST /rooms/lease']) assert.equal(counts[path], 1, path);
 });
@@ -315,17 +336,17 @@ test('initial presence is visible and a disconnected stream clears it', async t 
 test('a failed initial account load leaves Matrix and the event stream stopped', async t => {
   const f = fixture(t); let reject; f.gates.set('/me', new Promise((_, fail) => { reject = fail; }));
   const connecting = assert.rejects(f.connect()); await drain(); reject(Error('unreachable')); await connecting;
-  assert.equal(f.runtime.auth.sseOpen, false); assert.equal(f.runtime.auth.liveDispose, undefined);
+  assert.equal(f.runtime.auth.liveOpen, false); assert.equal(f.runtime.auth.liveDispose, undefined);
   assert.deepEqual(f.starts, []); assert.equal(f.eventSignals.length, 1); assert.equal(f.eventSignals[0].aborted, true);
 });
 
 for (const stage of ['storage', 'crypto', 'matrix']) {
-  test(`connection failure during ${stage} disposes its SSE stream`, async t => {
+  test(`connection failure during ${stage} disposes its live socket`, async t => {
     const f = fixture(t); let reject; f.gates.set(stage, new Promise((_, fail) => { reject = fail; }));
     const connecting = assert.rejects(f.connect()); await drain();
-    assert.equal(f.runtime.auth.sseOpen, true); assert.equal(f.eventSignals[0].aborted, false);
+    assert.equal(f.runtime.auth.liveOpen, true); assert.equal(f.eventSignals[0].aborted, false);
     reject(Error('unreachable')); await connecting;
-    assert.equal(f.eventSignals[0].aborted, true); assert.equal(f.runtime.auth.liveDispose, undefined); assert.equal(f.runtime.auth.sseOpen, false);
+    assert.equal(f.eventSignals[0].aborted, true); assert.equal(f.runtime.auth.liveDispose, undefined); assert.equal(f.runtime.auth.liveOpen, false);
     await f.advance(MINUTE_MS); assert.equal(f.eventSignals.length, 1);
   });
 }
@@ -333,7 +354,7 @@ for (const stage of ['storage', 'crypto', 'matrix']) {
 test('an invalidated connection attempt disposes its stream without disposing a replacement', async t => {
   const f = fixture(t); let release; f.gates.set('storage', new Promise(resolve => { release = resolve; }));
   const connecting = assert.rejects(f.connect()); await drain();
-  assert.equal(f.runtime.auth.sseOpen, true);
+  assert.equal(f.runtime.auth.liveOpen, true);
   f.runtime.auth.generation++;
   let disposed = false; const replacement = () => { disposed = true; }; f.runtime.auth.liveDispose = replacement;
   release(); await connecting;
@@ -356,9 +377,9 @@ const initialEvent = {
 
 test('events before the initial load coalesce into its reads and preserve presence and room updates', async t => {
   const f = fixture(t, { teams: [initialTeam] }); let release; f.gates.set('storage', new Promise(resolve => { release = resolve; }));
-  const connecting = f.connect(); await drain(); assert.equal(f.runtime.auth.sseOpen, true);
+  const connecting = f.connect(); await drain(); assert.equal(f.runtime.auth.liveOpen, true);
   await f.runtime.rooms.tabChanged({ asset: key.slice(6) });
-  for (let i = 0; i < 3; i++) { await f.event('refresh', { scope: 'me' }); await f.event('team-invites', { pending: i }); }
+  for (let i = 0; i < 3; i++) { await f.event('refresh', f.change()); await f.event('team-invites', { pending: i }); }
   f.server.presence.peer = 'away'; await f.event('presence', { account: 'peer', state: 'away' });
   await f.event('room', { key, type: 'count', count: 8 });
   assert.equal(f.runtime.state.rooms.summaries[key].count, 8);
@@ -371,7 +392,7 @@ test('events before the initial load coalesce into its reads and preserve presen
 
 test('presence during the initial snapshot survives creation of the people list without another read', async t => {
   const f = fixture(t, { teams: [initialTeam] }); let release; f.gates.set('/me', new Promise(resolve => { release = resolve; }));
-  const connecting = f.connect(); await drain(); assert.equal(f.runtime.auth.sseOpen, true);
+  const connecting = f.connect(); await drain(); assert.equal(f.runtime.auth.liveOpen, true);
   await f.event('presence', { account: 'peer', state: 'away' }); release(); await connecting;
   assert.equal(f.runtime.state.data.people.find(person => person.id === 'peer').presence, 'away');
   assert.equal(f.runtime.state.data.people.find(person => person.id === 'self').presence, 'active');
@@ -398,3 +419,31 @@ for (const mode of ['fresh sign-in', 'restored device']) {
     assert.equal(f.cachedMessages.length, 1); assert.equal(f.cachedMessages[0].id, '$initial');
   });
 }
+
+test('a failing snapshot backs off instead of being asked every maintenance tick', async t => {
+  const f = fixture(t); await f.connect(); f.runtime.auth.liveDispose(); f.runtime.auth.liveOpen = false; f.calls.length = 0;
+  const failMe = () => f.gates.set('/me', { then: (_resolve, reject) => reject(Error('down')) });
+  await f.advance(15_000); failMe(); await assert.rejects(f.runtime.auth.maintainConnection()); assert.equal(f.calls.filter(path => path === 'GET /me').length, 1);
+  // The first retry waits about 5 s (±20%); ticks before that send nothing.
+  for (let i = 0; i < 3; i++) { await f.advance(1_000); failMe(); await f.runtime.auth.maintainConnection(); }
+  assert.equal(f.calls.filter(path => path === 'GET /me').length, 1);
+  await f.advance(3_000); failMe(); await assert.rejects(f.runtime.auth.maintainConnection());
+  assert.equal(f.calls.filter(path => path === 'GET /me').length, 2);
+  // A manual reconnect ignores the wait, and success clears it.
+  f.gates.delete('/me'); await f.runtime.auth.reconnect(); await drain();
+  assert.equal(f.runtime.auth.maintenanceFailures, 0); assert.equal(f.runtime.auth.maintenanceRetryAt, 0);
+});
+
+test('a refresh push already covered by a snapshot is not read again', async t => {
+  const f = fixture(t); await f.connect(); f.calls.length = 0;
+  const readAt = f.runtime.auth.snapshotReadAt;
+  await f.event('refresh', { scope: 'me', at: readAt }); await drain();
+  assert.equal(f.calls.filter(path => path === 'GET /me').length, 0, 'the echo of a change the snapshot read after');
+  // An explicit read after a mutation, with the echo arriving while it is in flight: one read, not two.
+  let release; f.gates.set('/me', new Promise(resolve => { release = resolve; }));
+  const reading = f.runtime.refresh(); await drain();
+  await f.event('refresh', { scope: 'me', at: Date.now() }); f.gates.delete('/me'); release(); await reading; await drain();
+  assert.equal(f.calls.filter(path => path === 'GET /me').length, 1);
+  await f.event('refresh', f.change()); await drain();
+  assert.equal(f.calls.filter(path => path === 'GET /me').length, 2, 'a later change is read');
+});

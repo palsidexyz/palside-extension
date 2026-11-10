@@ -1,7 +1,7 @@
 'use client';
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
-import { ArrowUpRight, Bell, ChevronRight, Keyboard, KeyRound, Languages, Layers, LogOut, Monitor, ShieldCheck, SlidersHorizontal, Wallet } from 'lucide-react';
+import { ArrowUpRight, Bell, ChevronRight, Globe2, Keyboard, KeyRound, Languages, Layers, LogOut, Monitor, ShieldCheck, Wallet } from 'lucide-react';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
 import { usePreferences } from './use-preferences';
 import { Switch } from '@palside/ui/switch';
@@ -20,6 +20,8 @@ import { PersonAvatar } from '../ui/primitives';
 import { PalsAmount } from '../wallet/amount';
 import { SettingControl, SettingGroup, SettingItem, settingRows } from './setting-rows';
 import { allowedSites, useGrants } from './use-grants';
+import { useSiteSummary } from './sites';
+import { ALL_SITES } from '../../../domain/annotations/interaction';
 import type { PalsideController } from '../app/use-palside';
 import pages from '../app/pages.module.css';
 import { whenWalletOpen } from '../wallet/closed';
@@ -31,8 +33,9 @@ const modes: Mode[] = ['all', 'mentions', 'off'];
 const modeKey = { off: 'extension.settings.notifyOff', mentions: 'extension.settings.notifyMentions', all: 'extension.settings.notifyAll' } as const;
 
 /**
- * 设置: the account first — 资料 and 零钱 in one card. Then 网页, one card of states, not switches — those live on the header's keys and
- * each site's sheet: 共享在看 and whether Chrome allows it (its read sheet takes it back), 网站 with what runs on each, and 互动选项. Then 通用 (通知, 截图快捷键, 外观, 语言) and 账号
+ * 设置: the account first — 资料 and 零钱 in one card. Then 网页, one card of states: 共享在看 and whether Chrome allows it (its read sheet
+ * takes it back), 网页互动 with what runs on every site (its page holds the master switch and each feature's options), and 网站 with what
+ * runs on each. Then 通用 (通知, 截图快捷键, 外观, 语言) and 账号
  * (隐私与数据, 账号与安全, 关于) — then 退出登录.
  * Every page opens one level down and leads nowhere else, so 返回 always comes back here.
  */
@@ -42,6 +45,7 @@ export function Settings({ c }: { c: PalsideController }) {
   const shortcut = useCaptureShortcut(c);
   const notifications = notifyMode(c, grants.notifications);
   const sites = allowedSites(c, grants);
+  const interaction = useSiteSummary(c);
   const wallet = c.live?.state.wallet;
   const balance = wallet?.config?.enabled && wallet.availability === 'ready' ? wallet.balance?.balance : undefined;
   // With the chain off, a payment still settling or an order left to recover keeps the wallet reachable until it resolves.
@@ -58,8 +62,8 @@ export function Settings({ c }: { c: PalsideController }) {
     </SettingGroup>
     <SettingGroup title={t('extension.settings.groupWeb')}>
       <SettingItem icon={<ShareIcon size={16} />} title={t('extension.web.share')} value={<span className={privacy.state} data-on={grants.tabs || undefined}>{t(grants.tabs ? 'extension.privacy.allowed' : 'extension.privacy.notAllowed')}</span>} onClick={() => setSocialUi({ read: 'share' })} />
-      <SettingItem icon={<Layers size={16} />} title={t('extension.settings.sites')} value={sites.all ? t('extension.sites.allSites') : <CountText text={t('extension.web.siteCount', { count: sites.hosts.length })} value={sites.hosts.length} />} onClick={() => c.go('sites')} />
-      <SettingItem icon={<SlidersHorizontal size={16} />} title={t('extension.settings.interactionOptions')} onClick={() => c.go('interaction')} />
+      <SettingItem icon={<Layers size={16} />} title={t('extension.settings.interaction')} value={interaction(ALL_SITES)} onClick={() => c.go('interaction')} />
+      <SettingItem icon={<Globe2 size={16} />} title={t('extension.settings.sites')} value={sites.all ? t('extension.sites.allSites') : <CountText text={t('extension.web.siteCount', { count: sites.hosts.length })} value={sites.hosts.length} />} onClick={() => c.go('sites')} />
     </SettingGroup>
     <SettingGroup title={t('extension.settings.groupGeneral')}>
       {c.live && <SettingItem icon={<Bell size={16} />} title={t('extension.settings.notifications')} value={t(modeKey[notifications])} onClick={() => c.go('notifications')} />}

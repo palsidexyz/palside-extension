@@ -42,12 +42,16 @@ function fixture() {
   const hit = { readable: true, closest(selector) { return this.blocked || selector.split(',').includes(this.tagName?.toLowerCase()) ? this : null; } };
   const window = { navigation: { addEventListener(...args) { listen(this, ...args); } }, addEventListener(...args) { listen(this, ...args); } };
   const motion = { matches: false, addEventListener(...args) { listen(this, ...args); } };
-  const calls = [], plays = [], audio = [], observers = [];
+  const calls = [], plays = [], audio = [], observers = [], clips = [], frames = new Map();
+  let frameId = 0;
+  const pageListeners = new Set();
   const ctx = vm.createContext({ SECOND_MS, document, window, matchMedia: () => motion, innerWidth: 1000, innerHeight: 800,
     getComputedStyle: element => ({ zoom: element.style.zoom ?? '1' }),
-    location: { href: 'https://example.com/', hostname: 'example.com' }, AbortController, crypto, performance, Date,
+    location: { href: 'https://example.com/', hostname: 'example.com' }, AbortController, crypto, randomId: () => crypto.randomUUID(), performance, Date,
     MutationObserver: class { constructor(callback) { this.callback = callback; observers.push(this); } observe() {} disconnect() { this.disconnected = true; } },
     setTimeout: (fn, delay) => { timers.set(++sequence, { fn, delay }); return sequence; }, clearTimeout: id => timers.delete(id),
+    requestAnimationFrame: fn => { frames.set(++frameId, fn); return frameId; }, cancelAnimationFrame: id => frames.delete(id), scanning: work => work(),
+    IntersectionObserver: class { constructor(callback) { this.callback = callback; clips.push(this); } observe(target) { this.target = target; } disconnect() { this.disconnected = true; } },
     WHEEL, pickSlice, createSignalManifest, defaultSignalSettings, isEmote, normalizeSignalSettings, SIGNAL_TTL, signalArtCss: '', paletteCss: '',
     adapterFor: () => ({}), privateSelector: 'canvas,[data-private]', isTradeElement: element => element.attrs?.id === 'trade',
     readable: element => element?.readable === true, normalizeQuoteWhitespace: value => value.trim().replace(/\s+/g, ' '),
@@ -58,8 +62,8 @@ function fixture() {
   });
   vm.runInContext(script('../packages/shared/src/signal-art/wheel.ts'), ctx);
   vm.runInContext(script('../apps/extension/src/page-layer/signals.ts'), ctx);
-  const controller = vm.runInContext('createSignals', ctx)(message => calls.push(message), 'chrome-extension://test/signals/');
-  const labels = Object.fromEntries(['failed', 'locate', 'unmatched', 'page', 'cancel', 'send', 'emote', 'danger', 'together'].map(key => [key, key]));
+  const controller = vm.runInContext('createSignals', ctx)(message => calls.push(message), 'chrome-extension://test/signals/', listener => { pageListeners.add(listener); return () => pageListeners.delete(listener); });
+  const labels = Object.fromEntries(['failed', 'locate', 'cancel', 'emote', 'danger', 'together'].map(key => [key, key]));
   const configure = (settings = {}, on = true) => controller.configure(on, { ...defaultSignalSettings, ...settings }, labels);
   configure();
   function emit(type, changes = {}, target = window) {
@@ -71,7 +75,9 @@ function fixture() {
   const drag = (end = { clientY: 250 }, start = {}) => { emit('pointerdown', start); emit('pointermove', { ...start, ...end }); return emit('pointerup', { ...start, ...end }); };
   const host = document.documentElement.children[0];
   const receive = overrides => controller.receive({ id: crypto.randomUUID(), kind: 'danger', target: { kind: 'page' }, sentAt: Date.now(), at: Date.now(), ...overrides }, { name: 'Friend' });
-  return { controller, configure, emit, drag, calls, plays, timers, audio, ctx, hit, document, window, motion, host, receive, handlers, observers };
+  const pageChange = () => { for (const listener of pageListeners) listener(); };
+  const frame = () => { const pending = [...frames.values()]; frames.clear(); for (const run of pending) run(); };
+  return { controller, configure, emit, drag, calls, plays, timers, audio, ctx, hit, document, window, motion, host, receive, handlers, observers, clips, frames, frame, pageChange };
 }
 
 test('modified clicks and sub-threshold moves stay native; release in centre cancels', () => {
@@ -223,10 +229,10 @@ test('a hold near an edge picks nothing until the pointer moves; a release the p
     assert.equal(f.calls.at(-1).kind, 'together'); assert.equal(aim.attrs.opacity, '0');
   } finally { f.controller.dispose(); }
 });
-test('escape, resize, blur and navigation cancel active drags', () => {
+test('escape, resize and blur cancel active drags', () => {
   const f = fixture();
   try {
-    for (const [type, event, target] of [['keydown', { key: 'Escape' }], ['resize', {}, f.window], ['blur', {}, f.window], ['navigate', {}, f.window.navigation]]) {
+    for (const [type, event, target] of [['keydown', { key: 'Escape' }], ['resize', {}, f.window], ['blur', {}, f.window]]) {
       f.emit('pointerdown'); f.emit('pointermove', { clientY: 250 }); f.emit(type, event, target); f.emit('pointerup', { clientY: 250 });
     }
     assert.equal(f.calls.length, 0);
@@ -246,7 +252,7 @@ test('a found spot follows scroll, locates only on click, and drops to the edge 
   const f = fixture();
   try {
     let scrolls = 0;
-    const node = { isConnected: true, parentElement: { scrollIntoView() { scrolls++; } } };
+    const node = { isConnected: true, parentElement: { scrollIntoView() { scrolls++; }, getBoundingClientRect: () => rect } };
     let rect = { left: 200, top: 900, right: 300, bottom: 920, width: 100, height: 20 };
     const spot = { box: { startContainer: node, endContainer: node, getBoundingClientRect: () => rect }, x: 0.5, y: 0.5, level: 0 };
     f.ctx.resolveSignalSpot = () => spot;
@@ -254,9 +260,9 @@ test('a found spot follows scroll, locates only on click, and drops to the edge 
     const root = f.host.shadow.children.find(el => el.id === 'pings').lastElementChild;
     assert.equal(scrolls, 0); const badge = root.lastElementChild; assert.equal(badge.textContent, '↗'); assert.equal(badge.title, 'locate');
     f.emit('click', {}, badge); assert.equal(scrolls, 1);
-    rect = { ...rect, top: 200, bottom: 220 }; f.emit('scroll', {}, f.window);
+    rect = { ...rect, top: 200, bottom: 220 }; f.frame();
     assert.equal(root.style.top, '210px'); assert.equal(badge.hidden, true);
-    spot.alive = false; f.ctx.resolveSignalSpot = () => undefined; f.emit('resize', {}, f.window);
+    spot.alive = false; f.ctx.resolveSignalSpot = () => undefined; const tick = () => { const [id, timer] = [...f.timers].find(([, timer]) => timer.delay === 500); f.timers.delete(id); timer.fn(); }; tick(); f.frame();
     assert.equal(badge.textContent, ''); assert.equal(badge.hidden, true); assert.ok(root.className.includes('page-signal'));
   } finally { f.controller.dispose(); }
 });
@@ -287,14 +293,14 @@ test('a spot point is relative to its box, so it follows layout; a detached box 
     f.receive({ target: { kind: 'spot', anchors: [{ kind: 'chart', x: 0.5, y: 0.5 }] } });
     const root = f.host.shadow.children.find(el => el.id === 'pings').lastElementChild;
     assert.equal(root.style.left, '200px'); assert.equal(root.style.top, '250px');
-    rect = { left: 200, top: 300, width: 200, height: 100 }; f.emit('scroll', {}, f.window);
+    rect = { left: 200, top: 300, width: 200, height: 100 }; f.frame();
     assert.equal(root.style.left, '250px'); assert.equal(root.style.top, '375px');
-    spot.alive = false; f.ctx.resolveSignalSpot = () => undefined; f.emit('resize', {}, f.window);
+    spot.alive = false; f.ctx.resolveSignalSpot = () => undefined; const tick = () => { const [id, timer] = [...f.timers].find(([, timer]) => timer.delay === 500); f.timers.delete(id); timer.fn(); }; tick(); f.frame();
     assert.ok(root.className.includes('page-signal')); assert.equal(root.style.left, '968px');
     assert.equal(root.lastElementChild.textContent, '');
   } finally { f.controller.dispose(); }
 });
-test('a spot not found yet is looked for again every 500ms while it shows, and a found one is never searched again', () => {
+test('a spot not found looks again only after the page changed, and a found one is never searched again', () => {
   const f = fixture();
   try {
     let resolutions = 0, found;
@@ -304,9 +310,56 @@ test('a spot not found yet is looked for again every 500ms while it shows, and a
     assert.equal(resolutions, 1); assert.ok(root.className.includes('page-signal'));
     found = { box: { tagName: 'DIV', getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) }, x: 0.5, y: 0.5, level: 0 };
     const retry = () => { const [id, timer] = [...f.timers].find(([, timer]) => timer.delay === 500); f.timers.delete(id); timer.fn(); };
-    retry(); assert.equal(resolutions, 2); assert.equal(root.style.left, '50px');
+    retry(); assert.equal(resolutions, 1, 'an unchanged page reads the same');
+    f.pageChange();
+    retry(); f.frame(); assert.equal(resolutions, 2); assert.equal(root.style.left, '50px');
+    f.pageChange();
     retry(); assert.equal(resolutions, 2);
     f.controller.clear(); assert.equal([...f.timers.values()].some(timer => timer.delay === 500), false);
+  } finally { f.controller.dispose(); }
+});
+test('looking again stays within the search budget however often the page changes', () => {
+  const f = fixture();
+  try {
+    let resolutions = 0;
+    let now = 0;
+    f.ctx.performance = { now: () => now };
+    f.ctx.resolveSignalSpot = () => { resolutions++; now += 100; };
+    f.receive({ target: { kind: 'spot', anchors: [{ kind: 'chart', x: 0.5, y: 0.5 }] } });
+    const retry = () => { const [id, timer] = [...f.timers].find(([, timer]) => timer.delay === 500); f.timers.delete(id); timer.fn(); };
+    f.pageChange(); retry(); assert.equal(resolutions, 2);
+    now += 500; f.pageChange(); retry(); assert.equal(resolutions, 2, '100ms of search buys 2s of quiet');
+    now += 1_600; retry(); assert.equal(resolutions, 3);
+  } finally { f.controller.dispose(); }
+});
+test('a found spot follows layout every frame, and frames stop with the signal', () => {
+  const f = fixture();
+  try {
+    let top = 100;
+    f.ctx.resolveSignalSpot = () => ({ box: { tagName: 'DIV', parentElement: null, getBoundingClientRect: () => ({ left: 0, top, width: 100, height: 100 }) }, x: 0.5, y: 0.5, level: 0 });
+    f.receive({ target: { kind: 'spot', anchors: [{ kind: 'chart', x: 0.5, y: 0.5 }] } });
+    const root = f.host.shadow.children.find(el => el.id === 'pings').lastElementChild;
+    assert.equal(root.style.top, '150px');
+    top = 300; f.frame();
+    assert.equal(root.style.top, '350px', 'moved with no scroll or resize');
+    f.controller.clear();
+    assert.equal(f.frames.size, 0);
+  } finally { f.controller.dispose(); }
+});
+test('a spot scrolled out of an inner list offers locate instead of pointing at what covers it', () => {
+  const f = fixture();
+  try {
+    const box = { tagName: 'DIV', parentElement: null, getBoundingClientRect: () => ({ left: 0, top: 100, width: 100, height: 100 }) };
+    f.ctx.resolveSignalSpot = () => ({ box, x: 0.5, y: 0.5, level: 0 });
+    f.receive({ target: { kind: 'spot', anchors: [{ kind: 'chart', x: 0.5, y: 0.5 }] } });
+    const root = f.host.shadow.children.find(el => el.id === 'pings').lastElementChild, badge = root.children.at(-1), clip = f.clips.at(-1);
+    assert.equal(clip.target, box); assert.equal(badge.hidden, true);
+    clip.callback([{ isIntersecting: false }]); f.frame();
+    assert.equal(badge.hidden, false);
+    clip.callback([{ isIntersecting: true }]); f.frame();
+    assert.equal(badge.hidden, true);
+    f.controller.clear();
+    assert.equal(clip.disconnected, true);
   } finally { f.controller.dispose(); }
 });
 test('emote stills play in the CSS envelope with a placeholder fallback and load-based lifetime with cleanup', () => {

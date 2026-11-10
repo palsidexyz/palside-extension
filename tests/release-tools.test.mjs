@@ -26,7 +26,7 @@ const manifest = {
   side_panel: { default_path: 'sidepanel.html' },
   background: { service_worker: 'background.js' },
   optional_host_permissions: ['<all_urls>'],
-  optional_permissions: ['notifications', 'tabs', 'favicon'],
+  optional_permissions: ['notifications', 'tabs', 'favicon', 'tabGroups'],
   externally_connectable: { matches: [`${RELEASE_WEBSITE_ORIGIN}/*`] },
   content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) },
 };

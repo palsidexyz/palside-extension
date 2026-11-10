@@ -1,4 +1,7 @@
 .menu { --popover-width:216px; }
+/* Offline (known only while connected) fades the face and text, never the actions. */
+.row > [data-person-avatar], .row > div { transition:opacity .2s var(--ui-ease-feedback); }
+.row[data-offline] > [data-person-avatar], .row[data-offline] > div { opacity:.45; }
 /* Member list row: name + role badge on one line, tags then 一句话介绍 on the next. */
 .memberTitle { display:flex; align-items:center; gap:6px; min-width:0; font-size:var(--ui-type-body); line-height:20px; font-weight:600; color:var(--ui-text-primary); }
 .memberTitle > strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:inherit; }

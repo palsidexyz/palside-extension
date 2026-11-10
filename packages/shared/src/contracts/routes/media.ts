@@ -12,8 +12,6 @@ export const mediaEndpoints = [
     body: { kind: 'binary', maxBytes: UPLOAD_BYTES, caps: { avatar: AVATAR_BYTES, report: UPLOAD_BYTES, encrypted: UPLOAD_BYTES }, schema: binaryBody(UPLOAD_BYTES, 1) },
     response: jsonResponse(strictObject({ id })), errors: [...ownerErrors, 'TEAM_REQUIRED', 'EMPTY_UPLOAD', 'UNSUPPORTED_IMAGE', 'REPORT_UNAVAILABLE', 'UPLOAD_QUOTA', 'M_UNAVAILABLE'] }),
   endpoint({ id: 'media.read', method: 'GET', path: '/media/:id', params: mediaParams, query: readQuery, authorization: 'resource', rateLimits: ['mediaRead'], response: binaryResponse, errors: readErrors }),
-  endpoint({ id: 'media.readAttachment', method: 'GET', path: '/media/:id/attach', params: mediaParams, query: readQuery, authorization: 'resource', rateLimits: ['mediaRead'], response: binaryResponse, errors: readErrors }),
   endpoint({ id: 'media.attach', method: 'POST', path: '/media/:id/attach', params: mediaParams, authorization: 'resource', body: jsonBody(strictObject({ eventId })), response: jsonResponse(strictObject({ attached: Type.Literal(true) })), errors: [...memberErrors, 'MEDIA_UNAVAILABLE', 'MEDIA_FORBIDDEN', 'M_UNAVAILABLE'] }),
   endpoint({ id: 'media.remove', method: 'DELETE', path: '/media/:id', params: mediaParams, authorization: 'resource', response: jsonResponse(strictObject({ removed: Type.Literal(true) })), errors: removeErrors }),
-  endpoint({ id: 'media.removeAttachment', method: 'DELETE', path: '/media/:id/attach', params: mediaParams, authorization: 'resource', response: jsonResponse(strictObject({ removed: Type.Literal(true) })), errors: removeErrors }),
 ] as const;

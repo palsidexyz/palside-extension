@@ -1,6 +1,6 @@
 'use client';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
-import { errorMessage, localeOrEnglish, pastTime, message as uiMessage, type TextValue } from '@palside/i18n';
+import { localeOrEnglish,pastTime,message as uiMessage,type TextValue,failureText } from '@palside/i18n';
 import { npubEncode } from '@palside/shared/identity';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useTranslations } from 'use-intl';
@@ -21,8 +21,6 @@ import i from './identity.module.css';
 /** The account's npub, or '' when the id is not a valid key — that one row then stays out instead of the whole page failing. */
 function accountKey(id: string) { try { return npubEncode(id); } catch { return ''; } }
 
-const failure = (error: unknown, fallback: string): TextValue => error instanceof Error ? errorMessage(error) : uiMessage(fallback);
-
 function PhraseGrid({ phrase, hidden = false }: { phrase: readonly string[]; hidden?: boolean }) {
   return <ol className={i.phrase} data-hidden={hidden || undefined} aria-hidden={hidden || undefined}>{phrase.map((word, index) => <li key={index}><span>{index + 1}</span>{word}</li>)}</ol>;
 }
@@ -37,7 +35,7 @@ function PasswordForm({ submitLabel, danger = false, onSubmit, onCancel }: { sub
   return <form className={s.form} onSubmit={async event => {
     event.preventDefault(); if (!ready || busy) return;
     setBusy(true); setError('');
-    try { await onSubmit(password); } catch (cause) { setPassword(''); setError(failure(cause, 'common.error')); } finally { setBusy(false); }
+    try { await onSubmit(password); } catch (cause) { setPassword(''); setError(failureText(cause)); } finally { setBusy(false); }
   }}>
     <Field label={t('extension.copy.password')} error={error}>{props => <PinInput {...props} outlined autoComplete="current-password" autoFocus value={password} disabled={busy} onValueChange={value => { setPassword(value); setError(''); }} />}</Field>
     <div className={i.actions}>{onCancel && <Button onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button>}<Button type="submit" size={onCancel ? undefined : 'lg'} variant={danger ? 'surface' : 'primary'} className={danger ? s.danger : undefined} loading={busy} loadingLabel={t('common.working')} disabled={!ready}>{submitLabel}</Button></div>
@@ -59,7 +57,7 @@ export function Security({ c }: { c: PalsideController }) {
   const command = live.command;
   useEffect(() => {
     let current = true;
-    command('devices').then(result => { if (current) { setDevices(result.devices); setDevicesError(''); } }, cause => { if (current) setDevicesError(failure(cause, 'extension.copy.devicesUnavailable')); });
+    command('devices').then(result => { if (current) { setDevices(result.devices); setDevicesError(''); } }, cause => { if (current) setDevicesError(failureText(cause, 'extension.copy.devicesUnavailable')); });
     return () => { current = false; };
   }, [command, load]);
   return <div className={i.page}>

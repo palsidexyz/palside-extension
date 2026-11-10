@@ -1,7 +1,8 @@
 'use client';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
+import { localeOrEnglish, shortDateTime } from '@palside/i18n';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, ChevronRight, Copy, Eye, EyeOff, History, Settings, Wallet, X } from 'lucide-react';
 import { Button, IconButton } from '@palside/ui/button';
@@ -21,7 +22,7 @@ import { PacketDetail } from './packet';
 import type { ApiResult } from '../../../runtime/transport/api';
 import { WalletRecoveryList } from './recovery';
 import { recordLabels } from './recovery-state';
-import { EmptyState } from '../chat/history-scope';
+import { EmptyState } from '../ui/empty-state';
 import s from './wallet.module.css';
 
 
@@ -109,7 +110,7 @@ export function WalletReceive({ c }: { c: PalsideController }) {
 }
 
 function RecordDetail({ c, record, onClose }: { c: PalsideController; record: ChainRecord; onClose: () => void }) {
-  const t = useTranslations(), [packet, setPacket] = useState(false), [copied, copy, failedValue] = useCopied(c), command = c.live?.command, packetId = record.packetId;
+  const t = useTranslations(), locale = localeOrEnglish(useLocale()), [packet, setPacket] = useState(false), [copied, copy, failedValue] = useCopied(c), command = c.live?.command, packetId = record.packetId;
   // The packet is read while this sheet is up, so 红包 opens on its content; a failed read still opens and offers retry there.
   const [detail, setDetail] = useState<ApiResult<'chain.packet'> | null>();
   useEffect(() => { if (!packetId) return; let current = true; void command?.('wallet-packet', { id: packetId }).then(value => { if (current) setDetail(value); }, () => { if (current) setDetail(null); }); return () => { current = false; }; }, [command, packetId]);
@@ -122,7 +123,7 @@ function RecordDetail({ c, record, onClose }: { c: PalsideController; record: Ch
     <dl className={s.facts}>
       <div><dt>{t('extension.wallet.payer')}</dt><dd className={s.mono}>{record.from}</dd></div>
       <div><dt>{t('extension.wallet.recipient')}</dt><dd className={s.mono}>{record.to}</dd></div>
-      <div><dt>{t('extension.wallet.time')}</dt><dd>{new Date(record.occurredAt).toLocaleString()}</dd></div>
+      <div><dt>{t('extension.wallet.time')}</dt><dd>{shortDateTime(new Date(record.occurredAt), locale)}</dd></div>
       <div><dt>{t('extension.wallet.transaction')}</dt><dd className={s.mono}>{record.transactionHash}<button type="button" className={s.copyMini} aria-label={t('extension.copy.copy')} data-copied={copied || undefined} onClick={() => copy(record.transactionHash)}><Swap k={copied ? 'ok' : 'copy'}>{copied ? <Check /> : <Copy />}</Swap></button></dd></div>
     </dl>
     <ManualCopy value={failedValue} />

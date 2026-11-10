@@ -20,6 +20,8 @@
 .title h1, .plain { min-width:0; overflow:hidden; font-size:var(--ui-type-headline); font-weight:600; letter-spacing:-.02em; line-height:20px; text-overflow:ellipsis; white-space:nowrap; }
 .plain { font-size:var(--ui-type-title); line-height:24px; letter-spacing:-.025em; }
 .chevron { flex:none; margin-left:-7px; color:var(--ui-text-secondary); transition:color .18s var(--ui-ease-feedback); }
+.titleRow { display:flex; align-items:center; gap:4px; min-width:0; max-width:100%; }
+.titleRow > :first-child { flex:0 1 auto; }
 .title:hover .chevron { color:var(--ui-text-primary); }
 
 @media (prefers-reduced-motion:reduce) { .thumb, .switch button, .chevron { transition:none; } .dot, .mention { animation:none; } }

@@ -4,7 +4,7 @@ import { startPageLayer } from '../src/page-layer';
 import type { CaptureLabels, PageDown, PageUp } from '../src/runtime/browser/page-protocol';
 import { reviewStatus } from './review-harness';
 
-/** The page layer on a mock token page, driven by a fake background: `?scene=danmaku|capture|pick|stickies|hidden`. */
+/** The page layer on a mock token page, driven by a fake background: `?scene=danmaku|capture|hidden`. */
 // Review only: open the layer's shadow root so the page can be inspected.
 const attach = Element.prototype.attachShadow;
 Element.prototype.attachShadow = function (init) { return attach.call(this, { ...init, mode: 'open' }); };
@@ -34,13 +34,13 @@ const down = (message: PageDown) => listeners.forEach(listener => listener(messa
 (window as unknown as { down: typeof down }).down = down;
 (window as unknown as { pageUp: PageUp[] }).pageUp = [];
 startPageLayer({ postMessage: message => { (window as unknown as { pageUp: PageUp[] }).pageUp.push(message); }, onMessage: { addListener: listener => { listeners.push(listener); } } });
-const labels = { quote: t('extension.sticky.quote'), mark: t('extension.sticky.add'), saved: t('extension.sticky.saved'), openMark: t('extension.sticky.viewMark'), cancel: t('common.cancel'), refEdge: t('extension.page.refEdge', { name: '{name}' }), above: t('extension.page.above'), below: t('extension.page.below'), you: t('extension.page.you'), locale: 'zh-CN' };
+const labels = { you: t('extension.page.you'), locale: 'zh-CN' };
 down({ type: 'config', labels, danmaku: { density: 'high', enabled: true, area: 25, speed: 144, size: 'md', opacity: 90 } });
 const people = [{ name: 'Kai' }, { name: 'Robin' }, { name: 'Mia' }];
 const lines = ['这根量有点猛', '我先上车了', '止盈设好没', '持有人涨得好快', '等回调', '看这个大单'];
 if (scene === 'danmaku' || scene === 'hidden') {
   let n = 0;
-  const emit = () => { const i = n++; down({ type: 'danmaku', items: [{ id: `d${i}`, key: 'token:solana:fixture', text: lines[i % lines.length]!, author: people[i % 3]!, self: i % 4 === 1, timestamp: Date.now() - i * MINUTE_MS }] }); };
+  const emit = () => { const i = n++; down({ type: 'danmaku', items: [{ id: `d${i}`, key: 'token:solana:fixture', text: lines[i % lines.length]!, author: people[i % 3]!, self: i % 4 === 1, timestamp: Date.now() - i * MINUTE_MS, ...(i % 3 === 0 ? { likes: 3 + i } : {}) }] }); };
   for (let i = 0; i < 4; i++) setTimeout(emit, i * 300);
   setInterval(emit, 900);
 }
@@ -53,15 +53,4 @@ if (scene === 'capture') {
   } as CaptureLabels;
   setTimeout(() => down({ type: 'capture', src: shot.toDataURL('image/png'), labels: captureLabels }), 300);
 }
-if (scene === 'pick') setTimeout(() => down({ type: 'pick', on: true, canSticky: true, contextId: 'review-pick' }), 300);
-const quote = (exact: string) => ({ kind: 'quote' as const, exact, prefix: '', suffix: '' });
-if (scene === 'stickies' || scene === 'hidden') setTimeout(() => {
-  const now = Date.now();
-  down({ type: 'stickies', items: [
-    { id: 's1', target: quote('1,237'), text: '这笔卖单之后量就起来了，盯一下', author: { name: 'Mia' }, timestamp: now - 3 * MINUTE_MS },
-    { id: 's2', target: quote('1,348'), text: '这笔买单再观察一下', author: { name: 'Kai' }, timestamp: now - 40 * MINUTE_MS },
-    { id: 's3', target: quote('1,348'), text: '同意，等放量', author: { name: 'Robin' }, timestamp: now - 12 * MINUTE_MS },
-    { id: 's4', target: quote('不存在的文字'), text: '找不到的便利贴', author: { name: 'Kai' }, timestamp: now - 90 * MINUTE_MS },
-  ] });
-}, 300);
 setTimeout(() => reviewStatus('ready'), 600);

@@ -1,5 +1,5 @@
 'use client';
-import { errorMessage, message as uiMessage } from '@palside/i18n';
+import { message as uiMessage,failureText } from '@palside/i18n';
 import { INVITE_PASSWORD_ALPHABET, INVITE_PASSWORD_LENGTH } from '@palside/shared/rules/teams';
 import { normalizeInvitePassword } from '@palside/shared/contracts/rules';
 import { useTranslations } from 'use-intl';
@@ -22,7 +22,6 @@ export function randomInvitePassword() {
   while (value.length < INVITE_PASSWORD_LENGTH) for (const byte of crypto.getRandomValues(new Uint8Array(8))) if (byte < limit && value.length < INVITE_PASSWORD_LENGTH) value += INVITE_PASSWORD_ALPHABET[byte % size];
   return value;
 }
-
 
 /** Owner row under the invite link: shows the password itself so it can be read out or copied on its own. */
 export function InvitePasswordRow({ c, loading, unread = false }: { c: PalsideController; loading: boolean; unread?: boolean }) {
@@ -76,7 +75,7 @@ function InvitePasswordEditor({ c, onClose }: { c: PalsideController; onClose: (
     if (!ready || busy) return;
     setBusy(true); setError('');
     try { await c.saveInvitePassword(value); onClose(); }
-    catch (failure) { setError(failure instanceof Error ? errorMessage(failure) : uiMessage('common.error')); }
+    catch (failure) { setError(failureText(failure)); }
     finally { setBusy(false); }
   }
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }} title={current ? t('extension.copy.changeInvitePasswordTitle') : t('extension.copy.setInvitePasswordTitle')} pending={busy} initialFocusRef={input} placement="bottom" boundarySelector="[data-palside-app]"

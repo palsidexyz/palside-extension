@@ -9,7 +9,6 @@ import { shortAddress, tokenPageUrl } from '../packages/shared/src/navigation.ts
 import { siteById } from '../packages/shared/src/sites/index.ts';
 
 const root = 'apps/extension/src/features/palside/';
-const plain = value => JSON.parse(JSON.stringify(value));
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const drain = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 const nodes = (tree, check) => !tree || typeof tree !== 'object' ? [] : [...(check(tree) ? [tree] : []), ...(tree.props?.children ?? []).flat(Infinity).flatMap(child => nodes(child, check))];
@@ -163,33 +162,13 @@ test('people, blocks, invites and Hot show retry without replacing verified rows
   rooms.people = { key: rooms.pinned, people: [{ id: 'friend', nickname: 'Friend' }], count: 1 };
   rooms.blocked = rooms.people.people;
   rooms.invites = [{ id: 'invite' }];
-  rooms.hot = { rows: [{ key: 'room', count: 3, stance: { bull: 0, hold: 0, bear: 0 }, faces: [] }], loaded: true };
+  rooms.hot = { rows: [{ key: 'room', count: 3, faces: [] }], loaded: true };
   for (const [file, name] of [['rooms/danmaku-view.tsx', 'RoomPeople'], ['rooms/danmaku-view.tsx', 'BlockedPeople'], ['teams/invites.tsx', 'ReceivedInvites'], ['rooms/hot.tsx', 'Hot']]) {
     const tree = f.mount(f.load(file)[name]).render({ c });
     const feedback = find(tree, 'InlineFeedback'); assert.ok(feedback, name); feedback.props.action.onClick();
     assert.ok(nodes(tree, node => node.type !== 'InlineFeedback').length > 2, `${name} keeps content`);
   }
   assert.equal(retries, 4);
-});
-
-test('room quote completion returns only its originating navigation to the chat and keeps the original reference payload', async () => {
-  for (const leave of ['none', 'new-room', 'same-room-reopened', 'hot', 'unmount']) {
-    const f = fixture(), { c, rooms, calls, take } = controller(), api = f.load('rooms/rooms.ts');
-    c.screen = 'room'; rooms.pinned = 'token:Ethereum:token'; rooms.current = { key: rooms.pinned, site: null };
-    const owner = f.mount(api.useRoomOpening); owner.render(c);
-    const menu = f.mount(f.load('rooms/danmaku-view.tsx').LineMenu);
-    const message = { id: 'line', text: 'whole line', author: { id: 'friend', nickname: 'Friend' }, createdAt: 123 };
-    button(menu.render({ c, message, name: 'Friend', self: false }), 'extension.sticky.quote').props.onClick();
-    assert.deepEqual(plain(calls.find(call => call[0] === 'attach-ref')), ['attach-ref', { teamId: 'team', url: 'https://example.test/token', target: { kind: 'danmaku', id: 'line', author: 'friend', name: 'Friend', at: 123 }, caption: 'whole line' }]);
-    if (leave === 'new-room') { api.openRoom(c, 'token:Ethereum:new'); rooms.pinned = 'token:Ethereum:new'; owner.render(c); }
-    if (leave === 'same-room-reopened') { api.openRoom(c, rooms.pinned); owner.render(c); }
-    if (leave === 'hot') { c.go('hot'); owner.render(c); }
-    if (leave === 'unmount') owner.unmount();
-    take('attach-ref').resolve({}); await drain();
-    assert.equal(calls.some(call => call[0] === 'go' && call[1] === 'chat'), leave === 'none', leave);
-    assert.equal(calls.some(call => call[0] === 'room-close'), false, 'the 弹幕 tab keeps its token');
-    menu.unmount(); if (leave !== 'unmount') owner.unmount();
-  }
 });
 
 test('room drafts survive screen/room visits, clear after successful send, and isolate accounts and panel mounts', async () => {
@@ -258,7 +237,7 @@ test('unknown viewer counts stay absent until a verified room, summary or hot ro
   assert.equal(roomCount(c, 'room'), undefined);
   rooms.current = { key: 'room', count: 0, loading: true };
   assert.equal(roomCount(c, 'room'), undefined);
-  rooms.hot = { rows: [{ key: 'room', count: 7, stance: { bull: 0, hold: 0, bear: 0 }, faces: [] }], loaded: true };
+  rooms.hot = { rows: [{ key: 'room', count: 7, faces: [] }], loaded: true };
   assert.equal(roomCount(c, 'room'), 7);
   rooms.summaries.room = { count: 4 }; assert.equal(roomCount(c, 'room'), 4);
   rooms.current.loading = false; assert.equal(roomCount(c, 'room'), 0);

@@ -4,10 +4,11 @@ import { usableDirectory,type OfflineDirectory } from './offline-directory';
 import { ApiError } from '../transport/api';
 import type { RevisionedDraft } from '../storage/storage';
 import { validateView } from '../viewing/view-snapshot';
-import { type StickyRecord } from '../../domain/annotations/social';
 import type { Draft,Message } from '../../domain/chat/model';
 import type { Viewing } from '../../domain/assets/model';
 import type { Outgoing } from '../chat/outgoing';
+import type { SignalRecord } from '../annotations/signals';
+import type { ChartDrawing } from '../annotations/chart-drawings';
 import { orderMessages } from '../../domain/chat/order';
 import type { RuntimeDevice } from './device';
 import { color,readPreferences } from '../composition/state';
@@ -58,24 +59,11 @@ export async function restoreLocalData(this: SessionRuntime, session: RuntimeDev
     const rows = await runtime.storage.rows<RevisionedDraft<Draft>>(session.account.id, 'draft');
     guard();
     runtime.state.drafts = Object.fromEntries(rows.map(row => [row.key.split(':draft:')[1]!, row.value]));
-    const deletions = await runtime.storage.rows<import('../annotations/interactions').AnnotationDeletion>(session.account.id, 'annotation-deletion');
+    const cached = await runtime.storage.rows<{ message?: Message; views?: Viewing[]; timestamp?: number; signalRecord?: SignalRecord; chartDrawing?: ChartDrawing }>(session.account.id, 'cache');
     guard();
-    for (const { value } of deletions) {
-      if (!value || typeof value.id !== 'string' || typeof value.teamId !== 'string' || value.expiresAt <= Date.now() || !['pending', 'committed'].includes(value.status)) continue;
-      runtime.interactions.annotationDeletions.set(value.id, value);
-      if (value.status === 'committed') runtime.timeline.redactions.set(value.id, false);
-    }
-    const cached = await runtime.storage.rows<{ message?: Message; views?: Viewing[]; timestamp?: number; kind?: 'stickies'; item?: StickyRecord }>(session.account.id, 'cache');
-    guard();
+    runtime.signals.restoreRecords(cached.flatMap(row => row.value.signalRecord ? [row.value.signalRecord] : []), cached.flatMap(row => row.value.chartDrawing ? [row.value.chartDrawing] : []));
     for (const row of cached) {
       guard();
-      if (row.value.item) {
-        const item = row.value.item;
-        if (item.expiresAt <= Date.now()) { await runtime.storage.remove(row.key); continue; }
-        const kind = row.value.kind;
-        if (kind === 'stickies') runtime.interactions.upsertSticky(item as StickyRecord);
-        continue;
-      }
       if (!row.value.message) continue;
       if (typeof row.value.timestamp !== 'number') continue;
       const cachedMessage = row.value.message;
@@ -100,11 +88,9 @@ export async function restoreLocalData(this: SessionRuntime, session: RuntimeDev
       runtime.sending.outgoing.set(row.value.message.id, row.value);
       runtime.state.data.messages = [...runtime.state.data.messages.filter(m => m.id !== row.value.message.id), { ...row.value.message, status: row.value.attempted ? 'uncertain' : 'waiting' }];
       if (row.value.asset) runtime.cache.upsertView(row.value.asset);
-      if (row.value.message.ref) runtime.cache.upsertView(row.value.message.ref.view);
     }
     guard();
     for (const draft of Object.values(runtime.state.drafts)) {
-      if (draft.value.ref) runtime.cache.upsertView(draft.value.ref.view);
       const attachment = draft.value.attachment; if (attachment?.kind !== 'asset') continue;
       const view = attachment.view;
       if (view && validateView(view)) runtime.cache.upsertView({ ...view, id: attachment.assetId });

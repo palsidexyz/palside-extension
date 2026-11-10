@@ -2,7 +2,7 @@
 import { Button } from '@palside/ui/button';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'use-intl';
-import { errorMessage, message as uiMessage } from '@palside/i18n';
+import { message as uiMessage,failureText } from '@palside/i18n';
 import { Check, Copy, UsersRound } from 'lucide-react';
 import { CountText } from '../ui/motion-details';
 import { TeamAvatar } from './team-avatar';
@@ -32,7 +32,7 @@ export function NewTeam({ c, invite = true }: { c: PalsideController; invite?: b
       if (!url) { c.setNotice(uiMessage('extension.copy.inviteLoadFailed')); return; }
       await navigator.clipboard.writeText(url);
       setCopied(true);
-    } catch (failure) { c.setNotice(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.inviteLoadFailed')); }
+    } catch (failure) { c.setNotice(failureText(failure, 'extension.copy.inviteLoadFailed')); }
     finally { setBusy(false); }
   }
   const count = c.team.memberCount ?? c.team.memberIds.length;

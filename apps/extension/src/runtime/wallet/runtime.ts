@@ -1,3 +1,5 @@
+import type { ApiResult } from '../transport/api';
+import { coalesced } from '@palside/shared/coalesce';
 import type { ChainEvent, ChainOrder, ChainOrderInput } from '@palside/shared/contracts/chain';
 import type { PalsideService } from '../composition/core';
 import { unlockLocalMnemonic } from '../account/local-password';
@@ -22,7 +24,7 @@ export class WalletRuntime {
   private messageRequest = 0;
   private personRequests = new Map<string, object>();
   constructor(runtime: PalsideService) { this.runtime = runtime; }
-  reset() { this.hide(); this.generation++; this.roomRequest++; this.messageRequest++; this.personRequests.clear(); this.teamFeed = undefined; this.recipients.clear(); this.controller?.dispose(); this.keys?.dispose(); this.controller = undefined; this.keys = undefined; this.starting = undefined; this.accountId = undefined; this.runtime.state.wallet = undefined; }
+  reset() { this.hide(); this.generation++; this.roomRequest++; this.messageRequest++; this.personRequests.clear(); this.roomReads.clear(); this.teamFeed = undefined; this.recipients.clear(); this.controller?.dispose(); this.keys?.dispose(); this.controller = undefined; this.keys = undefined; this.starting = undefined; this.accountId = undefined; this.runtime.state.wallet = undefined; }
   async start(mnemonic?: string): Promise<WalletController> {
     const runtime = this.runtime, session = runtime.auth.session;
     if (!session) throw new Error('AUTH_REQUIRED');
@@ -42,10 +44,12 @@ export class WalletRuntime {
       // Address is public; only the encrypted mnemonic vault persists signing material.
       if (address) await runtime.storage.put(`${accountId}:wallet-address`, accountId, 'wallet-address', address);
       check();
+      // The binding read here also answers the check after start, so one start asks for it once.
+      let fetched: ApiResult<'chain.wallet'> | undefined;
       if (!address) {
         try {
-          const binding = await runtime.api.request('chain.wallet'); check();
-          if (binding && verifyWalletBinding(binding, accountId, binding.chainId)) address = binding.address;
+          fetched = await runtime.api.request('chain.wallet'); check();
+          if (fetched && verifyWalletBinding(fetched, accountId, fetched.chainId)) address = fetched.address;
         } catch { check(); }
       }
       this.controller?.dispose(); this.keys = keys;
@@ -63,7 +67,7 @@ export class WalletRuntime {
         try {
           if (mnemonic) await this.bind(mnemonic, check);
           else {
-            const binding = await runtime.api.request('chain.wallet'); check();
+            const binding = fetched !== undefined ? fetched : await runtime.api.request('chain.wallet'); check();
             if (!binding || !verifyWalletBinding(binding, accountId, controller.snapshot().config!.deployment!.chainId, address)) controller.lock();
           }
         } catch (error) { check(); controller.lock(); if (mnemonic) throw error; }
@@ -132,7 +136,7 @@ export class WalletRuntime {
     if (!recipientId) return;
     if (recipientId === accountId || runtime.state.rooms.blocked.some(person => person.id === recipientId)) throw new Error('RECIPIENT_BLOCKED');
     const scope = runtime.auth.scope();
-    const binding = await runtime.api.request('chain.walletPeer', { params: { id: recipientId } }); scope.check();
+    const binding = (await runtime.api.request('chain.person', { params: { id: recipientId } })).wallet; scope.check();
     if (!binding || !verifyWalletBinding(binding, recipientId, order.deployment.chainId, order.recipient)) throw new Error('WALLET_BINDING_MISMATCH');
     if (runtime.state.rooms.blocked.some(person => person.id === recipientId)) throw new Error('RECIPIENT_BLOCKED');
     if (input.kind === 'tip' && !runtime.state.rooms.current?.messages.some(message => message.id === input.messageId && message.author.id === recipientId)) throw new Error('TIP_MESSAGE_UNAVAILABLE');
@@ -179,6 +183,7 @@ export class WalletRuntime {
     context.tail = work;
     return work;
   }
+  private roomReads = new Map<string, () => Promise<unknown>>();
   async room(key: string) {
     const runtime = this.runtime, scope = runtime.auth.scope(), selected = runtime.state.rooms.current;
     const request = ++this.roomRequest;
@@ -193,7 +198,12 @@ export class WalletRuntime {
     runtime.state.chainRevision = (runtime.state.chainRevision ?? 0) + 1;
     const key = runtime.state.rooms.current?.key;
     if (event.type === 'tip' && event.roomKey === key || event.type === 'packet' && event.scope === key) {
-      if (key) await this.room(key);
+      if (key) {
+        // Tips and packets in a busy room arrive in bursts: one read at a time, plus one after it, for the room on screen only.
+        let read = this.roomReads.get(key);
+        if (!read) { this.roomReads.clear(); this.roomReads.set(key, read = coalesced(() => this.room(key))); }
+        await read();
+      }
     }
     const teamId = runtime.state.chainTeam?.teamId;
     if (teamId && (event.type === 'packet' && event.scope === teamId || event.type === 'order' && (event.order.payload.kind === 'transfer' && 'teamId' in event.order.payload && event.order.payload.teamId === teamId || event.order.payload.kind === 'packet' && event.order.payload.packet.scope === teamId))) await this.team(teamId);

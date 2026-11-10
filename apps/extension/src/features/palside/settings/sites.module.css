@@ -14,4 +14,10 @@
 .logo[data-off] svg { opacity:.5; }
 .logo[data-plate="light"] { background:var(--ui-logo-plate-light); }
 .logo[data-plate="dark"] { background:var(--ui-logo-plate-dark); }
+/* A site's own mark (transparent corners) stands bare like a tab's favicon; a plate appears only in the theme it would vanish in. */
+.logo[data-glyph] { background:transparent; }
+.logo[data-glyph] img { inset:7%; width:86%; height:86%; min-width:0; max-width:none; }
+.logo[data-glyph][data-plate="light"] { background:var(--ui-glyph-plate-light); }
+.logo[data-glyph][data-plate="dark"] { background:var(--ui-glyph-plate-dark); }
+.logo[data-glyph][data-plate] img { inset:16%; width:68%; height:68%; }
 @media (prefers-reduced-motion:reduce) { .logo img { transition:none; } }

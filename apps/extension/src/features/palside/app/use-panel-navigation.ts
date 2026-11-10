@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { type Screen } from './panel-model';
 import { type Viewing } from '../../../domain/assets/model';
 import type { PanelState } from './use-panel-state';
@@ -9,11 +9,20 @@ import type { PanelActions } from './panel-actions';
 const signedOutScreens: Screen[] = ['welcome', 'new-account', 'confirm-phrase', 'restore'];
 
 /** Where 返回 leads when a screen was opened directly, not from another panel screen. */
+/** 招募大厅 and the recruitment details opened from it. */
+const lobbyScreens = new Set<Screen>(['lobby', 'recruitment']);
 const parents: Partial<Record<Screen, Screen>> = { wallet: 'settings', 'wallet-receive': 'wallet', 'wallet-records': 'wallet', 'wallet-settings': 'wallet', 'wallet-packet': 'chat', profile: 'settings', privacy: 'settings', security: 'settings', about: 'settings', interaction: 'settings', sites: 'settings', site: 'sites', notifications: 'settings', 'delete-account': 'security', recruitment: 'lobby', 'former-teams': 'chat', requests: 'team', 'team-profile': 'team', 'room-people': 'room', blocked: 'interaction' };
 
 export function usePanelNavigation(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'go' | 'back' | 'openNotification' | 'openInvitation' | 'openSite' | 'selectAsset'> {
   const { view: { setSelectingOwner, screen, live, data, current, ownsScreen, setNotice }, returnFocus: returnFocusRef, localScreen, setPhrase, origins: originsRef, setScreen, setSiteHost, setSelectedAsset, setSelectedView } = state;
   const pendingFocus = useRef<{ accountId: string; teamId: string; element: HTMLElement | null } | undefined>(undefined);
+  // Leaving 招募大厅 by any route (a link, creating or joining a squad, 返回) stops its background reloads.
+  const lastScreen = useRef(screen);
+  useEffect(() => {
+    const was = lastScreen.current;
+    lastScreen.current = screen;
+    if (live && lobbyScreens.has(was) && !lobbyScreens.has(screen)) void getActions().run('lobby-close');
+  }, [screen, live, getActions]);
   useLayoutEffect(() => {
     const request = pendingFocus.current;
     if (!request) return;

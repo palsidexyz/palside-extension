@@ -39,7 +39,7 @@ function Review() {
     account: { bio: '', tags: [], id: data.self, nickname: scene === 'invite-nickname' ? '' : '测试成员', avatarId: null, matrixId: '@review:example.test', revision: 0, acceptTeamInvites: true }, data,
     drafts: scene === 'readonly' ? { night: { revision: 1, updatedAt: now, value: { text: '保留的未发送文字' } } } : {}, preferences: { toured: true, share: false, current: data.teams[0]?.id ?? '', notifications: 'all', notificationPreview: true },
     remoteTeams: [], lobbyTeams: [], config: { websiteUrl: 'https://example.test', signupDifficulty: 0 },
-    items: { stickies: [] }, invitations: { night: scene === 'invite' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + DAY_MS, active: true, password: new URLSearchParams(location.search).get('password'), suspended: false }
+    invitations: { night: scene === 'invite' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + DAY_MS, active: true, password: new URLSearchParams(location.search).get('password'), suspended: false }
       : scene === 'suspended' ? { url: 'https://example.test/invite/synthetic', expiresAt: now + DAY_MS, active: false, password: 'K7M2', suspended: true }
       : {suspended: false, password: null,  url: 'https://example.test/invite/synthetic', expiresAt: now - SECOND_MS, active: true } },
     ...(scene === 'password' ? { setup: 'password' as const } : {}),

@@ -4,9 +4,9 @@ import { Button, IconButton } from '@palside/ui/button';
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Activity, Ban, Bell, Clock, Coins, HardDrive, Highlighter, MapPin, Scissors, Star, TextQuote, Users, X } from 'lucide-react';
+import { Activity, Ban, Bell, Clock, Coins, HardDrive, MapPin, Scissors, Star, Users, X, Footprints, ChartCandlestick } from 'lucide-react';
 import { emptyFavorites } from '../../../domain/annotations/interaction';
-import { revokeAllSites, revokeNotifications, revokeTabs } from '../../../runtime/browser/permissions';
+import { revokeAllSites, revokeNotifications, revokeTabs, requestTabGroups, revokeTabGroups } from '../../../runtime/browser/permissions';
 import { CountText } from '../ui/motion-details';
 import { Sheet } from '@palside/ui/sheet';
 import { ChromeMark, DanmakuIcon, ShareIcon } from '../ui/icons';
@@ -21,24 +21,25 @@ import pages from '../app/pages.module.css';
 import s from './privacy.module.css';
 
 /** The Chrome permissions Palside runs on, named as Chrome's own prompt words them. `active` (当前标签页) and `idle` (设备空闲状态) come with the install. */
-type Permission = 'tabs' | 'sites' | 'active' | 'idle' | 'notifications';
+type Permission = 'tabs' | 'sites' | 'active' | 'idle' | 'notifications' | 'tabGroups';
 /** A card is a Chrome permission, or `none`: features that run on no browser permission, such as 代币数据 (names and icons come from the Palside service). */
 type CardKey = Permission | 'none';
 
 /** Each permission and the features that use it. 弹幕 follows the tab's token only on an added site, like every page feature. */
 const cards: [CardKey, ReadKey[]][] = [
   ['tabs', ['share']],
-  ['sites', ['quote', 'signal', 'sticky', 'room']],
+  ['sites', ['room', 'signal', 'chart']],
   ['active', ['shot']],
   ['idle', ['presence']],
   ['notifications', ['notify']],
+  ['tabGroups', ['follow']],
   ['none', ['token']],
 ];
-const uses: Record<ReadKey, Permission[]> = { share: ['tabs'], token: [], quote: ['sites'], signal: ['sites'], sticky: ['sites'], room: ['sites'], shot: ['active'], presence: ['idle'], notify: ['notifications'] };
+const uses: Record<ReadKey, Permission[]> = { share: ['tabs'], token: [], signal: ['sites'], chart: ['sites'], room: ['sites'], shot: ['active'], presence: ['idle'], notify: ['notifications'], follow: ['tabGroups'] };
 
 const readIcons: Record<ReadKey, () => ReactNode> = {
-  share: () => <ShareIcon size={14} />, token: () => <Coins size={14} />, quote: () => <TextQuote size={14} />, signal: () => <MapPin size={14} />,
-  sticky: () => <Highlighter size={14} />, room: () => <DanmakuIcon size={14} />, shot: () => <Scissors size={14} />, presence: () => <Activity size={14} />, notify: () => <Bell size={14} />,
+  share: () => <ShareIcon size={14} />, token: () => <Coins size={14} />, signal: () => <MapPin size={14} />, chart: () => <ChartCandlestick size={14} />,
+  room: () => <DanmakuIcon size={14} />, shot: () => <Scissors size={14} />, presence: () => <Activity size={14} />, notify: () => <Bell size={14} />, follow: () => <Footprints size={14} />,
 };
 
 /** Granted now (`true`/`false`), or `undefined` for 当前标签页 and 设备空闲状态, which are always there and cannot be taken back. */
@@ -48,7 +49,7 @@ function granted(permission: Permission, grants: Grants, c: PalsideController) {
   return grants[permission];
 }
 
-/** The state word after a permission's name: 已允许 / N 个网站 / 所有网站 / 未允许, or 安装时自带. */
+/** The state word after a permission's name: 已允许 / N 个网站 / 所有网站 / 未允许, or 随安装授予. */
 function PermissionState({ c, grants, permission }: { c: PalsideController; grants: Grants; permission: Permission }) {
   const t = useTranslations();
   const on = granted(permission, grants, c);
@@ -58,7 +59,7 @@ function PermissionState({ c, grants, permission }: { c: PalsideController; gran
   return <span className={s.state} data-on={on || undefined}>{text}</span>;
 }
 
-/** 收回: confirm, then give the permission back to Chrome; what used it turns off. Shared by 隐私与数据 and each feature's read sheet. */
+/** 撤销授权: confirm, then give the permission back to Chrome; what used it turns off. Shared by 隐私与数据 and each feature's read sheet. */
 function useRevoke(c: PalsideController, grants: Grants) {
   const t = useTranslations();
   const preferences = usePreferences(c.live);
@@ -69,7 +70,7 @@ function useRevoke(c: PalsideController, grants: Grants) {
     const take = {
       // Chrome taking 读取您的浏览记录 back switches 共享在看 off in the background, with its notice.
       tabs: () => c.live ? void revokeTabs().then(done => { if (!done) c.setNotice(uiMessage('common.error')); }, () => c.setNotice(uiMessage('common.error'))) : void c.toggle('share', false),
-      sites: () => { if (c.live) void revokeAllSites().catch(() => []); },
+      sites: () => { if (c.live) void revokeAllSites().catch(() => c.setNotice(uiMessage('common.error'))); },
       notifications: () => {
         if (!intent?.current()) return;
         const failed = () => { if (intent.current()) c.setNotice(uiMessage('extension.settings.notifyDenied')); };
@@ -79,6 +80,7 @@ function useRevoke(c: PalsideController, grants: Grants) {
         intent.track(work);
         return work;
       },
+      tabGroups: () => { void revokeTabGroups().then(done => { if (!done) c.setNotice(uiMessage('common.error')); }, () => c.setNotice(uiMessage('common.error'))); },
       active: () => {},
       idle: () => {},
     }[permission];
@@ -90,9 +92,9 @@ function useRevoke(c: PalsideController, grants: Grants) {
 }
 
 /**
- * 隐私与数据: one card per Chrome permission — Chrome's mark, the permission in Chrome's words, whether it is allowed now, 收回 — and the
+ * 隐私与数据: one card per Chrome permission — Chrome's mark, the permission in Chrome's words, whether it is allowed now, 撤销授权 — and the
  * features that use it; each feature opens what it reads, who sees it and for how long. Then what stays on this device.
- * 收回 gives the permission back to Chrome and turns off what used it; turning that on again later does not make Chrome ask again.
+ * 撤销授权 gives the permission back to Chrome and turns off what used it; turning that on again later does not make Chrome ask again.
  */
 export function Privacy({ c }: { c: PalsideController }) {
   const t = useTranslations();
@@ -110,6 +112,7 @@ export function Privacy({ c }: { c: PalsideController }) {
             <h2 className={s.name}>{t(`extension.privacy.perm_${permission}`)}</h2>
             <PermissionState c={c} grants={grants} permission={permission} />
             {granted(permission, grants, c) && <Button size="xs" variant="surface" className={s.revoke} onClick={() => revoke(permission)}>{t('extension.privacy.revoke')}</Button>}
+            {permission === 'tabGroups' && !granted(permission, grants, c) && <Button size="xs" variant="surface" className={s.revoke} onClick={() => { void requestTabGroups().catch(() => c.setNotice(uiMessage('common.error'))); }}>{t('extension.privacy.allow')}</Button>}
           </>}
         </header>
         <div className={s.chips}>

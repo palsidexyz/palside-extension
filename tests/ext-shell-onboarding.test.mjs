@@ -25,7 +25,7 @@ async function fixture(t, { lateScreen = false } = {}) {
   const modules = {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => translate },
-    '@palside/i18n': { errorMessage: error => error.message, message: key => key },
+    '@palside/i18n': { errorMessage: error => error.message, message: key => key, failureText: (error, fallback = 'common.error') => error instanceof Error ? error.message : fallback },
     '@palside/shared/identity': { ENGLISH_WORDS: phrase },
     '@palside/shared/units': require('@palside/shared/units'),
     '@palside/shared/rules/accounts': require('@palside/shared/rules/accounts'),
@@ -39,6 +39,7 @@ async function fixture(t, { lateScreen = false } = {}) {
     '../ui/primitives': { Action: ({ label, onClick }) => h('button', { onClick, 'aria-label': label }, label) },
     '../ui/brand': { Brand: noop },
     '../settings/language-setting': { LanguageSetting: noop },
+    '../settings/appearance': { AppearanceSetting: noop },
     '../ui/motion-details': { Count: noop },
     '../../../domain/chat/model': { characterLength: text => text.length },
     '../ui/text': { useText: () => value => value, useTextState: () => React.useState('') },

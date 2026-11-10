@@ -14,10 +14,10 @@ function fixture({ site = true, url = 'https://example.com/', imageFetch } = {})
   const pageMessages = [];
   const imageWindows = []; const closedWindows = []; const commands = []; const opened = [];
   let pagePort;
-  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true }, 'gmgn.ai': { on: false, danmaku: true, signal: true, sticky: true } }, notifications: 'off' }, remoteTeams: [{ id: 'one', joined: true }, { id: 'two', joined: true }], items: { stickies: [] }, data: { views: [], messages: [], people: [] }, drafts: {} };
+  let state = { authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false }, account: { id: 'alice' }, preferences: { current: 'one', siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true }, 'gmgn.ai': { on: false, danmaku: true, signal: true } }, notifications: 'off' }, remoteTeams: [{ id: 'one', joined: true }, { id: 'two', joined: true }], data: { views: [], messages: [], people: [] }, drafts: {} };
   const active = { id: 1, windowId: 10, url, active: true, status: 'complete', title: 'Example' };
   const browser = {
-    runtime: { id: 'qa', getURL: value => `chrome-extension://qa${value}`, getContexts: async () => [{}], sendMessage: async ({ command, type }) => type === 'palside/image-flush' ? { ok: true } : command.name === 'snapshot' ? { ok: true, value: state } : (commands.push(command), { ok: true }), onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event() },
+    runtime: { id: 'qa', getURL: value => `chrome-extension://qa${value}`, getContexts: async () => [{}], sendMessage: async ({ command, type }) => type === 'palside/image-flush' ? { ok: true } : command.name === 'snapshot' ? { ok: true, value: state } : (commands.push(command), { ok: true }), onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event(), onUpdateAvailable: event() },
     tabs: { query: async options => options?.url ? [] : [{ ...active }], captureVisibleTab: async () => 'data:image/png;base64,AA==', onActivated: event(), onUpdated: event(), onRemoved: event() },
     windows: { get: async id => ({ id }), create: async options => { const window = { id: 100 + imageWindows.length, ...options }; imageWindows.push(window); return window; }, remove: async id => { closedWindows.push(id); browser.windows.onRemoved.emit(id); }, onRemoved: event(), onFocusChanged: event() },
     sidePanel: { open: async options => { opened.push(options); }, setPanelBehavior: async () => {} },
@@ -132,14 +132,14 @@ test('capture errors distinguish permission loss from a temporary API failure', 
 
 test('capture injection failure is transient even when page interaction is switched off', async () => {
   const f = fixture();
-  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } } } });
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true } } } });
   f.browser.scripting.executeScript = async () => { throw new Error('injection'); };
   assert.equal((await f.command()).text.key, 'extension.runtime.pageActionFailed');
   assert.equal(f.timers.size, 0);
 });
 
 test('one-off page actions distinguish missing permission, forbidden pages, loading and injection failure', async () => {
-  const open = f => f.bg.pages.openPageTools(10, f.port.sender.url, 'pick');
+  const open = f => f.bg.pages.openPageTools(10, f.port.sender.url);
   await assert.rejects(open(fixture({ site: false })), { code: 'NEED_SITE' });
   await assert.rejects(open(fixture({ site: false, url: 'chrome://settings' })), { text: { key: 'extension.runtime.pageUnavailable' } });
   const f = fixture();
@@ -160,9 +160,18 @@ test('the editor holds the reservation until cancellation, then capture can rest
   f.pagePort.onMessage.emit({ type: 'capture-cancel' });
 });
 
+test('a same-document history change does not cancel capture editing', async () => {
+  const f = fixture();
+  await f.command();
+  f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.active);
+  f.browser.tabs.onUpdated.emit(1, { status: 'complete' }, f.active);
+  f.pagePort.onMessage.emit({ type: 'captured', src: 'data:image/png;base64,KEPT' });
+  assert.equal(f.messages.some(message => message.type === 'captured'), true);
+});
+
 test('navigation, tab switches, tab removal, page disconnection and panel disconnection cancel editing', async () => {
   for (const cancel of [
-    f => f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.active),
+    f => { f.pagePort.onDisconnect.emit(); f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.active); },
     f => f.pagePort.onMessage.emit({ type: 'url', url: 'https://example.com/next' }),
     f => f.browser.tabs.onActivated.emit({ windowId: 10 }),
     f => f.browser.tabs.onRemoved.emit(1, { windowId: 10 }),
@@ -237,7 +246,7 @@ test('page script registration is serialized and unrelated state does not re-reg
   f.browser.permissions.getAll = async () => ({ origins: ['https://gmgn.ai/*'] });
   f.browser.permissions.contains = async request => request.permissions?.includes('notifications') ? true : request.origins ? true : true;
   f.browser.notifications = { getAll: async () => { notifications++; return {}; } };
-  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true }, 'gmgn.ai': { on: true, danmaku: true, signal: true, sticky: true } } } });
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true }, 'gmgn.ai': { on: true, danmaku: true, signal: true } } } });
   for (let i = 0; i < 3; i++) f.browser.permissions.onAdded.emit({ origins: ['https://gmgn.ai/*'] });
   for (let i = 0; i < 6; i++) await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(maximum, 1);
@@ -261,27 +270,27 @@ test('page capabilities are pushed after load, tab activation, site switches and
   const flush = () => new Promise(resolve => setImmediate(resolve));
   const last = () => f.messages.filter(message => message.type === 'page').at(-1).status.capabilities;
   await flush();
-  assert.equal(last().pick.state, 'ready');
+  assert.equal(last().interact.state, 'ready');
   f.active.status = 'loading';
   f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.active);
   await flush();
-  assert.equal(last().pick.state, 'pending');
+  assert.equal(last().interact.state, 'pending');
   f.active.status = 'complete';
   f.browser.tabs.onUpdated.emit(1, { status: 'complete' }, f.active);
   await flush();
-  assert.equal(last().pick.state, 'ready');
-  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: true, danmaku: true, signal: true, sticky: true } } } });
+  assert.equal(last().interact.state, 'ready');
+  f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'example.com': { on: true, danmaku: true, signal: true } } } });
   await flush();
-  assert.equal(last().pick.state, 'ready');
+  assert.equal(last().interact.state, 'ready');
   assert.equal(f.messages.filter(message => message.type === 'page').at(-1).status.interactive, true);
   f.active.url = 'https://other.example';
   f.browser.tabs.onActivated.emit({ windowId: 10 });
   await flush();
-  assert.equal(last().pick.state, 'ready');
+  assert.equal(last().interact.state, 'ready');
   f.host.grantedOrigins.clear();
   f.browser.permissions.onRemoved.emit({ origins: ['<all_urls>'] });
   await flush();
-  assert.equal(last().pick.state, 'access');
+  assert.equal(last().interact.state, 'access');
   assert.equal(last().share.state, 'ready');
 });
 

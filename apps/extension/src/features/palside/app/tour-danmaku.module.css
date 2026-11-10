@@ -1,0 +1,24 @@
+/* 弹幕 over the demo's token chart, in the page layer's colours (page-layer/palette.ts) and heavy outlined type. */
+.layer { --dm-ink:#FFFFFF; --dm-outline:#000000; --dm-mate:#D0ED78; --dm-self:rgb(255 255 255 / 85%); --dm-self-fill:rgb(0 0 0 / 22%); --dm-hover:rgb(0 0 0 / 55%);
+  --card-surface:#141414; --card-ink:#EDEDED; --card-muted:#9E9E9E; --card-shadow:0 4px 12px rgb(0 0 0 / 6%);
+  position:absolute; inset:0; z-index:2; overflow:hidden; pointer-events:none; }
+
+.dm { position:absolute; left:0; display:flex; align-items:center; height:20px; padding:0 4px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); white-space:nowrap;
+  color:var(--dm-ink); font:600 var(--ui-type-callout)/20px SimHei, "Heiti SC", "Microsoft JhengHei", sans-serif; will-change:transform;
+  text-shadow:1px 0 1px var(--dm-outline), 0 1px 1px var(--dm-outline), 0 -1px 1px var(--dm-outline), -1px 0 1px var(--dm-outline); transition:background-color .12s; }
+.dm[data-mate] { color:var(--dm-mate); }
+.dm[data-self] { background:var(--dm-self-fill); box-shadow:inset 0 0 0 1px var(--dm-self); }
+.dm[data-held] { z-index:1; background:var(--dm-hover); }
+.likes { display:inline-flex; align-items:center; gap:.16em; margin-left:.4em; font-size:.62em; opacity:.9; }
+.likes svg { width:1em; height:1em; overflow:visible; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 1px var(--dm-outline)); }
+
+/* Who said the held line: face, name, 队友, when; above the line. */
+.card { position:absolute; left:0; top:0; z-index:2; display:flex; align-items:center; gap:5px; height:22px; padding:0 8px 0 3px; border-radius:var(--ui-radius-pill); background:var(--card-surface); color:var(--card-ink);
+  box-shadow:var(--card-shadow); font-size:var(--ui-type-caption); line-height:14px; white-space:nowrap; opacity:0; transform:translateY(3px); transition:opacity .16s var(--ui-ease-feedback), transform .16s var(--ui-ease-feedback); }
+.card[data-on] { opacity:1; transform:none; }
+.card b { font-weight:600; }
+.card time { color:var(--card-muted); }
+.face { display:grid; place-items:center; width:16px; height:16px; border-radius:50%; background:var(--dm-mate); color:var(--card-surface); font-weight:600; box-shadow:0 0 0 1.5px var(--card-surface), 0 0 0 2.5px var(--dm-mate); }
+.tag { height:14px; padding:0 4px; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--dm-mate) 16%, transparent); color:var(--dm-mate); font-weight:600; }
+
+@media (prefers-reduced-motion: reduce) { .card, .dm { transition:none; } }

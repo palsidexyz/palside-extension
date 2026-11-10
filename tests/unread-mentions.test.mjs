@@ -37,3 +37,12 @@ test('team unread counts follow each team’s read IDs and count @me separately'
   assert.deepEqual(counts.get('b'), { unread: 1, mentions: 1 });
   assert.equal(counts.get('c'), undefined);
 });
+
+test('an edit keeps the original mentions still written as @name and adds none', async () => {
+  const { keptMentions } = await import('../apps/extension/src/domain/chat/mentions.ts');
+  const people = [{ id: 'mia', name: 'Mia' }, { id: 'kai', name: 'Kai' }, { id: 'leo', name: 'Leo' }];
+  assert.deepEqual(keptMentions('@Mia 看这个币', people, ['mia']), ['mia'], 'fixing a typo keeps the reminder');
+  assert.deepEqual(keptMentions('看这个币', people, ['mia']), [], 'deleting @Mia removes it');
+  assert.deepEqual(keptMentions('@Mia @Kai 看这个币', people, ['mia']), ['mia'], 'typing @Kai in an edit does not notify Kai');
+  assert.deepEqual(keptMentions('@Mia2 看', people, ['mia']), [], 'a different word is not the mention');
+});

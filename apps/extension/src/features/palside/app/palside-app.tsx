@@ -1,5 +1,5 @@
 'use client';
-import { errorMessage, type TextValue, message as uiMessage } from '@palside/i18n';
+import { errorMessage,type TextValue,message as uiMessage,failureText } from '@palside/i18n';
 
 import { useText } from '../ui/text';
 
@@ -14,7 +14,7 @@ import { PersonCard } from '../account/person-card';
 import { PaymentSheet, usePaymentSession } from '../wallet/payment-sheet';
 import { teamDefaultAvatars, TeamPortraits } from '../account/default-avatar';
 import { SocialSession, captureSocialUi } from '../annotations/social-state';
-import { NoteSheet } from '../annotations/sticky-list';
+import { FollowBar } from '../annotations/follow-bar';
 import { AllSitesSheet, GrantSheet, SitePicker } from '../settings/access-sheet';
 import { ReadSheet } from '../settings/privacy';
 import { Chat } from '../chat/chat';
@@ -35,7 +35,13 @@ export function PalsideApp(props: PalsideProps) {
   const [working, setWorking] = useState<Working>(false);
   const [flow, setFlow] = useState<'create' | 'restore'>('create');
   const accountId = props.live ? props.live.state.account?.id ?? 'signed-out' : props.data.self;
-  return <SocialSession key={`${accountId}:${props.live?.state.authenticated ?? 'preview'}`} accountId={accountId}><PalsideSession {...props} onboarding={{ working, setWorking, flow, setFlow }} /></SocialSession>;
+  const session = { key: `${accountId}:${props.live?.state.authenticated ?? 'preview'}`, accountId };
+  // Registration writes the account and then signs in while the wait screen is up. Keep the session it started in until the
+  // wait ends, so the screen is not remounted half-way; the next session opens on chat (or the invitation) by default.
+  const [held, setHeld] = useState(session);
+  if (!working && held.key !== session.key) setHeld(session);
+  const active = working ? held : session;
+  return <SocialSession key={active.key} accountId={active.accountId}><PalsideSession {...props} onboarding={{ working, setWorking, flow, setFlow }} /></SocialSession>;
 }
 
 function PalsideSession(props: PalsideProps) {
@@ -116,16 +122,16 @@ function PalsideSession(props: PalsideProps) {
   }
   return <main ref={root} className={s.app} data-palside-app data-appearance={appearance} data-from={tabs ? leftScreen : undefined} onClick={event => { const link = event.target instanceof Element ? event.target.closest('a') : null; if (!event.defaultPrevented && c.live && link?.href && /^https?:/.test(link.href)) { event.preventDefault(); const live = c.live; const href = link.href; const session = captureSocialUi(); const open = () => { if (!session.current()) return Promise.resolve(); return live.openPage(href).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); }; if (siteForUrl(href)) void open(); else c.setConfirmation({ title: uiMessage('extension.copy.openLinkTitle'), description: uiMessage('extension.dynamic.openLinkDescription', { host: new URL(href).hostname }), confirm: async () => { await open(); } }); } }} onKeyDown={e => { if (e.key === 'Escape' && !e.defaultPrevented && c.screen !== 'chat' && !['welcome', 'password', 'nickname'].includes(c.screen)) { e.preventDefault(); c.go('chat'); } }}><TeamPortraits value={portraits}><SiteDirectoryContext value={sites}>
     {tabs && <ChatHeader c={c} tabs onTeam={id => { c.chooseTeam(id); setJumpTarget(undefined); setJumpOrigin(undefined); }} />}
+    {tabs && <FollowBar c={c} />}
     {onboarding || (c.live && !c.live.state.authenticated) ? null : noKnownTeam ? c.screen === 'chat' ? c.disconnected ? <ConnectionEmpty c={c} /> : <TeamStart c={c} /> : null : <Chat key={c.current} c={c} jumpId={jumpTarget?.teamId === c.current ? jumpTarget.id : undefined} clearJump={() => { setJumpTarget(undefined); setJumpOrigin(undefined); }} originLabel={origin ? t('extension.copy.searchMessages') : undefined} searchQuery={origin?.screen === 'search' ? c.query : undefined} onReturn={origin ? () => { c.go(origin.screen); requestAnimationFrame(() => { const element = root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]'); if (element) element.scrollTop = origin.scrollTop; }); } : undefined} />}
     {!onboarding && c.live && <DanmakuView c={c} />}
-    {onboarding ? <Onboarding c={c} /> : c.screen !== 'chat' && c.screen !== 'room' ? <Suspense fallback={<div className={s.empty} role="status">{t('extension.copy.loading')}</div>}><Panels key={c.screen} c={c} onJump={id => { if (c.screen === 'search') setJumpOrigin({ screen: c.screen, scrollTop: root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]')?.scrollTop ?? 0, teamId: c.current }); setJumpTarget({ id, teamId: c.current }); c.go('chat'); }} /></Suspense> : null}
+    {onboarding ? <Onboarding c={c} /> : c.screen !== 'chat' && c.screen !== 'room' ? <Suspense fallback={<div className={s.empty} data-lazy role="status">{t('extension.copy.loading')}</div>}><Panels key={c.screen} c={c} onJump={id => { if (c.screen === 'search') setJumpOrigin({ screen: c.screen, scrollTop: root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]')?.scrollTop ?? 0, teamId: c.current }); setJumpTarget({ id, teamId: c.current }); c.go('chat'); }} /></Suspense> : null}
     {!onboarding && <JoinSheet c={c} />}
     {touring && <FirstRunTour key={`tour:${c.current}`} c={c} onRun={setTourTeam} />}
     <Toaster label={t('extension.copy.notices')} closeLabel={t('extension.copy.closeNotice')} />
-    <AlertDialog confirmLabel={text(c.confirmation?.action) || t('common.confirm')} tone={c.confirmation?.danger ? 'danger' : undefined} cancelLabel={t('common.cancel')} placement="bottom" boundarySelector="[data-palside-app]" open={Boolean(c.confirmation)} title={text(c.confirmation?.title)} description={text(c.confirmation?.description)} onOpenChange={open => { if (!open) c.setConfirmation(undefined); }} pending={confirmBusy} error={confirmFailure?.target === c.confirmation ? text(confirmFailure?.message) : undefined} onConfirm={async () => { if (confirmBusy || !c.confirmation) return; const target = c.confirmation; setConfirmBusy(true); setConfirmFailure(undefined); try { await target.confirm(); c.setConfirmation(undefined); } catch (error) { setConfirmFailure({ target, message: error instanceof Error ? errorMessage(error) : uiMessage('common.error') }); } finally { setConfirmBusy(false); } }} />
+    <AlertDialog confirmLabel={text(c.confirmation?.action) || t('common.confirm')} tone={c.confirmation?.danger ? 'danger' : undefined} cancelLabel={t('common.cancel')} placement="bottom" boundarySelector="[data-palside-app]" open={Boolean(c.confirmation)} title={text(c.confirmation?.title)} description={text(c.confirmation?.description)} onOpenChange={open => { if (!open) c.setConfirmation(undefined); }} pending={confirmBusy} error={confirmFailure?.target === c.confirmation ? text(confirmFailure?.message) : undefined} onConfirm={async () => { if (confirmBusy || !c.confirmation) return; const target = c.confirmation; setConfirmBusy(true); setConfirmFailure(undefined); try { await target.confirm(); c.setConfirmation(undefined); } catch (error) { setConfirmFailure({ target, message: failureText(error) }); } finally { setConfirmBusy(false); } }} />
     {c.personId && <PersonCard key={c.personId} c={c} />}
     {c.live && <PaymentSheet c={c} />}
-    {c.live && <NoteSheet c={c} />}
     {c.live && <RoomPersonSheet c={c} />}
     {c.live && <InviteSheet c={c} />}
     <SitePicker c={c} />

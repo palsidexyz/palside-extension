@@ -1,21 +1,20 @@
 'use client';
 import { useLayoutEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
-import type { AssetKey } from '../../../domain/annotations/social';
 
 /**
  * Panel-local social state shared by the chat, the asset discussion and the sheets; never sent anywhere.
- * - `follow`: the teammate this panel follows (跟看); ends on team switch or panel close.
+ * - `follow`: the teammate this panel follows (跟看) in its follow tabs; `paused` once you took one over. Ends on team switch,
+ *   panel close or the last follow tab closing.
  * - `site`: 添加网站, with `select` already chosen. `then` runs once after the sites are added, if the account, team and tab are unchanged.
  * - `grant`: the 网页互动 sheet for the tab's site: what it draws there, its switches, and Chrome's permission for it.
  * - `allSites`: the sheet before Chrome's 所有网站 prompt.
  * - `read`: the 隐私与数据 drawer for one feature.
- * - `settingsTab`: the 互动选项 tab to show (弹幕, 信号 or 便利贴).
+ * - `settingsTab`: the 网页互动 feature card open on its page (弹幕, 信号 or 共享画线); none open when unset.
  * - `people`: the token 在看的人 shows (else the 弹幕 view's token). `roomPerson`: the card of someone met in 弹幕. `invite`: choosing a team to invite that person to.
  */
 type SocialUi = {
-  follow?: { teamId: string; personId: string };
+  follow?: { teamId: string; personId: string; startedAt?: number; paused?: boolean };
   /** Saved marks for one exact page or an asset; focus identifies a saved record. */
-  stickies?: { asset?: AssetKey; url?: string; focus?: string };
   site?: { select?: string[]; accountId?: string; teamId?: string; tabId?: number; then?: () => void };
   grant?: boolean;
   allSites?: boolean;
@@ -24,13 +23,11 @@ type SocialUi = {
   people?: string;
   roomPerson?: string;
   roomPersonMessage?: string;
-  /** The 弹幕 line a quote in chat asked to show; cleared once the room has loaded. */
-  roomLine?: string;
   invite?: string;
 };
 /** A feature as 隐私与数据 lists it under the Chrome permission it runs on; each opens its own drawer. */
-export type ReadKey = 'share' | 'token' | 'quote' | 'signal' | 'sticky' | 'room' | 'shot' | 'presence' | 'notify';
-export type SettingsTab = 'danmaku' | 'signal' | 'sticky';
+export type ReadKey = 'share' | 'token' | 'signal' | 'chart' | 'room' | 'shot' | 'presence' | 'notify' | 'follow';
+export type SettingsTab = 'danmaku' | 'signal' | 'chart';
 let value: SocialUi = {};
 let owner: { accountId: string } | undefined;
 const listeners = new Set<() => void>();

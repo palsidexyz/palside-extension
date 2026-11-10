@@ -1,10 +1,10 @@
 'use client';
 import { Spinner } from '@palside/ui/spinner';
-import { errorMessage, message as uiMessage } from '@palside/i18n';
+import { failureText } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useEffect, useRef, useState } from 'react';
 import { Scissors } from 'lucide-react';
-import { openShortcuts, shortcutKeys } from '../../../runtime/browser/shortcuts';
+import { openShortcuts, shortcutKeys, shortcutText } from '../../../runtime/browser/shortcuts';
 import { capability, unavailableReason } from '../settings/access';
 import { Action } from '../ui/primitives';
 import { Button, IconButton } from '@palside/ui/button';
@@ -29,13 +29,13 @@ export function CaptureTool({ c }: { c: PalsideController }) {
   useEffect(() => () => { version.current++; }, [teamId]);
   const { state } = capability(c, 'capture');
   const reason = unavailableReason(c, 'capture');
-  const label = shortcut ? t('extension.shot.labelKey', { key: shortcut }) : t('extension.copy.captureAnnotate');
+  const label = shortcut ? t('extension.shot.labelKey', { key: shortcutText(shortcut) }) : t('extension.copy.captureAnnotate');
   async function run() {
     if (!c.live) return;
     const current = ++version.current;
     setBusy(true);
     try { await c.live.command('capture', { teamId: c.current, accountId: c.data.self }); }
-    catch (error) { if (current === version.current) c.setNotice(error instanceof Error ? errorMessage(error) : uiMessage('extension.copy.captureFailed')); }
+    catch (error) { if (current === version.current) c.setNotice(failureText(error, 'extension.copy.captureFailed')); }
     finally { setBusy(false); }
   }
   if (state === 'access') return <span><Popover boundarySelector="[data-palside-app]" align="end"><PopoverTrigger asChild><IconButton label={label} size="sm" variant="quiet"><Scissors /></IconButton></PopoverTrigger><PopoverContent aria-label={label} className={styles.guide}><ShotGuide shortcut={shortcut} /></PopoverContent></Popover></span>;

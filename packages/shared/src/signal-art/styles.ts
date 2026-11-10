@@ -29,12 +29,13 @@ export const signalArtCss = `#pings, #emotes { position: fixed; inset: 0; pointe
 }
 .ping .art img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ping .pop { position: absolute; inset: 0; animation: pop .28s cubic-bezier(.2,1.6,.4,1) both, bob 1.6s ease-in-out .3s infinite; }
+/* The name sits right under the art on a solid plate with a coloured edge, so on a busy page it reads as the signal's and not as the site's own text. */
 .ping .tag, .emote .tag {
-  position: absolute; left: 0; top: calc(var(--size) * 0.5); transform: translateX(-50%); white-space: nowrap;
+  position: absolute; left: 0; top: calc(var(--size) * 0.28); transform: translateX(-50%); white-space: nowrap;
   max-width: 220px; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
-  padding: 1px 7px; border-radius: 4px; background: rgba(8, 12, 16, .62); color: var(--tag);
+  padding: 1px 8px; border: 1px solid var(--tag); border-radius: 6px; background: #0b0f14; color: #fff;
   font: 600 13px/18px Geist, ui-sans-serif, system-ui, sans-serif; letter-spacing: .2px;
-  text-shadow: 0 1px 2px #000; animation: tagIn .25s ease-out both, life var(--dur) linear forwards;
+  animation: tagIn .25s ease-out both, life var(--dur) linear forwards;
 }
 /* A kept ping skips the fade at the end of its life: its art stays, still bobbing, until it is removed. */
 .ping.kept .art, .ping.kept .tag { animation-name: none; }

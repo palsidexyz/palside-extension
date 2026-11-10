@@ -1,3 +1,4 @@
+import { fnv1a } from './person-avatars.ts';
 /**
  * Preset team portraits, in their fixed order: a team without an uploaded avatar always gets the same portrait,
  * so the side panel and the website show one identity for it. Files live under /team-avatars/ on both hosts.
@@ -15,7 +16,5 @@ export const teamAvatarPath = (name: DefaultTeamAvatarName) => `/team-avatars/te
 /** FNV-1a over the team ID picks the portrait. */
 export function defaultTeamAvatar(id: string): string | undefined {
   if (!id) return undefined;
-  let hash = 2166136261;
-  for (let index = 0; index < id.length; index++) hash = Math.imul(hash ^ id.charCodeAt(index), 16777619);
-  return teamAvatarPath(defaultTeamAvatarNames[(hash >>> 0) % defaultTeamAvatarNames.length]!);
+  return teamAvatarPath(defaultTeamAvatarNames[fnv1a(id) % defaultTeamAvatarNames.length]!);
 }

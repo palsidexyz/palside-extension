@@ -1,4 +1,4 @@
-/* 弹幕: the full-panel view of one token's public messages, its 看法, 热门, the people in it and team invites. */
+/* 弹幕: the full-panel view of one token's public messages, 热门, the people in it and team invites. */
 .view { position:relative; display:flex; flex-direction:column; flex:1; min-height:0; background:var(--ui-canvas); }
 /* Opened from 聊天: it comes in from the right, the side its tab is on. */
 :global([data-from=chat]) > .view { animation:tabFromRight .32s var(--ui-ease-feedback); }
@@ -14,38 +14,24 @@
 .faces b { margin-left:6px; color:var(--ui-text-primary); font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; }
 .faces:not(:has(span)) b { margin-left:0; }
 
-/* The 弹幕 toolbar: 看法 across the row, then 去网站 when the tab is elsewhere. Its 12px gutters match the switch row and the list below. */
-.toolbar { position:relative; display:flex; align-items:flex-start; gap:6px; flex:none; padding:8px 12px 6px; }
-.toolbar > .stance { flex:1; min-width:0; }
-/* 去网站: the site's logo with a small ↗, and a ⌄ beside it for the other sites. */
-.sites { display:inline-flex; flex:none; align-items:center; margin-left:4px; }
-.siteOpen { position:relative; display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
-.siteArrow { position:absolute; right:3px; bottom:3px; display:grid; place-items:center; width:12px; height:12px; border-radius:50%; background:var(--ui-canvas); box-shadow:0 0 0 1px var(--ui-border-soft); color:var(--ui-text-primary); }
-.siteArrow svg { width:9px; height:9px; stroke-width:3; }
-.siteMore { display:grid; place-items:center; width:18px; height:32px; margin-left:-2px; padding:0; border:0; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
+/* The 弹幕 toolbar, only when the tab is elsewhere: this token on the left, 去网站 at the end. Same 40px rhythm and 12px gutters as the switch row. */
+.toolbar { display:flex; align-items:center; gap:8px; flex:none; height:40px; padding:0 8px 0 12px; font-size:var(--ui-type-callout); }
+.toolbar > :first-child { --token-size:20px; }
+.toolbar > strong { flex:1; min-width:0; overflow:hidden; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+/* 去网站: one 28px pill — logo, site name, ↗ — split from ⌄ by a hairline. Flat surface, hover steps each half on its own. */
+.sites { display:inline-flex; flex:none; align-items:center; height:28px; max-width:60%; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); }
+.siteOpen { display:inline-flex; align-items:center; gap:6px; min-width:0; height:28px; padding:0 8px 0 6px; border:0; border-radius:var(--ui-radius-pill) 0 0 var(--ui-radius-pill); background:transparent; color:var(--ui-text-primary); font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
+.siteOpen > :first-child { flex:none; }
+.siteName { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.siteArrow { flex:none; color:var(--ui-text-secondary); transition:color .16s var(--ui-ease-feedback); }
+.siteOpen:hover .siteArrow { color:var(--ui-text-primary); }
+.siteMore { position:relative; display:grid; place-items:center; width:26px; height:28px; padding:0 2px 0 0; border:0; border-radius:0 var(--ui-radius-pill) var(--ui-radius-pill) 0; background:transparent; color:var(--ui-text-secondary); cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
+.siteMore::before { content:""; position:absolute; left:0; top:7px; bottom:7px; width:1px; background:var(--ui-border-soft); }
 .siteOpen:hover, .siteMore:hover, .siteMore[aria-expanded=true] { background:var(--ui-control-hover); color:var(--ui-text-primary); }
 .siteMenu { --popover-width:200px; padding:6px; }
 .siteMenuHead { padding:6px 10px 4px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; }
 
-/* 看法: a 36px track of three equal 32px choices, and under it the shares as one 4px bar across the full width. */
-.stance { display:flex; flex-direction:column; gap:6px; }
-.poll { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:2px; padding:2px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
-.poll button { --tone:var(--ui-text-primary); display:flex; align-items:center; justify-content:center; gap:5px; min-width:0; height:32px; padding:0 6px; border:0; border-radius:calc(var(--ui-radius-m) - 2px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; white-space:nowrap; cursor:pointer; transition:background-color .16s ease, color .16s ease, box-shadow .16s ease; }
-.poll button:hover:not(:disabled) { background:var(--ui-control-hover); color:var(--ui-text-primary); }
-.poll button:disabled { cursor:default; }
-.poll button > svg { flex:none; color:var(--tone); }
-.poll button > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.poll button > b { color:var(--ui-text-primary); font-weight:600; font-variant-numeric:tabular-nums; }
-.poll [data-stance=bull], .pollBar [data-stance=bull] { --tone:var(--ui-ink-success); }
-.poll [data-stance=hold], .pollBar [data-stance=hold] { --tone:var(--ui-ink-warning); }
-.poll [data-stance=bear], .pollBar [data-stance=bear] { --tone:var(--ui-ink-error); }
-.poll button[aria-checked=true] { background:var(--ui-canvas); color:var(--tone); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent); }
-.poll button[aria-checked=true] > b { color:var(--tone); }
-.pollBar { display:flex; gap:2px; height:4px; margin:0 2px; border-radius:2px; overflow:hidden; }
-.pollBar span { background:var(--tone); transition:flex-grow .3s var(--ui-ease-feedback), background-color .3s ease; }
-.stance:not([data-shares]) .pollBar span { background:var(--ui-control-surface); }
-
-/* The tab moved to another token: one row under 看法 offering the switch. */
+/* The tab moved to another token: one row under the header offering the switch. */
 .switchRow { display:flex; align-items:center; gap:8px; flex:none; height:40px; padding:0 12px; background:var(--ui-control-surface); font-size:var(--ui-type-callout); }
 .switchRow > :first-child { --token-size:20px; }
 .switchRow strong { flex:1; min-width:0; overflow:hidden; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
@@ -53,7 +39,7 @@
 .switchRow[data-notice] strong { font-weight:500; }
 .noticeLogo { flex:none; display:block; --logo-size:20px; }
 .noticeLogo > span { --logo-size:20px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-caption); }
-/* No token: the whole room (看法, list, box) frosts over and says why, the header staying sharp. Under it only grey shapes.
+/* No token: the whole room (list, box) frosts over and says why, the header staying sharp. Under it only grey shapes.
    A sanctioned veil, not a slab: an ellipse of canvas behind the words (94%, then 70% at its rim) fading to 12% at the edges over a 1.5px blur,
    so the skeleton shows round it. Flat, no border or shadow. It fades in and thaws out with the feedback timing. */
 .skeleton { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; padding:6px 10px; overflow:hidden; }
@@ -73,12 +59,12 @@
 .gateLogo { display:block; margin-bottom:4px; }
 .gateLogo > span { --logo-size:44px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-callout); }
 .gateLogo svg { width:65%; height:65%; opacity:.8; }
-.switchButton.switchButton { min-height:28px; height:28px; padding:0 12px; border-radius:var(--ui-radius-pill); font-size:var(--ui-type-footnote); font-weight:600; background:var(--ui-solid); color:var(--ui-on-solid); }
+.switchButton.switchButton { min-height:28px; height:28px; padding:0 12px; border-radius:var(--ui-radius-pill); font-size:var(--ui-type-footnote); font-weight:600; }
 
 /* Messages: dense rows, not chat bubbles. */
 .list { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; padding:6px 10px 6px; scrollbar-width:thin; }
 .list > :first-child { margin-top:auto; }
-.row { position:relative; display:grid; grid-template-columns:28px minmax(0, 1fr); align-items:start; column-gap:10px; padding:7px 8px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); transition:background-color .16s ease; }
+.row { position:relative; display:grid; grid-template-columns:28px minmax(0, 1fr) auto; align-items:start; column-gap:10px; padding:7px 8px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); transition:background-color .16s ease; }
 .row + .row { margin-top:2px; }
 .messageBody { min-width:0; }
 /* Name, 打赏 and time on one quiet line; the text under it carries the weight. */
@@ -99,10 +85,19 @@
 .row p { margin:0; color:var(--ui-text-primary); font-size:var(--ui-type-callout); line-height:20px; overflow-wrap:anywhere; }
 .row[data-self] { background:var(--ui-accent-soft); }
 /* The line a chat quote opened settles back after its highlight. */
-.row[data-focus] { background:var(--ui-control-hover); }
 .row time { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height:18px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .menu { position:absolute; top:0; right:2px; opacity:0; transition:opacity .12s ease; }
 .row:hover .menu, .row:focus-within .menu, .menu:has([aria-expanded=true]) { opacity:1; }
+/* 点赞: the line's last column, at the foot of the text. Unliked lines show it only on hover; once liked the count stays. */
+.like { display:inline-flex; align-self:end; align-items:center; gap:3px; height:22px; min-width:22px; margin:0 -2px -1px 0; padding:0 4px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-caption); font-weight:600; line-height:1; font-variant-numeric:tabular-nums; cursor:pointer; transition:opacity .12s ease, color .16s ease, background-color .16s ease; }
+.like svg { width:14px; height:14px; stroke-width:2; }
+.like > span { display:inline-flex; }
+.like:not([data-count]) { opacity:0; }
+.row:hover .like, .row:focus-within .like, .like:focus-visible { opacity:1; }
+button.like:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.like[aria-pressed=true], button.like[aria-pressed=true]:hover { color:var(--ui-ink-accent); }
+.like[aria-pressed=true] svg { fill:currentColor; fill-opacity:.18; }
+span.like { cursor:default; }
 .folded { display:inline-flex; align-items:center; gap:8px; color:var(--ui-text-secondary); }
 .more { align-self:center; height:24px; margin:4px 0; padding:0 10px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); }
 .empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; flex:1; color:var(--ui-text-secondary); font-size:var(--ui-type-callout); }
@@ -115,8 +110,7 @@
 .input::placeholder { color:var(--ui-text-secondary); }
 .counter { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-variant-numeric:tabular-nums; }
 .counter[data-over] { color:var(--ui-ink-error); }
-.send { border-radius:50%; background:var(--ui-text-primary); color:var(--ui-canvas); font-size:var(--ui-type-callout); font-weight:600; font-variant-numeric:tabular-nums; }
-.send:disabled { background:var(--ui-control-recess); color:var(--ui-text-secondary); cursor:default; }
+.send { border-radius:50%; font-size:var(--ui-type-callout); font-weight:600; font-variant-numeric:tabular-nums; }
 
 /* 热门 */
 /* The chain menu sits at the end of the header; its label and logo keep the same weight as a quiet control. */
@@ -149,11 +143,6 @@
 .hotName strong { display:flex; align-items:center; gap:6px; min-width:0; font-size:var(--ui-type-body); line-height:20px; font-weight:600; }
 .hotToken { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hotName small { display:flex; align-items:center; gap:6px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; white-space:nowrap; font-variant-numeric:tabular-nums; }
-.mini { display:inline-flex; gap:1px; width:44px; height:4px; border-radius:2px; overflow:hidden; background:var(--ui-control-surface); }
-.mini span { background:var(--tone); }
-.mini [data-stance=bull] { --tone:var(--ui-ink-success); }
-.mini [data-stance=hold] { --tone:var(--ui-ink-warning); }
-.mini [data-stance=bear] { --tone:var(--ui-ink-error); }
 .here { flex:none; height:18px; padding:0 6px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); line-height:18px; font-weight:600; }
 .hotNum { display:flex; flex-direction:column; align-items:flex-end; font-variant-numeric:tabular-nums; }
 .hotNum b { font-size:var(--ui-type-headline); line-height:19px; font-weight:600; }
@@ -190,7 +179,6 @@
 .choice[aria-checked=true] .radio { box-shadow:inset 0 0 0 5px var(--ui-ink-accent); }
 .state { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); font-weight:500; }
 .inviteCancel, .inviteSend { border-radius:var(--ui-radius-pill); font-weight:600; }
-.inviteSend { background:var(--ui-solid); color:var(--ui-on-solid); }
 .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .invites { display:flex; flex-direction:column; gap:8px; }
 .invite { background:var(--ui-control-surface); display:grid; grid-template-columns:auto minmax(0, 1fr) auto auto; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
@@ -206,10 +194,10 @@
 .preview svg { position:absolute; inset:12px 0 0; width:100%; height:calc(100% - 12px); opacity:.6; }
 .preview > span { position:absolute; color:var(--dm-ink); opacity:var(--dm-alpha); font:bold var(--dm-size)/1.25 SimHei, "Microsoft JhengHei", Arial, Helvetica, sans-serif; white-space:nowrap; text-shadow:1px 0 1px var(--dm-outline), 0 1px 1px var(--dm-outline), 0 -1px 1px var(--dm-outline), -1px 0 1px var(--dm-outline); }
 
-.poll button:focus-visible, .siteOpen:focus-visible, .siteMore:focus-visible, .row > button:first-child:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
-@media (prefers-reduced-motion:reduce) { .pollBar span, .row, .menu { transition:none; } }
+.siteOpen:focus-visible, .siteMore:focus-visible, .row > button:first-child:focus-visible, .like:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+@media (prefers-reduced-motion:reduce) { .row, .menu, .like { transition:none; } }
 
-/* 互动选项's tabs: 弹幕, 信号, 便利贴 — each with its icon. */
+/* 互动选项's tabs: 弹幕, 信号 — each with its icon. */
 .settingsTabs [role="tablist"] { display:flex; gap:4px; padding:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .settingsTabs [role="tab"] { display:inline-flex; flex:1; align-items:center; justify-content:center; gap:6px; min-width:0; min-height:34px; border:0; border-radius:calc(var(--ui-radius-l) - 4px); corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); white-space:nowrap; cursor:pointer; transition:background-color .18s, color .18s; }
 .settingsTabs [role="tab"] svg { flex:none; width:15px; height:15px; }

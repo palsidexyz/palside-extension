@@ -1,6 +1,6 @@
 import type { CaptureLabels,PageUp } from '../browser/page-protocol';
 import { ImageDocument,readImageDocument,fitImageViewport,imagePoint,imageCrop,imageCropHandle,resizeImageViewport,zoomImageViewport,type ImageDocumentSnapshot,type ImagePoint,type ImageViewport } from '../../domain/images/image-document.ts';
-import { captureDimensions,drawOps,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection,type CaptureTool, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX } from '../../domain/images/drawing.ts';
+import { captureDimensions,drawOps,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection,type CaptureTool, clipImageText, IMAGE_PEN_POINTS_MAX } from '../../domain/images/drawing.ts';
 import { encodeCapture } from './encode-capture.ts';
 
 export type ImageWorkspaceTool = 'pan' | 'crop' | CaptureTool;
@@ -105,10 +105,10 @@ export function createImageWorkspace(stage: HTMLElement, send: (message: PageUp)
     const at = point(event), start = originalPoint(at);
     if (tool !== 'pan' && (at.x < view.x || at.y < view.y || at.x > view.x + image.naturalWidth * view.scale || at.y > view.y + image.naturalHeight * view.scale)) return;
     if (tool === 'text') {
-      text = document.createElement('textarea'); text.className = 'image-workspace-text'; text.rows = 1; text.maxLength = IMAGE_TEXT_MAX; text.setAttribute('aria-label', labels.text);
+      text = document.createElement('textarea'); text.className = 'image-workspace-text'; text.rows = 1; text.setAttribute('aria-label', labels.text);
       text.dataset.x = String(start.x); text.dataset.y = String(start.y);
       Object.assign(text.style, { position: 'absolute', width: 'min(240px, 80%)', minHeight: '32px', resize: 'none', background: 'var(--ui-canvas,#fff)', border: '1px solid currentColor', padding: '4px', zIndex: '1', fontFamily: 'inherit' });
-      text.addEventListener('input', event => { if (event.isTrusted === false) return; notifyText(); });
+      text.addEventListener('input', event => { if (event.isTrusted === false || !text) return; const clipped = clipImageText(text.value); if (!(event as InputEvent).isComposing && clipped !== text.value) text.value = clipped; notifyText(); });
       text.addEventListener('keydown', event => { if (event.isTrusted === false) return; event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); text?.remove(); text = undefined; notifyText(); root.focus(); } else if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); commitText(); root.focus(); } });
       root.append(text); positionText(); text.focus(); return;
     }

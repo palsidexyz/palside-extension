@@ -1,7 +1,7 @@
 'use client';
 import { Spinner } from '@palside/ui/spinner';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
-import { errorMessage, message as uiMessage, MessageError } from '@palside/i18n';
+import { errorMessage,message as uiMessage,MessageError,failureText } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type RefObject } from 'react';
 import { ArrowUp, Check, Gift, ImageIcon, Plus, Pencil, X } from 'lucide-react';
@@ -10,8 +10,9 @@ import { prepareImage } from '@palside/ui/lib/image';
 import { ImageEditor } from '../media/image-editor';
 import { DraftConflict } from '../feedback/draft-conflict';
 import { AssetCard } from '../assets/asset-card';
-import { ComposerRows, EditLine, ReplyLine, composerStyles as refStyles } from './composer-social';
+import { EditLine, ReplyLine, composerStyles as refStyles } from './composer-social';
 import { assetView } from '../../../domain/assets/model';
+import { viewAsset } from '../../../domain/annotations/interaction';
 import { canSend, characterLength, quotedFragment } from '../../../domain/chat/model';
 import { quotedText } from './quotes';
 import { type Person } from '../../../domain/account/model';
@@ -27,6 +28,8 @@ import type { PalsideController } from '../app/use-palside';
 import { whenWalletOpen } from '../wallet/closed';
 import s from '../app/palside.module.css';
 import { liveView } from '../assets/token-data';
+import { ChainPicker } from '../assets/chain-picker';
+import { addressFamily } from '@palside/shared/tokens';
 
 const TEXT_MAX = 4000;
 
@@ -46,6 +49,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
   useEffect(() => { latest.current = c; }, [c]);
   const imageInput = useRef<HTMLInputElement>(null);
   const card = useLinkCard(c);
+  const addressCard = useAddressCard(c);
   const [holding, setHolding] = useState(false);
   const sendLatest = useRef(onSend);
   useEffect(() => { sendLatest.current = onSend; }, [onSend]);
@@ -75,7 +79,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
       const src = await readImage(image.blob, uiMessage('extension.copy.imageReadFailed'));
       c.attach({ kind: 'image', src, name: image.name });
     } catch (error) {
-      if (c.ownsScreen()) c.setNotice(error instanceof Error ? errorMessage(error) : uiMessage('extension.copy.imageProcessFailed'));
+      if (c.ownsScreen()) c.setNotice(failureText(error, 'extension.copy.imageProcessFailed'));
     } finally {
       setPreparing(false);
     }
@@ -88,6 +92,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
   function paste(event: ClipboardEvent<HTMLTextAreaElement>) {
     if (edited) return;
     if (LINK.test(event.clipboardData.getData('text/plain'))) card.pasted();
+    else addressCard.pasted(event.clipboardData.getData('text/plain'));
     const files = [...event.clipboardData.items].filter(item => item.kind === 'file').map(item => item.getAsFile()).filter((file): file is File => Boolean(file));
     if (!files.length) return;
     event.preventDefault();
@@ -170,14 +175,14 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
           <EditLine original={edited} />
           <IconButton size="sm" variant="quiet" className={refStyles.remove} label={t('extension.copy.cancelEdit')} onClick={() => c.setEditing(undefined)}><StateGlyph state={t('extension.copy.cancelEdit')}><X size={14} /></StateGlyph></IconButton>
         </div> : <>
-        <ComposerRows c={c} />
         <DraftConflict c={c} />
         {c.draft.replyTo && <div className={refStyles.refDraft}>
           <ReplyLine c={c} original={replyOriginal} text={replyText} fragment={quotedFragment(replyOriginal, c.draft.replyRange)} />
           <IconButton size="sm" variant="quiet" className={refStyles.remove} label={t('extension.copy.cancelReply')} onClick={() => c.updateDraft({ replyTo: undefined, replyRange: undefined })}><StateGlyph state={t('extension.copy.cancelReply')}><X size={14} /></StateGlyph></IconButton>
         </div>}
         {c.draft.attachment?.kind === 'asset' && (draftAsset
-          ? <AssetCard view={draftAsset} onOpen={() => c.selectAsset(draftAsset.id)} onRemove={() => c.updateDraft({ attachment: undefined })} />
+          ? <AssetCard view={draftAsset} onOpen={() => c.selectAsset(draftAsset.id)} onRemove={() => c.updateDraft({ attachment: undefined })}
+            chain={addressCard.candidates.length > 1 ? <ChainPicker c={c} assets={addressCard.candidates} current={viewAsset(draftAsset) ?? ''} onPick={addressCard.pick} /> : undefined} />
           : <div className={s.replyDraft}><span>{t('extension.copy.tokenUnavailableAddAgain')}</span><Action label={t('extension.copy.removeCard')} onClick={() => c.updateDraft({ attachment: undefined })}><X /></Action></div>)}
         {c.draft.attachment?.kind === 'image' && <div className={s.imageDraft}>
           <img src={c.draft.attachment.src} alt={c.draft.attachment.name} />
@@ -260,14 +265,14 @@ function useLinkCard(c: PalsideController) {
     if (auto) {
       const owned = attachment?.kind === 'asset' && attachment.assetId === auto.assetId;
       if (!owned) { latest.current.updateDraft({ automaticCard: undefined, dismissedUrls: [...new Set([...(dismissed ?? []), auto.url])] }); return; }
-      if (auto.url !== url) { latest.current.updateDraft({ attachment: undefined, automaticCard: undefined }); return; }
+      if (LINK.test(auto.url) ? auto.url !== url : !c.draft.text.includes(auto.url)) { latest.current.updateDraft({ attachment: undefined, automaticCard: undefined }); return; }
     }
     if (!url || !command || attachment || dismissed?.includes(url)) return;
     const delay = quick.current ? 0 : 350;
     quick.current = false;
     const timer = setTimeout(() => { void request.current(url, teamId, accountId); }, delay);
     return () => clearTimeout(timer);
-  }, [url, attachment, auto, dismissed, command, teamId, accountId]);
+  }, [url, attachment, auto, dismissed, command, teamId, accountId, c.draft.text]);
   return {
     pasted() { quick.current = true; },
     /** The field's first address has no card yet but would get one. */
@@ -281,6 +286,35 @@ function useLinkCard(c: PalsideController) {
       await Promise.race([done, new Promise<void>(resolve => { timer = setTimeout(resolve, 600); })]);
       clearTimeout(timer);
     },
+  };
+}
+
+/**
+ * 代币卡片 from a pasted contract address, the 链接卡片 rule for addresses: a paste that is exactly one address is looked up at once and,
+ * if it is a token, becomes the draft's card while the address stays in the text. Removing the card keeps it away for that address;
+ * deleting the address takes its card with it. Not a token, signed out or unreachable: nothing happens.
+ * When the address is a token on several chains, the card's chain tag picks another; the pick is remembered for the address.
+ */
+function useAddressCard(c: PalsideController) {
+  const latest = useRef(c);
+  useEffect(() => { latest.current = c; });
+  const [found, setFound] = useState<{ address: string; candidates: string[] }>();
+  const run = useRef(async (address: string, asset?: string) => {
+    const before = latest.current, team = before.current, account = before.data.self, command = before.live?.command;
+    if (!command) return;
+    const result = await command('token-card', { address, asset }).catch(() => undefined);
+    const now = latest.current, auto = now.draft.automaticCard, attached = now.draft.attachment;
+    if (!result?.attachment || now.current !== team || now.data.self !== account || !now.draft.text.includes(address) || now.draft.dismissedUrls?.includes(address)) return;
+    // A card already there stays, unless it is this address's own card changing chain.
+    if (attached && !(auto?.url === address && attached.kind === 'asset' && attached.assetId === auto.assetId)) return;
+    now.updateDraft({ attachment: result.attachment, automaticCard: { url: address, assetId: result.attachment.assetId } });
+    setFound({ address, candidates: result.candidates });
+  });
+  const auto = c.draft.automaticCard;
+  return {
+    pasted(text: string) { const address = text.trim(); if (addressFamily(address) && !latest.current.draft.attachment) void run.current(address); },
+    candidates: found && auto?.url === found.address ? found.candidates : [],
+    pick(asset: string) { const address = latest.current.draft.automaticCard?.url; if (address) void run.current(address, asset); },
   };
 }
 

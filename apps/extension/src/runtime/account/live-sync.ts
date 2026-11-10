@@ -1,5 +1,7 @@
 import type { RuntimeDevice } from './device';
 import type { SessionRuntime } from './session-lifecycle';
+import { refreshLobbyApplications } from '../teams/command-handlers';
+import { clientVersion } from '../transport/api';
 export type RefreshDomain = 'account' | 'blocks' | 'invites';
 export const refreshDomains: RefreshDomain[] = ['account', 'blocks', 'invites'];
 
@@ -12,16 +14,27 @@ export async function refresh(this: SessionRuntime, domains: readonly RefreshDom
       let failure: unknown;
       do {
         const queued = this.refreshQueued; this.refreshQueued = new Set();
+        if (queued.has('account')) this.changedAt = 0;
         await Promise.all([
           ...(queued.has('account') ? [this.fetchSnapshot().catch(error => { failure = error; })] : []),
           ...(queued.has('blocks') ? [this.runtime.rooms.blocks().catch(() => {})] : []),
           ...(queued.has('invites') ? [this.runtime.rooms.invites(true).catch(() => {})] : []),
         ]);
         scope.check();
+        // A change pushed while that read was in flight, and not proven to be in it, needs one more read.
+        if (this.changedAt > this.snapshotReadAt) { this.refreshQueued.add('account'); this.refreshQueued.add('blocks'); }
+        this.changedAt = 0;
       } while (this.refreshQueued.size);
       if (failure) throw failure;
     })().finally(() => { if (this.refreshing === promise) this.refreshing = undefined; });
     this.refreshing = promise; return promise;
+  }
+
+/** The service pushed a change to this account at service time `at`: read again unless a snapshot already holds it. */
+export function accountChanged(this: SessionRuntime, at: number) {
+    if (at <= this.snapshotReadAt) return;
+    if (this.refreshing) { this.changedAt = Math.max(this.changedAt, at); return; }
+    this.requestRefresh(['account', 'blocks']);
   }
 
 export function requestRefresh(this: SessionRuntime, domains: readonly RefreshDomain[] = ['account']) {
@@ -49,23 +62,33 @@ export async function reportDeviceState(this: SessionRuntime, force = false) {
       this.reportedDeviceState = state;
       if (this.deviceState !== state) this.scheduleDeviceStateReport();
     } catch { scope.check();
-      // The next state change or SSE reconnect retries the presence report.
+      // The next state change or live reconnect retries the presence report.
     }
   }
 
 export type LiveStartup = { initialIssued: boolean; roomsStarted: boolean; roomCatchUp: boolean };
 export function startLiveSync(auth: SessionRuntime, session: RuntimeDevice, current: () => boolean, status: LiveStartup) {
   const runtime = auth.runtime;
-  return auth.connectLiveEvents({
+  // Every request of this device rides the socket from now on; a later session's link is never cleared by this one ending.
+  const link = runtime.api.live.attach();
+  let opened = false;
+  const stop = auth.connectLiveEvents({
       baseUrl: runtime.api.baseUrl,
+      onChannel: channel => link.ready(channel && current() ? channel : undefined),
       token: () => current() ? session.token : undefined,
       onUnauthorized: () => { if (current()) void auth.expireRuntimeDevice().catch(() => {}); },
-      onRefresh: refreshScope => { if (current() && status.initialIssued && refreshScope === 'me') auth.requestRefresh(['account', 'blocks']); },
+      version: clientVersion, onOutdated: () => { if (current()) runtime.api.onOutdated?.(); },
+      onRefresh: refresh => { if (current() && status.initialIssued && refresh.scope === 'me') { auth.accountChanged(refresh.at); void refreshLobbyApplications(runtime.dispatch).catch(() => {}); } },
       onState: open => {
         if (!current()) return;
-        auth.presenceVersion++; auth.sseOpen = open;
+        auth.presenceVersion++; auth.liveOpen = open;
         if (open) {
-          if (status.initialIssued) { auth.requestRefresh(refreshDomains); void runtime.wallet.refresh().catch(() => {}); }
+          // Reads wait for the socket, so the first one of a session already sees every change after it; a reconnect may have missed
+          // pushes and reads everything again.
+          const reconnected = opened; opened = true;
+          if (status.initialIssued && reconnected) auth.requestRefresh(refreshDomains);
+          if (status.initialIssued) void runtime.wallet.refresh().catch(() => {});
+          runtime.directory.resume();
           if (status.roomsStarted) { auth.scheduleDeviceStateReport(true); runtime.rooms.reconnected(); }
           else status.roomCatchUp = true;
         } else {
@@ -89,4 +112,5 @@ export function startLiveSync(auth: SessionRuntime, session: RuntimeDevice, curr
         runtime.emit();
       },
     });
+  return () => { stop(); link.detach(); };
 }

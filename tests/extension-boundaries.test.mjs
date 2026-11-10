@@ -161,7 +161,7 @@ test("sidepanel module graph excludes HTTP endpoint tables, error machinery and 
 });
 
 test("artifact requires URL metadata permission and rejects website access or automatic injection", () => {
-  const manifest = { externally_connectable: { matches: ["https://palside.xyz/*"] }, manifest_version: 3, side_panel: { default_path: "sidepanel.html" }, background: { service_worker: "background.js" }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) } };
+  const manifest = { externally_connectable: { matches: ["https://palside.xyz/*"] }, manifest_version: 3, side_panel: { default_path: "sidepanel.html" }, background: { service_worker: "background.js" }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon', 'tabGroups'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) } };
   assert.deepEqual(validateExtensionManifest(manifest, undefined, true), []);
   assert.ok(validateExtensionManifest({ ...manifest, commands: undefined }, undefined, true).length, "the 截图 shortcut is declared");
   assert.ok(validateExtensionManifest({ ...manifest, commands: { ...extensionCommands, _execute_action: { suggested_key: { default: 'Alt+Shift+P' } } } }, undefined, true).length, "no other shortcut");
@@ -191,7 +191,7 @@ test("activeTab is a required permission and tabs is only optional, asked for �
   const config = await readFile(new URL("../apps/extension/wxt.config.ts", import.meta.url), "utf8");
   assert.match(config, /permissions:\s*\[[^\]]*"activeTab"/);
   assert.doesNotMatch(config, /\bpermissions:\s*\[[^\]]*"tabs"/);
-  assert.match(config, /optional_permissions:\s*\["notifications", "tabs", "favicon"\]/);
+  assert.match(config, /optional_permissions:\s*\["notifications", "tabs", "favicon", "tabGroups"\]/);
   const manifest = { externally_connectable: { matches: ["https://palside.xyz/*"] }, manifest_version: 3, side_panel: { default_path: "sidepanel.html" }, background: { service_worker: "background.js" }, action: {}, permissions: extensionPermissions.filter(name => name !== "activeTab"), optional_permissions: ["notifications", "tabs", "favicon"], optional_host_permissions: ["<all_urls>"] };
   assert.ok(validateExtensionManifest(manifest, undefined, true).includes("Unexpected permissions"), "dropping activeTab is rejected");
 });
@@ -202,7 +202,7 @@ test("pinned extension ID is derived from the manifest key", () => {
 });
 
 test('release manifest restricts external messaging to the exact website with no extension ids', () => {
-  const manifest = { manifest_version: 3, side_panel: { default_path: 'sidepanel.html' }, background: { service_worker: 'background.js' }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) }, externally_connectable: { matches: ['https://palside.xyz/*'] } };
+  const manifest = { manifest_version: 3, side_panel: { default_path: 'sidepanel.html' }, background: { service_worker: 'background.js' }, action: {}, permissions: extensionPermissions, optional_permissions: ['notifications', 'tabs', 'favicon', 'tabGroups'], optional_host_permissions: ['<all_urls>'], commands: extensionCommands, content_security_policy: { extension_pages: extensionPagePolicy(RELEASE_API_ORIGIN) }, externally_connectable: { matches: ['https://palside.xyz/*'] } };
   assert.deepEqual(validateExtensionManifest(manifest, undefined, true), []);
   for (const external of [undefined, {}, { matches: ['https://*/*'] }, { matches: ['https://other.example/*'] }, { matches: ['http://localhost:3000/*'] }, { matches: ['https://palside.xyz/*', 'https://other.example/*'] }, { matches: ['https://palside.xyz/*'], ids: [] }, { matches: ['https://palside.xyz/*'], ids: ['*'] }, { matches: ['https://palside.xyz/*'], accepts_tls_channel_id: true }]) {
     assert.ok(validateExtensionManifest({ ...manifest, externally_connectable: external }, undefined, true).length, JSON.stringify(external));

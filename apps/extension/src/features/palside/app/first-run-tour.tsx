@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Gift, ImageIcon, Scissors, SmilePlus } from 'lucide-react';
@@ -10,7 +10,6 @@ import { defaultSignalSettings } from '../../../runtime/annotations/signals';
 import { shortcutKeys } from '../../../runtime/browser/shortcuts';
 import { KeyCaps } from '../settings/signal-settings';
 import { useCaptureShortcut } from '../settings/use-shortcut';
-import { TourDemo } from './tour-demo';
 import s from './first-run-tour.module.css';
 
 /** Controls the tour points at carry `data-tour`; a step whose control is not on screen is left out. */
@@ -47,6 +46,10 @@ function useBox(app: Element | null, anchor: Anchor | undefined) {
  * account on this device: the first bubble saves `toured`, because the panel can leave the chat from outside (a press on the page's
  * 弹幕) or close without 跳过 ever being pressed. `onRun` holds the run open past that save and lets it go after the last fade. 关于 › 重看引导 clears it.
  */
+/** The demo's chart and danmaku stay out of the first panel bundle; the tour fetches them when it starts, two steps before they show. */
+const loadDemo = () => import('./tour-demo');
+const TourDemo = lazy(() => loadDemo().then(module => ({ default: module.TourDemo })));
+
 export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team: string | undefined) => void }) {
   const t = useTranslations();
   const reduced = useReducedMotion();
@@ -54,6 +57,7 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
   const next = useRef<HTMLButtonElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
   const [app, setApp] = useState<Element | null>(null);
+  useEffect(() => { void loadDemo().catch(() => {}); }, []);
   const [anchors, setAnchors] = useState<Anchor[]>();
   const [index, setIndex] = useState(0);
   const [closed, setClosed] = useState(false);
@@ -65,12 +69,12 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
       <dt>{t('extension.room.name')}</dt><dd>{t('extension.tour.room')}</dd>
     </dl> },
     share: { title: t('extension.web.share'), body: <p>{t('extension.tour.share')}</p> },
-    site: { title: t('extension.settings.interaction'), body: <><p>{t('extension.tour.site')}</p><TourDemo settings={c.live?.page?.signalSettings ?? defaultSignalSettings} /></> },
+    site: { title: t('extension.settings.interaction'), body: <><p>{t('extension.tour.site')}</p><Suspense fallback={null}><TourDemo settings={c.live?.page?.signalSettings ?? defaultSignalSettings} /></Suspense></> },
     tools: { title: t('extension.tour.toolsTitle'), body: <ul className={s.tools}>
-      <li><SmilePlus aria-hidden="true" /><b>{t('extension.copy.reactionPicker')}</b><span>{t('extension.tour.reactions')}</span></li>
-      <li><ImageIcon aria-hidden="true" /><b>{t('extension.copy.image')}</b><span>{t('extension.tour.image')}</span></li>
-      <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><span>{t('extension.tour.shot')}</span>{shotKeys.length > 0 && <KeyCaps keys={shotKeys} />}</li>
-      <li><Gift aria-hidden="true" /><b>{t('extension.wallet.packet')}</b><span>{t('extension.tour.packet')}</span></li>
+      <li><SmilePlus aria-hidden="true" /><b>{t('extension.copy.reactionPicker')}</b><p><span>{t('extension.tour.reactions')}</span></p></li>
+      <li><ImageIcon aria-hidden="true" /><b>{t('extension.copy.image')}</b><p><span>{t('extension.tour.image')}</span></p></li>
+      <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><p><span>{t('extension.tour.shot')}</span>{shotKeys.length > 0 && <KeyCaps keys={shotKeys} />}</p></li>
+      <li><Gift aria-hidden="true" /><b>{t('extension.wallet.packet')}</b><p><span>{t('extension.tour.packet')}</span></p></li>
     </ul> },
     invite: { title: t('extension.tour.inviteTitle'), body: <p>{t('extension.tour.invite')}</p> },
   };

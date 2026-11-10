@@ -5,19 +5,19 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTranslations } from 'use-intl';
 import { Flame, Layers } from 'lucide-react';
 import { Count } from '../ui/motion-details';
-import { EmptyState } from '../chat/history-scope';
+import { EmptyState } from '../ui/empty-state';
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HotRoom } from '../../../runtime/rooms/contract-types';
 import { HOT_CHAIN_ORDER } from '../../../runtime/rooms/token-sites';
 import { Token } from '../ui/primitives';
 import { ChainLogo } from '../assets/chain-identity';
 import { Faces } from './danmaku-view';
-import { StanceMini, stanceShares } from './stance-poll';
 import { openRoom, roomView, tabRoomKey, useRoomRead } from './rooms';
 import type { PalsideController } from '../app/use-palside';
 import d from './danmaku.module.css';
 import { TokenName } from '../assets/token-name';
 import { tokenStats } from '../assets/token-data';
+import { HotSearchField, HotSearchResults } from './hot-search';
 
 /** The board left for a room, so 返回热门 lands on the same chain filter and scroll position. */
 let leftBoard: { chain: string | null; scrollTop: number } | undefined;
@@ -54,7 +54,10 @@ export function Hot({ c, chain, onChain }: { c: PalsideController; chain: string
     leftBoard = undefined;
   }, [loaded]);
   const open = (key: string) => { leftBoard = { chain, scrollTop: scroller(board.current)?.scrollTop ?? 0 }; openRoom(c, key); };
+  const [query, setQuery] = useState('');
   return <>
+    <HotSearchField query={query} onQuery={setQuery} />
+    {query.trim() ? <HotSearchResults c={c} query={query} /> : <>
     <HotChains chain={chain} onChange={onChain} />
     {read.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback>}
     <div ref={board} className={d.board} aria-live="off">
@@ -64,6 +67,7 @@ export function Hot({ c, chain, onChain }: { c: PalsideController; chain: string
       {rows?.length === 0 && <EmptyState icon={<Flame />} title={t('extension.hot.none')} />}
       {!rows && read.status !== 'error' && <EmptyState title={t('extension.copy.loading')} />}
     </div>
+    </>}
   </>;
 }
 
@@ -83,7 +87,6 @@ function HotRow({ c, row, rank, climbed, onOpen }: { c: PalsideController; row: 
   const view = roomView(c, row.key);
   // The ranking supplies order; the numbers are the token's one record, which the open room keeps live.
   const stats = tokenStats(c, row.key) ?? row;
-  const shares = stanceShares(stats.stance);
   const here = tabRoomKey(c) === row.key;
   const name = useId();
   return <motion.div className={d.hot} data-top={rank <= 3 || undefined}
@@ -95,7 +98,6 @@ function HotRow({ c, row, rank, climbed, onOpen }: { c: PalsideController; row: 
     <Token view={view} size="sm" />
     <span className={d.hotName}>
       <strong><span id={name} className={d.hotToken}><TokenName c={c} view={view} /></span>{here && <span className={d.here}>{t('extension.hot.here')}</span>}</strong>
-      <small><StanceMini stance={stats.stance} /><span>{shares ? t('extension.hot.bull', { percent: shares.bull }) : '—'}</span></small>
     </span>
     <Faces c={c} people={stats.faces} />
     <span className={d.hotNum} data-rising={row.rise ? '' : undefined}>

@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { parseHTML } from 'linkedom';
-import { CAPTURE_IDLE_MS, CAPTURE_MAX_MS, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX, MIN_SELECTION, clamp, moveSelection, captureDimensions, cropRectAtDpr, mosaicBlockSize, normalizeSelection, resizeSelection, toolbarPlacement, undoAnnotations } from '../apps/extension/src/domain/images/drawing.ts';
+import { CAPTURE_IDLE_MS, CAPTURE_MAX_MS, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX, MIN_SELECTION, clamp, clipImageText, moveSelection, captureDimensions, cropRectAtDpr, mosaicBlockSize, normalizeSelection, resizeSelection, toolbarPlacement, undoAnnotations } from '../apps/extension/src/domain/images/drawing.ts';
 import { createCaptureEditor } from '../apps/extension/src/page-layer/capture.ts';
 import { encodeCapture } from '../apps/extension/src/runtime/media/encode-capture.ts';
 import { IMAGE_LIMIT } from '../apps/extension/src/domain/images/image-policy.ts';
@@ -59,7 +59,7 @@ function editorFixture(options) {
   const rendered = [];
   const schedule = (fn, delay) => { const id = { at: now + delay, delay }; timers.set(id, fn); return id; };
   const editor = vm.runInNewContext(`(${createCaptureEditor.toString()})(stage, send, 'data:image/png;base64,AA==', labels, close, options)`, {
-    CAPTURE_IDLE_MS, CAPTURE_MAX_MS, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX, MIN_SELECTION, clamp, moveSelection, normalizeSelection, resizeSelection, toolbarPlacement, cropRectAtDpr, undoAnnotations,
+    CAPTURE_IDLE_MS, CAPTURE_MAX_MS, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX, MIN_SELECTION, clamp, clipImageText, moveSelection, normalizeSelection, resizeSelection, toolbarPlacement, cropRectAtDpr, undoAnnotations,
     Date: { now: () => now }, requestAnimationFrame: fn => fn(),
     pointerPoint: event => ({ x: event.clientX, y: event.clientY }),
     drawOps: (_context, ops) => { rendered.splice(0, rendered.length, ...ops); },

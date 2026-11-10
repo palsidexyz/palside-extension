@@ -8,7 +8,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && context.parentURL?.includes('/runtime/')) return next(specifier + '.ts', context);
   return next(specifier, context);
 } });
-const { lobbyCommand, lobbyMoreCommand } = await import('../apps/extension/src/runtime/teams/command-handlers.ts');
+const { lobbyCommand, lobbyMoreCommand, lobbyCloseCommand, refreshLobbyApplications } = await import('../apps/extension/src/runtime/teams/command-handlers.ts');
 const { Api } = await import('../apps/extension/src/runtime/transport/api.ts');
 hooks.deregister();
 
@@ -30,7 +30,7 @@ function fixture(request) {
     state: { lobbyTeams: [] }, emit: () => { emits++; },
   };
   const commands = { runtime };
-  return { runtime, run: payload => lobbyCommand.call(commands, { name: 'lobby', ...(payload === undefined ? {} : { payload }) }), more: list => lobbyMoreCommand.call(commands, { name: 'lobby-more', payload: { list } }), emits: () => emits };
+  return { runtime, commands, run: payload => lobbyCommand.call(commands, { name: 'lobby', ...(payload === undefined ? {} : { payload }) }), more: list => lobbyMoreCommand.call(commands, { name: 'lobby-more', payload: { list } }), emits: () => emits };
 }
 
 test('lobby sends search and sort through the real API contract and defaults existing callers to heat', async t => {
@@ -221,4 +221,21 @@ test('a failed load-more keeps its cursor and can be retried', async () => {
   fail = false;
   assert.deepEqual(await f.more('teams'), done);
   assert.deepEqual(f.runtime.state.lobbyTeams.map(row => row.id), ['first', 'second']);
+});
+
+test('a decision made on another device reloads the open lobby’s applications; without an open lobby nothing is requested', async () => {
+  const f = fixture(async () => result());
+  let applications = { applications: [{ teamId: 'x', status: 'pending', team: team('x') }], next: null }, reads = 0;
+  f.runtime.api.request = async id => { if (id === 'teams.applications') { reads++; return applications; } return result(); };
+  await refreshLobbyApplications(f.commands);
+  assert.equal(reads, 0, 'no lobby open yet');
+  await f.run();
+  assert.equal(f.runtime.state.lobbyTeams[0].applicationStatus, 'pending');
+  applications = { applications: [], next: null };
+  await refreshLobbyApplications(f.commands);
+  assert.equal(reads, 2);
+  assert.deepEqual(f.runtime.state.lobbyTeams, [], 'the approved application left 我的申请');
+  await lobbyCloseCommand.call(f.commands);
+  await refreshLobbyApplications(f.commands);
+  assert.equal(reads, 2, 'a closed lobby is not reloaded');
 });

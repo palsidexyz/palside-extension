@@ -29,6 +29,11 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // A leading underscore marks a value left out on purpose (a rest-destructured field, a positional parameter).
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+    rules: { "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_", ignoreRestSiblings: true }] },
+  },
+  {
     files: ["**/*.{js,mjs,cjs}"],
     rules: { "no-undef": "error" },
   },

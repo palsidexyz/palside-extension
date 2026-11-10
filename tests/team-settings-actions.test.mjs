@@ -19,6 +19,7 @@ const dialogCode = ts.transpileModule(`(${dialog.getText(app)})`, { compilerOpti
 const jsx = (type, props) => ({ type, props });
 const message = (key, values) => ({ key, ...(values ? { values } : {}) });
 const errorMessage = error => message(error.code || 'common.error');
+const failureText = (error, fallback = 'common.error') => error instanceof Error ? errorMessage(error) : message(fallback);
 const text = value => value?.key ?? value;
 function find(node, type) {
   if (!node || typeof node !== 'object') return;
@@ -51,7 +52,7 @@ function fixture({ retention = 7, live = true } = {}) {
         useRef(value) { const index = cursor++; return hooks[index] ??= { current: value }; },
         useState(value) { const index = cursor++; if (!(index in hooks)) hooks[index] = value; return [hooks[index], next => { hooks[index] = next; }]; },
       };
-      if (name === '@palside/i18n') return { message, errorMessage };
+      if (name === '@palside/i18n') return { message, errorMessage, failureText };
       if (name === 'use-intl') return { useTranslations: () => key => key };
       if (name === '../ui/text') return { useText: () => text };
       if (name === './retention') return retentionRules;
@@ -61,7 +62,7 @@ function fixture({ retention = 7, live = true } = {}) {
     },
   };
   vm.runInNewContext(compiled, context);
-  const confirmationContext = vm.createContext({ exports: {}, c, Error, uiMessage: message, errorMessage, text, t: key => key, AlertDialog: 'AlertDialog', confirmBusy: false, confirmFailure: undefined, require: () => ({ jsx }) });
+  const confirmationContext = vm.createContext({ exports: {}, c, Error, uiMessage: message, errorMessage, failureText, text, t: key => key, AlertDialog: 'AlertDialog', confirmBusy: false, confirmFailure: undefined, require: () => ({ jsx }) });
   confirmationContext.setConfirmBusy = value => { confirmationContext.confirmBusy = value; };
   confirmationContext.setConfirmFailure = value => { confirmationContext.confirmFailure = value; };
   const render = () => { cursor = 0; return context.exports.TeamSettings({ c }); };

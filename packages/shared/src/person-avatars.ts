@@ -10,12 +10,17 @@ export type DefaultAvatarName = typeof defaultAvatarNames[number];
 
 export const avatarPath = (name: DefaultAvatarName) => `/avatars/avatar-${name}.webp`;
 
+/** 32-bit FNV-1a: a stable, evenly spread pick from an ID; shared by person and team portraits. */
+export function fnv1a(id: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < id.length; index++) hash = Math.imul(hash ^ id.charCodeAt(index), 16777619);
+  return hash >>> 0;
+}
+
 /** FNV-1a over the account ID picks the portrait. */
 export function defaultAvatarName(id: string): DefaultAvatarName | undefined {
   if (!id) return undefined;
-  let hash = 2166136261;
-  for (let index = 0; index < id.length; index++) hash = Math.imul(hash ^ id.charCodeAt(index), 16777619);
-  return defaultAvatarNames[(hash >>> 0) % defaultAvatarNames.length]!;
+  return defaultAvatarNames[fnv1a(id) % defaultAvatarNames.length]!;
 }
 
 export const isDefaultAvatarName = (value: unknown): value is DefaultAvatarName => defaultAvatarNames.includes(value as DefaultAvatarName);

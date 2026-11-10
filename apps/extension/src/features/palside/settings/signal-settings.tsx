@@ -13,7 +13,6 @@ import { browserPlatform } from '../../../runtime/browser/platform';
 const mac = browserPlatform() === 'macOS';
 const keyNames: Record<SignalModifier, string> = mac ? { Control: '⌃ Control', Alt: '⌥ Option', Shift: '⇧ Shift' } : { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift' };
 const keySymbols: Record<SignalModifier, string> = mac ? { Control: '⌃', Alt: '⌥', Shift: '⇧' } : { Control: 'Ctrl', Alt: 'Alt', Shift: 'Shift' };
-export const signalKeyName = (key: readonly SignalModifier[]) => key.map(modifier => keyNames[modifier]).join(' + ');
 /** A wheel entry's still, as the page wheel draws it. */
 export function WheelArt({ entry, style }: { entry: WheelEntry; style?: CSSProperties }) {
   return <img src={`/signals/${wheelIcon(entry)}`} alt="" draggable={false} style={style} />;
@@ -31,11 +30,46 @@ export function KeyCaps({ keys }: { keys: readonly string[] }) {
 
 /** 信号's settings: the wheel itself first — what each slot holds and the shortcut that opens it — then sizes and sound as secondary rows. Saved by the background for every page. */
 export function SignalOptions({ c }: { c: PalsideController }) {
-  return <AccountSignalOptions key={c.live ? c.live.state.account?.id : c.data.self} c={c} />;
+  return <AccountSignalOptions key={accountKey(c)} c={c} />;
 }
+
+/** 共享画线's settings: whether new drawings go to the squad, and whether teammates' drawings show. The same choices as the chart's own panel. */
+export function ChartOptions({ c }: { c: PalsideController }) {
+  return <AccountChartOptions key={accountKey(c)} c={c} />;
+}
+
+const accountKey = (c: PalsideController) => c.live ? c.live.state.account?.id : c.data.self;
 
 function AccountSignalOptions({ c }: { c: PalsideController }) {
   const t = useTranslations();
+  const { settings, ready, busy, save } = useSignalSettings(c);
+  const sizes: ['sm' | 'md' | 'lg', string][] = [['sm', t('extension.center.small')], ['md', t('extension.center.medium')], ['lg', t('extension.center.large')]];
+  return <div className={s.root} inert={!ready} aria-busy={!ready || busy || undefined}>
+    <WheelEditor value={settings.wheel} keys={settings.key} onChange={wheel => save({ wheel })} onKey={key => save({ key })} />
+    <div className={s.rows}>
+      <Sub label={t('extension.signal.size')}><Seg label={t('extension.signal.size')} value={settings.size} options={sizes} onChange={size => save({ size })} /></Sub>
+      <Sub label={t('extension.signal.emoteSize')}><Seg label={t('extension.signal.emoteSize')} value={settings.emoteSize} options={sizes} onChange={emoteSize => save({ emoteSize })} /></Sub>
+      <Sub label={t('extension.signal.wheelSize')}><Seg label={t('extension.signal.wheelSize')} value={settings.wheelSize} options={sizes} onChange={wheelSize => save({ wheelSize })} /></Sub>
+      <SubSwitch label={t('extension.signal.sound')} checked={settings.sound} onChange={sound => save({ sound })} />
+      {settings.sound && <Sub label={t('extension.signal.volume')}><Range label={t('extension.signal.volume')} min={0} max={100} value={settings.volume} onChange={volume => save({ volume })} /></Sub>}
+    </div>
+  </div>;
+}
+
+function AccountChartOptions({ c }: { c: PalsideController }) {
+  const t = useTranslations();
+  const { settings, ready, busy, save } = useSignalSettings(c);
+  return <div className={s.rows} inert={!ready} aria-busy={!ready || busy || undefined}>
+    <SubSwitch label={t('extension.chart.sync')} checked={settings.chartShare} onChange={chartShare => save({ chartShare })} />
+    <SubSwitch label={t('extension.chart.showTeam')} checked={!settings.chartHideAll} onChange={show => save(show ? { chartHideAll: false, chartHidden: [] } : { chartHideAll: true })} />
+  </div>;
+}
+
+/**
+ * The account's signal settings (信号 and 共享画线 share one record), as the background keeps them: read once, followed while the page
+ * layer changes them, and saved patch by patch in order — the last answer wins, a refusal reads the record back.
+ */
+function useSignalSettings(c: PalsideController) {
   const [settings, setSettings] = useState<SignalSettings>(defaultSignalSettings);
   const [ready, setReady] = useState(!c.live);
   const [busy, setBusy] = useState(false);
@@ -76,17 +110,7 @@ function AccountSignalOptions({ c }: { c: PalsideController }) {
       }
     }).finally(() => { if (latest()) setBusy(false); });
   }
-  const sizes: ['sm' | 'md' | 'lg', string][] = [['sm', t('extension.center.small')], ['md', t('extension.center.medium')], ['lg', t('extension.center.large')]];
-  return <div className={s.root} inert={!ready} aria-busy={!ready || busy || undefined}>
-    <WheelEditor value={settings.wheel} keys={settings.key} onChange={wheel => save({ wheel })} onKey={key => save({ key })} />
-    <div className={s.rows}>
-      <Sub label={t('extension.signal.size')}><Seg label={t('extension.signal.size')} value={settings.size} options={sizes} onChange={size => save({ size })} /></Sub>
-      <Sub label={t('extension.signal.emoteSize')}><Seg label={t('extension.signal.emoteSize')} value={settings.emoteSize} options={sizes} onChange={emoteSize => save({ emoteSize })} /></Sub>
-      <Sub label={t('extension.signal.wheelSize')}><Seg label={t('extension.signal.wheelSize')} value={settings.wheelSize} options={sizes} onChange={wheelSize => save({ wheelSize })} /></Sub>
-      <SubSwitch label={t('extension.signal.sound')} checked={settings.sound} onChange={sound => save({ sound })} />
-      {settings.sound && <Sub label={t('extension.signal.volume')}><Range label={t('extension.signal.volume')} min={0} max={100} value={settings.volume} onChange={volume => save({ volume })} /></Sub>}
-    </div>
-  </div>;
+  return { settings, ready, busy, save };
 }
 
 /**

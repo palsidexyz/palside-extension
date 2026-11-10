@@ -19,10 +19,13 @@
 .pairs dt { font-weight:600; }
 .pairs dd { margin:0; color:var(--ui-text-secondary); }
 .tools { display:grid; gap:7px; margin:2px 0 0; padding:0; list-style:none; font-size:var(--ui-type-callout); line-height:1.4; }
-.tools li { display:grid; grid-template-columns:18px auto 1fr auto; align-items:center; gap:8px; }
-.tools svg { width:17px; height:17px; stroke-width:1.8; }
-.tools b { font-weight:600; }
-.tools span { color:var(--ui-text-secondary); }
+/* Icon, name, then one text column: the description never breaks; keycaps sit beside it when they fit and drop under it, on the same edge, when they don't. */
+.tools li { display:grid; grid-template-columns:18px auto minmax(0, 1fr); align-items:start; column-gap:8px; }
+.tools svg { width:17px; height:17px; margin-top:2px; stroke-width:1.8; }
+.tools b { font-weight:600; white-space:nowrap; }
+.tools p { display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; margin:0; min-width:0; color:inherit; line-height:inherit; }
+.tools p > span:first-child { color:var(--ui-text-secondary); white-space:nowrap; }
+.tools p > span:last-child:not(:first-child) { justify-content:flex-start; }
 
 .footer { display:flex; align-items:center; gap:4px; margin-top:12px; }
 .dots { display:flex; gap:4px; margin-right:auto; }

@@ -1,7 +1,9 @@
 import { readSignalTarget,signalIdentityUrl,SIGNAL_ANCHORS,SIGNAL_MATCHES,type SignalAnchor,type SignalElementAnchor,type SignalQuoteAnchor,type SignalTarget } from '../runtime/annotations/signals.ts';
-import { adapterFor,genericChart,privateSelector } from './adapters.ts';
-import { readable } from './targets.ts';
-import { quoteContext } from './text.ts';
+import { adapterFor,genericChart } from './adapters.ts';
+import { findText,matchRange,matchStart,pageElements,publicElement,readable,scanning,shown,textKey,type TextMatch } from './page-text.ts';
+import { normalizeQuoteWhitespace,quoteContext } from './text.ts';
+
+export { textKey };
 
 /**
  * Signal anchors: what a press points at, written so another member's page can find it again.
@@ -12,85 +14,14 @@ import { quoteContext } from './text.ts';
  * of it is never an anchor: falling back to it would land too far from the press.
  *
  * Text compares with whitespace collapsed. A receiver first looks for an exact match; failing that, a loose match
- * (`textKey`: every digit read as 0) counts only when it is the only one. A ticking price still matches while rows
- * that differ only in their numbers stay distinct. Each capture or resolve walks the page once, in one task and
- * within fixed caps, so the page cannot change under it.
+ * (`textKey`: a standalone number of any length reads as 0) counts only when it is the only one. A ticking price still matches while
+ * rows that differ only in their numbers stay distinct. Each capture or resolve walks the page once, in one task, so
+ * the page cannot change under it.
  */
 
-const MAX_NODES = 20_000;
-const MAX_TEXT = 400_000;
 const ELEMENT_ANCHORS = 3;
 const NAME_TEXT = 80;
 const MEDIA = ['img', 'picture', 'svg', 'video'];
-
-export const textKey = (text: string) => text.replace(/\s+/gu, ' ').replace(/\d/gu, '0');
-
-/** Own visibility only; walks start at the root and never enter a hidden or private subtree. */
-function shown(element: Element) {
-  if (element.matches(privateSelector)) return false;
-  const style = getComputedStyle(element);
-  return style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.opacity !== '0' && style.contentVisibility !== 'hidden';
-}
-/** The element and all its ancestors are public and visible. */
-function publicElement(element: Element | null): element is Element {
-  if (!element || element.closest(privateSelector)) return false;
-  for (let node: Element | null = element, depth = 0; node; node = node.parentElement) if (++depth > 64 || !shown(node)) return false;
-  return true;
-}
-
-type Point = { node: Text; offset: number };
-/** `text` has whitespace collapsed; `loose` is the same run through `textKey`, position for position. */
-type Run = { text: string; loose?: string; at: Point[] };
-/** The page's public elements in document order, and its public text as `textKey` runs mapped back to positions. */
-type Snapshot = { elements: Element[]; runs: Run[] };
-let current: { snapshot?: Snapshot | null } | undefined;
-/** Runs `work` against one walk of the page, taken on first use. */
-function scanning<T>(work: () => T): T {
-  current = {};
-  try { return work(); } finally { current = undefined; }
-}
-function snapshot(): Snapshot | undefined {
-  if (current?.snapshot !== undefined) return current.snapshot ?? undefined;
-  const taken = walk();
-  if (current) current.snapshot = taken ?? null;
-  return taken;
-}
-/** A private or hidden subtree ends a text run, so no match spans it. Undefined past the caps. */
-function walk(): Snapshot | undefined {
-  const root = document.body;
-  if (!root) return;
-  const elements: Element[] = [], runs: Run[] = [];
-  let text = '', at: Point[] = [], total = 0, space: Point | undefined;
-  const end = () => { if (text) runs.push({ text, at }); text = ''; at = []; space = undefined; };
-  let node: Node | null = root.firstChild, visited = 0;
-  while (node) {
-    if (++visited > MAX_NODES) return;
-    const element = node.nodeType === 1 ? node as Element : undefined;
-    const allowed = node.nodeType === Node.TEXT_NODE || Boolean(element && shown(element));
-    if (element && allowed) elements.push(element);
-    if (!allowed) end();
-    else if (node.nodeType === Node.TEXT_NODE) {
-      const part = node as Text;
-      for (let start = 0; start < part.length; start += 256) {
-        const chunk = part.substringData(start, 256);
-        for (let i = 0; i < chunk.length; i += 1) {
-          const point = { node: part, offset: start + i }, character = chunk[i]!;
-          if (/\s/u.test(character)) { space ??= point; continue; }
-          if (space && text) { text += ' '; at.push(space); }
-          space = undefined;
-          text += character; at.push(point);
-          if (++total > MAX_TEXT) return;
-        }
-      }
-    }
-    if (element && allowed && node.firstChild) { node = node.firstChild; continue; }
-    while (node && node !== root && !node.nextSibling) node = node.parentNode;
-    if (!node || node === root) break;
-    node = node.nextSibling;
-  }
-  end();
-  return { elements, runs };
-}
 
 /** An element's own public text when it is short enough to be a name, like a button's or a table cell's; undefined
  * when any of it is hidden or private, or it reads as content rather than a name (quotes cover that). */
@@ -150,42 +81,42 @@ function identity(element: Element): Identity | undefined {
   }
   return named || result.text || result.cls ? result : undefined;
 }
-const flat = (text: string, loose: boolean) => loose ? textKey(text) : text.replace(/\s+/gu, ' ');
+const flat = (text: string, loose: boolean) => loose ? textKey(text) : normalizeQuoteWhitespace(text);
 const sameText = (a: string | undefined, b: string | undefined, loose: boolean) => a === undefined ? b === undefined : b !== undefined && flat(a, loose) === flat(b, loose);
 const same = (a: Identity, b: Identity, loose: boolean) => a.tag === b.tag && a.id === b.id && a.role === b.role && a.cls === b.cls && a.href === b.href && a.src === b.src && sameText(a.label, b.label, loose) && sameText(a.text, b.text, loose);
+/** A walk's elements by tag; each identity is read once, however many anchors compare against it. */
+type Known = { element: Element; identity?: Identity | null };
+const tagIndexes = new WeakMap<Element[], Map<string, Known[]>>();
+function withTag(tag: string) {
+  const elements = pageElements();
+  if (!elements) return;
+  let index = tagIndexes.get(elements);
+  if (!index) {
+    index = new Map();
+    for (const element of elements) {
+      const name = element.tagName.toLowerCase(), list = index.get(name);
+      if (list) list.push({ element }); else index.set(name, [{ element }]);
+    }
+    tagIndexes.set(elements, index);
+  }
+  return index.get(tag) ?? [];
+}
 /** Public elements with this identity, in document order; undefined when the page is too large to tell. */
 function findElements(want: Identity, loose = false): Element[] | undefined {
-  const page = snapshot();
-  if (!page) return;
+  const known = withTag(want.tag);
+  if (!known) return;
   const out: Element[] = [];
-  for (const element of page.elements) {
-    if (element.tagName.toLowerCase() !== want.tag) continue;
-    const found = identity(element);
-    if (found && same(found, want, loose) && out.push(element) > SIGNAL_MATCHES) break;
+  for (const item of known) {
+    const found = item.identity === undefined ? item.identity = identity(item.element) ?? null : item.identity;
+    if (found && same(found, want, loose) && out.push(item.element) > SIGNAL_MATCHES) break;
   }
   return out;
 }
-type QuoteMatch = { start: Point; end: Point };
 /** Every place the quote reads the same with its context; undefined when the page is too large to tell. */
-function findQuotes(quote: Pick<SignalQuoteAnchor, 'exact' | 'prefix' | 'suffix'>, loose = false): QuoteMatch[] | undefined {
-  const exact = flat(quote.exact, loose).trim(), prefix = flat(quote.prefix, loose).trimStart(), suffix = flat(quote.suffix, loose).trimEnd();
-  const page = exact ? snapshot() : undefined;
-  if (!page) return;
-  const query = prefix + exact + suffix, out: QuoteMatch[] = [];
-  for (const run of page.runs) {
-    const text = loose ? run.loose ??= textKey(run.text) : run.text;
-    for (let index = text.indexOf(query); index >= 0; index = text.indexOf(query, index + 1)) {
-      const head = index + prefix.length;
-      out.push({ start: run.at[head]!, end: run.at[head + exact.length - 1]! });
-      if (out.length > SIGNAL_MATCHES) return out;
-    }
-  }
-  return out;
-}
-function rangeOf(match: QuoteMatch) {
-  const range = document.createRange();
-  range.setStart(match.start.node, match.start.offset); range.setEnd(match.end.node, match.end.offset + 1);
-  return range;
+function findQuotes(quote: Pick<SignalQuoteAnchor, 'exact' | 'prefix' | 'suffix'>, loose = false): TextMatch[] | undefined {
+  const exact = normalizeQuoteWhitespace(quote.exact).trim();
+  if (!exact) return;
+  return findText({ exact, prefix: normalizeQuoteWhitespace(quote.prefix).trimStart(), suffix: normalizeQuoteWhitespace(quote.suffix).trimEnd() }, SIGNAL_MATCHES, loose);
 }
 const chartAt = () => (adapterFor().chart ?? genericChart)();
 const inside = (rect: { left: number; right: number; top: number; bottom: number; width: number; height: number }, x: number, y: number) =>
@@ -253,8 +184,11 @@ export function captureSignalTarget(x: number, y: number): SignalTarget {
       if (publicElement(hit)) {
         const words = wordsAt(x, y);
         const quotes = words && findQuotes(words.quote);
-        const nth = quotes?.findIndex(match => match.start.node === words!.node && match.start.offset === words!.offset) ?? -1;
-        if (words && quotes && nth >= 0 && quotes.length <= SIGNAL_MATCHES) anchors.push({ ...words.quote, nth, of: quotes.length });
+        const nth = quotes?.findIndex(match => { const start = matchStart(match); return start.node === words!.node && start.offset === words!.offset; }) ?? -1;
+        if (words && quotes && nth >= 0 && quotes.length <= SIGNAL_MATCHES) {
+          const rect = matchRange(quotes[nth]!).getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) anchors.push({ ...words.quote, nth, of: quotes.length, x: unit((x - rect.left) / rect.width), y: unit((y - rect.top) / rect.height) });
+        }
         let elements = 0;
         for (let element: Element | null = hit, depth = 0; element && depth < 8 && elements < ELEMENT_ANCHORS; element = element.parentElement, depth += 1) {
           const tag = element.tagName.toLowerCase();
@@ -301,7 +235,7 @@ export function resolveSignalSpot(target: SignalTarget): SignalSpot | undefined 
         } else if (anchor.kind === 'quote') {
           const exact = findQuotes(anchor), loose = exact?.length === anchor.of ? undefined : findQuotes(anchor, true);
           const match = exact?.length === anchor.of ? exact[anchor.nth] : loose?.length === 1 ? loose[0] : undefined;
-          if (match) return { box: rangeOf(match), x: 0.5, y: 0.5, level };
+          if (match) return { box: matchRange(match), x: anchor.x, y: anchor.y, level };
         } else {
           const { nth, of, x, y, ...want } = anchor;
           const exact = findElements(want), loose = exact?.length === of ? undefined : findElements(want, true);

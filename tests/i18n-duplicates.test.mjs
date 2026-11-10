@@ -17,8 +17,8 @@ const allowedDuplicates = [
   { keys: ['common.member', 'extension.web.member'], reason: 'A person fallback label versus the membership role shown in the website preview.' },
   { keys: ['extension.copy.remove', 'extension.copy.removeDevice'], reason: 'Different objects: captain removal of a message versus account device removal.' },
   { keys: ['extension.copy.imageFormats', 'extension.errors.IMAGE_TYPE'], reason: 'Error code lookup is separate from image-picker guidance.' },
-  { keys: ['extension.copy.showPhrase', 'extension.sticky.show', 'extension.room.show'], reason: 'Different actions: reveal a recovery phrase, restore a hidden sticky note, or expand a folded message.' },
-  { keys: ['extension.copy.hidePhrase', 'extension.sticky.hide'], reason: 'Different actions: conceal a recovery phrase versus hide a sticky note from the page.' },
+  { keys: ['extension.chart.show', 'extension.copy.showPhrase', 'extension.room.show'], reason: 'Different actions: show a teammate\'s chart lines, reveal a recovery phrase, expand a folded message.' },
+  { keys: ['extension.chart.hide', 'extension.copy.hidePhrase'], reason: 'Different actions: hide a teammate\'s chart lines versus cover a recovery phrase.' },
   { keys: ['extension.copy.invitePasswordOff', 'extension.settings.notifyOff'], reason: 'Different settings: join-code protection versus notification delivery.' },
   { keys: ['extension.copy.openProfile', 'extension.dynamic.viewTeam'], reason: 'Different destinations: a person profile versus a squad; name identifies different objects.' },
   { keys: ['extension.errors.MATRIX_UNAVAILABLE', 'extension.errors.MATRIX_ERROR'], reason: 'Error code lookup requires one key per server error code.' },
@@ -33,7 +33,7 @@ const allowedDuplicates = [
   { keys: ['extension.access.none', 'extension.room.blockedNone'], reason: 'Different sets: enabled page-interaction features versus blocked people.' },
   { keys: ['extension.center.sites', 'extension.settings.sites'], reason: 'Different lists: favorite websites versus websites with interaction permission.' },
   { keys: ['extension.web.signal', 'extension.privacy.feature_signal'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern.' },
-  { keys: ['extension.web.sticky', 'extension.privacy.feature_sticky'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern.' },
+  { keys: ['extension.web.chart', 'extension.chart.toolbar', 'extension.privacy.feature_chart'], reason: 'The feature tile, the chart toolbar entry and the structured feature_<id> privacy lookup name one feature.' },
   { keys: ['extension.web.share', 'extension.privacy.feature_share'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern.' },
   { keys: ['extension.web.category_all', 'extension.hot.all'], reason: 'Different filters: website categories versus chains in the hot list.' },
   { keys: ['extension.settings.notifications', 'extension.privacy.feature_notify'], reason: 'Privacy feature lookup uses the structured feature_<id> key pattern.' },
@@ -43,10 +43,7 @@ const allowedDuplicates = [
   { keys: ['extension.privacy.perm_active', 'extension.privacy.revoke_active_title'], reason: 'Privacy permission and revocation-title lookups use structured permission keys.' },
   { keys: ['extension.privacy.perm_idle', 'extension.privacy.revoke_idle_title'], reason: 'Privacy permission and revocation-title lookups use structured permission keys.' },
   { keys: ['extension.privacy.revoke_active', 'extension.privacy.revoke_idle'], reason: 'Each built-in permission has its own structured revocation lookup; both come with the install.' },
-  { keys: ['extension.privacy.feature_quote', 'extension.reading.quote'], reason: 'Privacy feature lookup names page quoting; chat reading labels a quoted message excerpt.' },
-  { keys: ['extension.privacy.read.share.who', 'extension.privacy.read.quote.who', 'extension.privacy.read.signal.who', 'extension.privacy.read.sticky.who'], reason: 'Privacy table lookup requires read.<feature>.who for each feature.' },
-  { keys: ['extension.privacy.read.quote.keep', 'extension.privacy.read.sticky.keep'], reason: 'Privacy table lookup requires read.<feature>.keep for each feature; screenshots have a separate image retention cap.' },
-  { keys: ['extension.privacy.read.quote.no', 'extension.privacy.read.signal.no', 'extension.privacy.read.sticky.no'], reason: 'Privacy table lookup requires read.<feature>.no for each feature; quotes, signals and sticky notes share technical exclusions.' },
+  { keys: ['extension.privacy.read.share.who', 'extension.privacy.read.chart.who', 'extension.privacy.read.signal.who'], reason: 'Privacy table lookup requires read.<feature>.who for each feature.' },
 ];
 
 function duplicateGroups(website) {

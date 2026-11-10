@@ -1,13 +1,14 @@
-import { MINUTE_MS } from '@palside/shared/units';
+import { DAY_MS, MINUTE_MS, SECOND_MS } from '@palside/shared/units';
+import { retryDelayMs } from '@palside/shared/backoff';
 import { clearBrowserAccount } from '../browser/account-cleanup';
-import { refresh, requestRefresh, scheduleDeviceStateReport, reportDeviceState, refreshDomains, type RefreshDomain } from './live-sync';
+import { refresh, requestRefresh, accountChanged, scheduleDeviceStateReport, reportDeviceState, refreshDomains, type RefreshDomain } from './live-sync';
 import { fetchSnapshot } from './snapshot';
 import { connectRuntimeDevice,history,preloadHistory } from './matrix-session';
 import { start } from './local-restore';
 import { type PresenceState } from '@palside/shared/contracts/common';
 import type { DeviceState } from '@palside/shared/contracts/presence';
 import { message as uiMessage,MessageError } from '@palside/i18n';
-import { connectionBlock,connectionStatus } from '../transport/connection';
+import { connectionBlock } from '../transport/connection';
 import { createClient,type MatrixClient,type MatrixEvent,type Room } from 'matrix-js-sdk';
 import { type Identity } from '@palside/shared/identity';
 import { ApiError } from '../transport/api';
@@ -18,6 +19,9 @@ import { sessionScope } from './session';
 import { DeviceCleanup,within,type CleanupIntent } from './cleanup';
 import type { PalsideService } from '../composition/core';
 
+
+/** A failed reconnect or snapshot is retried after 5 s, doubling up to 5 min. */
+const MAINTENANCE_BACKOFF = { baseMs: 5 * SECOND_MS, maxMs: 5 * MINUTE_MS };
 
 export class SessionRuntime {
   readonly runtime: PalsideService;
@@ -50,8 +54,11 @@ export class SessionRuntime {
   connecting?: { session: RuntimeDevice; promise: Promise<void> };
   connectLiveEvents = connectLiveEvents;
   liveDispose?: () => void;
-  sseOpen = false;
+  liveOpen = false;
   refreshQueued = new Set<RefreshDomain>();
+  /** Service time the last snapshot started reading, and the latest pushed change not yet proven to be in a snapshot. */
+  snapshotReadAt = 0;
+  changedAt = 0;
   scope() {
     const generation = this.generation;
     return sessionScope(() => this.generation === generation, () => new MessageError(uiMessage('extension.runtime.loginChanged')));
@@ -102,21 +109,45 @@ export class SessionRuntime {
     const runtime = this.runtime;
     if (runtime.state.connection.retrying || this.pendingDevice) return;
     const session = this.session;
+    this.maintenanceFailures = 0; this.maintenanceRetryAt = 0;
     runtime.state.connection.retrying = true; runtime.emit();
     try {
       if (!this.cryptoInitialised && session) await this.connect(session);
       else { this.client?.retryImmediately(); await this.refresh(refreshDomains); }
     } finally { if (this.session === session) { runtime.state.connection.retrying = false; runtime.emit(); } }
   }
+  /** Consecutive failed maintenance attempts, and when the next may start: a down service is asked again with backoff, not every tick. */
+  maintenanceFailures = 0;
+  maintenanceRetryAt = 0;
   async maintainConnection() {
     const runtime = this.runtime;
     if (!this.session || this.pendingDevice) return;
     if (this.connecting) return this.connecting.promise;
-    if (runtime.state.connection.messaging === 'failed') return;
-    if (!this.cryptoInitialised) return this.connect(this.session);
-    if (runtime.state.connection.messaging !== 'ready') this.client?.retryImmediately();
-    else if (connectionStatus(runtime.state.connection) === 'connected' && Date.now() - this.snapshotAt < (this.sseOpen ? MINUTE_MS : SNAPSHOT_INTERVAL)) return;
-    await this.refresh(refreshDomains);
+    const { connection } = runtime.state;
+    if (connection.messaging === 'failed' || !connection.networkOnline) return;
+    const now = Date.now();
+    if (now < this.maintenanceRetryAt) return;
+    if (this.cryptoInitialised && connection.messaging !== 'ready') this.client?.retryImmediately();
+    if (this.cryptoInitialised && connection.service === 'ready' && !this.snapshotStale(now)) return;
+    const session = this.session;
+    try {
+      await (this.cryptoInitialised ? this.refresh(refreshDomains) : this.connect(session));
+      if (this.session === session) { this.maintenanceFailures = 0; this.maintenanceRetryAt = 0; }
+    } catch (error) {
+      if (this.session !== session) return;
+      this.maintenanceRetryAt = Date.now() + Math.max(error instanceof ApiError ? error.retryAfterMs ?? 0 : 0, retryDelayMs(++this.maintenanceFailures, MAINTENANCE_BACKOFF));
+      throw error;
+    }
+  }
+  /** Each device reads the new UTC day's 荣誉 within this spread after midnight, so the service does not see every device at once. */
+  dayRefreshDelay = Math.floor(Math.random() * 10 * MINUTE_MS);
+  /**
+   * With the event stream open every account change arrives as a `refresh` push and reconnects read everything again, so the
+   * snapshot is only re-read when a new UTC day changes 荣誉 and 热度. Without the stream it is re-read every `SNAPSHOT_INTERVAL`.
+   */
+  snapshotStale(now: number) {
+    if (!this.liveOpen) return now - this.snapshotAt >= SNAPSHOT_INTERVAL;
+    return Math.floor((now - this.dayRefreshDelay) / DAY_MS) > Math.floor((this.snapshotAt - this.dayRefreshDelay) / DAY_MS);
   }
   connect(session: RuntimeDevice, identity?: Identity): Promise<void> {
     const runtime = this.runtime;
@@ -132,7 +163,7 @@ export class SessionRuntime {
       if (signal.aborted) abort(); else signal.addEventListener('abort', abort, { once: true });
     })]) : work;
     const promise = connection.catch(error => {
-      if (this.generation === generation && this.session === session) { this.liveDispose?.(); this.liveDispose = undefined; this.sseOpen = false; this.client?.stopClient(); this.client = undefined; this.cryptoInitialised = false; if (runtime.state.connection.messaging !== 'failed') runtime.state.connection.messaging = 'unavailable'; runtime.emit(); }
+      if (this.generation === generation && this.session === session) { this.liveDispose?.(); this.liveDispose = undefined; this.liveOpen = false; this.client?.stopClient(); this.client = undefined; this.cryptoInitialised = false; if (runtime.state.connection.messaging !== 'failed') runtime.state.connection.messaging = 'unavailable'; runtime.emit(); }
       throw error;
     }).finally(() => { if (abort) signal?.removeEventListener('abort', abort); if (this.connecting?.promise === promise) this.connecting = undefined; });
     this.connecting = { session, promise }; return promise;
@@ -147,6 +178,7 @@ export class SessionRuntime {
 
   refresh(domains: readonly RefreshDomain[] = ['account']) { return refresh.call(this, domains); }
   requestRefresh(domains: readonly RefreshDomain[] = ['account']) { return requestRefresh.call(this, domains); }
+  accountChanged(at: number) { return accountChanged.call(this, at); }
   fetchSnapshot() { return fetchSnapshot.call(this); }
   async revokeDevice(session: RuntimeDevice) {
     const runtime = this.runtime;
@@ -190,22 +222,18 @@ export class SessionRuntime {
     this.identityAbort?.abort(); this.identityAbort = undefined;
     const scope = this.scope();
     runtime.dispatch.inviteRequest++; runtime.dispatch.inviteExpiresAt = 0; runtime.sharing.invalidatePage();
-    this.liveDispose?.(); this.liveDispose = undefined; this.sseOpen = false; this.refreshQueued.clear();
+    this.liveDispose?.(); this.liveDispose = undefined; this.liveOpen = false; this.refreshQueued.clear();
     clearTimeout(this.deviceStateTimer); this.deviceStateTimer = undefined; this.reportedDeviceState = undefined;
     const old = this.session ?? this.pendingDevice; this.session = undefined; runtime.api.token = undefined;
     const client = this.client; this.client = undefined; client?.stopClient();
     this.scheduleCleanup(old, preservePreferences, client);
     this.connecting = undefined; this.refreshing = undefined; this.cryptoOpening = undefined;
-    runtime.timeline.readyForLiveEvents = false; runtime.timeline.notifying.clear(); runtime.sending.sendRequests.clear(); runtime.sending.inFlight.clear(); runtime.dispatch.mutations.clear(); runtime.sending.editOriginals.clear(); runtime.sharing.publishing = false;
-    runtime.sharing.peerViewing.clear(); runtime.sharing.activeViewing.clear(); runtime.sharing.viewingOrder = 0; runtime.sharing.ownViewing = undefined; runtime.timeline.missingEvents.clear(); runtime.timeline.edits.clear(); runtime.timeline.redactions.clear(); runtime.timeline.visiblePanels.clear(); runtime.timeline.visibleMessages.clear(); runtime.cache.preparedViews.clear(); this.mnemonic = undefined; this.pendingIdentity = undefined; this.pendingDevice = undefined; runtime.sharing.page = undefined; runtime.sharing.invalidatePage(); runtime.sharing.peerViewingVersions.clear(); this.cryptoInitialised = false; runtime.sharing.selectedDevice = false; clearTimeout(runtime.sharing.viewingTimer); clearTimeout(runtime.sharing.viewingExpiryTimer); clearTimeout(runtime.interactions.reactionTimer); runtime.sharing.preferencesQueue = Promise.resolve(); runtime.sharing.persistedPreferences = undefined; runtime.sending.outgoing.clear(); runtime.cache.eventTimes.clear(); runtime.sending.pacer.clear(); runtime.sending.queued.clear(); runtime.state.sendQueue = undefined; runtime.timeline.pendingRead.clear(); clearTimeout(runtime.timeline.readTimer); this.snapshotAt = 0;
-    for (const url of runtime.cache.mediaUrls.values()) URL.revokeObjectURL(url); runtime.cache.mediaUrls.clear();
-    runtime.sharing.pagePreview = false;
-    this.directoryExpiresAt = 0;
-    this.authMode = undefined;
+    runtime.timeline.reset(); runtime.sending.reset(); runtime.sharing.reset(); runtime.cache.reset(); runtime.interactions.reset();
+    runtime.dispatch.mutations.clear(); runtime.state.sendQueue = undefined;
+    this.mnemonic = undefined; this.pendingIdentity = undefined; this.pendingDevice = undefined;
+    this.cryptoInitialised = false; this.snapshotAt = 0; this.snapshotReadAt = 0; this.changedAt = 0; this.maintenanceFailures = 0; this.maintenanceRetryAt = 0; this.directoryExpiresAt = 0; this.authMode = undefined;
     const config = runtime.state.config;
-    runtime.interactions.stickyRecords = [];
-    runtime.interactions.annotationDeletions.clear();
-    runtime.state = { ...emptyState(), revision: runtime.state.revision, ready: true, config, items: { stickies: [] }, pokes: undefined };
+    runtime.state = { ...emptyState(), revision: runtime.state.revision, ready: true, config, pokes: undefined };
     runtime.emit();
     if (!await this.cleanup.flush() && scope.current()) { runtime.state.error = uiMessage('extension.runtime.deviceCleanupPending'); runtime.emit(); }
   }

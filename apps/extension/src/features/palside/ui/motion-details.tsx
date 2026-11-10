@@ -19,8 +19,8 @@ export function StateGlyph({ state, children }: { state: string; children: React
 }
 
 /** Shared rolling digits inherit the surrounding count typography. */
-export function Count({ value }: { value: number }) {
-  return <Counter value={value} separator="" className={s.countNumber} />;
+export function Count({ value, compact }: { value: number; compact?: boolean }) {
+  return <Counter value={value} separator="" compact={compact} className={s.countNumber} />;
 }
 
 /** A translated count phrase whose number rolls: the value, as the message printed it, becomes a Count; `last` when a name precedes it. */
@@ -44,6 +44,15 @@ export function Swap({ k, children, className }: { k: string; children: ReactNod
   return <span className={`${m.swap} ${className ?? ''}`}><AnimatePresence initial={false} mode="popLayout">
     <motion.span key={k} className={m.swapLayer} initial={{ opacity: 0, y: reduced ? 0 : 4, filter: reduced ? 'none' : 'blur(2px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
       exit={{ opacity: 0, y: reduced ? 0 : -4, filter: reduced ? 'none' : 'blur(2px)' }} transition={reduced ? motionPresets.reduced : motionPresets.feedback}>{children}</motion.span>
+  </AnimatePresence></span>;
+}
+
+/** Rolls one line of text into the next inside a clipped slot: the old line leaves upward as the new one arrives from below. */
+export function Roll({ k, children }: { k: string; children: ReactNode }) {
+  const reduced = useReducedMotion();
+  return <span className={m.roll}><AnimatePresence initial={false} mode="popLayout">
+    <motion.span key={k} className={m.swapLayer} initial={{ opacity: 0, y: reduced ? 0 : '100%' }} animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: reduced ? 0 : '-100%' }} transition={reduced ? motionPresets.reduced : motionPresets.feedback}>{children}</motion.span>
   </AnimatePresence></span>;
 }
 

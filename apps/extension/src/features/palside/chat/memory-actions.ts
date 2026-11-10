@@ -58,7 +58,7 @@ async function send(prepare?: (message: Message) => void): Promise<boolean> {
     }
     if (!canWrite || !canSend(draft))
         return false;
-    const message: Message = { id: crypto.randomUUID(), teamId: current, author: data.self, text: draft.text.trim(), time: '', timestamp: Date.now(), attachment: draft.attachment, ref: draft.ref, replyTo: draft.replyTo, ...(draft.replyTo && draft.replyRange ? { replyRange: draft.replyRange } : {}), mentionIds: draft.mentions?.filter(p => draft.text.includes(`@${p.label}`) && team.memberIds.includes(p.id)).map(p => p.id), status: 'sending' };
+    const message: Message = { id: crypto.randomUUID(), teamId: current, author: data.self, text: draft.text.trim(), time: '', timestamp: Date.now(), attachment: draft.attachment, replyTo: draft.replyTo, ...(draft.replyTo && draft.replyRange ? { replyRange: draft.replyRange } : {}), mentionIds: draft.mentions?.filter(p => draft.text.includes(`@${p.label}`) && team.memberIds.includes(p.id)).map(p => p.id), status: 'sending' };
     prepare?.(message);
     setMessages(old => [...old, message]);
     setDrafts(old => ({ ...old, [current]: emptyDraft }));

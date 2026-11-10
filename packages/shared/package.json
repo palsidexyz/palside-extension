@@ -27,6 +27,8 @@
     "./signal-art": "./src/signal-art/index.ts",
     "./models/*": "./src/models/*.ts",
     "./units": "./src/units.ts",
+    "./backoff": "./src/backoff.ts",
+    "./coalesce": "./src/coalesce.ts",
     "./tokens": "./src/tokens.ts",
     "./rules/*": "./src/rules/*.ts"
   },

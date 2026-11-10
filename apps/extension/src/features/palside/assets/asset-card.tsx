@@ -1,7 +1,8 @@
 'use client';
 
 import { useTranslations } from 'use-intl';
-import { MessagesSquare, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ArrowUpRight, MessagesSquare, X } from 'lucide-react';
 import { Button, IconButton } from '@palside/ui/button';
 import { shortAddress } from '@palside/shared/navigation';
 import { Token } from '../ui/primitives';
@@ -9,16 +10,16 @@ import type { Viewing } from '../../../domain/assets/model';
 import s from '../app/palside.module.css';
 import a from './asset-card.module.css';
 import { tokenLabel } from './token-name';
+import { displayHost } from '../../../domain/assets/site-host';
 
-function hostOf(url: string) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
-}
+const hostOf = (url: string) => displayHost(url) ?? url;
 
 /**
- * One card for every shared page: the site's icon, the page name, the domain. The title opens the page; a token
- * shows its chain and short contract instead of the domain, and a 详情 button opens its discussion. Shared by messages, drafts and person cards.
+ * One card for every shared page, one layout: the icon, a one-line name, then the domain, and an action on the right. A token shows its
+ * chain and short contract instead of the domain and 详情 opens its discussion; a website's 打开 opens the page, like its title.
+ * Shared by messages, drafts and person cards.
  */
-export function AssetCard({ view, onOpen, onRemove }: { view: Viewing; onOpen: () => void; onRemove?: () => void }) {
+export function AssetCard({ view, onOpen, onRemove, chain }: { view: Viewing; onOpen: () => void; onRemove?: () => void; chain?: ReactNode }) {
   const t = useTranslations();
   const asset = view.kind === 'asset';
   const name = tokenLabel(view, t);
@@ -28,11 +29,13 @@ export function AssetCard({ view, onOpen, onRemove }: { view: Viewing; onOpen: (
       <div className={a.identity}>
         <span className={a.heading}>
           <a className={a.title} href={view.url} target="_blank" rel="noreferrer noopener" title={[name, asset ? view.chain : undefined, hostOf(view.url)].filter(Boolean).join(' · ')}>{name}</a>
-          {asset && view.chain && <span className={a.chain}>{view.chain}</span>}
+          {asset && (chain ?? (view.chain && <span className={a.chain}>{view.chain}</span>))}
         </span>
         <span className={a.meta}>{asset && view.address ? <span className={a.address} title={view.address}>{shortAddress(view.address)}</span> : <span className={a.host}>{hostOf(view.url)}</span>}</span>
       </div>
-      {asset && <Button size="sm" variant="surface" className={a.details} onClick={onOpen} aria-label={t('extension.dynamic.viewToken', { name })}><MessagesSquare size={13} aria-hidden="true" />{t('extension.copy.details')}</Button>}
+      {asset
+        ? <Button size="sm" variant="surface" className={a.details} onClick={onOpen} aria-label={t('extension.dynamic.viewToken', { name })}><MessagesSquare size={13} aria-hidden="true" />{t('extension.copy.details')}</Button>
+        : <Button size="sm" variant="surface" className={a.details} onClick={() => window.open(view.url, '_blank', 'noopener,noreferrer')} aria-label={`${t('extension.top.open')} · ${hostOf(view.url)}`}>{t('extension.top.open')}<ArrowUpRight size={13} aria-hidden="true" /></Button>}
     </div>
     {onRemove && <IconButton label={t('extension.copy.removeCard')} size="sm" variant="surface" className={a.remove} onClick={onRemove}><X size={13} /></IconButton>}
   </div>;

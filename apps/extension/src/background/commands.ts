@@ -6,7 +6,7 @@ import type { Background } from './index.ts';
 import { accessStatus, broadOrigin, siteOriginPattern } from '../runtime/browser/permissions.ts';
 
 /** Commands only the worker itself may send to the offscreen runtime. */
-const hostOnly = new Set(['signal-send', 'room-panels', 'room-tab', 'visible-drop', 'wallet-panel-drop']);
+const hostOnly = new Set(['signal-send', 'mark-send', 'drawing-send', 'follow-scroll', 'follow-tabs', 'room-panels', 'room-tab', 'visible-drop', 'wallet-panel-drop']);
 /** Commands whose success may turn sharing on before the state that says so arrives. */
 const claimsSharing = (command: Command) => command.name === 'toggle' && command.payload?.share === true || command.name === 'preferences' && 'current' in (command.payload ?? {});
 
@@ -24,7 +24,7 @@ export function commands(bg: Background) {
           bg.browser.permissions.getAll(),
           accessStatus(command.payload?.url, bg.browser),
         ]);
-        return { ok: true, value: { origins: grants.origins ?? [], tabs: grants.permissions?.includes('tabs') ?? false, notifications: grants.permissions?.includes('notifications') ?? false, site: access.site } };
+        return { ok: true, value: { origins: grants.origins ?? [], tabs: grants.permissions?.includes('tabs') ?? false, notifications: grants.permissions?.includes('notifications') ?? false, tabGroups: grants.permissions?.includes('tabGroups') ?? false, site: access.site } };
       }
       case 'permissions-sync':
         bg.notifications.listenNotifications();
@@ -40,8 +40,8 @@ export function commands(bg: Background) {
             removed = await bg.browser.permissions.remove({ origins: [origin] });
             removed = !await bg.browser.permissions.contains({ origins: [origin] }) && removed;
           }
-        } else if (request.kind === 'tabs' || request.kind === 'notifications') {
-          removed = await bg.browser.permissions.remove({ permissions: request.kind === 'tabs' ? ['tabs', 'favicon'] : ['notifications'] });
+        } else if (request.kind === 'tabs' || request.kind === 'notifications' || request.kind === 'tabGroups') {
+          removed = await bg.browser.permissions.remove({ permissions: request.kind === 'tabs' ? ['tabs', 'favicon'] : [request.kind] });
         } else {
           const granted = (await bg.browser.permissions.getAll()).origins ?? [];
           const removing = request.kind === 'sites' ? granted : granted.filter(broadOrigin);
@@ -67,13 +67,12 @@ export function commands(bg: Background) {
           pageLayer: { enabled: site, registered: scripts.length > 0 },
         }) };
       }
+      case 'update': return { ok: true, value: await bg.updates.request() };
       case 'signal-settings-get': return { ok: true, value: await bg.signals.readSignalSettings() };
       case 'signal-settings': return { ok: true, value: await bg.signals.changeSignalSettings(payload.settings, payload.expectedAccountId) };
       case 'danmaku-settings': await bg.danmaku.saveDanmakuSettings(payload.settings); return { ok: true };
-      case 'selection-enabled': await bg.selection.setSelectionEnabled(windowId, senderUrl, payload.on); return { ok: true };
-      case 'quote-sticky': return bg.stickies.quoteSticky(payload);
-      case 'locate-sticky': return bg.stickies.locateSticky(payload, senderUrl);
-      case 'locate-ref': return bg.stickies.locateRef(payload, senderUrl);
+      case 'signal-replay': return bg.refs.replaySignal(payload, senderUrl);
+      case 'drawing-show': return bg.refs.showDrawing(payload, senderUrl);
       case 'capture': return { ok: true, value: await bg.capture.startCapture(windowId, senderUrl, payload) };
       case 'link-card': return { ok: true, value: await bg.sharing.linkCard(windowId, senderUrl, payload.url) };
       case 'language':

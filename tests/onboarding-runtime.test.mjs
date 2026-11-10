@@ -15,7 +15,7 @@ const context = {
   ...languageGlobals, connectLiveEvents, connectionStatus, readFavorites, readSiteInteractions, ApiError, completeTeamStart, startedTeams, sessionScope, parseInvitation,
   text: value => typeof value === 'string' ? value : '', DAY: DAY_MS, Date, URL,
   DeviceCleanup: class {}, uniqueMediaIds: () => new Set(), color: () => '#eee',
-  pruneTeamItems: items => items, offlineDirectory: () => ({}),
+  offlineDirectory: () => ({}),
 };
 const load = productionModules(context);
 const { RuntimeCommands } = load('apps/extension/src/runtime/composition/dispatch.ts');
@@ -44,6 +44,7 @@ function fixture() {
   runtime.auth.session = { account: { id: 'alice', nickname: 'Alice' } };
   runtime.state.account = runtime.auth.session.account;
   runtime.sharing = new SharingRuntime(runtime);
+  runtime.signals = { syncClock() {}, restoreRecords() {}, async pruneRecords() { return false; } };
   runtime.dispatch = new RuntimeCommands(runtime);
   runtime.refresh = () => runtime.auth.refresh();
   return { runtime, stored, writes };
@@ -86,6 +87,15 @@ test('completion persists once and stale preference commands cannot clear or inv
   await runtime.dispatch.execute({ name: 'preferences', payload: { accountId: 'alice', startedTeams: ['invented'], current: 'team' } });
   assert.deepEqual(stored.get('alice:preferences').startedTeams, ['team']);
   assert.deepEqual(startedTeams(['team', 'team', null, '', 12]), ['team']);
+});
+
+test('marks of squads the account left are dropped with the next completion, so the list never outgrows the squads', async () => {
+  const { runtime, stored } = fixture();
+  runtime.state.preferences = { ...runtime.state.preferences, startedTeams: ['left-1', 'left-2'] };
+  runtime.state.remoteTeams = [...runtime.state.remoteTeams, { id: 'other', joined: true }];
+  await completeTeamStart(runtime, 'team');
+  await completeTeamStart(runtime, 'other');
+  assert.deepEqual(stored.get('alice:preferences').startedTeams, ['team', 'other']);
 });
 
 test('completion queues after an older preference write and remains durable', async () => {
@@ -152,13 +162,11 @@ test('a snapshot superseded during persistence does not mark cold-start membersh
   assert.ok(runtime.auth.snapshotAt > 0);
 });
 
-test('unsupported event kinds and mismatched-account selections are rejected before mutation', async () => {
+test('removed commands are rejected before mutation', async () => {
   const { runtime } = fixture();
   let calls = 0;
-  runtime.interactions = { teamEvent: async () => { calls++; } };
-  for (const kind of ['danmaku', 'unknown-kind', '', 42]) await assert.rejects(runtime.dispatch.execute({ name: 'team-event', payload: { kind, teamId: 'team' } }));
-  await assert.rejects(runtime.dispatch.execute({ name: 'team-event', payload: { kind: 'sticky', teamId: 'team', accountId: 'bob' } }));
-  await assert.rejects(runtime.dispatch.execute({ name: 'attach-ref', payload: { teamId: 'team', accountId: 'bob' } }));
+  runtime.interactions = { poke: async () => { calls++; } };
+  for (const name of ['team-event', 'team-event-remove', 'quote-sticky', 'locate-sticky', 'attach-ref']) await assert.rejects(runtime.dispatch.execute({ name, payload: { kind: 'sticky', teamId: 'team' } }));
   assert.equal(calls, 0);
 });
 

@@ -8,7 +8,8 @@ import { useId, useState, type ReactNode } from 'react';
 import { MessageImage } from '../media/message-image';
 import { ArrowUpRight, Coins, Image as ImageIcon, Link2 } from 'lucide-react';
 import { sharedTokens } from '../../../domain/assets/shared-tokens';
-import { EmptyState, HistoryMore } from '../chat/history-scope';
+import { HistoryMore } from '../chat/history-scope';
+import { EmptyState } from '../ui/empty-state';
 import { Tabs } from '../ui/sub-rows';
 import type { PalsideController } from '../app/use-palside';
 
@@ -26,7 +27,7 @@ export function SharedContent({ c, onJump, messages: results }: { c: PalsideCont
   const hit = (...values: (string | undefined)[]) => !query || values.some(value => value?.toLocaleLowerCase().includes(query));
   const messages = c.currentMessages.filter(m => m.status === 'sent' && !m.recalled).toReversed();
   const [order, setOrder] = useState<'recent' | 'discussed'>('recent');
-  const assets = category === 'assets' ? sharedTokens({ messages, now: c.now, order }).map(item => ({ ...item, view: liveView(c, item.view) })).filter(item => hit(tokenLabel(item.view, t), item.view.name, item.view.address)) : [];
+  const assets = category === 'assets' ? sharedTokens({ messages, now: c.now, order }).map(item => ({ ...item, view: liveView(c, item.view) })).filter(item => hit(tokenLabel(item.view, t, c), item.view.name, item.view.address)) : [];
   const images = category === 'images' ? messages.filter(m => m.attachment?.kind === 'image' && hit(m.text)) : [];
   const links = new Map<string, (typeof messages)[number]>();
   if (category === 'links') {
@@ -42,9 +43,9 @@ export function SharedContent({ c, onJump, messages: results }: { c: PalsideCont
       {(['recent', 'discussed'] as const).map(value => <button type="button" key={value} aria-pressed={order === value} onClick={() => setOrder(value)}>{t(`extension.sharedTokens.${value}`)}</button>)}
     </div>}
     {category === 'assets' && assets.length > 0 && <div className={s.sharedTokens}>{assets.map(item => <div key={item.asset} className={s.sharedToken}>
-      <Tooltip content={item.view.address ?? tokenLabel(item.view, t)}><button type="button" className={s.sharedTokenOpen} aria-label={t('extension.dynamic.viewToken', { name: tokenLabel(item.view, t) })} onClick={() => c.selectAsset(item.view.id)} /></Tooltip>
+      <Tooltip content={item.view.address ?? tokenLabel(item.view, t, c)}><button type="button" className={s.sharedTokenOpen} aria-label={t('extension.dynamic.viewToken', { name: tokenLabel(item.view, t, c) })} onClick={() => c.selectAsset(item.view.id)} /></Tooltip>
       <Token view={item.view} size="card" />
-      <span className={s.sharedTokenName}><strong>{tokenLabel(item.view, t)}</strong><small>{[authorOf(item.lastMessage), item.lastMessage.time, item.messages > 1 ? t('extension.dynamic.messageCount', { count: item.messages }) : undefined].filter(Boolean).join(' · ')}</small></span>
+      <span className={s.sharedTokenName}><strong>{tokenLabel(item.view, t, c)}</strong><small>{[authorOf(item.lastMessage), item.lastMessage.time, item.messages > 1 ? t('extension.dynamic.messageCount', { count: item.messages }) : undefined].filter(Boolean).join(' · ')}</small></span>
       <Tooltip content={t('extension.copy.viewMessage')}><IconButton label={t('extension.copy.viewMessage')} size="sm" variant="quiet" onClick={() => onJump(item.lastMessage.id)}><ArrowUpRight size={15} /></IconButton></Tooltip>
     </div>)}</div>}
     {category === 'images' && images.map(message => message.attachment?.kind === 'image' && <div className={s.sharedItem} key={message.id}><MessageImage c={c} id={message.id} sentAt={message.timestamp} image={message.attachment} compact />{attribution(message)}</div>)}

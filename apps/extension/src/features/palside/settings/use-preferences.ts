@@ -1,5 +1,5 @@
 'use client';
-import { errorMessage,message as uiMessage } from '@palside/i18n';
+import { failureText } from '@palside/i18n';
 
 import { useTextState } from '../ui/text';
 
@@ -43,7 +43,7 @@ export function usePreferences(live?: LivePort) {
     intent.current = { account, patch: merged }; setPending({ account, patch: merged }); setError('');
     try { await live.command('preferences', { ...merged, accountId: account }); }
     catch (failure) {
-      if (current() && sequence.current === revision) setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.settingsSaveFailed'));
+      if (current() && sequence.current === revision) setError(failureText(failure, 'extension.copy.settingsSaveFailed'));
       throw failure;
     } finally {
       if (current() && sequence.current === revision) { intent.current = { patch: {} }; setPending({ patch: {} }); }

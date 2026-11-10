@@ -1,13 +1,16 @@
 import Type, { type StaticDecode as Static } from 'typebox';
 import { strictObject } from './validation.ts';
-import { count, id, presenceState } from './common.ts';
-import { roomKey, roomMessage, stanceCounts, hotRooms } from './rooms.ts';
+import { count, id, presenceState, timestamp } from './common.ts';
+import { roomKey, roomMessage, hotRooms } from './rooms.ts';
 import { chainEvent, chainConfigEvent } from './chain.ts';
 import { tokenEntry } from './tokens.ts';
-export const roomEvent = Type.Union([strictObject({ type: Type.Literal('hot'), rooms: hotRooms }), strictObject({ key: roomKey, type: Type.Literal('message'), message: roomMessage }), strictObject({ key: roomKey, type: Type.Literal('folded'), id }), strictObject({ key: roomKey, type: Type.Literal('retract'), id }), strictObject({ key: roomKey, type: Type.Literal('count'), count }), strictObject({ key: roomKey, type: Type.Literal('stance'), stance: stanceCounts })]);
-/** SSE has no event IDs or replay cursor. A refresh invalidates /me; ping comments have no payload. */
+export const roomEvent = Type.Union([strictObject({ type: Type.Literal('hot'), rooms: hotRooms }), strictObject({ key: roomKey, type: Type.Literal('message'), message: roomMessage }), strictObject({ key: roomKey, type: Type.Literal('folded'), id }), strictObject({ key: roomKey, type: Type.Literal('retract'), id }), strictObject({ key: roomKey, type: Type.Literal('count'), count }), strictObject({ key: roomKey, type: Type.Literal('likes'), id, count })]);
+/**
+ * Pushes over the live socket (`live.ts`); they have no IDs or replay cursor. A refresh invalidates /me: `at` is the service time
+ * after the change committed, so a snapshot whose `readAt` is not earlier already holds it.
+ */
 export const events = {
-  refresh: strictObject({ scope: Type.Literal('me') }),
+  refresh: strictObject({ scope: Type.Literal('me'), at: timestamp }),
   presence: strictObject({ account: id, state: presenceState }),
   'team-invites': strictObject({ pending: count }),
   room: roomEvent,

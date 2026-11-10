@@ -1,3 +1,5 @@
+import { siteByDomain } from '@palside/shared/sites';
+
 const separators = /\s(?:\||-|–|—|·)\s/u;
 const boilerplate = /^(?:price|chart|charts|price chart|live price|价格|行情)$/iu;
 const priceToken = /^(?:[$€£¥]\s?\d[\d,.]*(?:[KMBT])?|[+-]\s?\d[\d,.]*%|\d[\d,.]*%)$/iu;
@@ -62,4 +64,20 @@ export function pageName(title: unknown, host: string): string | undefined {
   if (!value || words(titleName).join('') === words(hostName).join('')) return undefined;
   const graphemes = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value));
   return graphemes.slice(0, 80).map(part => part.segment).join('').trim() || undefined;
+}
+
+/** A title carrying an email address (a mailbox, an account page). */
+export const titleNamesAccount = (title: unknown) => typeof title === 'string' && /[^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]{2,}/u.test(title);
+
+/**
+ * What a website card is called: the page's own name, else, for a site outside the catalog, the name its title gives
+ * the site ("Bankr" on bankr.bot) rather than the bare host. Catalog sites and raw-domain titles return undefined so the
+ * card falls back to the catalog name or the host.
+ */
+export function pageLabel(title: unknown, host: string): string | undefined {
+  const page = pageName(title, host);
+  if (page || typeof title !== 'string' || siteByDomain(host)) return page;
+  const own = trimBoilerplate(trimPriceTokens(title.trim().replace(/\s+/gu, ' '))).trim();
+  const hostName = host.replace(/^www\./iu, '').replace(/\.[a-z]{2,}$/iu, '');
+  return own && own.length <= 32 && !/\.[a-z]{2,}$/iu.test(own) && words(own).join('') === words(hostName).join('') ? own : undefined;
 }

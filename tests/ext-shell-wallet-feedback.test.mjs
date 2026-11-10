@@ -48,7 +48,7 @@ async function fixture(t) {
     '@palside/shared/navigation': { shortAddress: value => value.slice(0, 8) },
     './payment-sheet': { PALS: {} }, './packet': { PacketDetail: () => null },
     './recovery': { WalletRecoveryList: () => null }, './recovery-state': { recordLabels: {} },
-    '../chat/history-scope': { EmptyState: () => null },
+    '../ui/empty-state': { EmptyState: () => null },
   };
   let write = async () => {};
   const context = vm.createContext({ console, navigator: { clipboard: { writeText: value => write(value) } },

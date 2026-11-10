@@ -1,5 +1,5 @@
 'use client';
-import { errorMessage, message as uiMessage, type TextValue } from '@palside/i18n';
+import { message as uiMessage,type TextValue,failureText } from '@palside/i18n';
 
 import { useTranslations } from 'use-intl';
 import { Checkbox } from '@palside/ui/checkbox';
@@ -43,7 +43,7 @@ export function Report({ c, target }: { c: PalsideController; target: ReportTarg
   const body = target.kind === 'message' ? target.preview : target.kind === 'team' ? rest.join('\n').trim() : '';
   return <form className={r.report} onSubmit={async event => {
     event.preventDefault(); if (!c.live || busy || !ready || !reason) return; setBusy(true);
-    try { const result = await c.live.command('report', { accountId: c.data.self, kind: target.kind, targetId: target.targetId, reason, note: details.trim(), snapshot: target.preview, image: includeImage ? target.image?.src : undefined, key }); if (result.pending) { setPending(true); setOutcome({ tone: 'warning', message: uiMessage('extension.copy.reportUnknown') }); } else { setPending(false); setOutcome({ tone: 'success', message: uiMessage(result.recovered ? 'extension.copy.reportAlreadySent' : 'extension.copy.reportSent') }); } } catch (error) { setPending(false); setOutcome({ tone: 'error', message: error instanceof Error ? errorMessage(error) : uiMessage('extension.copy.reportFailed') }); } finally { setBusy(false); }
+    try { const result = await c.live.command('report', { accountId: c.data.self, kind: target.kind, targetId: target.targetId, reason, note: details.trim(), snapshot: target.preview, image: includeImage ? target.image?.src : undefined, key }); if (result.pending) { setPending(true); setOutcome({ tone: 'warning', message: uiMessage('extension.copy.reportUnknown') }); } else { setPending(false); setOutcome({ tone: 'success', message: uiMessage(result.recovered ? 'extension.copy.reportAlreadySent' : 'extension.copy.reportSent') }); } } catch (error) { setPending(false); setOutcome({ tone: 'error', message: failureText(error, 'extension.copy.reportFailed') }); } finally { setBusy(false); }
   }}>
     <section className={r.section} aria-labelledby="report-target-title">
       <h2 id="report-target-title" className={r.title}>{t(target.kind === 'message' ? 'extension.copy.reportMessage' : target.kind === 'team' ? 'extension.copy.reportTeam' : 'extension.copy.reportAccount')}</h2>

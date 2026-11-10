@@ -66,7 +66,7 @@ export function stateSender(browser, sender = { id: browser.runtime.id, url: bro
   const cache = createPatchSliceCache();
   let previous;
   return state => {
-    const next = { items: { stickies: [] }, drafts: {}, ...state, revision: (previous?.revision ?? 0) + 1 };
+    const next = { drafts: {}, ...state, revision: (previous?.revision ?? 0) + 1 };
     const patch = JSON.parse(JSON.stringify(diffState(previous, next, cache)));
     previous = next;
     browser.runtime.onMessage.emit({ type: 'palside/state-patch', patch }, sender, () => {});

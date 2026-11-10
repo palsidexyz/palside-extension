@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
-import { clockTime, errorMessage, localeOrEnglish } from '@palside/i18n';
+import { clockTime, deadlineTime, errorMessage, localeOrEnglish } from '@palside/i18n';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { Crown, Minus, Plus, X } from 'lucide-react';
 import { motionPresets } from '@palside/design/motion';
@@ -158,7 +158,7 @@ function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; det
     return () => { live = false; clearTimeout(timer); };
   }, [got, reduced, coins]);
   const status = packet.status === 'refunded' ? t('extension.wallet.refunded') : packet.status === 'exhausted' ? t('extension.wallet.gone') : packet.expiresAt <= c.now ? t('extension.wallet.packetExpired')
-    : mine ? t('extension.wallet.closesAt', { time: new Date(packet.expiresAt).toLocaleString([], { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }) : t(`extension.wallet.eligibility.${detail.eligibility}`);
+    : mine ? t('extension.wallet.closesAt', { time: deadlineTime(packet.expiresAt, localeOrEnglish(locale), c.now) }) : t(`extension.wallet.eligibility.${detail.eligibility}`);
   return <div className={`${s.page} ${s.sheetContent} ${p.result}`}>
     <IconButton size="sm" variant="quiet" className={p.close} label={t('common.close')} onClick={onClose}><X size={18} /></IconButton>
     <div className={p.hero}>
@@ -279,7 +279,7 @@ export function PacketPage({ c }: { c: PalsideController }) {
 }
 
 /**
- * The live packets of a room, as one banner under 看法: who sent it, how many are left and one button whose state says
+ * The live packets of a room, as one banner above the lines: who sent it, how many are left and one button whose state says
  * everything. Several at once: the envelope becomes a small stack and a 1/3 pager steps through them.
  */
 export function RoomPacketBanner({ c, packets }: { c: PalsideController; packets: Packet[] }) {

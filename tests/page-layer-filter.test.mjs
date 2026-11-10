@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { parseHTML } from 'linkedom';
-import { readable } from '../apps/extension/src/page-layer/targets.ts';
-import { normalizeSiteHost } from '../apps/extension/src/domain/assets/site-host.ts';
+import { readable } from '../apps/extension/src/page-layer/page-text.ts';
+import { displayHost, normalizeSiteHost } from '../apps/extension/src/domain/assets/site-host.ts';
 
 function region(markup) {
   const { document } = parseHTML(`<html><body>${markup}</body></html>`);
@@ -49,12 +49,18 @@ test('privacy descriptions reflect technical exclusions with identical translati
   assert.deepEqual(keys(zh), keys(en));
   const descriptions = value => {
     const found = [];
-    const visit = node => { for (const [key, child] of Object.entries(node)) { if (key === 'read' && child.quote && child.sticky && child.signal) found.push(child); else if (child && typeof child === 'object') visit(child); } };
+    const visit = node => { for (const [key, child] of Object.entries(node)) { if (key === 'read' && child.signal && child.room) found.push(child); else if (child && typeof child === 'object') visit(child); } };
     visit(value); return found[0];
   };
-  for (const kind of ['quote', 'sticky', 'signal']) {
+  for (const kind of ['signal']) {
     assert.match(descriptions(zh)[kind].no, /隐藏内容、画布/);
     assert.doesNotMatch(descriptions(zh)[kind].no, /表单|余额|交易/);
     assert.match(descriptions(en)[kind].no, /hidden content, canvases/);
   }
+});
+
+test('a link reads as its host without scheme or leading www; text that is not a URL has none', () => {
+  assert.equal(displayHost('https://www.dexscreener.com/base/0x1'), 'dexscreener.com');
+  assert.equal(displayHost('https://app.uniswap.org/'), 'app.uniswap.org');
+  assert.equal(displayHost('not a url'), undefined);
 });

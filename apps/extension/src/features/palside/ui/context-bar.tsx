@@ -28,7 +28,7 @@ export function ContextBar({ lead, badge, title, meta, actions = [], onClose, cl
       <span className={s.title}>{title}</span>
       {meta && <span className={s.meta}>{meta}</span>}
     </span>
-    {actions.map(action => <Button key={action.label} size="sm" variant={action.primary ? 'surface' : 'quiet'} className={s.action} data-primary={action.primary || undefined} onClick={action.onClick}>{action.label}</Button>)}
+    {actions.map(action => <Button key={action.label} size="sm" variant={action.primary ? 'solid' : 'quiet'} className={s.action} data-primary={action.primary || undefined} onClick={action.onClick}>{action.label}</Button>)}
     {onClose && closeLabel && <IconButton size="sm" variant="quiet" className={s.close} label={closeLabel} onClick={onClose}><X style={{ width: 14, height: 14 }} /></IconButton>}
   </div>;
 }

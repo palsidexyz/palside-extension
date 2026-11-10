@@ -96,3 +96,20 @@ test('a directory answer still fetching its icon is marked pending until the ico
   assert.equal(tokens.get(asset).logoPending, undefined, 'a settled answer without an icon falls back to the initial');
   assert.ok(published.length >= 3);
 });
+
+test('an unnamed token is loading until the directory answers it is not one, or cannot read it', () => {
+  const { tokens, published } = cache();
+  const other = 'Ethereum:0x0000000000000000000000000000000000000002';
+  assert.deepEqual(tokens.unknownOf([asset, other]), [], 'nothing is unknown before an answer');
+  assert.equal(tokens.putDirectory(other, null), true, 'not a token: shown as unknown');
+  assert.equal(tokens.markUnknown(other), false, 'marked once');
+  assert.deepEqual(tokens.unknownOf([asset, other, other]), [other]);
+  assert.equal(tokens.putDirectory(asset, entry()), true);
+  assert.equal(tokens.markUnknown(asset), false, 'a named token is never unknown');
+  const count = published.length;
+  assert.equal(tokens.putDirectory(other, entry({ address: other.slice(9) })), true, 'a later answer names it');
+  assert.deepEqual(tokens.unknownOf([other]), []);
+  assert.ok(published.length > count);
+  tokens.markUnknown('Ethereum:0x0000000000000000000000000000000000000003'); tokens.clear();
+  assert.deepEqual(tokens.unknownOf(['Ethereum:0x0000000000000000000000000000000000000003']), []);
+});

@@ -47,14 +47,14 @@ test('privacy promises distinguish website data, private content and deliberate 
       encrypted: /Private messages, attachments and Share viewing content are all encrypted on your devices/,
       public: /does not hide all metadata/,
       automatic: /Share viewing.*Page content, your screen and page actions are never shared/,
-      selected: /Quotes and screenshots appear only after you send them/,
+      selected: /Screenshots appear only after you send them/,
     },
     'zh-CN': {
       wallet: /其他网站的钱包或账户数据，包括余额和订单/,
       encrypted: /私密消息、附件与共享在看内容，均在设备端加密/,
       public: /不隐藏全部元数据/,
       automatic: /共享在看.*网页内容、屏幕与页面操作不会共享/,
-      selected: /引用与截图仅在手动发送后可见/,
+      selected: /截图仅在手动发送后可见/,
     },
   };
   for (const [locale, expected] of Object.entries(checks)) {

@@ -16,6 +16,9 @@ export const productColors = {
   darkText: '#EDEDED', // --foreground, dark
   darkTextSecondary: '#9E9E9E', // --ui-text-secondary, dark
   darkInkAccent: '#D0ED78', // --ui-ink-accent, dark
+  darkInkSuccess: '#83D1A0', // --ui-ink-success, dark
+  darkInkWarning: '#E6BA76', // --ui-ink-warning, dark
+  darkInkError: '#F39494', // --ui-ink-error, dark
   inkAccent: '#4B5900', // --ui-ink-accent
   textSecondary: '#6B6B6B', // --ui-text-secondary
   signalInk: '#E8E2CF', // --signal-ink

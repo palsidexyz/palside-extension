@@ -1,4 +1,4 @@
-import { errorMessage,message as uiMessage } from '@palside/i18n';
+import { failureText } from '@palside/i18n';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import type { PanelState } from '../app/use-panel-state';
 import type { PanelActions } from '../app/panel-actions';
@@ -23,7 +23,7 @@ async function startCreate() {
     setFlow('create');
     await identityStep(async () => {
       try { const result = await live!.command('account-generate'); if (!mounted.current || !ownsScreen()) return; setPhrase(result.words); setScreen('new-account'); }
-      catch (error) { if (mounted.current && ownsScreen()) setNotice(error instanceof Error ? errorMessage(error) : uiMessage('common.error')); }
+      catch (error) { if (mounted.current && ownsScreen()) setNotice(failureText(error)); }
     });
   }
 async function previewInvite(url: string) {

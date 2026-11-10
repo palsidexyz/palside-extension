@@ -14,7 +14,16 @@ export type CaptureOp =
 export const MIN_SELECTION = 8;
 export const CAPTURE_IDLE_MS = 2 * MINUTE_MS;
 export const CAPTURE_MAX_MS = 10 * MINUTE_MS;
+/** A text mark holds at most this many user-perceived characters (an emoji or a composed letter counts once). */
 export const IMAGE_TEXT_MAX = 500;
+const graphemes = new Intl.Segmenter('und', { granularity: 'grapheme' });
+/** The first `IMAGE_TEXT_MAX` user-perceived characters of a text mark. */
+export function clipImageText(value: string) {
+  let count = 0, end = 0;
+  for (const part of graphemes.segment(value)) { if (++count > IMAGE_TEXT_MAX) break; end = part.index + part.segment.length; }
+  return value.slice(0, end);
+}
+export const imageTextFits = (value: string) => clipImageText(value).length === value.length;
 export const IMAGE_PEN_POINTS_MAX = 10_000;
 export const COLORS: CaptureColor[] = ['#FF4D4F', '#FFB020', '#22C55E', '#3B82F6'];
 export function clamp(value: number, min: number, max: number) {

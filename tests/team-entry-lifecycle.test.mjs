@@ -60,7 +60,7 @@ function production(overrides = {}) {
     '@palside/shared/rules/interactions': limits,
     '@palside/shared/rules/admin': limits,
     '@palside/shared/contracts/rules': { normalizeInvitePassword: value => value },
-    '@palside/i18n': { message, errorMessage: error => error.message, localeOrEnglish: value => value, deadlineTime: String },
+    '@palside/i18n': { message, errorMessage: error => error.message, failureText: (error, fallback = 'common.error') => error instanceof Error ? error.message : message(fallback), localeOrEnglish: value => value, deadlineTime: String },
     '@palside/ui/button': { Button, IconButton },
     '@palside/ui/field': { Field, Input, Textarea, PinInput, CharacterCount: () => null },
     '@palside/ui/inline-feedback': { InlineFeedback: ({ children }) => h('p', { role: 'alert' }, children) },
@@ -91,6 +91,7 @@ function production(overrides = {}) {
   modules['../../internal/backdrop-dismiss'] = load('packages/ui/src/internal/backdrop-dismiss.ts');
   modules['@palside/ui/sheet'] = load('packages/ui/src/components/sheet/sheet.tsx');
   modules['../ui/text'] = load('apps/extension/src/features/palside/ui/text.ts');
+  modules['../ui/empty-state'] = load('apps/extension/src/features/palside/ui/empty-state.tsx');
   return { ...load('apps/extension/src/features/palside/teams/team-start.tsx'), frames };
 }
 

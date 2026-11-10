@@ -9,3 +9,15 @@ export const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`;
 /** Store builds talk only to these public origins; both are fixed at build time. */
 export const RELEASE_WEBSITE_ORIGIN = 'https://palside.xyz';
 export const RELEASE_API_ORIGIN = 'https://api.palside.xyz';
+
+/** The extension version each request to the service names: an HTTP header, and the live socket's `auth` message. */
+export const EXTENSION_VERSION_HEADER = 'x-palside-version';
+/** A Chrome extension version: one to four dot-separated integers. */
+export const EXTENSION_VERSION = /^(0|[1-9]\d{0,4})(\.(0|[1-9]\d{0,4})){0,3}$/;
+/** Whether `version` is older than `minimum`. A missing or malformed version is older: it comes from a build before versions were sent. */
+export function versionBelow(version: string | undefined, minimum: string) {
+  if (!version || !EXTENSION_VERSION.test(version)) return true;
+  const a = version.split('.').map(Number), b = minimum.split('.').map(Number);
+  for (let i = 0; i < 4; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
+  return false;
+}

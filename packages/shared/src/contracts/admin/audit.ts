@@ -8,7 +8,7 @@ import { accountFields, teamFields, duration } from './moderation.ts';
 
 /** Who caused the event. The server derives it from its own context, never from a request body. */
 export const adminAuditActors = ['operator', 'system', 'host', 'unauthenticated'] as const;
-export const adminAuditTargets = ['account', 'team', 'case', 'report', 'room-message', 'job', 'word', 'settings', 'chain', 'operator', 'dataset'] as const;
+export const adminAuditTargets = ['account', 'team', 'case', 'report', 'room-message', 'job', 'word', 'token', 'settings', 'chain', 'operator', 'dataset'] as const;
 export type AdminAuditActor = typeof adminAuditActors[number];
 export type AdminAuditTarget = typeof adminAuditTargets[number];
 
@@ -17,6 +17,8 @@ const delta = <S extends TSchema>(schema: S) => strictObject({ before: schema, a
 /** `null` = not banned; `expiresAt: null` = permanent. */
 const ban = nullable(strictObject({ expiresAt: nullable(Type.Integer()) }));
 const word = strictObject({ word: Type.String(), kind: Type.Enum(['reserved', 'sensitive']), builtin: Type.Boolean() });
+const blocks = strictObject({ name: Type.Boolean(), logo: Type.Boolean() });
+const token = strictObject({ chain: Type.String(), address: Type.String(), name: nullable(Type.String()), symbol: nullable(Type.String()) });
 const credentialContext = Type.Enum(['login', 'change-password', 'change-totp']);
 const revoked = strictObject({ sessionsRevoked: count });
 const none = strictObject({});
@@ -39,6 +41,8 @@ export const adminAuditRegistry = {
   'view-private-report': event('首次提供私密举报内容', 'moderation', 'report', strictObject({ surface: Type.Enum(['text', 'image']) })),
   'add-word': event('添加词', 'moderation', 'word', strictObject({ word })),
   'remove-word': event('删除词', 'moderation', 'word', strictObject({ word })),
+  'block-token': event('隐藏代币资料', 'moderation', 'token', strictObject({ token, before: blocks, after: blocks })),
+  'refresh-token': event('重新读取代币', 'moderation', 'token', strictObject({ token })),
   settings: event('修改注册与举报设置', 'config', 'settings', delta(strictObject({ reportThreshold: Type.Integer({ minimum: REPORT_THRESHOLD.min, maximum: REPORT_THRESHOLD.max }), signupMode: Type.Enum(SIGNUP_MODES) }))),
   'chain-config': event('修改链上配置', 'config', 'chain', delta(chainConfig)),
   'seed-local-development': event('载入演示数据', 'config', 'dataset', strictObject({ seedVersion: Type.Literal(1), rows: Type.Array(strictObject({ table: Type.String(), rows: Type.Array(Type.Record(Type.String(), Type.String())) })) })),

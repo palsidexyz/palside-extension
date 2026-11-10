@@ -2,12 +2,12 @@
 import { SECOND_MS } from '@palside/shared/units';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { NICKNAME_LENGTH, PIN_LENGTH } from '@palside/shared/rules/accounts';
-import { errorMessage, message as uiMessage, type TextValue } from '@palside/i18n';
+import { message as uiMessage,type TextValue,failureText } from '@palside/i18n';
 import { ENGLISH_WORDS } from '@palside/shared/identity';
 import { useTranslations } from 'use-intl';
-import { Count, DrawnCheck, Swap } from '../ui/motion-details';
+import { Count, Roll } from '../ui/motion-details';
 import type { SignupPhase } from '../../../runtime/composition/runtime-state';
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowLeft, Check, Copy, Eye, ShieldAlert, Users } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { avatarPath, type DefaultAvatarName } from '@palside/shared/person-avatars';
@@ -17,6 +17,7 @@ import { Input, PinInput, Field } from '@palside/ui/field';
 import { Action } from '../ui/primitives';
 import { Brand } from '../ui/brand';
 import { LanguageSetting } from '../settings/language-setting';
+import { AppearanceSetting } from '../settings/appearance';
 import { characterLength } from '../../../domain/chat/model';
 import { useText, useTextState } from '../ui/text';
 import type { PalsideController } from '../app/use-palside';
@@ -24,7 +25,6 @@ import edge from '../feedback/edge-states.module.css';
 import o from './onboarding.module.css';
 
 const words = new Set(ENGLISH_WORDS);
-const failure = (error: unknown, fallback: string): TextValue => error instanceof Error ? errorMessage(error) : uiMessage(fallback);
 export const onboardingScreens = ['welcome', 'new-account', 'confirm-phrase', 'restore', 'password', 'nickname'];
 
 type StepKey = 'stepPhrase' | 'stepVerify' | 'stepPassword' | 'stepName';
@@ -76,7 +76,8 @@ function Step({ title, lead, help, hero, footer, children, onSubmit }: { title: 
 const signupPhases: SignupPhase[] = ['seal', 'register', 'connect', 'wallet'];
 const phaseTitle = { seal: 'phaseSeal', register: 'phaseRegister', connect: 'phaseConnect', wallet: 'phaseWallet' } as const;
 
-/** Registration names the part the runtime reports it is in; nothing advances on a timer. Four segments say how many parts are left, not how long. */
+/** Registration names the part the runtime reports it is in; nothing advances on a timer. The mark stays put for the whole wait:
+    its eyes bob like a typing indicator, one bar fills by finished parts, the title rolls, and on success the check is drawn in the same tile. */
 function Working({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -86,12 +87,14 @@ function Working({ c }: { c: PalsideController }) {
   const phase = signupPhases[index];
   const title = done ? t(c.flow === 'create' ? 'extension.copy.createDone' : 'extension.copy.restoreDone')
     : phase === 'register' && c.flow === 'restore' ? t('extension.copy.phaseAddDevice') : t(`extension.copy.${phaseTitle[phase ?? 'seal']}`);
-  return <div className={o.working} role="status" aria-live="polite">
-    <Swap k={done ? 'done' : 'mark'} className={o.workingSlot}>{done ? <DrawnCheck /> : <span className={o.workingMark} aria-hidden="true"><img src="/brand/palside.svg" alt="" draggable={false} /></span>}</Swap>
-    <h1 ref={heading} tabIndex={-1}><Swap k={title}>{title}</Swap></h1>
-    <ol className={o.phases} aria-label={t(c.flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')}>
-      {signupPhases.map((step, at) => <li key={step} data-state={at < index ? 'done' : at === index ? 'current' : 'upcoming'} />)}
-    </ol>
+  return <div className={o.working} role="status" aria-live="polite" data-done={done || undefined}>
+    <span className={o.workingMark} aria-hidden="true">
+      <svg className={o.workingLogo} viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="32" fill="#CCFF00" /><path d="M38 33H90A4 4 0 0 1 94 37V75A4 4 0 0 1 90 79H59.333Q58 79 56.933 79.8L36.4 95.2Q34 97 34 94V37A4 4 0 0 1 38 33Z" fill="#202121" /><circle className={o.eye} cx="53" cy="56" r="5" fill="#CCFF00" /><circle className={o.eye} cx="75" cy="56" r="5" fill="#CCFF00" /></svg>
+      <svg className={o.workingCheck} viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2L18.5 7.8" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" pathLength={1} /></svg>
+    </span>
+    <h1 ref={heading} tabIndex={-1} className={o.workingTitle}><Roll k={title}>{title}</Roll></h1>
+    <span className={o.phaseBar} role="progressbar" aria-label={t(c.flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')} aria-valuemin={0} aria-valuemax={signupPhases.length} aria-valuenow={index}
+      style={{ '--done': index / signupPhases.length, '--at': Math.min(index, signupPhases.length - 1) / signupPhases.length } as CSSProperties} />
     {c.live?.state?.signupWaiting && <p className={o.waiting}>{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>}
   </div>;
 }
@@ -291,7 +294,7 @@ function ConfirmPhrase({ c }: { c: PalsideController }) {
   const question = questions[Math.min(round, questions.length - 1)]!;
   async function create() {
     if (!active.current || !c.ownsScreen() || c.authBusy) return;
-    setError(''); try { await c.createAccount(); } catch (cause) { if (active.current && c.ownsScreen()) setError(failure(cause, 'common.error')); }
+    setError(''); try { await c.createAccount(); } catch (cause) { if (active.current && c.ownsScreen()) setError(failureText(cause)); }
   }
   function choose(word: string) {
     if (!active.current || !c.ownsScreen() || chosen || finished) return;
@@ -334,7 +337,7 @@ function RestorePhrase({ c }: { c: PalsideController }) {
   async function submit() {
     if (!valid || c.authBusy) return;
     setError(''); try { await c.restoreAccount(phrase); }
-    catch (cause) { if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ACCOUNT_NOT_FOUND') setPhrase(Array(12).fill('')); setError(failure(cause, 'common.error')); }
+    catch (cause) { if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ACCOUNT_NOT_FOUND') setPhrase(Array(12).fill('')); setError(failureText(cause)); }
   }
   return <Step title={t('extension.copy.restoreTitle')} lead={t('extension.copy.restoreHint')} help={{ label: t('extension.copy.restorePasteHint'), content: t('extension.copy.restorePasteHint') }} onSubmit={() => void submit()} footer={<Button type="submit" variant="primary" size="lg" loading={c.authBusy} loadingLabel={t('extension.copy.signingIn')} disabled={!valid}>{t('extension.copy.signIn')}</Button>}>
     <div className={o.sheet}>
@@ -356,7 +359,7 @@ function PasswordSetup({ c }: { c: PalsideController }) {
   const [error, setError] = useTextState();
   async function submit() {
     if (pin.length < PIN_LENGTH || c.authBusy) return;
-    setError(''); try { await c.setPassword(pin); } catch (cause) { setError(failure(cause, 'common.error')); }
+    setError(''); try { await c.setPassword(pin); } catch (cause) { setError(failureText(cause)); }
   }
   return <Step title={t('extension.copy.passwordTitle')} lead={t('extension.copy.passwordHint')} help={{ label: t('extension.copy.passwordHelpLabel'), content: t('extension.copy.passwordHelp') }} onSubmit={() => void submit()}
     footer={<Button type="submit" variant="primary" size="lg" loading={c.authBusy} loadingLabel={t('common.working')} disabled={pin.length < PIN_LENGTH}>{t(c.flow === 'create' ? 'extension.copy.createAccount' : 'extension.copy.signIn')}</Button>}>
@@ -382,7 +385,7 @@ function Nickname({ c }: { c: PalsideController }) {
       else c.setPeople(old => old.map(person => person.id === c.data.self ? { ...person, name: name.trim() } : person));
       if (c.data.pendingInvite) c.openInvitation();
       else c.go('chat');
-    } catch (cause) { setError(failure(cause, 'extension.copy.profileSaveFailed')); }
+    } catch (cause) { setError(failureText(cause, 'extension.copy.profileSaveFailed')); }
     finally { setBusy(false); }
   }
   return <Step title={t('extension.copy.yourNameTitle')} lead={t('extension.copy.nicknameLead')} onSubmit={() => void submit()} footer={<Button type="submit" variant="primary" size="lg" loading={busy} loadingLabel={t('common.working')} disabled={!name.trim() || Boolean(invalid)}>{t('extension.copy.finishSetup')}</Button>}>
@@ -403,7 +406,7 @@ export function Onboarding({ c }: { c: PalsideController }) {
   return <section ref={shell} className={o.shell} data-screen={c.working ? 'working' : c.screen} aria-label={t('extension.copy.onboardingSteps')}>
     <header className={o.header}>
       {back ? <Action label={t('common.back')} onClick={() => c.go(c.screen === 'confirm-phrase' ? 'new-account' : 'welcome')}><ArrowLeft /></Action> : <Brand />}
-      {c.live && <LanguageSetting compact />}
+      <span className={o.headerTools}><AppearanceSetting compact />{c.live && <LanguageSetting compact />}</span>
     </header>
     <Steps c={c} />
     {c.working && <div className={o.body}><Working c={c} /></div>}

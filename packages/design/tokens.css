@@ -20,6 +20,8 @@
   /* Plates behind site logos drawn for the other theme: a near-black mark in dark mode, a near-white one in light mode. */
   --ui-logo-plate-light: var(--ui-control-surface);
   --ui-logo-plate-dark: #2A2A2A;
+  --ui-glyph-plate-light: transparent;
+  --ui-glyph-plate-dark: #2A2A2A;
   --ui-text-primary: var(--foreground);
   --ui-text-secondary: #6B6B6B;
   /* Robin Neon: https://docs.robinhood.com/chain/brand-guidelines/ */
@@ -122,6 +124,8 @@
   --ui-control-surface: #F4F4F4;
   --ui-logo-plate-light: var(--ui-control-surface);
   --ui-logo-plate-dark: #2A2A2A;
+  --ui-glyph-plate-light: transparent;
+  --ui-glyph-plate-dark: #2A2A2A;
   --ui-control-hover: #EBEBEB;
   --ui-control-recess: #E7E7E7;
   --ui-disabled-surface: #EDEDED;
@@ -155,6 +159,8 @@
   --ui-control-surface: #1F1F1F;
   --ui-logo-plate-light: #F4F4F4;
   --ui-logo-plate-dark: var(--ui-control-surface);
+  --ui-glyph-plate-light: #F4F4F4;
+  --ui-glyph-plate-dark: transparent;
   --ui-control-hover: #292929;
   --ui-control-recess: #191919;
   --ui-disabled-surface: #242424;
@@ -187,6 +193,8 @@
   --ui-control-surface: #1F1F1F;
   --ui-logo-plate-light: #F4F4F4;
   --ui-logo-plate-dark: var(--ui-control-surface);
+  --ui-glyph-plate-light: #F4F4F4;
+  --ui-glyph-plate-dark: transparent;
   --ui-control-hover: #292929;
   --ui-control-recess: #191919;
   --ui-disabled-surface: #242424;

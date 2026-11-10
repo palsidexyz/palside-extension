@@ -1,7 +1,7 @@
 import { pageMatches, pageScript } from '../apps/extension/src/runtime/browser/page-layer-host.ts';
 import { readFile, access, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { validateExtensionManifest, validatePageLayerRegistration } from "./lib/extension-artifact.mjs";
+import { chartBridgePolicy, validateChartBridge, validateExtensionManifest, validatePageLayerRegistration } from "./lib/extension-artifact.mjs";
 import { RELEASE_API_ORIGIN, RELEASE_WEBSITE_ORIGIN } from '../packages/shared/src/extension.ts';
 import { verifyThirdPartyLicenses } from './third-party-licenses.mjs';
 import { brandIconSizes, renderBrandPng } from './lib/brand-assets.mjs';
@@ -56,6 +56,7 @@ for (const path of [manifest.side_panel?.default_path, manifest.background?.serv
 }
 try { await access(new URL('content-scripts/page.js', root)); errors.push('Page-reading script found in the artifact'); } catch { /* No automatic page script is allowed. */ }
 try { await access(new URL('page-layer.js', root)); } catch { errors.push('Missing page-layer.js build asset'); }
+errors.push(...validateChartBridge(await readFile(new URL(chartBridgePolicy.file, root), 'utf8').catch(() => '')));
 const pages = await Promise.all(['sidepanel.html', 'image.html', 'offscreen.html', 'welcome.html'].map(async path => ({ path, html: await readFile(new URL(path, root), 'utf8') })));
 let fontCount = 0;
 for (const entry of await readdir(new URL("assets/", root))) {
@@ -76,4 +77,4 @@ for (const { path, html } of pages) {
   if (/<script[^>]+src=["']https?:/i.test(html) || /localhost|127\.0\.0\.1/.test(html)) errors.push(`Production page contains remote/development script URLs: ${path}`);
 }
 if (errors.length) { console.error(errors.join("\n")); process.exitCode = 1; }
-else console.log("Chrome MV3 artifact verified: local panel, local service worker, pinned extension ID with activeTab, optional notifications, browsing history and per-site access, no required host grants, local Rust crypto WebAssembly.");
+else console.log("Chrome MV3 artifact verified: local panel, local service worker, pinned extension ID with activeTab, optional notifications, browsing history, tab group names and per-site access, no required host grants, local Rust crypto WebAssembly.");

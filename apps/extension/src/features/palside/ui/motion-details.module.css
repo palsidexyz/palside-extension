@@ -1,5 +1,6 @@
 /* Shared motion bits: in-place phrase swaps, the drawn check and its ring, content that rises in. */
 .swap { position:relative; display:inline-grid; vertical-align:middle; }
+.roll { position:relative; display:inline-grid; vertical-align:top; overflow:hidden; overflow-clip-margin:2px; }
 .swapLayer { grid-area:1/1; display:inline-flex; align-items:center; justify-content:inherit; gap:inherit; }
 .done { position:relative; display:grid; place-items:center; width:56px; height:56px; border-radius:50%; background:var(--ui-accent); color:var(--ui-on-accent); }
 .done svg { position:relative; width:28px; height:28px; }

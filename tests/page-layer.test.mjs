@@ -1,17 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { abbreviate, sameAddress, caption, quoteContext } from '../apps/extension/src/page-layer/text.ts';
+import { caption, quoteContext, randomId } from '../apps/extension/src/page-layer/text.ts';
 import { defaultDanmakuSettings, normalizeDanmakuSettings } from '../apps/extension/src/runtime/browser/page-protocol.ts';
 import { danmakuAreaRect, createMediaClock } from '../apps/extension/src/page-layer/danmaku-helpers.ts';
 
-test('abbreviated addresses compare by first six and last four characters', () => {
-  assert.equal(abbreviate('0x12ab34567890cd34'), '0x12ab…cd34');
-  assert.equal(sameAddress('0x12ab34…cd34', '0x12ab34567890cd34'), true);
-  assert.equal(sameAddress('0x12ab34…cd34', '0x12ac35…cd34'), false);
+test('page-layer ids are v4 UUIDs without the secure-context crypto.randomUUID', () => {
+  const original = crypto.randomUUID;
+  Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: undefined });
+  try {
+    const id = randomId();
+    assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.notEqual(id, randomId());
+  } finally { Object.defineProperty(crypto, 'randomUUID', { configurable: true, writable: true, value: original }); }
 });
 
-test('captions stay compact for addresses and quotes', () => {
-  assert.equal(caption({ kind: 'address', text: '0x12ab34567890cd34' }), '0x12ab…cd34');
+test('captions stay compact', () => {
   assert.equal(caption({ kind: 'quote', exact: 'hello world', prefix: '', suffix: '' }), '“hello world”');
   assert.ok(Array.from(caption({ kind: 'quote', exact: 'x'.repeat(200), prefix: '', suffix: '' })).length <= 40);
 });
@@ -26,7 +29,7 @@ test('quote context keeps exact text and up to 24 characters around it', () => {
 
 test('danmaku settings validate defaults and clamp opacity', () => {
   assert.deepEqual(normalizeDanmakuSettings(undefined), defaultDanmakuSettings);
-  assert.deepEqual(normalizeDanmakuSettings({ enabled: false, area: 'full', speed: 190, opacity: 120 }), { enabled: false, area: 100, density: 'mid', speed: 190, size: 'md', opacity: 100 });
+  assert.deepEqual(normalizeDanmakuSettings({ enabled: false, area: 100, speed: 190, opacity: 120 }), { enabled: false, area: 100, density: 'mid', speed: 190, size: 'md', opacity: 100 });
   assert.deepEqual(normalizeDanmakuSettings({ area: 'bad', speed: 3, opacity: 1 }), { ...defaultDanmakuSettings, opacity: 30 });
 });
 
@@ -44,10 +47,8 @@ test('danmaku area is a band from the top of the viewport, a quarter by default'
   assert.deepEqual(danmakuAreaRect(800, 600, 100), { top: 0, left: 0, width: 800, height: 600 });
 });
 
-test('stored danmaku areas from earlier builds map onto the viewport bands', () => {
-  assert.equal(normalizeDanmakuSettings({ area: 'chart' }).area, 25);
-  assert.equal(normalizeDanmakuSettings({ area: 'top' }).area, 25);
-  assert.equal(normalizeDanmakuSettings({ area: 'full' }).area, 100);
+test('danmaku areas are the viewport bands; anything else starts at the top quarter', () => {
+  assert.equal(normalizeDanmakuSettings({ area: 'full' }).area, 25);
   assert.equal(normalizeDanmakuSettings({ area: 75 }).area, 75);
   assert.equal(normalizeDanmakuSettings({ area: 40 }).area, 25);
 });

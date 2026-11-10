@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sessionScope } from '../apps/extension/src/runtime/account/session.ts';
-import { STICKY_EVENT, teamEventContent } from '../apps/extension/src/domain/annotations/social.ts';
 import { ApiError } from '../apps/extension/src/runtime/transport/api.ts';
 import { registerHooks } from 'node:module';
 
@@ -18,7 +17,6 @@ const { RuntimeCommands } = await import('../apps/extension/src/runtime/composit
 const { TimelineRuntime } = await import('../apps/extension/src/runtime/chat/timeline.ts');
 const { LocalDataRuntime } = await import('../apps/extension/src/runtime/media/cache.ts');
 const { SharingRuntime } = await import('../apps/extension/src/runtime/viewing/sharing.ts');
-const { TeamInteractions } = await import('../apps/extension/src/runtime/annotations/interactions.ts');
 const bridge = await import('../apps/extension/src/runtime/transport/bridge.ts');
 if (chromeDescriptor) Object.defineProperty(globalThis, 'chrome', chromeDescriptor);
 else delete globalThis.chrome;
@@ -29,8 +27,8 @@ test('all room and invite commands route their payload to the owned service', as
   const routes = [
     ['room-watch', 'watch', { id: 'panel:summary', view: key }, ['panel:summary', key]],
     ['room-panels', 'panelChanged', { connected: true }, [true]], ['room-tab', 'tabChanged', { asset: key.slice(6), site: 'gmgn' }], ['room-open', 'open', { key }], ['room-close', 'close', {}, []],
-    ['room-send', 'send', { text: 'hi' }, ['hi']], ['room-more', 'more', {}, []], ['room-find', 'find', { key, id: 'm' }, [key, 'm']], ['room-retract', 'retract', { id: 'm' }, ['m']], ['room-report', 'report', { id: 'm' }, ['m']],
-    ['room-stance', 'stance', { key, value: 'bull' }, [key, 'bull']], ['room-summary', 'summary', { key }, [key]], ['room-people', 'people', { key }, [key]], ['room-hot', 'watchHot', { sourceId: 'panel', chain: 'Solana' }],
+    ['room-send', 'send', { text: 'hi' }, ['hi']], ['room-more', 'more', {}, []], ['room-retract', 'retract', { id: 'm' }, ['m']], ['room-report', 'report', { id: 'm' }, ['m']],
+    ['room-like', 'like', { key, id: 'message', liked: true }, [key, 'message', true]], ['room-summary', 'summary', { key }, [key]], ['room-people', 'people', { key }, [key]], ['room-hot', 'watchHot', { sourceId: 'panel', chain: 'Solana' }],
     ['room-block', 'block', { accountId: 'peer', blocked: true }, ['peer', true]], ['room-blocks', 'blocks', {}, []], ['room-settings', 'settings', { off: true }],
     ['invite-list', 'invites', {}, []], ['invite-options', 'inviteOptions', { accountId: 'peer' }, ['peer']], ['invite-send', 'inviteSend', { teamId: 'team', accountId: 'peer' }, ['team', 'peer']],
     ['invite-accept', 'inviteAccept', { id: 'i' }, ['i']], ['invite-ignore', 'inviteIgnore', { id: 'i' }, ['i']], ['invite-settings', 'inviteSettings', { accept: false }, [false]], ['team-invite-permission', 'invitePermission', { teamId: 'team', on: true }, ['team', true]],
@@ -57,23 +55,17 @@ test('panel bridge emits validated open-room keys, unsubscribes, ignores disconn
   await assert.rejects(bridge.command('room-send', { text: 'hi' }), error => error.code === 'ROOM_SLOW' && error.retryAfterMs === 1234);
 });
 
-test('team timeline ignores unsupported event types but still caches encrypted stickies', async () => {
-  const session = { account: { id: 'self' } }, writes = [], stickies = [];
+test('team timeline ignores unsupported event types', async () => {
+  const session = { account: { id: 'self' } }, writes = [];
   const runtime = {
     auth: { session, scope: () => sessionScope(() => true, () => Error('changed')) },
-    state: { remoteTeams: [{ id: 'team', roomId: 'room', memberIds: ['peer'], people: [{ id: 'peer', matrixId: '@peer' }], periods: [{ joinedAt: 0, leftAt: null }], retentionDays: 30 }], items: { stickies: [] } },
-    interactions: { upsertSticky: item => stickies.push(item) }, storage: { async cache(...args) { writes.push(args); return []; } }, cache: { evictCachedContent() {} }, emit() {},
+    state: { remoteTeams: [{ id: 'team', roomId: 'room', memberIds: ['peer'], people: [{ id: 'peer', matrixId: '@peer' }], periods: [{ joinedAt: 0, leftAt: null }], retentionDays: 30 }] },
+    storage: { async cache(...args) { writes.push(args); return []; } }, cache: { evictCachedContent() {} }, emit() {},
   };
   runtime.cache = Object.assign(new LocalDataRuntime(runtime), runtime.cache);
-  const timeline = new TimelineRuntime(runtime), content = teamEventContent(key.slice(6), { text: 'keep' });
+  const timeline = new TimelineRuntime(runtime), content = { text: 'keep' };
   const event = type => ({ status: null, getRoomId: () => 'room', getId: () => '$id', isEncrypted: () => true, isBeingDecrypted: () => false, shouldAttemptDecryption: () => false, isDecryptionFailure: () => false, isRedaction: () => false, isRedacted: () => false, getTs: () => Date.now(), getType: () => type, getContent: () => content, getUnsigned: () => ({}), getSender: () => '@peer' });
-  await timeline.consume(event('com.palside.unknown-a')); await timeline.consume(event('com.palside.unknown-b')); assert.equal(writes.length, 0); assert.equal(stickies.length, 0);
-  await timeline.consume(event(STICKY_EVENT)); assert.equal(writes.length, 1); assert.equal(writes[0][2].kind, 'stickies'); assert.equal(stickies[0].text, 'keep');
-});
-
-test('unsupported team event sends fail before encryption or persistence', async () => {
-  const interactions = new TeamInteractions({ auth: { session: {} } });
-  for (const kind of ['danmaku', 'unknown-kind', '']) await assert.rejects(interactions.teamEvent('team', kind, {}), error => error.text?.key === 'common.error');
+  await timeline.consume(event('com.palside.unknown-a')); await timeline.consume(event('com.palside.unknown-b')); assert.equal(writes.length, 0);
 });
 
 test('invite writes reuse their durable operation key after an unknown outcome', async () => {
@@ -103,7 +95,7 @@ function privateFixture() {
     sending: { outgoing: new Map() },
     storage: { async remove(key) { removed.push(key); } },
     cache: { eventTimes: new Map(), expiresAt: message => message.expiresAt, async cacheMessage(message) { writes.push(structuredClone(message)); }, pruneViews() {}, evictCachedContent() {}, upsertView() {} },
-    interactions: { stickyRecords: [], refreshStickies() {}, async rememberAnnotationDeletion() {} }, emit() {},
+    signals: { async pruneRecords() { return false; }, evicted() { return false; }, serviceNow: () => Date.now(), toLocal: time => time }, emit() {},
   };
   runtime.cache = Object.assign(new LocalDataRuntime(runtime), runtime.cache);
   return { runtime, timeline: new TimelineRuntime(runtime), writes, removed };

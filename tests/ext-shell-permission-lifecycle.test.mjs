@@ -42,7 +42,7 @@ function fixture() {
     message: key => key, errorMessage: error => error?.message ?? 'common.error',
     MessageError: class extends Error {},
     broadOrigin: value => value === '<all_urls>', grantedHost: value => /^https:\/\/([^/]+)\/\*$/.exec(value)?.[1],
-    getHostPermissions: async () => [], notificationsGranted: async () => false, tabsGranted: async () => false,
+    getHostPermissions: async () => [], notificationsGranted: async () => false, tabsGranted: async () => false, tabGroupsGranted: async () => false,
     watchPermissions: listener => { events.add(listener); return () => events.delete(listener); },
     requestNotifications: () => { const job = deferred(); requests.push(job); return job.promise; },
     requestSitesAccess: hosts => { const job = deferred(); requests.push({ hosts, ...job }); return job.promise; },
@@ -55,10 +55,11 @@ function fixture() {
     permissionRemovalPending: () => false,
     normalizeSiteHost: host => host, siteCategories: [], siteCategory: () => undefined,
     siteOf: (_c, host) => ({ id: host, name: host, domain: host }),
-    siteTags: () => ({}), interactionFeatures: [],
+    siteTags: () => ({}),
     readSiteInteractions: value => value && typeof value === 'object' ? value : undefined,
-    siteInteraction: (sites, host) => sites?.[host] ?? { on: true, danmaku: true, signal: true, sticky: true },
-    pageSite: c => c.pageHost ? { id: c.pageHost, name: c.pageHost, domain: c.pageHost } : undefined, roomsOn: () => true, shownStickyCount: () => 0,
+    siteInteraction: (sites, host) => sites?.[host] ?? { on: true, danmaku: true, signal: true },
+    withSiteInteraction: (sites, host, value) => ({ ...sites, [host]: value }),
+    pageSite: c => c.pageHost ? { id: c.pageHost, name: c.pageHost, domain: c.pageHost } : undefined, roomsOn: () => true,
     pageUnusable: () => false, shareShown: () => true, useShare: () => ({ state: 'off', enabled: true, set() {} }),
   };
   api.askSiteAccess = host => api.requestSitesAccess([host]);
@@ -148,8 +149,8 @@ test('rapid per-site edits merge pending feature flags before a snapshot arrives
   const f = fixture(), writes = [];
   f.c.live.command = (name, patch) => { const gate = deferred(); writes.push({ name, patch: plain(patch), ...gate }); return gate.promise; };
   const { actions } = pageActions(f);
-  actions.setSite('example.com', { signal: false }); actions.setSite('example.com', { sticky: false });
-  assert.deepEqual(writes[1].patch.siteInteraction, { 'example.com': { on: true, danmaku: true, signal: false, sticky: false } });
+  actions.setSite('example.com', { signal: false }); actions.setSite('example.com', { danmaku: false });
+  assert.deepEqual(writes[1].patch.siteInteraction, { 'example.com': { on: true, danmaku: false, signal: false } });
   writes[0].resolve(); writes[1].resolve(); await drain();
   assert.equal(f.calls.length, 0);
 });
@@ -158,7 +159,7 @@ test('per-site interaction changes only that host and do not request Chrome acce
   const f = fixture();
   const { actions } = pageActions(f);
   await actions.setSite('example.com', { on: false });
-  assert.deepEqual(f.calls, [['preferences', { siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true, sticky: true } }, accountId: 'alice' }]]);
+  assert.deepEqual(f.calls, [['preferences', { siteInteraction: { 'example.com': { on: false, danmaku: true, signal: true } }, accountId: 'alice' }]]);
   assert.equal(f.requests.length, 0);
 });
 
@@ -251,7 +252,7 @@ test('AllSitesSheet preserves click-time closure and ignores a replacement sheet
   const field = 'allSites';
   f.social.setSocialUi({ [field]: true });
   const hook = f.mount(api.AllSitesSheet); let tree = hook.render({ c: f.c });
-  const click = () => nodes(tree, node => node.type === 'Button' && node.props.variant === 'surface')[0].props.onClick();
+  const click = () => nodes(tree, node => node.type === 'Button' && node.props.variant === 'solid')[0].props.onClick();
   click();
   assert.equal(f.requests.length, 1); assert.equal(f.social.captureSocialUi().snapshot()[field], undefined);
   f.social.setSocialUi({ [field]: true }); tree = hook.render({ c: f.c });

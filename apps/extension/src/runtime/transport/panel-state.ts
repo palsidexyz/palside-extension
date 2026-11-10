@@ -10,6 +10,10 @@ export function stateForPanel(state: RuntimeState, windowId: number | undefined)
   if (state.jumpMessageId && (windowId === undefined || state.jumpWindowId !== windowId)) {
     result = { ...state, jumpMessageId: undefined, jumpWindowId: undefined };
   }
+  // 弹幕 follows the panel window the user last worked in; any other window's panel says so instead of waiting.
+  const rooms = state.rooms as RuntimeState['rooms'] | undefined;
+  const elsewhere = windowId !== undefined && rooms?.window !== undefined && rooms.window !== windowId;
+  if (rooms && elsewhere !== Boolean(rooms.elsewhere)) result = { ...result, rooms: { ...result.rooms, elsewhere } };
   let byWindow = memo.get(state);
   if (!byWindow) {
     byWindow = new Map();

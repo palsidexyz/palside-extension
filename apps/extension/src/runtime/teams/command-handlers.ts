@@ -155,14 +155,12 @@ export async function teamPreferencesCommand(this: RuntimeCommands, command: Ext
     const scope = runtime.auth.scope();
  const teamId = text('teamId' in p ? p.teamId : undefined);
 await scope.wait(runtime.api.request('teams.preferences', { params: { id: teamId }, body: { muted: p.muted, readIds: p.readIds } }));
-    // A saved mute settles the switch now; the wider refresh follows without holding it.
-    if (typeof p.muted === 'boolean') {
-      const muted = p.muted, remote = runtime.state.remoteTeams.find(t => t.id === teamId);
-      if (remote) remote.preferences = { ...remote.preferences, muted };
-      runtime.state.data.teams = runtime.state.data.teams.map(t => t.id === teamId ? { ...t, muted } : t); runtime.emit();
-      void runtime.refresh().catch(() => {}); return { done: true };
-    }
-    await scope.wait(runtime.refresh()); return { done: true };
+    // The service saved exactly this: it applies here at once, and the account's other devices get a refresh push.
+    const remote = runtime.state.remoteTeams.find(t => t.id === teamId);
+    const muted = typeof p.muted === 'boolean' ? p.muted : undefined, readIds = Array.isArray(p.readIds) ? p.readIds.filter((id): id is string => typeof id === 'string') : [];
+    if (remote) remote.preferences = { ...remote.preferences, ...(muted === undefined ? {} : { muted }), readIds: [...new Set([...remote.preferences.readIds, ...readIds])] };
+    if (muted !== undefined) runtime.state.data.teams = runtime.state.data.teams.map(t => t.id === teamId ? { ...t, muted } : t);
+    runtime.emit(); return { done: true };
 }
 
 export async function invitationCommand(this: RuntimeCommands, command: Extract<Command, { name: "invitation" }>) {
@@ -238,6 +236,23 @@ export async function lobbyCommand(this: RuntimeCommands, command: Extract<Comma
   }
 }
 
+/**
+ * A captain approved, rejected or the application expired on another device: the open lobby's 我的申请 reloads its first page, so the
+ * applicant never acts on a stale row.
+ */
+export async function refreshLobbyApplications(commands: RuntimeCommands) {
+  const runtime = commands.runtime, lobby = lobbies.get(commands);
+  if (!lobby || runtime.auth.session !== lobby.session || lobby.loading.applications) return;
+  const scope = runtime.auth.scope();
+  const applications = await scope.wait(runtime.api.request('teams.applications', { query: {} }));
+  if (lobbies.get(commands) !== lobby || runtime.auth.session !== lobby.session) return;
+  lobby.applications = applications.applications; lobby.next.applications = applications.next;
+  await publishLobby(commands, lobby);
+}
+
+/** The lobby left the screen: account changes stop reloading its 我的申请; the next visit loads it afresh. */
+export async function lobbyCloseCommand(this: RuntimeCommands) { lobbies.delete(this); }
+
 /** Appends the next page of one lobby list; concurrent calls for the same list share one request. */
 export async function lobbyMoreCommand(this: RuntimeCommands, command: Extract<Command, { name: 'lobby-more' }>) {
   const runtime = this.runtime;
@@ -295,4 +310,5 @@ export const teamsHandlers = {
   'invitation': invitationCommand,
   'lobby': lobbyCommand,
   'lobby-more': lobbyMoreCommand,
+  'lobby-close': lobbyCloseCommand,
 } satisfies HandlerRegistry;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createContext } from '../apps/extension/src/background/context.ts';
 import { images } from '../apps/extension/src/background/images.ts';
+import { defaultAvatar, teamDefaultAvatars } from '../packages/shared/src/person-avatars.ts';
 
 function fixture() {
   const calls = [];
@@ -42,4 +43,27 @@ test('background avatar failures are retried and parallel projections share one 
   const first = f.bg.pagePerson('peer'), second = f.bg.pagePerson('peer');
   assert.equal(f.calls.length, 2); finish(new Response('ok'));
   assert.ok((await first).avatar); assert.deepEqual(await first, await second);
+});
+
+test('a member without an upload reaches the page with the portrait the side panel shows', async () => {
+  const f = fixture();
+  f.bg.state.data.people = [{ id: 'first', name: 'First' }, { id: 'second', name: 'Second' }];
+  f.bg.state.remoteTeams = [{ id: 'team', joined: true, memberIds: ['first', 'second'] }];
+  f.bg.state.preferences = { current: 'team' };
+  const portraits = teamDefaultAvatars(['first', 'second']);
+  assert.ok((await f.bg.pagePerson('second')).avatar);
+  assert.deepEqual(f.calls, [`chrome-extension://qa${portraits.get('second')}`]);
+  await f.bg.pagePerson('second');
+  assert.equal(f.calls.length, 1);
+  f.bg.state.authenticated = false;
+  assert.equal((await f.bg.pagePerson('second')).avatar, undefined);
+});
+
+test('a member without a team falls back to the portrait of their account', async () => {
+  const f = fixture();
+  f.bg.state.data.people = [{ id: 'first', name: 'First' }];
+  f.bg.state.remoteTeams = [];
+  f.bg.state.preferences = { current: '' };
+  assert.ok((await f.bg.pagePerson('first')).avatar);
+  assert.deepEqual(f.calls, [`chrome-extension://qa${defaultAvatar('first')}`]);
 });

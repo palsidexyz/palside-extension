@@ -160,3 +160,13 @@ test('localized invitation paths retain strict origin and code validation', () =
   assert.equal(parseInvitation(`https://user@palside.example/en/invite/${code}`, origin), null);
   assert.equal(parseInvitation(`https://evil.example/zh-CN/invite/${code}`, origin), null);
 });
+
+test('GoPlus token checks on its console host are token pages named GoPlus; its wallet checks are never read', () => {
+  const usdt = '0x55d398326f99059ff775485246999027b3197955';
+  const page = identifyPage(`https://console.gopluslabs.io/token-security/56/${usdt}`, undefined, 'page');
+  assert.deepEqual([page.kind, page.chain, page.address, page.site], ['asset', 'BNB Chain', usdt, 'GoPlus']);
+  for (const path of [`/address-security/${usdt}`, `/approval-security/56/${usdt}`]) {
+    const wallet = identifyPage(`https://console.gopluslabs.io${path}`, undefined, 'page');
+    assert.deepEqual([wallet.kind, wallet.site, wallet.id], ['website', 'GoPlus', 'website:goplus']);
+  }
+});

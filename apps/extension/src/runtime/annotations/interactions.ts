@@ -1,66 +1,106 @@
-import { DAY_MS } from '@palside/shared/units';
 import { REACTION_TTL_MS } from '@palside/shared/rules/interactions';
 import { message as uiMessage,MessageError } from '@palside/i18n';
-import { messageExpiry } from '../chat/message-expiry';
-import type { MatrixEvent,TimelineEvents } from 'matrix-js-sdk';
+import type { MatrixEvent } from 'matrix-js-sdk';
 import { sharingWork, PING_ENCRYPTION_WAIT_MS } from '../viewing/sharing-work';
 import { trustedDeviceMessages } from '../viewing/viewing-targets';
-import { requireEncryptedSend,teamSendGuard } from '../account/crypto-identity';
+import { teamSendGuard } from '../account/crypto-identity';
 import { readView } from '../viewing/view-snapshot';
-import { STICKY_EVENT,STICKY_MAX,POKE_EVENT,teamEventContent,readTeamEvent,readRefTarget,resolveStickies,stickyTargetKey,type StickyRecord } from '../../domain/annotations/social';
+import { POKE_EVENT } from '../../domain/annotations/social';
 import { isReactionEmoji,pruneReactions,readReaction,REACTION_DISPLAY,REACTION_MAX_COUNT } from '../../domain/annotations/reactions';
 import type { RuntimeDevice } from '../account/device';
-import { text } from '../composition/state';
-import { mergePoke,upsertTeamItem } from './team-items';
+import { mergePoke } from './team-items';
 import { commandError } from '../composition/commands';
 import type { PalsideService } from '../composition/core';
-import { expired } from '../../domain/chat/expiry.ts';
 import { liveMembers } from '../../domain/teams/model.ts';
-
-type TeamEventResult = { id: string; revision?: string; existing?: boolean };
-export type AnnotationDeletion = { id: string; teamId: string; expiresAt: number; status: 'pending' | 'committed'; baseRevision?: string; transactionId?: string; records?: string[] };
-type SelectionReceipt = { fingerprint: string; timestamp: number; expiresAt: number; transactionId: string; eventId?: string; completed?: boolean; admitted?: boolean; result?: TeamEventResult };
-const SELECTION_LIFETIME_MS = DAY_MS;
-const operationPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') return `{${Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}`;
-  return JSON.stringify(value);
-}
-async function digest(value: string) {
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
-}
+import { FOLLOW_EVENT,FOLLOW_SCROLL_MS,FOLLOW_WATCH_LIFE,nextFollowers,readFollowEvent } from '../../domain/annotations/follow.ts';
 
 export class TeamInteractions {
   readonly runtime: PalsideService;
   constructor(runtime: PalsideService) { this.runtime = runtime; }
   reactionTimer?: ReturnType<typeof setTimeout>;
-  stickyRecords: StickyRecord[] = [];
-  private readonly selectionTasks = new Map<string, { fingerprint: string; session: RuntimeDevice; result: Promise<TeamEventResult> }>();
-  private readonly selectionReceipts = new Map<string, SelectionReceipt>();
-  private readonly stickyChanges = new Map<string, Promise<unknown>>();
-  readonly annotationDeletions = new Map<string, AnnotationDeletion>();
-  async rememberAnnotationDeletion(id: string, teamId: string, expiresAt: number) {
-    const runtime = this.runtime, session = runtime.auth.session;
-    if (!session) return;
-    const known = this.annotationDeletions.get(id);
-    const receipt: AnnotationDeletion = { ...known, id, teamId, expiresAt: Math.max(expiresAt, known?.expiresAt ?? 0), status: 'committed' };
-    this.annotationDeletions.set(id, receipt);
-    await runtime.storage.put(`${session.account.id}:annotation-deletion:${id}`, session.account.id, 'annotation-deletion', receipt, receipt.expiresAt);
+  private followTimer?: ReturnType<typeof setTimeout>;
+  private lastScroll = 0;
+  private readonly followSeen = new Map<string, number>();
+  /** Forget everything learned under the previous device session. */
+  reset() {
+    clearTimeout(this.reactionTimer); this.reactionTimer = undefined;
+    clearTimeout(this.followTimer); this.followTimer = undefined;
+    this.followSeen.clear(); this.lastScroll = 0;
+    this.runtime.state.followers = []; this.runtime.state.leadScrolls = []; this.runtime.state.leadTabs = [];
   }
-  private changeSticky<T>(key: string, work: () => Promise<T>) {
-    const next = (this.stickyChanges.get(key) ?? Promise.resolve()).catch(() => {}).then(work);
-    this.stickyChanges.set(key, next);
-    void next.finally(() => { if (this.stickyChanges.get(key) === next) this.stickyChanges.delete(key); }).catch(() => {});
-    return next;
+  /** 跟看: tell the followed teammate, and only them, that following runs or stopped. */
+  async followWatch(teamId: string, leaderId: string, on: boolean) {
+    const runtime = this.runtime, scope = runtime.auth.scope();
+    const guard = teamSendGuard(runtime, teamId, true);
+    const leader = liveMembers(guard.team).find(person => person.id === leaderId && person.id !== guard.session.account.id);
+    if (!leader) throw new MessageError(uiMessage('extension.runtime.teamUnavailable'));
+    return await this.followSend(scope, guard, teamId, [leader.matrixId], { kind: 'watch', on });
   }
-  private sticky(teamId: string, id: unknown) { return this.runtime.state.items.stickies?.find(item => item.teamId === teamId && item.id === id && !expired(item.expiresAt, Date.now())); }
-  private stickyPayload(teamId: string, payload: Record<string, unknown>) {
-    if (payload.edits === undefined) return payload;
-    const original = this.sticky(teamId, payload.edits);
-    if (!original || original.author !== this.runtime.auth.session?.account.id) throw commandError('ANNOTATION_UNAVAILABLE', 'extension.runtime.messageUnavailable');
-    return { ...payload, asset: original.asset, url: original.url, site: original.site, target: original.target, caption: original.caption };
+  /** 跟看: the page in front scrolled; only the people following this account hear it. */
+  async leadScroll(teamId: string, url: string, y: number) {
+    const runtime = this.runtime, scope = runtime.auth.scope(), now = Date.now();
+    const guard = teamSendGuard(runtime, teamId, true), { session, team } = guard;
+    if (now - this.lastScroll < FOLLOW_SCROLL_MS) return { delivered: 0 };
+    const targets = this.followerDevices(team, session, now);
+    if (!targets.length) return { delivered: 0 };
+    this.lastScroll = now;
+    return await this.followSend(scope, guard, teamId, targets, { kind: 'scroll', url, y });
+  }
+  /** 跟看: which tabs came to the front and which is there now; only the people following this account hear it. */
+  async leadTabs(teamId: string, gen: string, open: string[], front: { tab: string; url: string } | undefined) {
+    const scope = this.runtime.auth.scope(), guard = teamSendGuard(this.runtime, teamId, true);
+    const targets = this.followerDevices(guard.team, guard.session, Date.now());
+    if (!targets.length) return { delivered: 0 };
+    return await this.followSend(scope, guard, teamId, targets, { kind: 'tabs', gen, open, ...(front ? { front } : {}) });
+  }
+  private followerDevices(team: ReturnType<typeof teamSendGuard>['team'], session: RuntimeDevice, now: number) {
+    const followers = new Set((this.runtime.state.followers ?? []).filter(item => item.teamId === team.id && item.until > now).map(item => item.personId));
+    return liveMembers(team).filter(person => followers.has(person.id) && person.id !== session.account.id).map(person => person.matrixId);
+  }
+  private async followSend(scope: ReturnType<PalsideService['auth']['scope']>, { session, client, check }: ReturnType<typeof teamSendGuard>, teamId: string, targets: string[], body: Record<string, unknown>) {
+    const cryptoApi = client.getCrypto();
+    if (!cryptoApi) throw new MessageError(uiMessage('extension.runtime.reactionNotReady'));
+    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, targets, session.matrix, FOLLOW_EVENT, { ...body, id: crypto.randomUUID(), teamId, sentAt: Date.now() }, check), PING_ENCRYPTION_WAIT_MS));
+    check();
+    if (!Object.keys(messages).length) return { delivered: 0 };
+    const result = await scope.wait(this.runtime.api.request('viewing.react', { body: { teamId, messages } }));
+    check(); return result;
+  }
+  consumeFollow(event: MatrixEvent, session: RuntimeDevice) {
+    const runtime = this.runtime, now = Date.now();
+    if (runtime.auth.session !== session || !event.isEncrypted() || event.getType() !== FOLLOW_EVENT) return;
+    const wire = readFollowEvent(event.getContent(), now);
+    const team = wire && runtime.state.remoteTeams.find(t => t.id === wire.teamId && t.joined && t.memberIds.includes(session.account.id));
+    const person = team?.people.find(p => !p.deleted && p.matrixId === event.getSender() && team.memberIds.includes(p.id) && p.id !== session.account.id);
+    if (!wire || !person) return;
+    for (const [key, until] of this.followSeen) if (until <= now) this.followSeen.delete(key);
+    const key = `${wire.teamId}\0${person.id}\0${wire.id}`;
+    if (this.followSeen.has(key) || this.followSeen.size >= 512) return;
+    this.followSeen.set(key, now + 2 * FOLLOW_WATCH_LIFE);
+    if (wire.kind === 'watch') runtime.state.followers = nextFollowers(runtime.state.followers ?? [], wire.teamId, person.id, wire.on, now);
+    else if (wire.kind === 'tabs') {
+      // Likewise counted only from someone this panel follows; the newest snapshot per teammate replaces the last.
+      const rest = (runtime.state.leadTabs ?? []).filter(item => !(item.teamId === wire.teamId && item.personId === person.id));
+      runtime.state.leadTabs = [...rest, { teamId: wire.teamId, personId: person.id, gen: wire.gen, open: wire.open, ...(wire.front ? { front: wire.front } : {}), at: now }].slice(-8);
+    } else {
+      // A scroll counts only from someone this panel follows; the background checks that before it moves a tab.
+      const rest = (runtime.state.leadScrolls ?? []).filter(item => !(item.teamId === wire.teamId && item.personId === person.id));
+      runtime.state.leadScrolls = [...rest, { teamId: wire.teamId, personId: person.id, url: wire.url, y: wire.y, at: now }].slice(-8);
+    }
+    this.scheduleFollowers(session);
+    runtime.emit();
+  }
+  /** Followers whose heartbeat stopped leave on time, without another event. */
+  private scheduleFollowers(session: RuntimeDevice) {
+    clearTimeout(this.followTimer); this.followTimer = undefined;
+    const runtime = this.runtime, next = Math.min(...(runtime.state.followers ?? []).map(item => item.until));
+    if (!Number.isFinite(next)) return;
+    this.followTimer = setTimeout(() => {
+      if (runtime.auth.session !== session) return;
+      const now = Date.now();
+      runtime.state.followers = (runtime.state.followers ?? []).filter(item => item.until > now);
+      this.scheduleFollowers(session); runtime.emit();
+    }, Math.max(0, next - Date.now()) + 50);
   }
   async react(teamId: string, emoji: unknown, count: number) {
     const runtime = this.runtime;
@@ -93,168 +133,6 @@ export class TeamInteractions {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     if (runtime.auth.session !== session || !event.isEncrypted()) return; const c = event.getContent(); const team = typeof c.teamId === 'string' ? runtime.state.remoteTeams.find(t => t.id === c.teamId && t.joined) : undefined; const person = team?.people.find(p => p.matrixId === event.getSender() && team.memberIds.includes(p.id) && p.id !== session.account.id); if (!team || !person || typeof c.id !== 'string' || typeof c.sentAt !== 'number' || Date.now() - c.sentAt > REACTION_TTL_MS) return; const view = await scope.wait(readView(c.view)); if (!view || view.kind !== 'asset') return; runtime.state.pokes = mergePoke(runtime.state.pokes, { id: c.id, teamId: team.id, from: person.id, view, at: Date.now(), count: 1 }); runtime.emit();
-  }
-  refreshStickies() {
-    const runtime = this.runtime;
-    runtime.state.items.stickies = resolveStickies(this.stickyRecords, Date.now(), (id, teamId) => {
-      const deletion = this.annotationDeletions.get(id);
-      return deletion?.teamId === teamId && deletion.status === 'committed';
-    });
-  }
-  upsertSticky(item: StickyRecord) {
-    if (this.annotationDeletions.get(item.id)?.status === 'committed' || item.edits && this.annotationDeletions.get(item.edits)?.status === 'committed') return;
-    this.stickyRecords = upsertTeamItem({ stickies: this.stickyRecords }, item).stickies ?? [];
-    this.refreshStickies();
-  }
-  async teamEvent(teamId: string, kind: 'sticky', payload: Record<string, unknown>): Promise<TeamEventResult> {
-    if (kind !== 'sticky') throw new MessageError(uiMessage('common.error'));
-    const session = this.runtime.auth.session, snapshot = { ...payload }, key = `${session?.account.id}\0${teamId}`;
-    return this.changeSticky(key, () => {
-      if (session !== this.runtime.auth.session) throw new MessageError(uiMessage('extension.runtime.loginChanged'));
-      return this.selectionEvent(teamId, kind, this.stickyPayload(teamId, snapshot));
-    });
-  }
-  private async selectionEvent(teamId: string, kind: 'sticky', payload: Record<string, unknown>): Promise<TeamEventResult> {
-    if (payload.operationId === undefined) return this.sendTeamEvent(teamId, kind, payload);
-    if (typeof payload.operationId !== 'string' || !operationPattern.test(payload.operationId)) throw commandError('INVALID_SELECTION_OPERATION', 'common.error');
-    const runtime = this.runtime; const scope = runtime.auth.scope(); const session = runtime.auth.session;
-    if (!session || !runtime.state.remoteTeams.some(team => team.id === teamId && team.joined)) throw new MessageError(uiMessage('extension.runtime.teamUnavailable'));
-    const operationId = payload.operationId.toLowerCase();
-    const snapshot = JSON.parse(JSON.stringify(payload)) as Record<string, unknown>;
-    const content = teamEventContent(text(snapshot.asset) || undefined, {
-      text: typeof snapshot.text === 'string' ? snapshot.text : undefined,
-      site: typeof snapshot.site === 'string' ? snapshot.site : undefined,
-      url: typeof snapshot.url === 'string' ? snapshot.url : undefined,
-      target: readRefTarget(snapshot.target),
-      edits: typeof snapshot.edits === 'string' ? snapshot.edits : undefined,
-      baseRevision: typeof snapshot.baseRevision === 'string' ? snapshot.baseRevision : undefined,
-      caption: typeof snapshot.caption === 'string' ? snapshot.caption : undefined,
-    });
-    const fingerprint = await scope.wait(digest(canonical(content)));
-    const transactionId = `selection-${await scope.wait(digest(JSON.stringify([session.account.id, teamId, kind, operationId])))}`;
-    const key = `${session.account.id}:selection:${transactionId}`;
-    for (const [id, receipt] of this.selectionReceipts) if (receipt.expiresAt <= Date.now()) this.selectionReceipts.delete(id);
-    const existing = this.selectionTasks.get(key);
-    if (existing) {
-      if (existing.fingerprint !== fingerprint) throw commandError('SELECTION_OPERATION_CONFLICT', 'common.error');
-      if (existing.session !== session) throw new MessageError(uiMessage('extension.runtime.loginChanged'));
-      return scope.wait(existing.result);
-    }
-    const result = (async () => {
-      let receipt = this.selectionReceipts.get(key) ?? await scope.wait(runtime.storage.get<SelectionReceipt>(key));
-      if (receipt && receipt.fingerprint !== fingerprint) throw commandError('SELECTION_OPERATION_CONFLICT', 'common.error');
-      if (receipt && receipt.expiresAt <= Date.now()) throw commandError('SELECTION_OPERATION_EXPIRED', 'extension.runtime.outgoingExpired');
-      if (!receipt) {
-        const timestamp = Date.now();
-        receipt = { fingerprint, timestamp, expiresAt: timestamp + SELECTION_LIFETIME_MS, transactionId };
-        // Persist only a digest and receipt metadata, never a second plaintext copy of the selected content.
-        await scope.wait(runtime.storage.put(key, session.account.id, 'selection', receipt, receipt.expiresAt));
-      }
-      this.selectionReceipts.set(key, receipt);
-      if (receipt.completed && (receipt.result || receipt.eventId)) return receipt.result ?? { id: receipt.eventId! };
-      const save = () => runtime.storage.put(key, session.account.id, 'selection', receipt!, receipt!.expiresAt);
-      const sent = await scope.wait(this.sendTeamEvent(teamId, kind, snapshot, { receipt, save }));
-      receipt.completed = true;
-      receipt.result = sent;
-      await scope.wait(save());
-      return sent;
-    })();
-    this.selectionTasks.set(key, { fingerprint, session, result });
-    try { return await scope.wait(result); }
-    finally { if (this.selectionTasks.get(key)?.result === result) this.selectionTasks.delete(key); }
-  }
-  private async sendTeamEvent(teamId: string, kind: 'sticky', payload: Record<string, unknown>, operation?: { receipt: SelectionReceipt; save: () => Promise<void> }) {
-    const runtime = this.runtime;
-    const scope = runtime.auth.scope();
-    const { session, client, team, check } = teamSendGuard(runtime, teamId);
-    const people = liveMembers(team);
-    const asset = text(payload.asset) || undefined;
-    const count = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text(payload.text).trim())).length;
-    if (count > STICKY_MAX) throw new MessageError(uiMessage('extension.runtime.stickyTooLong', { count }));
-    if (payload.edits !== undefined) {
-      const original = this.sticky(teamId, payload.edits);
-      if (!original || original.author !== session.account.id || original.asset !== asset) throw commandError('ANNOTATION_UNAVAILABLE', 'extension.runtime.messageUnavailable');
-      const revision = original.revision ?? original.id;
-      if (!operation?.receipt.admitted && payload.baseRevision !== revision) throw commandError('ANNOTATION_CONFLICT', 'extension.runtime.annotationChanged');
-    }
-    if (payload.target !== undefined && readRefTarget(payload.target)?.kind !== 'quote') throw new MessageError(uiMessage('common.error'));
-    if (payload.edits === undefined && !operation?.receipt.eventId) {
-      const targetKey = stickyTargetKey({ url: typeof payload.url === 'string' ? payload.url : undefined, target: readRefTarget(payload.target) });
-      const existing = targetKey && runtime.state.items.stickies?.find(item => item.teamId === teamId && item.author === session.account.id && !expired(item.expiresAt, Date.now()) && stickyTargetKey(item) === targetKey);
-      if (existing) return { id: existing.id, revision: existing.revision ?? existing.id, existing: true };
-    }
-    const fields = {
-      text: typeof payload.text === 'string' ? payload.text : undefined,
-      site: typeof payload.site === 'string' ? payload.site : undefined,
-      url: typeof payload.url === 'string' ? payload.url : undefined,
-      target: readRefTarget(payload.target),
-      edits: typeof payload.edits === 'string' ? payload.edits : undefined,
-      baseRevision: typeof payload.baseRevision === 'string' ? payload.baseRevision : undefined,
-      caption: typeof payload.caption === 'string' ? payload.caption : undefined,
-    };
-    const type = STICKY_EVENT;
-    const content = teamEventContent(asset, fields);
-    const parsed = readTeamEvent(type, content);
-    if (!parsed || parsed.kind !== 'sticky') throw new MessageError(uiMessage('common.error'));
-    if (operation && !operation.receipt.admitted) { operation.receipt.admitted = true; await scope.wait(operation.save()); }
-    const transactionId = operation?.receipt.transactionId ?? crypto.randomUUID();
-    await scope.wait(requireEncryptedSend(client, team.roomId, people, check));
-    check();
-    const room = operation ? client.getRoom(team.roomId) : undefined;
-    const pending = operation?.receipt.eventId ? undefined : room?.getEventForTxnId(transactionId);
-    // The SDK retains failed local echoes by transaction id; creating another echo with that id throws.
-    if (pending && pending.status !== 'not_sent' && pending.status !== 'sent') throw commandError('SELECTION_OPERATION_PENDING', 'common.working');
-    const result = operation?.receipt.eventId ? { event_id: operation.receipt.eventId }
-      : pending?.status === 'sent' && pending.getId() ? { event_id: pending.getId()! }
-      : pending && room ? await scope.wait(client.resendEvent(pending, room))
-      : await scope.wait(client.sendEvent(team.roomId, type as keyof TimelineEvents, content as never, transactionId));
-    check();
-    const id = result.event_id;
-    if (operation && !operation.receipt.eventId) { operation.receipt.eventId = id; await scope.wait(operation.save()); check(); }
-    const timestamp = operation?.receipt.timestamp ?? Date.now();
-    const expiresAt = messageExpiry(undefined, timestamp, team.retentionDays);
-    const item = { ...parsed, id, teamId, author: session.account.id, timestamp, expiresAt };
-    this.upsertSticky(item);
-    const evicted = await scope.wait(runtime.storage.cache(session.account.id, `item:${id}`, { kind: 'stickies', item }, expiresAt));
-    check(); runtime.cache.evictCachedContent(evicted); runtime.emit();
-    const root = parsed.edits ?? id, current = this.sticky(teamId, root);
-    if (parsed.edits && current?.revision !== id) throw commandError('ANNOTATION_CONFLICT', 'extension.runtime.annotationChanged');
-    return { id: root, revision: current?.revision ?? id };
-  }
-  async removeSticky(teamId: string, id: unknown, baseRevision: unknown) {
-    const runtime = this.runtime, session = runtime.auth.session;
-    return this.changeSticky(`${session?.account.id}\0${teamId}`, async () => {
-      const scope = runtime.auth.scope(); runtime.auth.requireConnection();
-      if (!session || session !== runtime.auth.session || !runtime.auth.client) throw new MessageError(uiMessage('extension.runtime.loginChanged'));
-      const team = runtime.state.remoteTeams.find(item => item.id === teamId && item.joined);
-      if (!team || typeof id !== 'string') throw commandError('ANNOTATION_UNAVAILABLE', 'extension.runtime.messageUnavailable');
-      const key = `${session.account.id}:annotation-deletion:${id}`;
-      let receipt = this.annotationDeletions.get(id) ?? await scope.wait(runtime.storage.get<AnnotationDeletion>(key));
-      if (receipt && (receipt.teamId !== teamId || receipt.baseRevision !== baseRevision)) throw commandError('ANNOTATION_CONFLICT', 'extension.runtime.annotationChanged');
-      if (!receipt) {
-        const original = this.sticky(teamId, id);
-        if (!original || original.author !== session.account.id) throw commandError('ANNOTATION_UNAVAILABLE', 'extension.runtime.messageUnavailable');
-        if (baseRevision !== (original.revision ?? original.id)) throw commandError('ANNOTATION_CONFLICT', 'extension.runtime.annotationChanged');
-        receipt = { id, teamId, baseRevision: String(baseRevision), transactionId: `annotation-delete-${await scope.wait(digest(JSON.stringify([session.account.id, teamId, id, baseRevision])))}`, status: 'pending', expiresAt: Math.max(original.expiresAt, Date.now() + SELECTION_LIFETIME_MS), records: this.stickyRecords.filter(item => item.teamId === teamId && item.author === session.account.id && (item.id === id || item.edits === id)).map(item => item.id) };
-        await scope.wait(runtime.storage.put(key, session.account.id, 'annotation-deletion', receipt, receipt.expiresAt));
-      }
-      this.annotationDeletions.set(id, receipt);
-      if (receipt.status !== 'committed') {
-        // Unknown results retry the same SDK transaction; no new root or local success is invented.
-        await scope.wait(runtime.auth.client.redactEvent(team.roomId, id, receipt.transactionId));
-        receipt.status = 'committed';
-      }
-      runtime.timeline.redactions.set(id, false);
-      this.stickyRecords = this.stickyRecords.filter(item => item.id !== id && item.edits !== id);
-      this.refreshStickies(); runtime.emit();
-      const observed = this.annotationDeletions.get(id);
-      if (observed?.status === 'committed') receipt = { ...receipt, expiresAt: Math.max(receipt.expiresAt, observed.expiresAt) };
-      this.annotationDeletions.set(id, receipt);
-      await scope.wait(runtime.storage.put(key, session.account.id, 'annotation-deletion', receipt, receipt.expiresAt));
-      for (const eventId of receipt.records ?? [id]) await scope.wait(runtime.storage.remove(`${session.account.id}:cache:item:${eventId}`));
-      for (const eventId of receipt.records ?? []) if (eventId !== id) await scope.wait(runtime.auth.client.redactEvent(team.roomId, eventId).catch(error => runtime.diagnosticErrors?.record(error)));
-      return { id };
-    });
   }
   async poke(teamId: string, accountId: string) {
     const runtime = this.runtime;

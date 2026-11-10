@@ -11,12 +11,14 @@ test('token grouping retains per-site sources and deduplicates accounts without 
  assert.equal(groups.length,1);assert.equal(groups[0].members.length,2);assert.deepEqual(groups[0].sources.map(s=>s.members.length),[1,1]);assert.equal(a.name,'SOL');
  const conflict={...b,name:'IMPOSTOR'};assert.equal(watchGroups([person('a',a),person('b',b)],[a,conflict])[0].view.name,'So1111…1112');
 });
-test('same website groups distinct page links and site-only viewers without inventing shared-page counts',()=>{
+test('each page of a website is its own card, the same page gathers people, and a site-only share stands apart',()=>{
  const a=pageView(websiteIdentity('https://x.com/alice/status/1','page'));
  const b=pageView(websiteIdentity('https://x.com/bob/status/2','page'));
  const c=pageView(websiteIdentity('https://x.com/messages/3','site'));
- const group=watchGroups([person('a',a),person('b',b),person('c',c)],[a,b,c])[0];
- assert.equal(group.members.length,3);assert.equal(group.sources.length,3);assert.equal(group.sources.at(-1).url,'https://x.com/');assert.ok(!JSON.stringify(c).includes('messages'));
+ const same=pageView(websiteIdentity('https://www.x.com/alice/status/1/#top','page'));
+ const groups=watchGroups([person('a',a),person('b',b),person('c',c),person('d',same)],[a,b,c,same]);
+ assert.equal(groups.length,3);assert.deepEqual(groups.map(group=>group.members.length),[2,1,1]);
+ assert.equal(groups.at(-1).sources[0].url,'https://x.com/');assert.ok(!JSON.stringify(c).includes('messages'));
 });
 test('rank changes move larger groups first and preserve existing ties before newcomers',()=>{
  const g=(key,n)=>({key,members:Array(n)});
@@ -72,4 +74,11 @@ test('faces keep their places: the next person takes a leaver\'s place and the u
  assert.deepEqual(stickyFaces(['a'],['a','me'],'me'),['me','a'],'with room, the user leads and nobody is hidden');
  assert.deepEqual(stickyFaces(['me','b'],['a','b'],'me'),['a','b'],'the user leaving gives the place back by team order');
  assert.deepEqual(stickyFaces(['a','b'],['b'],'me'),['b']);
+});
+test('跟看: the followed teammate takes a face, after the user, and the other face keeps its place',()=>{
+ assert.deepEqual(stickyFaces(['a','b'],['a','b','f'],'me',2,'f'),['f','b'],'full: the followed takes the first non-leader face');
+ assert.deepEqual(stickyFaces(['a','b'],['a','b','f','me'],'me',2,'f'),['me','f'],'the user and the followed both show, user first');
+ assert.deepEqual(stickyFaces(['a'],['a','f'],'me',2,'f'),['f','a']);
+ assert.deepEqual(stickyFaces(['f','b'],['f','b'],'me',2,'f'),['f','b'],'already shown stays');
+ assert.deepEqual(stickyFaces(['a','b'],['a','b'],'me',2,'f'),['a','b'],'no effect when the followed is elsewhere');
 });

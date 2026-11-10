@@ -26,7 +26,7 @@ export function stateSync(bg: Background) {
       if (version !== replayVersion) return;
       await bg.run({ name: 'device-state', payload: { state: bg.panels.size > 0 || idle === 'active' ? 'active' : 'away' } });
       if (version !== replayVersion) return;
-      await bg.sharing.observer.refresh(false);
+      await bg.sharing.observer.replay();
       if (version === replayVersion) await bg.panel.reportRoomPanels();
     });
     void replaying.catch(() => {});
@@ -52,17 +52,23 @@ export function stateSync(bg: Background) {
     const roomChanged = previous?.preferences.rooms?.off !== next.preferences.rooms?.off || previous?.rooms?.current?.key !== next.rooms?.current?.key;
     const policyChanged = contextChanged || interactionChanged || roomChanged;
     if ((interactionChanged || roomChanged) && !contextChanged) {
-      void bg.danmaku.broadcastDanmakuSettings().then(bg.signals.broadcastSignals).then(() => { for (const [port, info] of bg.pages.pagePorts) void bg.stickies.pushStickies(port, info); }).catch(() => {});
+      void bg.danmaku.broadcastDanmakuSettings().then(bg.signals.broadcastSignals).catch(() => {});
     }
     const pageChanged = previous?.data.views !== next.data.views || previous?.data.messages !== next.data.messages || previous?.drafts !== next.drafts || previous?.pages !== next.pages;
     if (policyChanged) bg.pages.pagePolicyChanged(contextChanged);
-    if (policyChanged || pageChanged || previous?.items.stickies !== next.items.stickies) bg.pages.restoreAllPages();
-    const pageContentChanged = pageChanged || previous?.items.stickies !== next.items.stickies || previous?.chainRoom !== next.chainRoom || previous?.rooms !== next.rooms || previous?.data.people !== next.data.people || previous?.remoteTeams !== next.remoteTeams || previous?.preferences.hiddenStickies !== next.preferences.hiddenStickies;
-    if (policyChanged || pageContentChanged) void bg.pages.routePageState(previous, next);
+    if (policyChanged || pageChanged) bg.pages.restoreAllPages();
+    const pageContentChanged = pageChanged || previous?.chainRoom !== next.chainRoom || previous?.rooms !== next.rooms || previous?.data.people !== next.data.people || previous?.remoteTeams !== next.remoteTeams;
+    if (policyChanged || pageContentChanged) bg.pages.routePageState();
     if (policyChanged || previous?.signals !== next.signals) void bg.signals.routeSignals(previous, next).catch(() => {});
+    if (policyChanged || previous?.chartMarks !== next.chartMarks || previous?.chartDrawings !== next.chartDrawings || previous?.remoteTeams !== next.remoteTeams) void bg.signals.routeMarks().catch(() => {});
+    if (policyChanged || pageChanged || previous?.followers !== next.followers || previous?.publishedViewing !== next.publishedViewing) void bg.follow.routeLead().catch(() => {});
+    if (previous?.leadScrolls !== next.leadScrolls) bg.follow.routeScroll();
+    if (previous?.leadTabs !== next.leadTabs) void bg.follow.routeTabs().catch(() => {});
     if (policyChanged || pageChanged) void bg.pages.pushPageStatus();
     bg.notifications.notificationState(previous, next);
+    bg.updates.stateChanged(previous, next);
     if (contextChanged || pageChanged || previous?.tokens !== next.tokens) void bg.roomTab.refresh();
+    else if (previous?.rooms !== next.rooms) bg.roomTab.stateChanged(next);
   }
 
   return {

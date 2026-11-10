@@ -7,7 +7,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Globe2, KeyRound, Layers, Plus, Scissors, Search, X } from 'lucide-react';
 import { Switch } from '@palside/ui/switch';
 import { Input } from '@palside/ui/field';
-import { siteInteraction } from '../../../domain/annotations/interaction';
+import { siteRunning, turnSite } from './sites';
 import { SiteFeatureTiles } from './site-feature-tiles';
 import { requestAllSites, requestSitesAccess } from '../../../runtime/browser/permissions';
 import { normalizeSiteHost } from '../../../domain/assets/site-host';
@@ -155,7 +155,7 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
     </div>
     {q && !shown.length && !custom && <p className={s.empty}>{t('extension.web.noMatch')}</p>}
     <footer className={s.foot}>
-      <Button variant="surface" size="lg" className={s.primary} disabled={!selected.length || busy} aria-busy={busy || undefined} onClick={add}>
+      <Button variant="solid" size="lg" className={s.primary} disabled={!selected.length || busy} aria-busy={busy || undefined} onClick={add}>
         {!selected.length ? t('extension.sites.choose') : one ? t('extension.sites.addOne', { name: one.name }) : <CountText text={t('extension.sites.addMany', { count: selected.length })} value={selected.length} />}
       </Button>
     </footer>
@@ -164,7 +164,7 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
 
 /**
  * The 网页互动 sheet, from the left half of the header capsule: the tab's site, Chrome's permission for it, then 网页互动 with the
- * site's 弹幕, 信号 and 便利贴. Switching 网页互动 on asks Chrome in the same click when the site is not allowed yet; off keeps Chrome's grant.
+ * site's 弹幕, 信号 and 共享画线. Switching 网页互动 on asks Chrome in the same click when the site is not allowed yet; off keeps Chrome's grant.
  */
 export function GrantSheet({ c }: { c: PalsideController }) {
   const t = useTranslations();
@@ -188,46 +188,40 @@ export function GrantSheet({ c }: { c: PalsideController }) {
 }
 
 /**
- * 网页互动 for one site: Chrome's permission for it on top, as Chrome words it (已允许 / 未允许, never a switch), then one card — the
- * 网页互动 switch and, under it, the site's 弹幕, 信号 and 便利贴 as tiles, shown even while it is off.
+ * 网页互动 for one site: first a quiet line with Chrome's permission in Chrome's own words (已允许 / 未允许, never a switch), then
+ * one card with the 网页互动 switch and the site's 弹幕, 信号 and 共享画线 tiles, shown even while it is off.
  */
 export function SiteControls({ c, host }: { c: PalsideController; host: string }) {
   const t = useTranslations();
   const grants = useGrants(c);
   const waiting = useAsking();
   const allowed = siteAllowed(c, grants, host);
-  const on = allowed && siteInteraction(c.siteInteraction, host).on;
+  const on = allowed && siteRunning(c, host);
   const busy = waiting === host;
   const session = captureSocialUi();
   function turn(next: boolean) {
-    if (!next || allowed) { void c.setSite(host, { on: next }); return; }
+    if (!next || allowed) { void turnSite(c, host, next); return; }
     const denied = () => { if (session.current()) c.setNotice(uiMessage('extension.sites.denied')); };
     // Chrome's prompt must open synchronously from this click.
     const asking = c.live ? askSiteAccess(host) : c.enableSites([host]);
-    void asking.then(granted => { if (!session.current()) return; if (granted) void c.setSite(host, { on: true }); else denied(); }, denied);
+    void asking.then(granted => { if (!session.current()) return; if (granted) void turnSite(c, host, true); else denied(); }, denied);
   }
+  const label = t('extension.settings.interaction');
   return <>
-    <section className={s.group}>
-      <dl className={s.facts}>
-        <div className={s.chromeRow}>
-          <ChromeMark size={16} />
-          <dd>{t('extension.grant.access', { host })}</dd>
-          <dd><span className={s.state} data-on={allowed || undefined}>{t(allowed ? 'extension.privacy.allowed' : 'extension.privacy.notAllowed')}</span></dd>
-        </div>
-      </dl>
-    </section>
-    <section className={s.group}>
-      <dl className={s.facts}>
-        <SwitchRow icon={<Layers size={16} />} label={t('extension.settings.interaction')} on={on} disabled={busy} onChange={turn} />
-        <div className={s.tilesRow}><dd><SiteFeatureTiles c={c} host={host} live={on} /></dd></div>
-      </dl>
+    <div className={s.siteAccess}>
+      <ChromeMark size={14} />
+      <span>{t('extension.access.sites')}</span>
+      <b data-on={allowed || undefined}>{t(allowed ? 'extension.privacy.allowed' : 'extension.privacy.notAllowed')}</b>
+    </div>
+    <section className={s.siteCard}>
+      <div className={s.siteMaster}>
+        <Layers size={16} />
+        <span>{label}</span>
+        <Switch hideLabel label={label} checked={on} disabled={busy} onChange={event => turn(event.currentTarget.checked)} />
+      </div>
+      <SiteFeatureTiles c={c} host={host} live={on} />
     </section>
   </>;
-}
-
-/** A row with its own switch and nothing else to read: icon, name, the switch at the end. */
-function SwitchRow({ icon, label, on, disabled, onChange }: { icon: ReactNode; label: string; on: boolean; disabled?: boolean; onChange: (on: boolean) => void }) {
-  return <div data-switch="">{icon}<dd>{label}</dd><dd data-control=""><Switch hideLabel label={label} checked={on} disabled={disabled} onChange={event => onChange(event.currentTarget.checked)} /></dd></div>;
 }
 
 /**
@@ -267,7 +261,7 @@ export function AllSitesSheet({ c }: { c: PalsideController }) {
       </Group>
       <div className={s.actions}>
         <Button size="lg" className={s.soft} onClick={close}>{t('common.cancel')}</Button>
-        <Button variant="surface" size="lg" className={s.primary} onClick={allow}>{t('extension.grant.allow')}</Button>
+        <Button variant="solid" size="lg" className={s.primary} onClick={allow}>{t('extension.grant.allow')}</Button>
       </div>
     </>}
   </Sheet>;

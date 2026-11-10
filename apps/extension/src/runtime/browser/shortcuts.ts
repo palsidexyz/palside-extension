@@ -19,9 +19,17 @@ export function openShortcuts(host = browser) {
   return host.tabs.create({ url: SHORTCUTS_URL });
 }
 
-/** One keycap per key: "Alt+Shift+S" splits on +, macOS symbols ("⌥⇧S") split per modifier. */
+/** macOS modifier symbols carry their name: a bare ⇧ reads as an up arrow. Matches the 信号 shortcut caps. */
+const macKeyNames: Record<string, string> = { '⌃': '⌃ Control', '⌥': '⌥ Option', '⇧': '⇧ Shift', '⌘': '⌘ Command' };
+
+/** One keycap per key: "Alt+Shift+S" splits on +, macOS symbols ("⌥⇧S") split per modifier and keep their name. */
 export function shortcutKeys(value: string): string[] {
   if (!value) return [];
   if (value.includes('+')) return value.split('+').filter(Boolean);
-  return value.match(/[⌃⌥⇧⌘]|[^⌃⌥⇧⌘]+/g) ?? [value];
+  return (value.match(/[⌃⌥⇧⌘]|[^⌃⌥⇧⌘]+/g) ?? [value]).map(key => macKeyNames[key] ?? key);
+}
+
+/** The shortcut as one line of text, for labels and tooltips: "⌥ Option + ⇧ Shift + S". */
+export function shortcutText(value: string) {
+  return shortcutKeys(value).join(' + ');
 }

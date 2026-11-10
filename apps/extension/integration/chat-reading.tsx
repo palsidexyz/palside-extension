@@ -34,7 +34,7 @@ let state: RuntimeState = {
   revision: 0, ready: true, rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} }, authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
   account: { bio: '', tags: [], id: data.self, nickname: '阅读验收', avatarId: null, matrixId: '@reading:example.test', revision: 0, acceptTeamInvites: true }, data, 
   drafts: {}, preferences: { share: false, current: 'night', notifications: 'off', toured: true },
-  remoteTeams: [], config: { websiteUrl: '', signupDifficulty: 0 }, invitations: {}, items: { stickies: [] }, history: { night: { missingKeys: 0, loaded: false, loading: false }, weekend: { missingKeys: 0, loaded: true, loading: false } },
+  remoteTeams: [], config: { websiteUrl: '', signupDifficulty: 0 }, invitations: {}, history: { night: { missingKeys: 0, loaded: false, loading: false }, weekend: { missingKeys: 0, loaded: true, loading: false } },
 };
 const command: LivePort['command'] = async <T,>(name: string, payload?: Record<string, unknown>) => {
   if (name === 'visible') { reports.push(payload?.ids as string[]); return undefined as T; }

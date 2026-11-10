@@ -2,8 +2,10 @@ import { resolveTokenMetadata,tokenName } from './token-name.ts';
 import { identifyPage,normalizeAddress,publicShareUrl,shortAddress,websiteIdentity,type Network,type PageIdentity } from '@palside/shared/navigation';
 import { networkTokenChain } from '@palside/shared/tokens';
 import type { Viewing } from '../../domain/assets/model';
+import { iconDataUrl } from './viewing.ts';
 
-const pageLogo = (value: unknown) => typeof value === 'string' && value.startsWith('data:image/') && value.length <= 8192 ? value : undefined;
+/** A teammate's page title, bounded: the sender cuts it at 80 graphemes. */
+const WEBSITE_NAME_MAX = 120;
 
 /**
  * A token view carries its identity and a fallback name only: every receiver draws the name and icon from the token
@@ -11,7 +13,7 @@ const pageLogo = (value: unknown) => typeof value === 'string' && value.startsWi
  */
 export function pageView(identity: Extract<PageIdentity, { kind: 'asset' | 'website' }>, metadata?: { name?: string; logo?: string }, via?: Viewing['via']): Viewing {
   const name = identity.kind === 'asset' ? resolveTokenMetadata(identity, metadata).name : metadata?.name || identity.site;
-  const logo = identity.kind === 'asset' ? undefined : pageLogo(metadata?.logo);
+  const logo = identity.kind === 'asset' ? undefined : iconDataUrl(metadata?.logo);
   return {
     version: 1,
     id: `${identity.id}:${identity.kind === 'website' ? identity.disclosure : 'asset'}:${identity.url}`,
@@ -35,7 +37,7 @@ export function validateView(value: unknown): Viewing | undefined {
     if (v.disclosure !== 'site' && v.disclosure !== 'page') return;
     const identity = websiteIdentity(v.url, v.disclosure);
     if (!identity || identity.disclosure !== v.disclosure || (v.disclosure === 'site' ? new URL(v.url).pathname !== '/' || new URL(v.url).search || new URL(v.url).hash : !publicShareUrl(v.url))) return;
-    return { ...pageView(identity, { name: v.name, logo: pageLogo(v.logo) }), source: new URL(v.url).hostname };
+    return { ...pageView(identity, { name: Array.from(v.name.trim()).slice(0, WEBSITE_NAME_MAX).join(''), logo: iconDataUrl(v.logo) }), source: new URL(v.url).hostname };
   }
   if (v.kind !== 'asset' || typeof v.chain !== 'string' || !(v.chain in networkTokenChain)) return;
   let host: string; try { host = new URL(v.url).hostname; } catch { return; }

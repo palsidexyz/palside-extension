@@ -1,10 +1,10 @@
 import { MessageError,message as uiMessage } from '@palside/i18n';
 import { accessStatus } from '../runtime/browser/permissions.ts';
-import { PAGE_SCRIPT_ID,pageAsset,pageDiff,pageMatches,pageScript,pageStatus,pageUrlHost,updatePageUrl,locateResponse,type PageConnection } from '../runtime/browser/page-layer-host.ts';
+import { PAGE_SCRIPT_ID,pageAsset,pageMatches,pageScript,pageStatus,pageUrlHost,updatePageUrl,locateResponse,type PageConnection } from '../runtime/browser/page-layer-host.ts';
 import type { LocateResult,PageDown,PageUp } from '../runtime/browser/page-protocol.ts';
-import type { RuntimeState } from '../runtime/composition/runtime-state';
-import { pageScopeUrl } from '../domain/annotations/interaction.ts';
+import { pageScopeUrl,samePage } from '../domain/annotations/interaction.ts';
 import type { Background } from './index.ts';
+import type { LocateMessage } from './locate.ts';
 import type { Port,Tab } from './context.ts';
 
 const PAGE_CONNECT_MS = 8_000;
@@ -60,7 +60,6 @@ export function pages(bg: Background) {
     return bg.interactivePage(info) || bg.danmaku.allows(info) || oneOffPage(info);
   }
   function stopPage(port: Port, info: PageConnection) {
-    if (bg.selection.picks.get(info.windowId)?.tabId === info.tabId) bg.selection.discardPick(info.windowId);
     bg.danmaku.forget(port);
     for (const waiter of locating.values()) if (waiter.port === port) waiter.resolve('unavailable');
     if (bg.capture.captures.get(info.windowId)?.page === port) bg.capture.discardCapture(info.windowId);
@@ -70,8 +69,6 @@ export function pages(bg: Background) {
   /** Every page session ends: account, team or origin access changed. */
   function clearPages() {
     for (const tabId of oneOffPages.keys()) forgetOneOff(tabId);
-    bg.selection.clearSelections();
-    bg.stickies.clearPendingStickies();
     bg.danmaku.clear();
     for (const windowId of bg.capture.captures.keys()) bg.capture.discardCapture(windowId);
     for (const [port, info] of pagePorts) {
@@ -81,7 +78,7 @@ export function pages(bg: Background) {
     for (const waiter of locating.values()) waiter.resolve('unavailable');
   }
 
-  /** Bring the active tab of a window up to its policy: bind a connected page, or inject the page layer where 互动 runs. */
+  /** Bring the active tab of a window up to its policy: inject the page layer where 互动 runs, unless it is already connected. */
   async function restoreActivePage(windowId: number) {
     if (!bg.state?.authenticated || !bg.state.account?.id) return;
     const current = restoring.get(windowId);
@@ -98,7 +95,7 @@ export function pages(bg: Background) {
       const active = await bg.activeTab(windowId);
       if (bg.tabVersions.get(tab.id) !== tabVersion || !valid() || active?.id !== tab.id || active.url !== tab.url || active.status === 'loading' || !allowedPage({ tabId: tab.id, windowId, url: tab.url })) return;
       const port = portFor(tab.id, tab.url);
-      if (port) { bg.selection.bindSelection(port, pagePorts.get(port)!); void bg.stickies.pushStickies(port, pagePorts.get(port)!); return; }
+      if (port) return;
       await inject(tab.id).catch(() => {});
     })();
     restoring.set(windowId, job);
@@ -156,7 +153,7 @@ export function pages(bg: Background) {
       if (windowId === undefined) continue;
       const tab = await bg.activeTab(windowId);
       const access = await bg.capture.tabAccess(tab);
-      const favicon = tab?.url ? await bg.favicon(tab.url) : undefined;
+      const favicon = tab?.url && !tab.incognito ? await bg.siteIcons.shareable(tab.url) : undefined;
       if (version !== statusVersion || bg.panels.get(panel) !== windowId) return;
       const status = pageStatus(windowId, tab && { ...tab, favicon }, [...pagePorts.values()], access, bg.state);
       status.signalSettings = bg.signals.signalSettings();
@@ -167,50 +164,32 @@ export function pages(bg: Background) {
   function resetPage(port: Port, info: PageConnection, url: string) {
     if (info.url === url) {
       // The page clears its overlays before this handshake, even when Chrome's URL event arrived first.
-      bg.stickies.forgetStickies(port);
-      void refreshPage(port, info).catch(() => {});
+      refreshPage(port, info);
       return;
     }
     // A document can change its route, never its origin. Cross-origin navigation needs a fresh port and permission check.
     try { if (new URL(info.url).origin !== new URL(url).origin) { forgetOneOff(info.tabId); stopPage(port, info); return; } } catch { stopPage(port, info); return; }
     if (bg.capture.captures.get(info.windowId)?.tabId === info.tabId) bg.capture.discardCapture(info.windowId);
-    if (bg.selection.picks.get(info.windowId)?.tabId === info.tabId) bg.selection.discardPick(info.windowId);
     if (pageScopeUrl(info.url) !== pageScopeUrl(url)) forgetOneOff(info.tabId);
     if (!allowedPage({ ...info, url })) { stopPage(port, info); void pushPageStatus(); return; }
-    bg.danmaku.forget(port);
+    // The same page under another tab or query (`samePage`) keeps its signals, highlights and 弹幕 in flight; another page starts clean.
+    if (!samePage(info.url, url, info.asset, pageAsset(url, bg.state))) {
+      try { port.postMessage({ type: 'clear' } satisfies PageDown); } catch { /* page gone */ }
+      bg.danmaku.forget(port);
+    }
     updatePageUrl(info, url, bg.state);
     bg.danmaku.syncPage(port, info);
-    bg.stickies.forgetStickies(port);
-    bg.selection.bindSelection(port, info);
     void bg.signals.signalConfig(port, info).catch(() => {});
-    void bg.stickies.pushStickies(port, info);
     void pushPageStatus();
   }
-  /** Re-apply the page's current policy to a live port: selection, signals and 便利贴 follow the site's 互动 at once. */
-  async function refreshPage(port: Port, info: PageConnection) {
+  /** Re-apply the page's current policy to a live port: 弹幕 and signals follow the site's 互动 at once. */
+  function refreshPage(port: Port, info: PageConnection) {
     bg.danmaku.syncPage(port, info);
     void bg.signals.signalConfig(port, info).catch(() => {});
-    void bg.stickies.pushStickies(port, info);
-    const active = await bg.activeTab(info.windowId);
-    if (pagePorts.get(port) === info && active?.id === info.tabId && active.url === info.url) bg.selection.bindSelection(port, info);
   }
-  /** New live danmaku and reference flashes go to the pages they belong to. */
-  async function routePageState(old: RuntimeState | undefined, next: RuntimeState) {
-    for (const [port, info] of pagePorts) { info.asset = pageAsset(info.url, bg.state); bg.danmaku.syncPage(port, info); void bg.stickies.pushStickies(port, info); }
-    for (const item of pageDiff(old, next, [...pagePorts.values()])) {
-      const port = [...pagePorts].find(([, info]) => info === item.port)?.[0];
-      if (!port) continue;
-      const url = item.port.url, version = bg.sessionVersion;
-      const valid = () => version === bg.sessionVersion && bg.state?.account?.id === next.account?.id && bg.state?.authenticated && bg.state.preferences.current === next.preferences.current && allowedPage(item.port) && pagePorts.get(port) === item.port && item.port.url === url;
-      const interactive = bg.interactivePage(item.port);
-      for (const flash of interactive ? item.flashes : []) {
-        const target = flash.ref!.target;
-        if (target.kind === 'danmaku') continue;
-        const author = await bg.pagePerson(flash.author);
-        if (!valid()) break;
-        try { port.postMessage({ type: 'flash', target, author } satisfies PageDown); } catch { break; }
-      }
-    }
+  /** Live 弹幕 goes to the pages it belongs to. */
+  function routePageState() {
+    for (const [port, info] of pagePorts) { info.asset = pageAsset(info.url, bg.state); bg.danmaku.syncPage(port, info); }
   }
 
   /** Waits for this tab's page script to connect after an injection. */
@@ -223,7 +202,8 @@ export function pages(bg: Background) {
     }
   }
   /** Connect this window's active page for one action. A page without 互动 is admitted only as a one-off, which never turns its interaction on. */
-  async function openPageTools(windowId: number, senderUrl: string, action: 'pick') {
+  async function openPageTools(windowId: number, senderUrl: string) {
+    const action = 'interact';
     const accountId = bg.state?.account?.id, teamId = bg.state?.preferences.current, version = bg.sessionVersion;
     const tab = (await bg.panelTab(windowId, senderUrl))?.tab;
     await bg.capture.requirePageAction(tab, action);
@@ -262,19 +242,19 @@ export function pages(bg: Background) {
       return { tab, port, info: pagePorts.get(port)!, accountId, teamId, finish };
     } catch (error) { finish(); throw error; }
   }
-  /** Ask a page to find a target; it answers `located`, or `unavailable` after five seconds or when the page goes. */
-  function locate(port: Port, message: Extract<PageDown, { type: 'flash' }>) {
+  /** Ask a page to find a target; it answers `located`, else `timeout` after five seconds, or `unavailable` when the page goes. */
+  function locate(port: Port, message: LocateMessage) {
     const requestId = crypto.randomUUID();
     const result = new Promise<LocateResult>(resolve => {
-      const timer = bg.setTimeout(() => finish('unavailable'), 5000);
+      const timer = bg.setTimeout(() => finish('timeout'), 5000);
       function finish(value: LocateResult) { bg.clearTimeout(timer); locating.delete(requestId); resolve(value); }
       locating.set(requestId, { port, resolve: finish });
     });
-    port.postMessage({ ...message, requestId, focus: true } satisfies PageDown);
+    port.postMessage({ ...message, requestId } satisfies PageDown);
     return result;
   }
 
-  /** A page script connects: admit it under the current policy, then send its config, signals, notes and selection. */
+  /** A page script connects: admit it under the current policy, then send its config and signals. */
   function connectPage(port: Port) {
     const tab = port.sender?.tab, tabId = tab?.id, windowId = tab?.windowId, url = tab?.url;
     if (port.sender?.id !== browser.runtime.id || tab?.incognito || (port.sender?.frameId !== undefined && port.sender.frameId !== 0) || tabId === undefined || windowId === undefined || !url || !pageUrlHost(url)) { try { port.disconnect(); } catch { /* already closed */ } return; }
@@ -286,10 +266,9 @@ export function pages(bg: Background) {
       const valid = () => !disconnected && bg.tabVersions.get(tabId) === tabVersion && version === bg.sessionVersion && accountId === bg.state?.account?.id && teamId === bg.state?.preferences.current && bg.state?.authenticated && (allowedPage({ tabId, windowId, url }) || bg.capture.capturePageAllowed({ tabId, windowId, url }));
       if (!(access.site || bg.capture.capturePageAllowed({ tabId, windowId, url })) || !valid()) { off(); return; }
       const current = await browser.tabs.get(tabId).catch(() => undefined);
-      if (!valid() || !current || current.url !== url || current.status === 'loading' || current.incognito) { off(); return; }
+      // A document that runs this script is ready for it; a page's slow images or ads keep the tab `loading` for a long time.
+      if (!valid() || !current || current.url !== url || current.incognito) { off(); return; }
       const capture = bg.capture.captures.get(windowId);
-      const active = await bg.activeTab(windowId);
-      if (!valid()) { off(); return; }
       const info: PageConnection = { tabId, windowId, url, asset: pageAsset(url, bg.state), documentId: port.sender?.documentId, siteGranted: access.site };
       for (const [existing, connection] of pagePorts) if (connection.tabId === tabId && existing !== port) stopPage(existing, connection);
       const connected = pagePorts.get(port);
@@ -301,10 +280,10 @@ export function pages(bg: Background) {
       if (!live()) { if (pagePorts.get(port) === info) stopPage(port, info); return; }
       port.postMessage(config);
       bg.danmaku.syncPage(port, info);
+      bg.follow.pageConnected(port, info);
+      void bg.follow.routeLead().catch(() => {});
       void bg.signals.signalConfig(port, info).catch(() => {});
-      await bg.stickies.pushStickies(port, info);
       if (!live()) { if (pagePorts.get(port) === info) stopPage(port, info); return; }
-      if (active?.id === tabId && active.url === url) bg.selection.bindSelection(port, info);
       void pushPageStatus();
     })().catch(() => { if (bg.capture.captures.get(windowId)?.page === port) bg.capture.discardCapture(windowId); pagePorts.delete(port); });
 
@@ -314,26 +293,23 @@ export function pages(bg: Background) {
       if (!bg.state?.authenticated || !allowedPage(info) && !bg.capture.capturePageAllowed(info)) { stopPage(port, info); return; }
       switch (message.type) {
         case 'located': { const waiter = locating.get(message.requestId); if (waiter?.port === port) waiter.resolve(locateResponse(message.requestId, message) ?? 'unavailable'); break; }
-        case 'url':
-          resetPage(port, info, message.url);
-          void bg.activeTab(info.windowId).then(active => { if (pagePorts.get(port) === info && active?.id === info.tabId && active.url === info.url) bg.selection.bindSelection(port, info); }).catch(() => {});
-          break;
+        case 'url': resetPage(port, info, message.url); break;
         case 'signal-send': void bg.signals.sendPageSignal(port, info, message).catch(() => {}); break;
-        case 'stickies-located': bg.stickies.stickiesLocated(info, message.missing); void pushPageStatus(); break;
-        case 'pick-error': bg.selection.pickError(info, message); break;
-        case 'picked': case 'marked': void bg.selection.finishPick(port, info, message).catch(() => {}); break;
+        case 'mark-send': void bg.signals.sendPageMark(port, info, message).catch(() => {}); break;
+        case 'drawing-send': void bg.signals.sendPageDrawing(port, info, message).catch(() => {}); break;
+        case 'chart-pref': void bg.signals.changeChartPref(port, info, message).catch(() => {}); break;
+        case 'chart-found': void bg.signals.chartFound(port, info).catch(() => {}); break;
+        case 'follow-touch': bg.follow.touched(port, info); break;
+        case 'lead-scroll': void bg.follow.leadScrolled(port, info, message.y).catch(() => {}); break;
         case 'captured': case 'capture-cancel': bg.capture.captureDone(port, info, message); break;
         case 'open-room': bg.danmaku.openRoom(port, info, message.key); break;
         case 'open-panel': void browser.sidePanel.open({ windowId: info.windowId }).catch(() => {}); break;
-        case 'open-sticky': bg.stickies.openStickyFromPage(info, message.id); break;
       }
     });
     port.onDisconnect.addListener(() => {
       disconnected = true;
       const connection = pagePorts.get(port);
       if (connection) { forgetOneOff(tabId); stopPage(port, connection); }
-      const pick = bg.selection.picks.get(windowId);
-      if (pick?.tabId === tabId && (!pick.documentId || pick.documentId === port.sender?.documentId)) bg.selection.discardPick(windowId);
       const capture = bg.capture.captures.get(windowId);
       if (capture && (capture.page === port || !capture.page && capture.tabId === tabId && capture.url === url)) bg.capture.discardCapture(windowId);
       pagePorts.delete(port);
@@ -352,9 +328,8 @@ export function pages(bg: Background) {
         // A site that gains 互动 covers its one-off pages; one that loses it takes its pages down at once.
         for (const [tabId, binding] of oneOffPages) if (bg.interactivePage(binding)) forgetOneOff(tabId);
         for (const binding of oneOffPages.values()) if (![...bg.panels.values()].includes(binding.windowId)) endActions(binding.windowId);
-        bg.selection.dropSelections(context => !bg.interactivePage(context));
         for (const [port, info] of pagePorts) if (!allowedPage(info) && !bg.capture.capturePageAllowed(info)) stopPage(port, info);
-        for (const [port, info] of pagePorts) void refreshPage(port, info).catch(() => {});
+        for (const [port, info] of pagePorts) refreshPage(port, info);
       }
       void registerPageLayer().catch(() => {});
     },
@@ -367,7 +342,6 @@ export function pages(bg: Background) {
       permissionSync = permissionSync.catch(() => {}).then(async () => {
         await Promise.all([bg.signals.signalsReady, bg.danmaku.ready]);
         for (const [tabId, binding] of oneOffPages) if (!await granted(binding.url)) forgetOneOff(tabId);
-        for (const [windowId, pick] of bg.selection.picks) if (!await granted(pick.url)) bg.selection.discardPick(windowId);
         // An activeTab capture holds its page without a site grant.
         for (const [windowId, session] of bg.capture.captures) if (!session.active && !await granted(session.url)) bg.capture.discardCapture(windowId);
         for (const [port, info] of pagePorts) if (!await granted(info.url) && !bg.capture.capturePageAllowed(info)) stopPage(port, info);
@@ -383,10 +357,11 @@ export function pages(bg: Background) {
       if (change.url || change.status === 'loading') {
         bg.tabVersions.set(tabId, (bg.tabVersions.get(tabId) ?? 0) + 1);
         restoring.delete(tab.windowId);
+        // Chrome reports `loading` for same-document history changes too. A connected document that really goes away
+        // disconnects its port, so only that ends the page; `loading` alone decides nothing while one is connected.
+        const connected = [...pagePorts.values()].some(info => info.tabId === tabId);
         const binding = oneOffPages.get(tabId);
-        if (binding && (change.status === 'loading' || change.url && binding.url !== pageScopeUrl(change.url))) forgetOneOff(tabId);
-        bg.selection.dropSelections(pick => pick.tabId === tabId);
-        if (change.status === 'loading') for (const [port, info] of pagePorts) if (info.tabId === tabId) stopPage(port, info);
+        if (binding && (change.status === 'loading' && !connected || change.url && binding.url !== pageScopeUrl(change.url))) forgetOneOff(tabId);
       }
       if (change.url) for (const [port, info] of pagePorts) if (info.tabId === tabId) resetPage(port, info, change.url);
       // The page layer connects at document_idle, often before the tab finishes loading; recheck once it has.
@@ -399,7 +374,6 @@ export function pages(bg: Background) {
       bg.tabVersions.set(tabId, (bg.tabVersions.get(tabId) ?? 0) + 1);
       forgetOneOff(tabId);
       for (const [port, info] of pagePorts) if (info.tabId === tabId) stopPage(port, info);
-      bg.selection.dropSelections(pick => pick.tabId === tabId);
       void pushPageStatus();
     },
   };

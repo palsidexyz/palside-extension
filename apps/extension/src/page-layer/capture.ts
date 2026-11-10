@@ -1,5 +1,5 @@
 import type { CaptureLabels,PageUp } from '../runtime/browser/page-protocol';
-import { type CaptureSelection,type CaptureHandle,type CaptureTool,type CaptureColor,type CaptureOp,MIN_SELECTION,CAPTURE_IDLE_MS,CAPTURE_MAX_MS,IMAGE_TEXT_MAX,IMAGE_PEN_POINTS_MAX,COLORS,clamp,normalizeSelection,resizeSelection,moveSelection,toolbarPlacement,cropRectAtDpr,undoAnnotations,drawOps,captureDimensions } from '../domain/images/drawing.ts';
+import { type CaptureSelection,type CaptureHandle,type CaptureTool,type CaptureColor,type CaptureOp,MIN_SELECTION,CAPTURE_IDLE_MS,CAPTURE_MAX_MS,clipImageText,IMAGE_PEN_POINTS_MAX,COLORS,clamp,normalizeSelection,resizeSelection,moveSelection,toolbarPlacement,cropRectAtDpr,undoAnnotations,drawOps,captureDimensions } from '../domain/images/drawing.ts';
 import { encodeCapture } from '../runtime/media/encode-capture.ts';
 
 function icon(path: string) {
@@ -144,7 +144,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
   const commitText = () => {
     if (!text) return;
     const input = text; text = undefined;
-    const value = input.textContent?.trim().slice(0, IMAGE_TEXT_MAX);
+    const value = clipImageText(input.textContent?.trim() ?? '');
     if (value && selection) ops = [...ops, { kind: 'text', x: parseFloat(input.style.left) - selection.x + 2, y: parseFloat(input.style.top) - selection.y + 18, value, color: input.dataset.color as CaptureColor }];
     input.remove();
     layout();

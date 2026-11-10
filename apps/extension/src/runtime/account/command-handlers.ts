@@ -124,7 +124,7 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
         return { nicknameRequired: !session.account.nickname };
       } catch (error) {
         if (!attempt.current()) throw error instanceof ApiError && error.code === 'RESULT_UNKNOWN' ? error : new MessageError(uiMessage('extension.runtime.loginChanged'));
-        runtime.auth.liveDispose?.(); runtime.auth.liveDispose = undefined; runtime.auth.sseOpen = false;
+        runtime.auth.liveDispose?.(); runtime.auth.liveDispose = undefined; runtime.auth.liveOpen = false;
         clearTimeout(runtime.auth.deviceStateTimer); runtime.auth.deviceStateTimer = undefined;
         const client = runtime.auth.client; runtime.auth.client = undefined; client?.stopClient(); runtime.auth.cryptoInitialised = false;
         runtime.auth.generation++; runtime.rooms.reset(); runtime.auth.session = undefined; runtime.state.authenticated = false; runtime.state.account = undefined; runtime.api.token = token;

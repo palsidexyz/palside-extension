@@ -1,5 +1,6 @@
 'use client';
 import { useTranslations } from 'use-intl';
+import { FollowBar } from '../annotations/follow-bar';
 import { CountText } from '../ui/motion-details';
 import { hitSegments } from '../chat/text-highlights';
 import { assetView } from '../../../domain/assets/model';
@@ -22,7 +23,8 @@ import { TeamSettings } from '../teams/team-settings';
 import { TeamLevel } from '../teams/team-level';
 import { Members, Requests } from '../teams/member-list';
 import { SharedContent } from '../assets/shared-content';
-import { EmptyState, HistoryMore } from '../chat/history-scope';
+import { HistoryMore } from '../chat/history-scope';
+import { EmptyState } from '../ui/empty-state';
 import { Report } from '../feedback/report';
 import { DeleteAccountForm, Security } from '../account/identity';
 import { Lobby, Recruitment } from '../teams/lobby';
@@ -37,7 +39,7 @@ import { ConnectionCard, ConnectionState, NeedsService, pageIssue } from '../fee
 import type { PalsideController } from './use-palside';
 import s from './palside.module.css';
 
-const titles: Record<string, string> = { wallet: 'extension.wallet.title', 'wallet-receive': 'extension.wallet.receive', 'wallet-records': 'extension.wallet.records', 'wallet-settings': 'extension.wallet.settings', 'wallet-packet': 'extension.wallet.createPacket', report: 'extension.copy.report', 'delete-account': 'extension.copy.deleteAccount', lobby: 'extension.copy.visitLobby', join: 'extension.copy.joinInvitation', 'add-team': 'extension.copy.lobby', 'former-teams': 'extension.start.formerTeams', recruitment: 'extension.copy.teamIntro', team: 'extension.copy.teamSettings', members: 'extension.copy.teamMembers', requests: 'extension.copy.joinRequests', 'team-profile': 'extension.copy.editTeam', settings: 'extension.copy.settings', search: 'extension.copy.searchMessages', asset: 'extension.copy.details', profile: 'extension.copy.editProfile', security: 'extension.copy.security', interaction: 'extension.settings.interactionOptions', sites: 'extension.settings.sites', notifications: 'extension.settings.notifications', favorites: 'extension.web.myFavorites', privacy: 'extension.settings.privacy', about: 'extension.copy.aboutPalside', 'room-people': 'extension.room.people', blocked: 'extension.room.blocked', hot: 'extension.hot.tokens' };
+const titles: Record<string, string> = { wallet: 'extension.wallet.title', 'wallet-receive': 'extension.wallet.receive', 'wallet-records': 'extension.wallet.records', 'wallet-settings': 'extension.wallet.settings', 'wallet-packet': 'extension.wallet.createPacket', report: 'extension.copy.report', 'delete-account': 'extension.copy.deleteAccount', lobby: 'extension.copy.visitLobby', join: 'extension.copy.joinInvitation', 'add-team': 'extension.copy.lobby', 'former-teams': 'extension.start.formerTeams', recruitment: 'extension.copy.teamIntro', team: 'extension.copy.teamSettings', members: 'extension.copy.teamMembers', requests: 'extension.copy.joinRequests', 'team-profile': 'extension.copy.editTeam', settings: 'extension.copy.settings', search: 'extension.copy.searchMessages', asset: 'extension.copy.details', profile: 'extension.copy.editProfile', security: 'extension.copy.security', interaction: 'extension.settings.interaction', sites: 'extension.settings.sites', notifications: 'extension.settings.notifications', favorites: 'extension.web.myFavorites', privacy: 'extension.settings.privacy', about: 'extension.copy.aboutPalside', 'room-people': 'extension.room.people', blocked: 'extension.room.blocked', hot: 'extension.hot.tokens' };
 
 /** Pages whose content or actions come from the business service: they carry the connection card at the top. */
 const serviceScreens = new Set(['team', 'members', 'requests', 'team-profile', 'asset', 'recruitment', 'join', 'add-team', 'former-teams', 'profile', 'security', 'delete-account', 'blocked', 'report', 'wallet', 'wallet-receive', 'wallet-records', 'wallet-settings', 'wallet-packet']);
@@ -63,6 +65,7 @@ export function Panels({ c, onJump }: { c: PalsideController; onJump: (id: strin
     if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); back(); }
   }}>
     <header className={`${s.secondaryHeader} ${s.pageHeader}`}><span className={s.headerSide}><Action label={t('common.back')} onClick={back}><ArrowLeft /></Action></span><h1 ref={heading} tabIndex={-1}>{c.screen === 'members' && c.selectingOwner ? t('extension.copy.selectNewOwner') : c.screen === 'site' ? siteTitle : t(title)}</h1><span className={s.headerSide}>{c.screen === 'asset' && asset && <AssetHeaderActions c={c} asset={asset} />}</span></header>
+    <FollowBar c={c} />
     <div className={s.secondaryBody} data-palside-panel-scroll>
       {serviceScreens.has(c.screen) && <ConnectionCard c={c} />}
       {liveScreens.has(c.screen) && pageIssue(c, 'service') ? <ConnectionState c={c} /> : <>

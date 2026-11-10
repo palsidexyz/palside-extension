@@ -24,6 +24,8 @@ export const errors = {
   ACCOUNT_BANNED: definition(403, strictObject({ expiresAt: Type.Union([timestamp, Type.Null()]) })),
   TEXT_NOT_ALLOWED: definition(400, empty),
   CHAIN_UNAVAILABLE: definition(503, empty),
+  /** This extension version is below the service minimum; Chrome installs the newer one from the store. */
+  CLIENT_OUTDATED: definition(426, empty),
   TOKENS_UNAVAILABLE: definition(503, empty),
   CHAIN_RELAY_UNAVAILABLE: definition(503, empty),
   CHAIN_INDEX_UNAVAILABLE: definition(503, empty),
@@ -160,7 +162,7 @@ export const errorSchemas = Object.fromEntries(Object.entries(errors).map(([code
 })) as unknown as ErrorSchemas;
 export const errorBody = Type.Unsafe<ErrorBody>(Type.Union(Object.values(errorSchemas).flatMap(schema => Type.IsUnion(schema) ? schema.anyOf : [schema]), { discriminator: 'error' }));
 export const matrixErrorBody = strictObject({ errcode: contractString({ pattern: /^M_[A-Z_]{1,64}$/ }), error: contractString(), retry_after_ms: Type.Optional(count) });
-export const transportErrors = ['INVALID_INPUT', 'ORIGIN_DENIED', 'RATE_LIMITED', 'DRAINING', 'INTERNAL_ERROR'] as const;
+export const transportErrors = ['INVALID_INPUT', 'ORIGIN_DENIED', 'CLIENT_OUTDATED', 'RATE_LIMITED', 'DRAINING', 'INTERNAL_ERROR'] as const;
 export const sessionErrors = ['LOGIN_REQUIRED', 'DEVICE_REVOKED', 'ACCOUNT_RESTRICTED', 'ACCOUNT_BANNED'] as const;
 export const signatureErrors = ['AUTH_REQUIRED', 'AUTH_INVALID', 'AUTH_EXPIRED', 'AUTH_REPLAYED'] as const;
 export const memberErrors = ['TEAM_NOT_FOUND', 'NOT_MEMBER'] as const;

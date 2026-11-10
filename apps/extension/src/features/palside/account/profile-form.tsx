@@ -1,5 +1,5 @@
 'use client';
-import { errorMessage, message as uiMessage } from '@palside/i18n';
+import { failureText } from '@palside/i18n';
 
 import type { ProfileTag } from '@palside/shared/contracts/profiles';
 import { normalizeTagText, presetTagIds } from '@palside/shared/contracts/rules';
@@ -58,7 +58,7 @@ export function ProfileForm({ c }: { c: PalsideController }) {
       if (c.live) await c.live.command('profile', { name: name.trim(), bio: bio.trim(), tags: nextTags });
       else c.setPeople(old => old.map(person => person.id === c.data.self ? { ...person, name: name.trim(), bio: bio.trim(), tags: nextTags } : person));
       c.go('settings');
-    } catch (failure) { setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.profileSaveFailed')); }
+    } catch (failure) { setError(failureText(failure, 'extension.copy.profileSaveFailed')); }
     finally { setBusy(false); }
   }}>
     <div className={p.avatar}><AvatarEditor c={c}><PersonAvatar person={{ ...c.me, presence: undefined }} size="xxl" /></AvatarEditor></div>
@@ -83,7 +83,6 @@ export function ProfileForm({ c }: { c: PalsideController }) {
   </form>;
 }
 
-
 export function TeamProfileForm({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const [name, setName] = useState(c.team.name);
@@ -101,7 +100,7 @@ export function TeamProfileForm({ c }: { c: PalsideController }) {
       if (c.live) await c.live.command('team', { teamId: c.current, name: name.trim(), description: description.trim() });
       else c.setTeams(old => old.map(team => team.id === c.current ? { ...team, name: name.trim(), description: description.trim() } : team));
       c.go('team');
-    } catch (failure) { setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.teamSaveFailed')); }
+    } catch (failure) { setError(failureText(failure, 'extension.copy.teamSaveFailed')); }
     finally { setBusy(false); }
   }}>
     <div className={p.avatar}><AvatarEditor c={c} team><TeamAvatar team={c.team} size="xl" /></AvatarEditor></div>

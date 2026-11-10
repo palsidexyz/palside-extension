@@ -1,10 +1,10 @@
 {
   "common": {
+    "opening": "Opening Palside…",
     "language": "Language",
     "saveFailed": "Could not save. Try again.",
     "connectionLostTitle": "Can't reach Palside",
     "connectionLost": "The side panel lost its connection to the extension. Reopen the side panel.",
-    "loading": "Opening Palside…",
     "retry": "Retry",
     "error": "Action failed. Try again.",
     "confirm": "Confirm",
@@ -31,8 +31,8 @@
         "eligible": "Available to claim",
         "sender": "Your red packet",
         "not-member-at-send": "You were not in the squad when this was sent",
-        "account-too-new": "Account is less than 24 hours old",
-        "stay-too-short": "Stay here for 30 seconds",
+        "account-too-new": "New accounts can't claim yet",
+        "stay-too-short": "Wait a moment to claim",
         "claimed": "Claimed",
         "unavailable": "Red packet ended",
         "disabled": "Onchain features are not available yet"
@@ -48,9 +48,9 @@
       "recoveryUnavailable": "Could not check or resume this operation. Try again.",
       "recoveryReview": "Review original operation",
       "recoveryFailed": "Failed",
-      "recoveryIndexing": "Confirmed onchain · awaiting indexing",
+      "recoveryIndexing": "Confirmed onchain · syncing",
       "recoveryCancelled": "Submission cancelled",
-      "recoveryReserved": "Funds remain reserved. A cancelled or expired submission does not prove that its signature is invalid. Check the original operation.",
+      "recoveryReserved": "This payment may still complete, so the funds stay held. Keep checking and don't pay again.",
       "logoutRecovery": "Back up your recovery phrase first; without it you cannot recover your account or wallet. Signing out clears this device's drafts, caches and keys, but does not cancel submitted transactions. After signing back in with the same account, use Payment recovery to check the original operation before paying again.",
       "settings": "Wallet settings",
       "address": "Wallet address",
@@ -210,6 +210,10 @@
       "loadingTeams": "Loading squads",
       "reconnecting": "Reconnecting",
       "reconnect": "Reconnect",
+      "update": "Update",
+      "updateTo": "Update to {version}",
+      "updateChecking": "Checking",
+      "updateNotReady": "The new version isn't out yet. Try again later.",
       "removeCard": "Remove card",
       "websiteHome": "Website homepage",
       "openPageFailed": "Could not open the page. Try again.",
@@ -245,7 +249,7 @@
       "searchMessages": "Search messages",
       "teamMenu": "Squad menu",
       "historyUnavailable": "Some earlier messages are unavailable on this device. New messages are not affected.",
-      "aboutHistory": "About older messages",
+      "historyBefore": "Messages from before this device signed in can’t be read here",
       "markedRead": "Marked as read",
       "markAllRead": "Mark all read",
       "teamSettings": "Squad settings",
@@ -590,7 +594,6 @@
       "aboutPrivacy": "Privacy policy",
       "aboutTerms": "Terms of use",
       "aboutSource": "Source code",
-      "thirdPartyLogos": "Third-party site names and logos belong to their respective owners and are used only to identify those sites. To request removal, contact {email}.",
       "invitePassword": "Join code",
       "invitePasswordOff": "Off",
       "copyInvitePassword": "Copy join code",
@@ -645,7 +648,7 @@
       "CHAIN_WALLET_BOUND": "This wallet is already linked to another account",
       "CHAIN_CHALLENGE_INVALID": "The wallet verification request is invalid. Start again.",
       "CHAIN_CHALLENGE_EXPIRED": "The wallet verification request expired. Start again.",
-      "CHAIN_SIGNATURE_INVALID": "The wallet signature could not be verified",
+      "CHAIN_SIGNATURE_INVALID": "Payment could not be verified",
       "CHAIN_AMOUNT_INVALID": "The payment amount is invalid",
       "CHAIN_TEXT_REJECTED": "This onchain display text is not allowed. Edit it and try again.",
       "CHAIN_RECIPIENT_INVALID": "The payment recipient is invalid",
@@ -671,6 +674,7 @@
       "BODY_TOO_LARGE": "Content exceeds the size limit",
       "INVALID_JSON": "Invalid request content",
       "ORIGIN_DENIED": "This source is not allowed",
+      "CLIENT_OUTDATED": "Update Palside to continue",
       "MEDIA_UNAVAILABLE": "This image is no longer available",
       "OWNED_TEAMS": "Transfer the captain role or disband the squads you lead first",
       "INVALID_ACTION": "Invalid action",
@@ -743,10 +747,10 @@
       "IMAGE_DECODE": "Could not read this image. Choose another.",
       "IMAGE_PROCESSING": "Could not process the image. Try again.",
       "IMAGE_RESULT_TOO_LARGE": "The processed image exceeds the size limit. Choose a smaller one.",
-      "AUTH_REQUIRED": "This request needs your account signature",
-      "AUTH_INVALID": "Signature check failed. Try again.",
-      "AUTH_EXPIRED": "The signature expired. Check your computer clock and try again.",
-      "AUTH_REPLAYED": "That signature was already used. Try again.",
+      "AUTH_REQUIRED": "You're signed out. Try again.",
+      "AUTH_INVALID": "Verification failed. Try again.",
+      "AUTH_EXPIRED": "Verification expired. Check your computer clock and try again.",
+      "AUTH_REPLAYED": "Duplicate request. Try again.",
       "POW_REQUIRED": "The security check did not pass. Try again.",
       "ACCOUNT_EXISTS": "This account already exists",
       "SIGNUP_PAUSED": "Sign-up is paused. Try again later.",
@@ -801,7 +805,6 @@
       "INVALID_PACKET_DISTRIBUTION": "This packet type doesn’t support that split"
     },
     "runtime": {
-      "annotationChanged": "This sticky note changed. Review it and retry.",
       "pageNoCapture": "This tab cannot be captured. Switch to a webpage or paste an image.",
       "captureInProgress": "Finish or cancel the current screenshot first",
       "capturePageChanged": "The page changed. Take a new screenshot.",
@@ -863,6 +866,8 @@
       "encryptionFailedTitle": "Encrypted chat could not start",
       "encryptionFailedDetail": "Encryption on this device is not ready, so messaging is unavailable. Retry, or reopen the side panel if it still fails.",
       "connectingTitle": "Connecting to chat",
+      "updateRequiredTitle": "Update required",
+      "updateRequiredDetail": "This version is out of date. Update to keep using Palside.",
       "serviceConnectingTitle": "Connecting to the service",
       "connectingDetail": "Connecting and syncing messages. You can edit drafts and send them manually when ready.",
       "removedReadonly": "Removed from the squad · Read-only history",
@@ -871,7 +876,7 @@
       "readonlyDetail": "You can view history kept on this device, but you will not receive new messages or be able to send.",
       "sendUncertain": "The server may already have this message, but delivery is not confirmed. Check its status instead of sending it again.",
       "sendForbidden": "The service refused this message. Check that you are still in the squad and allowed to send.",
-      "sendRateLimited": "Still sending too fast after waiting. Resend in a moment.",
+      "sendRateLimited": "Sending too fast. Resend in a moment.",
       "sendWaiting": "Not connected; the message was not submitted. Send it manually once connected.",
       "sendUploadFailed": "Image upload failed; the message was not sent. Try again later.",
       "sendServiceUnavailable": "Service unavailable; the message was not sent. Try again later.",
@@ -905,7 +910,8 @@
       "pageUnavailable": "This page is unavailable",
       "needSite": "Needs site access",
       "signalRateLimited": "Too many signals. Try again in a few seconds.",
-      "stickyTooLong": "Notes can be up to {count} characters",
+      "signalAlone": "No one else is in this squad yet",
+      "signalUnverified": "Squad members’ devices aren’t verified yet",
       "pagePending": "This page is loading. Try again shortly.",
       "pageActionFailed": "Page tools couldn't start. Refresh the page and try again.",
       "captureContextChanged": "The account or squad changed. Take the screenshot again.",
@@ -1007,15 +1013,29 @@
       "opacity": "Opacity"
     },
     "top": {
-      "notSharing": "Not sharing",
-      "syncing": "In sync",
+      "end": "End",
       "open": "Open",
       "ignore": "Dismiss",
       "openDetails": "Open {name} details",
-      "followTitle": "Following {name}",
-      "go": "Go",
-      "end": "End",
-      "pokeTitle": "{name} wants you here",
+      "signalAt": "{name} signaled <kind></kind> on <page>{place}</page>",
+      "signalAtSelf": "You signaled <kind></kind> on <page>{place}</page>",
+      "emoteAt": "{name} sent <kind></kind> on <page>{place}</page>",
+      "emoteAtSelf": "You sent <kind></kind> on <page>{place}</page>",
+      "actedAt": "{name} <kind></kind> on <page>{place}</page>",
+      "actedAtSelf": "You <kind></kind> on <page>{place}</page>",
+      "verbEmote": "sent ",
+      "verbSignal": "signaled ",
+      "drewAt": "{name} drew on <page>{place}</page><times></times>",
+      "drewAtSelf": "You drew on <page>{place}</page><times></times>",
+      "drawing": "drew",
+      "pokeAt": "{name} wants you to see <page>{place}</page>",
+      "followOn": "Following {name}",
+      "followGroup": "👣 Following {name}",
+      "followPausedHere": "Following {name} paused",
+      "followPause": "Pause",
+      "followContinue": "Continue",
+      "following": "{name} is following you",
+      "followingMany": "{count} people including {name} are following you",
       "awayTitle": "{count, plural, one {# token} other {# tokens}} discussed while you were away",
       "more": "{count} more"
     },
@@ -1046,29 +1066,24 @@
       "poked": "Sent"
     },
     "composer": {
-      "removeRef": "Remove quote",
-      "refPage": "Page",
-      "findRef": "Find on page: {caption}",
       "refMissing": "No longer on the page",
-      "refHidden": "Not visible in this window",
-      "refOtherSite": "Only findable on the original site",
-      "refUnavailable": "Couldn't reach the page",
+      "refOutside": "The chart has no candles that far back. Try a longer timeframe",
+      "refLoading": "The page hasn’t finished loading",
+      "refBlocked": "This page can’t be searched",
+      "refMoved": "The page went somewhere else",
+      "refTimeout": "The page didn’t respond. Reload and try again",
+      "refChanged": "Your account or squad changed",
       "editImage": "Edit image",
       "unreadMentions": "{count} unread mentions"
     },
     "page": {
-      "selectionTooLong": "Select up to 200 characters",
-      "selectionUnavailable": "This content cannot be quoted",
-      "refEdge": "{name}'s quote",
-      "above": "above",
-      "below": "below",
       "you": "You"
     },
     "access": {
       "chrome": "Chrome permission",
-      "who": "Who can see it",
-      "keep": "How long it is kept",
-      "no": "Never read",
+      "who": "Visible to",
+      "keep": "Retention",
+      "no": "Not read",
       "sites": "Read and change site data",
       "none": "None",
       "separator": ", "
@@ -1076,11 +1091,11 @@
     "center": {
       "sites": "Sites",
       "cache": "Cache",
-      "cacheUnavailable": "Could not read cache usage. Try again.",
+      "cacheUnavailable": "Cache usage unavailable",
       "clear": "Clear",
-      "clearTitle": "Clear cached images and content?",
+      "clearTitle": "Clear local cache?",
       "diagnostics": "Copy diagnostics",
-      "clearDescription": "Messages, drafts and sign-in stay. Images load again when opened.",
+      "clearDescription": "Messages, drafts and sign-in are unaffected. Images reload when next opened.",
       "fontSize": "Text size",
       "small": "S",
       "medium": "M",
@@ -1100,13 +1115,8 @@
       "disagree": "Disagree",
       "watch": "Keep watching",
       "together": "Look together",
-      "send": "Send signal",
-      "unavailable": "Signals unavailable",
-      "page": "Page alert",
-      "unmatched": "Location not found",
       "locate": "Locate",
       "failed": "Could not send",
-      "empty": "No recipients",
       "emote": "Emote",
       "size": "Signal size",
       "emoteSize": "Emote size",
@@ -1148,28 +1158,28 @@
       "emote_gn": "GN",
       "keyChange": "Change"
     },
+    "chart": {
+      "toolbar": "Shared drawings",
+      "showTeam": "Show squad drawings",
+      "sync": "Share with squad",
+      "syncOn": "New drawings are visible to your squad",
+      "syncOff": "Only you see your drawings",
+      "mark": "Laser pointer",
+      "markNote": "Draw a stroke for your squad; it fades in seconds",
+      "members": "Squad members",
+      "search": "Search members",
+      "show": "Show",
+      "hide": "Hide",
+      "hideAll": "Hide all drawings",
+      "showAll": "Show all drawings",
+      "unsynced": "Not shared, only you see it",
+      "failed": "Sharing failed",
+      "guideOff": "Don’t show again",
+      "guide": "Turn on Share with squad, and the lines, text and emoji you draw show up for your squad."
+    },
     "current": {
       "detail": "{name} details",
       "share": "Share to chat"
-    },
-    "sticky": {
-      "placeholder": "Write a note",
-      "assetNote": "Write a sticky note",
-      "addComment": "Add a note",
-      "loadLatest": "Load latest content",
-      "quote": "Quote to chat",
-      "saved": "Note saved",
-      "viewMark": "View",
-      "conflict": "This sticky note has other changes. Review its content.",
-      "add": "Add sticky note",
-      "delete": "Delete",
-      "hide": "Hide",
-      "show": "Show",
-      "empty": "No sticky notes yet",
-      "hidden": "{count} hidden",
-      "deleteTitle": "Delete this sticky note?",
-      "deleteDescription": "It will be removed for everyone in the squad.",
-      "find": "Find original"
     },
     "capability": {
       "pending": "Page loading",
@@ -1182,11 +1192,8 @@
     "web": {
       "favorites": "Favorites",
       "myFavorites": "My favorites",
+      "chart": "Shared drawings",
       "signal": "Signals",
-      "sticky": "Sticky notes",
-      "notesOn": "Notes on {name}",
-      "hiddenNotes": "Hidden notes",
-      "showAll": "Show all",
       "share": "Share viewing",
       "category": "Category",
       "category_all": "All",
@@ -1208,7 +1215,7 @@
       "siteCount": "{count, plural, one {# site} other {# sites}}",
       "favoriteCount": "{count, plural, one {# item} other {# items}} · this account only",
       "clearFavoritesTitle": "Clear favorites?",
-      "clearFavoritesDescription": "Removes this account's favorites on this device only.",
+      "clearFavoritesDescription": "Deletes this account’s favorites on this device only.",
       "favoritesFull": "Up to {count} favorites",
       "thisPage": "This page",
       "thisSite": "This site",
@@ -1220,6 +1227,7 @@
       "bringOver": "Bring over",
       "followShort": "Follow",
       "followingShort": "Following",
+      "followPausedShort": "Paused",
       "more": "More",
       "save": "Save",
       "saved": "Saved",
@@ -1251,11 +1259,9 @@
       "aboutFeature": "About {name}",
       "acceptInvites": "Allow invites from danmaku",
       "off": "Off",
-      "groupStrangers": "Strangers",
-      "seeLocal": "Only on this device",
+      "seeLocal": "On this device",
       "groupWeb": "Web",
-      "interactionOptions": "Interaction options",
-      "roomsOff": "Danmaku is off",
+      "joinRooms": "Join danmaku",
       "onPages": "Show on pages",
       "permissionsReadFailed": "Couldn’t read browser permissions"
     },
@@ -1294,7 +1300,6 @@
       "shareBlocked": "Share viewing · On · Not this page; resumes on the next"
     },
     "grant": {
-      "access": "Read and change your data on {host}",
       "allow": "Allow",
       "turnOn": "Turn on"
     },
@@ -1310,15 +1315,17 @@
       "mate": "Teammate",
       "folded": "Folded",
       "show": "Show",
-      "quoteLine": "“{text}” — {name} · {room} danmaku",
       "block": "Block",
       "blockedName": "Blocked {name}",
       "unblock": "Unblock",
       "reported": "Reported",
       "reportTitle": "Report this danmaku from {name}?",
-      "reportDescription": "After 5 reports, it folds for everyone and no longer shows on pages.",
+      "reportDescription": "Your report goes to Palside for review.",
       "placeholder": "Send danmaku",
       "watching": "{count, plural, one {# watching} other {# watching}}",
+      "like": "Like",
+      "unlike": "Unlike",
+      "likes": "{count, plural, one {# like} other {# likes}}",
       "switch": "Switch",
       "pageDanmaku": "Show danmaku on pages",
       "retractTitle": "Unsend this danmaku?",
@@ -1327,18 +1334,16 @@
       "noSpeakers": "No one spoke recently",
       "openOn": "Open on {name}",
       "noToken": "Open a token page to use danmaku",
+      "elsewhere": "Danmaku is in another window",
+      "loadFailed": "Couldn’t load danmaku",
       "otherSite": "Open on another site",
       "gateTitle": "See this page’s danmaku",
       "notOnPage": "Danmaku isn’t shown on this page",
       "pageUnusable": "Danmaku doesn’t work on this page",
-      "joinedNotice": "Danmaku is on: the service sees which token you are in. Turn it off in Settings › Interaction options › Danmaku."
-    },
-    "stance": {
-      "title": "Outlook",
-      "votes": "{count, plural, one {# vote} other {# votes}}",
-      "bull": "Bullish",
-      "hold": "Neutral",
-      "bear": "Bearish"
+      "chainSwitch": "Switch chain",
+      "onChains": "On {count} chains",
+      "recent": "Recently viewed",
+      "joinedNotice": "Danmaku is on: the service sees which token you are in. Turn it off in Settings › Page interaction › Danmaku."
     },
     "hot": {
       "title": "Trending",
@@ -1346,8 +1351,8 @@
       "chain": "Chain",
       "all": "All",
       "here": "This page",
-      "bull": "{percent}% bullish",
       "riseLabel": "{count} more viewers in 5 minutes",
+      "search": "Token name or contract address",
       "watchingShort": "watching",
       "none": "None yet"
     },
@@ -1397,88 +1402,92 @@
     },
     "privacy": {
       "chrome": "Chrome permissions",
-      "builtIn": "Comes with install",
+      "builtIn": "Granted at install",
       "allowed": "Allowed",
       "notAllowed": "Not allowed",
       "revoke": "Revoke",
+      "allow": "Allow",
       "perm_tabs": "Read your browsing history",
       "perm_sites": "Read and change site data",
       "perm_active": "Current tab",
       "perm_notifications": "Display notifications",
+      "perm_tabGroups": "View and manage your tab groups",
       "perm_idle": "Idle state of this device",
-      "perm_none": "No browser permission",
+      "perm_none": "No browser permission required",
       "revoke_tabs_title": "Revoke “Read your browsing history”?",
-      "revoke_tabs": "Share viewing turns off. Turning it on again later won’t make Chrome ask again.",
+      "revoke_tabs": "Share viewing will turn off. Chrome will not prompt again when it is re-enabled.",
       "revoke_sites_title": "Revoke site access?",
-      "revoke_sites": "Page interaction turns off and {scope} are revoked together. Turning it on again later restores these sites without Chrome asking again.",
+      "revoke_sites": "Page interaction will turn off and access for {scope} will be revoked. Re-enabling restores the same sites without a Chrome prompt.",
       "revoke_notifications_title": "Revoke “Display notifications”?",
-      "revoke_notifications": "Notifications turn off. Turning them on again later won’t make Chrome ask again.",
+      "revoke_notifications": "Notifications will turn off. Chrome will not prompt again when they are re-enabled.",
+      "revoke_tabGroups_title": "Revoke “View and manage your tab groups”?",
+      "revoke_tabGroups": "Follow tab groups will be unnamed. Other features are unaffected.",
       "revoke_active_title": "Current tab",
-      "revoke_active": "Comes with the install and cannot be revoked.",
+      "revoke_active": "Granted at install; cannot be revoked.",
       "revoke_idle_title": "Idle state of this device",
-      "revoke_idle": "Comes with the install and cannot be revoked.",
+      "revoke_idle": "Granted at install; cannot be revoked.",
       "feature_share": "Share viewing",
       "feature_token": "Token data",
-      "feature_quote": "Quote",
       "feature_signal": "Signals",
-      "feature_sticky": "Sticky notes",
+      "feature_chart": "Shared drawings",
       "feature_room": "Danmaku",
       "feature_shot": "Screenshot",
       "feature_notify": "Notifications",
+      "feature_follow": "Follow along",
       "feature_presence": "Online status",
       "read": {
         "share": {
-          "line": "While share viewing is on, reads the address, title and site icon of the current tab and sends them to your current squad.",
-          "who": "Your current squad",
+          "line": "While share viewing is on, reads the current tab’s address, title and site icon and sends them to the current squad.",
+          "who": "Current squad members",
           "keep": "Not stored; expires after 30 seconds",
           "no": "Other tabs, page content"
         },
         "token": {
-          "line": "When a token is recognized, sends its chain and contract address to the Palside service, which reads its public name, symbol and icon from the blockchain; everyone sees the same record.",
-          "who": "The Palside service; blockchain nodes receive only the contract address",
-          "keep": "Public token details stay on the service and are deleted after 90 days without lookups; who looked a token up is not recorded.",
+          "line": "When a token is detected, sends its chain and contract address to the Palside service, which reads the public name, symbol and icon on-chain. All users share one record.",
+          "who": "Palside service; blockchain nodes receive only the contract address",
+          "keep": "Public token details are stored on the service and deleted after 90 days without lookups; lookups are not attributed",
           "no": "Page content, balances, holdings, orders, wallets"
         },
-        "quote": {
-          "line": "Selection reads up to 200 characters, up to 24 characters on each side, and the URL. Quote adds them to a local draft; sending shares them with your squad.",
-          "who": "Your current squad",
-          "keep": "Your squad’s retention period",
-          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and anything Palside itself shows on the page"
+        "chart": {
+          "line": "With Share with squad on, the tool, coordinates and style of new lines, text and emoji drawn with the site’s tools are sent to the squad. Teammates’ drawings render on your chart; site scripts can read the shapes but cannot identify who drew them.",
+          "who": "Current squad members",
+          "keep": "Until the author deletes them or turns off Share with squad, within the squad’s message retention; laser pointer strokes are not stored",
+          "no": "Drawings made while Share with squad is off, chart pixels, page text, input content"
         },
         "signal": {
-          "line": "Sending a signal reads the target position and a few nearby words, labels or link addresses so teammates can find the same spot. Signals disappear 5 seconds after sending.",
-          "who": "Your current squad",
-          "keep": "Not stored; gone after 5 seconds",
-          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and anything Palside itself shows on the page"
-        },
-        "sticky": {
-          "line": "Selection reads up to 200 characters, up to 24 characters on each side, and the URL. Saving a sticky note sends them encrypted to your squad; page notes appear at the same URL.",
-          "who": "Your current squad",
-          "keep": "Your squad’s retention period",
-          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and anything Palside itself shows on the page"
+          "line": "Sending a signal reads the target position and a small amount of nearby text, labels or link addresses so teammates can locate the same spot.",
+          "who": "Current squad members",
+          "keep": "Removed from the page after 5 seconds; the chat record follows the squad’s message retention",
+          "no": "Inputs, editable areas, dropdowns, hidden content, canvases, embedded pages and Palside’s own page elements"
         },
         "room": {
-          "line": "With the panel connected and danmaku on, participation sends a token key to the service for a lease. Turning danmaku off stops renewal requests; messages you send stay public.",
-          "who": "The service sees the token, account and device session; counts and messages are public.",
-          "keep": "Participation leases stay in memory for 40 seconds and renew while participating. The latest 10000 messages per token have no time expiry. Votes remain until changed, withdrawn or the account is deleted.",
+          "line": "While the panel is online and danmaku is on, the token being viewed is submitted to the service. Turning danmaku off stops submission; sent danmaku remain public.",
+          "who": "The service sees the token, account and device session; viewer counts, danmaku and like counts are public; likers are not",
+          "keep": "The viewed token is held in memory only and cleared 40 seconds after leaving; each token keeps its latest 10,000 danmaku; likes remain until withdrawn, the danmaku is deleted or the account is closed",
           "no": "Addresses, other tabs, page content"
         },
         "shot": {
-          "line": "When you press the screenshot shortcut or tap Screenshot, reads the image of the current tab; it is sent to your squad only after you select an area and confirm.",
-          "who": "Your current squad, after you confirm",
-          "keep": "Squad retention, capped at 30 days after sending",
+          "line": "Using the screenshot shortcut or button reads the current tab’s image; it is sent to the squad only after an area is selected and confirmed.",
+          "who": "Current squad members, after confirmation",
+          "keep": "Squad message retention, up to 30 days",
           "no": "Other tabs, the whole screen"
         },
+        "follow": {
+          "line": "While following, the other person’s pages are kept in a tab group named after them; the address of their foreground page and scroll position are sent to you encrypted.",
+          "who": "Only the two participants",
+          "keep": "Not added to chat history; tab mappings last until the browser session ends",
+          "no": "Your own tabs, other tab groups"
+        },
         "notify": {
-          "line": "Reads no pages. Shows a desktop alert when your squad has new messages.",
-          "who": "Chrome and your operating system display the alert; the OS may keep a copy.",
-          "keep": "Local click records clear on close, click or invalidation; OS notification history may remain.",
+          "line": "Reads no pages. Shows a desktop notification when the squad has new messages.",
+          "who": "Chrome and the operating system; the OS may retain a copy",
+          "keep": "Local click records clear when the notification is closed, clicked or expires; OS notification history may persist",
           "no": "Page content"
         },
         "presence": {
-          "line": "Shows you as active while the side panel is open or you used the keyboard or mouse in the last 5 minutes, otherwise away. Only that one state is reported.",
-          "who": "Your squad members; the business service",
-          "keep": "Held in service memory only; it lapses 40 seconds after the last report",
+          "line": "Active while the side panel is open or keyboard or mouse input occurred in the last 5 minutes, otherwise Away. Only this state is reported.",
+          "who": "Squad members; business service",
+          "keep": "Held in service memory only; expires 40 seconds after the last report",
           "no": "Pages, keystrokes, other apps"
         }
       }
@@ -1534,14 +1543,16 @@
       "room": "Public talk for each token, open to everyone",
       "share": "When it’s on, your squad sees the page you’re on at the top. Press again to turn it off.",
       "site": "Turn it on from the site icon, then on this site’s pages:",
-      "quoteTab": "Quote · Sticky",
       "signalHow": "drag, release toward one",
-      "quoteHow": "Select text, use the bar",
-      "danmakuHow": "Public talk drifts across token pages",
-      "demoText": "LP locked 180 days, <mark>top 10 hold 62%</mark>, ownership renounced.",
+      "chartHow": "Once shared, your squad sees what you draw",
+      "demoMate": "Mia",
+      "danmakuHow": "Public talk drifts across token pages; hover for who",
       "demoDanmaku1": "volume picking up",
-      "demoDanmaku2": "watch 0.0021 support",
+      "demoDanmaku2": "support near 0.055",
       "demoDanmaku3": "send it!",
+      "demoDanmaku4": "triangle almost done",
+      "demoDanmaku5": "waiting for a retest",
+      "demoDanmaku6": "gm",
       "toolsTitle": "Message tools",
       "reactions": "Send your squad a burst of emoji",
       "image": "Send an image",
@@ -1572,7 +1583,6 @@
       "selected": "Selection",
       "draft": "Draft",
       "sent": "Sent",
-      "saved": "Saved",
       "steps": "Demo steps",
       "play": "Play once",
       "pause": "Pause",
@@ -1582,15 +1592,15 @@
     "docDemo": {
       "shareLabel": "Share viewing: turn it on and your face joins the squad card for the token you are viewing; open another site and the card follows you; turn it off and it disappears",
       "syncLabel": "Squad viewing: tokens sorted by how many squad members are viewing, with faces moving as people switch",
-      "peopleLabel": "Following: when Robin moves to another token, the card offers Go, and one tap brings you to the same page",
-      "notesLabel": "Quote and sticky note: select text, quote it into the draft and send it; select another line and add a sticky note",
+      "peopleLabel": "Following: when Robin moves to another token, your tab switches with them, and the bar on top shows who you are following",
       "signalLabel": "Signals: hold Option on the chart and drag to Attention or Question",
       "captureLabel": "Screenshot and annotation: select a region, circle the peak with the pen, then Done",
+      "drawLabel": "Shared drawings: Mia’s line appears on the TradingView chart; turn on Share with squad from the Palside mark, draw with the site’s trend-line tool, then circle the pullback with the laser pointer",
       "shareMia": "On PONS too",
       "overviewLabel": "The Palside side panel: the header holds the squad and the page capsule, with the tokens members are viewing and the encrypted chat below; Leo sends a line and you reply",
       "accountLabel": "Create an account: reveal and back up the 12 recovery words, pick two words to verify them, set a 6-digit device PIN, then choose a nickname",
       "teamsLabel": "Invite a teammate: the captain copies the invitation link; Mia pastes it under Join by invitation, views the invitation and confirms, and the squad counts 2 people",
-      "roomLabel": "Public danmaku: choosing Bullish updates the split; a new line appears in the list and drifts across the page",
+      "roomLabel": "Public danmaku: liking a line rolls up its count; a new line appears in the list and drifts across the page",
       "walletLabel": "Wallet transfer: choose teammate Mia and enter 300 PALS, review, enter the device PIN and pay; once confirmed the balance goes from 4,200 to 3,900 PALS",
       "packetLabel": "Squad red packet: a member’s packet pops up; pressing Open bursts PALS out, your share rolls up and then shows as added to your wallet",
       "tipLabel": "Tip: choose Tip from a danmaku line’s menu, pick 50 PALS, review and pay; after signing, sending and confirming onchain, the line’s tip total goes up",
@@ -1621,7 +1631,7 @@
       "featuresRegion": "Palside features",
       "questionsHeading": "FAQ",
       "footerTagline": "Browse together. Chat privately.",
-      "footerLead": "Share viewing and encrypted chat with your squad. The Chrome release is coming soon.",
+      "footerLead": "Share viewing and encrypted chat with your squad.",
       "footerStart": "Get started",
       "footerAbout": "About Palside",
       "featuresNav": "Features",
@@ -1678,7 +1688,7 @@
       },
       "signal": {
         "title": "Talk right on the chart",
-        "description": "Drop signals and circle what matters in a screenshot, all without leaving the page."
+        "description": "Drop signals, share your drawings and point with the laser, all without leaving the page."
       },
       "danmaku": {
         "title": "Live market mood",
@@ -1696,7 +1706,7 @@
     "questions": {
       "purpose": {
         "question": "What is Palside?",
-        "answer": "A side panel extension for desktop Chrome for following tokens with your squad: share viewing, page interaction (signals, danmaku, sticky notes) and end-to-end encrypted squad chat."
+        "answer": "A side panel extension for desktop Chrome for following tokens with your squad: share viewing, page interaction (signals, danmaku) and end-to-end encrypted squad chat."
       },
       "account": {
         "question": "Do I need to sign up?",
@@ -1704,7 +1714,7 @@
       },
       "privacy": {
         "question": "Can my squad see what I browse?",
-        "answer": "Only while Share viewing is on, and only your current tab’s token, or its page title and link. Page content, your screen and page actions are never shared. Quotes and screenshots appear only after you send them."
+        "answer": "Only while Share viewing is on, and only your current tab’s token, or its page title and link. Page content, your screen and page actions are never shared. Screenshots appear only after you send them."
       },
       "permissions": {
         "question": "Which browser permissions are required?",
@@ -1784,35 +1794,22 @@
       "continueTeam": "Return to your squad"
     },
     "film": {
-      "heroAccessible": "Demo: on PONS, turning on Share viewing, then Page interaction for the site, so public danmaku appear on the chart; holding ⌥ to send a “Look here” signal, capturing and marking the chart for the squad, opening Robin’s red packet; opening the X post Leo shared, quoting it and adding a sticky note, then back on PONS turning Page interaction and Share viewing off again. All demo data is fictional.",
+      "heroAccessible": "Demo: one click on Share on PONS turns on Share viewing and Page interaction together, the Palside entry joins the chart’s drawing toolbar, and public danmaku cross the chart; you hold ⌥ to send “Look here” and Mia answers “Look together”; Mia boxes the range on PONS and stretches it, and Leo circles the last candles and draws an arrow to the breakout; Robin calls the squad, you follow him from his profile card and Chrome opens the “Following Robin” tab group on CHUMP, where he is; back on your own tab, the group follows Robin in the background as he navigates, opens and closes tabs; you open Robin’s red packet, close the group’s last tab to stop following, and turn sharing off. All demo data is fictional; the candle shapes come from real markets.",
       "ranking": "Ranking",
       "holders": "Holders {value}",
       "volume": "24h volume {value}",
       "liquidity": "Liquidity {value}",
       "lpBurned": "LP burned",
-      "post": "Post",
-      "xTab": "“$PONS on-chain today” / X",
-      "xLead": "$PONS on-chain today:",
-      "xQuote": "1h volume just passed $1M",
-      "xMiddle": ", 3,412 holders, ",
-      "xSticky": "LP fully burned",
-      "xEnd": ".",
-      "xCard": "“$PONS on-chain today: 1h volume just passed $1M…” / X",
-      "xTime": "2:47 PM · Oct 19, 2026 · ",
-      "xViewCount": "12K",
-      "xViews": "Views",
       "team": "Night Owls",
       "leoShare": "X is talking about it too",
       "quoteReply": "Matches what we saw",
-      "notesLine": "Contract renounced · Top 10 hold 18.4%",
       "miaVolume": "PONS volume is picking up",
-      "packetHype": "CASHCAT actually doubled 😂",
-      "packetAsk": "Whoever called it, send a red packet!",
       "packetWish": "CASHCAT doubled, bubble tea on me",
-      "leoSticky": "LP burned, note added",
+      "leoBurned": "LP burned, worth a look",
       "robinMove": "Checking out CHUMP",
       "kaiFollow": "Following Robin",
-      "dmMine": "Volume’s up, leaning bullish",
+      "dmMine": "Volume’s up, keeping an eye on it",
+      "signalHint": "{name} signaled {kind} on {place}",
       "dm": {
         "poolDoubled": "Pool just doubled",
         "watching5m": "In, watching the 5m",
@@ -1844,11 +1841,10 @@
       "wishLuck": "Good luck!",
       "wishRide": "Let’s ride",
       "wishThanks": "Thanks for the call",
-      "noteLp": "LP is burned, check on-chain",
-      "noteLocked": "Liquidity locked for 180 days",
-      "noteHolders": "Holders still climbing",
-      "noteDoubled": "Holders doubled since yesterday",
-      "noteTime": "2 min ago"
+      "signalHintSelf": "You signaled {kind} on {place}",
+      "drawHint": "{name} drew on {place}",
+      "hotQuery": "C",
+      "robinCall": "CHUMP is about to break out of the triangle, follow me"
     },
     "workflows": {
       "hot": {
@@ -1865,29 +1861,20 @@
         "title": "Tip the calls that land",
         "description": "Spot a danmaku you enjoy? Tip its author PALS in one click."
       },
-      "notes": {
-        "label": "Notes and quotes",
-        "title": "Page quotes and notes",
-        "description": "Quotes keep their source and notes stay where you left them, ready when teammates open the page."
-      },
       "people": {
         "label": "Follow",
         "title": "Follow traders you trust",
-        "description": "Follow a teammate’s page and switch along with them in one click."
+        "description": "Follow a teammate’s pages: your tabs switch as theirs do."
       }
     },
     "statement": {
       "lineSync": "<sync>Sync the page you are on</sync>, <phrase>see <tokens>the tokens your squad<mates></mates> is tracking</tokens>,</phrase>",
-      "lineTalk": "<quote>quote</quote>, <mark>mark</mark> and <signal>signal</signal> in place, and compare notes as it happens.",
+      "lineTalk": "<mark>mark</mark> and <signal>signal</signal> in place, and compare notes as it happens.",
       "encryptedLead": "<privacy>end-to-end encryption</privacy>,",
       "peekSync": "Share viewing: you and Mia on PONS, Robin and Kai on CASHCAT",
       "peekTokens": "Member card: Mia is viewing PONS",
-      "peekQuote": "Leo quotes a line from the CASHCAT page",
-      "peekMark": "Sticky note on $24.8K on the page",
-      "peekSignal": "Signal: a teammate sends “Look here” on the chart",
-      "refQuote": "Liquidity locked for 12 months",
-      "leoReply": "Locked for a year, safe to look",
-      "markLine": "Volume picked up after this <stk>$24.8K</stk> buy"
+      "peekMark": "Screenshot markup: the breakout circled on the chart",
+      "peekSignal": "Signal: a teammate sends “Look here” on the chart"
     },
     "privacy": {
       "perTab": "Asked when needed",
@@ -1964,7 +1951,7 @@
         "title": "What Palside does",
         "chat": "Encrypts and decrypts squad chat on your device",
         "share": "Shares the current token or page with your squad once Share viewing is on",
-        "capture": "Takes screenshots and quotes page text when you act",
+        "capture": "Takes screenshots when you act",
         "notify": "Sends desktop notifications for new messages once enabled"
       },
       "never": {
@@ -1994,11 +1981,15 @@
         },
         "site": {
           "title": "Read and change site data",
-          "detail": "Page interaction (danmaku, signals, sticky notes, quotes); granted per site or for all sites."
+          "detail": "Page interaction (danmaku, signals); granted per site or for all sites."
         },
         "notifications": {
           "title": "Display notifications",
           "detail": "Alerts for new messages, mentions and replies."
+        },
+        "tabGroups": {
+          "title": "View and manage your tab groups",
+          "detail": "Asked the first time you follow someone, only to name the follow tab group. Following works without it."
         }
       },
       "data": {
@@ -2006,17 +1997,17 @@
         "note": "End-to-end encryption protects content but does not hide all metadata. Only the screenshot you confirm is uploaded, without the original or cropped areas.",
         "device": {
           "title": "Your device only",
-          "detail": "Recovery phrase, local password and wallet private key; full screenshots and their editing; drafts; the page text index for locating quotes."
+          "detail": "Recovery phrase, local password and wallet private key; full screenshots and their editing; drafts; the page text index for locating signals."
         },
         "squad": {
           "title": "Squad members",
           "scope": "End-to-end encrypted",
-          "detail": "Chat text and images, page cards, quotes, sticky notes, signals, and the token or page shared through Share viewing. Links are stripped of tracking parameters; links carrying sign-in credentials send only the site name. The service stores ciphertext only."
+          "detail": "Chat text and images, page cards, signals, and the token or page shared through Share viewing. Links are stripped of tracking parameters; links carrying sign-in credentials send only the site name. The service stores ciphertext only."
         },
         "public": {
           "title": "Everyone",
           "scope": "Public, not encrypted",
-          "detail": "Danmaku, votes, and the poster’s nickname and avatar; public profiles of recruiting squads; addresses, amounts and transaction hashes of PALS onchain transactions."
+          "detail": "Danmaku, like counts, and the poster’s nickname and avatar; public profiles of recruiting squads; addresses, amounts and transaction hashes of PALS onchain transactions."
         },
         "service": {
           "title": "Palside service",
@@ -2035,8 +2026,8 @@
           "detail": "The latest 10,000 lines per token are kept; authors can withdraw their own."
         },
         "votes": {
-          "title": "Votes",
-          "detail": "Kept until changed, withdrawn or the account is deleted."
+          "title": "Likes",
+          "detail": "Kept until taken back, the line is removed or the account is deleted."
         },
         "device": {
           "title": "On your device",
@@ -2071,7 +2062,7 @@
       },
       "public": {
         "title": "Public content",
-        "body": "Danmaku, votes and the profiles of recruiting squads are public, and recruiting profiles may be indexed by search engines. When recruiting ends, the website page is removed; search engine caches expire on their own schedules."
+        "body": "Danmaku, like counts and the profiles of recruiting squads are public, and recruiting profiles may be indexed by search engines. When recruiting ends, the website page is removed; search engine caches expire on their own schedules."
       },
       "liability": {
         "title": "Disclaimer",

@@ -1,6 +1,5 @@
 'use client';
 import { Spinner } from '@palside/ui/spinner';
-import type { ReactNode } from 'react';
 import { useTranslations } from 'use-intl';
 import { Button } from '@palside/ui/button';
 import type { PalsideController } from '../app/use-palside';
@@ -21,12 +20,4 @@ export function HistoryMore({ c }: { c: PalsideController }) {
     </Button>}
     {history?.missingKeys && <p className={s.historyNote} role="status">{t('extension.copy.historyUnavailable')}</p>}
   </>;
-}
-
-/**
- * Empty list: icon tile, one line, optional next step. Alone on a page it is centred in the space the page leaves (fill); under other
- * content it follows that content directly.
- */
-export function EmptyState({ icon, title, fill = true, children }: { icon?: ReactNode; title: string; fill?: boolean; children?: ReactNode }) {
-  return <div className={s.empty} data-fill={fill || undefined}>{icon}<p>{title}</p>{children}</div>;
 }

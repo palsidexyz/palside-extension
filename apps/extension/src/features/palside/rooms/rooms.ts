@@ -4,8 +4,8 @@ import { roomKeyForAsset } from '@palside/shared/contracts/rules';
 import type { RoomKey,RoomPerson } from '../../../runtime/rooms/contract-types';
 import type { PageStatus } from '../../../runtime/browser/page-protocol';
 import { resolveTokenMetadata } from '../../../runtime/viewing/token-name';
-import { pageName } from '../../../runtime/viewing/page-title';
-import { pageFavicon } from '../../../runtime/viewing/viewing';
+import { pageLabel } from '../../../runtime/viewing/page-title';
+import { iconDataUrl } from '../../../runtime/viewing/viewing';
 import { pageView } from '../../../runtime/viewing/view-snapshot';
 import { tokenPage } from '../../../runtime/viewing/page-resolver';
 import { tokenNamed } from '../../../runtime/viewing/token-profiles';
@@ -43,7 +43,7 @@ export function tabView(page: PageStatus | undefined, asset?: string): Viewing |
   // A pool or chainless contract page shows its token once the background reports it (`page.asset`).
   const lookup = identity?.kind === 'pool' || identity?.kind === 'address' ? identity : undefined;
   const source = identity?.kind === 'asset' ? identity : lookup && page.asset ? tokenPage(lookup, page.asset) : websiteIdentity(page.url, 'page');
-  return source ? pageView(source, source.kind === 'asset' ? resolveTokenMetadata(source) : { name: pageName(page.title, page.host), logo: pageFavicon(page.favicon) }, lookup && source.kind === 'asset' ? lookup.kind : undefined) : undefined;
+  return source ? pageView(source, source.kind === 'asset' ? resolveTokenMetadata(source) : { name: pageLabel(page.title, page.host), logo: iconDataUrl(page.favicon) }, lookup && source.kind === 'asset' ? lookup.kind : undefined) : undefined;
 }
 
 /** A token by its room key, drawn from its one token record; a known view or the active tab supplies the page it opens. */
@@ -119,33 +119,22 @@ export function useOpeningKey(c: PalsideController) {
   return useSyncExternalStore(listener => { session.listeners.add(listener); return () => { session.listeners.delete(listener); }; }, () => session.opening?.key, () => session.opening?.key);
 }
 
-/** The active tab's token as 弹幕 follows it: only where Chrome allows the site, which is where the background joins its room. */
+/** The token 弹幕 follows, exactly as the runtime leases it: the active tab of the panel window the user last worked in, on an added site.
+ *  Another window's panel gets none (`elsewhere`). */
 export function followedTabRoomKey(c: PalsideController) {
-  return c.live?.page?.access.site ? tabRoomKey(c) : undefined;
+  const rooms = c.live?.state.rooms;
+  return rooms && !rooms.elsewhere ? rooms.tab : undefined;
 }
 
-/** The token the 弹幕 tab shows: the one being opened, else the pinned one, else the token it follows on the active tab; none elsewhere. */
+/** This panel's own tab shows a token that 弹幕 cannot follow because it follows another window. */
+export function roomElsewhere(c: PalsideController) {
+  return Boolean(c.live?.state.rooms.elsewhere && c.live.page?.access.site && tabRoomKey(c) && !c.live.state.rooms.pinned);
+}
+
+/** The token the 弹幕 tab shows: the one being opened, else the pinned one, else the token it follows; none elsewhere. */
 export function useShownRoomKey(c: PalsideController) {
   const opening = useOpeningKey(c);
   return opening ?? c.live?.state.rooms.pinned ?? followedTabRoomKey(c);
-}
-
-/** A quote may return only from the room and navigation that initiated it. */
-export function roomQuoteReturn(c: PalsideController, key: RoomKey) {
-  const session = roomSession(c), navigation = session.navigation;
-  const owns = () => c.ownsScreen() && session.navigation === navigation && session.current?.screen === 'room' && session.current.live?.state.rooms.current?.key === key;
-  return {
-    owns,
-    back: () => {
-      if (!owns()) return;
-      // The 弹幕 tab keeps its token: the quote only moves to the chat beside it.
-      c.go('chat');
-      requestAnimationFrame(() => {
-        const current = session.current;
-        if (session.navigation === navigation && current?.screen === 'chat' && current.data.self === c.data.self && current.current === c.current) document.querySelector<HTMLTextAreaElement>('textarea[data-message-input]')?.focus();
-      });
-    },
-  };
 }
 
 /** Drafts belong to the mounted panel account, including visits to other screens. */

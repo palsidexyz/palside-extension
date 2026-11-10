@@ -5,7 +5,7 @@ import { API_URL } from './config';
 import type { RuntimeState } from './runtime-state';
 import { emptyState } from './state';
 import { AUTH_CANCEL_COMMANDS,AUTH_SETUP_COMMANDS,SERIAL_COMMANDS,commandError } from './commands';
-import { DiagnosticErrors } from '../diagnostics/diagnostics';
+import { DiagnosticErrors,DiagnosticLatency } from '../diagnostics/diagnostics';
 import { SessionRuntime } from '../account/session-lifecycle';
 import { LocalDataRuntime } from '../media/cache';
 import { SharingRuntime } from '../viewing/sharing';
@@ -20,8 +20,12 @@ import { RuntimeCommands } from './dispatch';
 import { RoomService } from '../rooms/rooms';
 import { WalletRuntime } from '../wallet/runtime';
 import { SignalService } from '../annotations/signal-service';
+import { signalAsset } from '../annotations/signals';
 import { createPatchSliceCache,diffState } from '../transport/state-diff';
 import { teamUnreadCounts } from '../../domain/chat/unread-mentions';
+
+/** 最近看过 keeps this many 弹幕. */
+const RECENT_ROOMS_SHOWN = 3;
 
 /** One offscreen runtime coordinates the account-scoped services for all panels. */
 export class PalsideService {
@@ -30,6 +34,8 @@ export class PalsideService {
   readonly foreground: (url: string) => Promise<boolean>;
   constructor(notify: (payload: Record<string, unknown>) => Promise<void> = async () => {}, foreground: (url: string) => Promise<boolean> = async () => true, storage = new ClientStorage()) {
     this.notify = notify; this.foreground = foreground; this.storage = storage;
+    // Once the service refuses this version, every surface says 需要更新 until the newer one is installed (docs/engineering/release.md).
+    this.api.onOutdated = () => { if (this.state.connection.outdated) return; this.state.connection.outdated = true; this.emit(); };
   }
   readonly api = new Api(API_URL);
   state = emptyState();
@@ -39,6 +45,9 @@ export class PalsideService {
     async items => { const token = this.auth.session?.token; if (!token) return undefined; return (await this.api.request('tokens.resolve', { body: { items }, token })).items; },
     answers => { let changed = false; for (const [asset, entry] of answers) changed = this.tokens.putDirectory(asset, entry) || changed; if (changed) this.emit(); },
     asset => this.tokens.answered(asset),
+    undefined,
+    assets => { let changed = false; for (const asset of assets) changed = this.tokens.markUnknown(asset) || changed; if (changed) this.emit(); },
+    () => this.auth.liveOpen,
   );
   /** Pool pages and chainless contract pages: the server finds the token, whose name and icon join the token records. */
   readonly pages = new PageResolver(
@@ -54,6 +63,7 @@ export class PalsideService {
   }
   listeners = new Set<(state: RuntimeState) => void>();
   diagnosticErrors = new DiagnosticErrors();
+  diagnosticLatency = new DiagnosticLatency();
   subscribe(listener: (state: RuntimeState) => void) {
     this.listeners.add(listener); return () => this.listeners.delete(listener); }
   private unreadInput = '';
@@ -109,6 +119,15 @@ export class PalsideService {
   }
   private tokenInput = '';
   private pagesVersion = -1;
+  private recentAccount?: string;
+  /** Remembers each 弹幕 once it has opened, for 最近看过 where there is no token. */
+  private noteRecentRoom() {
+    const state = this.state, account = state.account?.id;
+    if (account !== this.recentAccount) { this.recentAccount = account; state.recentRooms = undefined; state.searchAssets = undefined; state.cardAssets = undefined; }
+    const key = state.rooms.current && !state.rooms.current.loading ? state.rooms.current.key : undefined;
+    if (!account || !key || state.recentRooms?.[0] === key) return;
+    state.recentRooms = [key, ...(state.recentRooms ?? []).filter(item => item !== key)].slice(0, RECENT_ROOMS_SHOWN);
+  }
   /** The token records the panel needs: every token it currently shows, so card, 详情, 弹幕, 热门 and 在看 read one record. */
   private projectTokens() {
     const state = this.state, assets: string[] = [];
@@ -116,14 +135,21 @@ export class PalsideService {
     const addKey = (key: string | undefined) => { if (key?.startsWith('token:')) assets.push(key.slice('token:'.length)); };
     addKey(state.rooms.current?.key); addKey(state.rooms.pinned); addKey(this.rooms.tabKey);
     for (const view of state.data.views) add(view);
-    for (const message of state.data.messages) { add(message.attachment?.kind === 'asset' ? message.attachment.view : undefined); add(message.ref?.view); }
-    for (const draft of Object.values(state.drafts)) { add(draft.value.attachment?.kind === 'asset' ? draft.value.attachment.view : undefined); add(draft.value.ref?.view); }
+    for (const message of state.data.messages) { add(message.attachment?.kind === 'asset' ? message.attachment.view : undefined); }
+    for (const record of [...state.signalRecords ?? [], ...(state.chartDrawings ?? []).filter(record => record.shape)]) { const asset = signalAsset(record); if (asset) assets.push(asset); }
+    for (const poke of state.pokes ?? []) add(poke.view);
+    for (const draft of Object.values(state.drafts)) { add(draft.value.attachment?.kind === 'asset' ? draft.value.attachment.view : undefined); }
     for (const row of state.rooms.hot?.rows ?? []) addKey(row.key);
     for (const key of Object.keys(state.rooms.summaries)) addKey(key);
-    if (this.pages.version !== this.pagesVersion) { this.pagesVersion = this.pages.version; state.pages = this.pages.pick(); }
+    this.noteRecentRoom();
+    for (const key of state.recentRooms ?? []) addKey(key);
+    assets.push(...state.searchAssets ?? [], ...state.cardAssets ?? []);
+    if (this.pages.version !== this.pagesVersion) { this.pagesVersion = this.pages.version; state.pages = this.pages.pick(); state.pageChoices = this.pages.choices(); }
+    // 切换链 names every chain the address is a token on, not only the one shown.
+    for (const candidates of Object.values(state.pageChoices ?? {})) assets.push(...candidates);
     const input = `${this.tokens.version}:${this.auth.session ? 1 : 0}:${assets.join(',')}`;
     if (input === this.tokenInput) return;
-    this.tokenInput = input; this.directory.show(assets); state.tokens = this.tokens.pick(assets);
+    this.tokenInput = input; this.directory.show(assets); state.tokens = this.tokens.pick(assets); state.tokenUnknown = this.tokens.unknownOf(assets);
   }
   private authCommandEpoch = 0;
   async command(input: unknown): Promise<unknown> {

@@ -20,7 +20,7 @@ function panel() {
   let cursor = 0, nextTimer = 0;
   const ref = value => slots[cursor++] ??= { current: value };
   const load = productionModules({
-    Error, message: key => key, errorMessage: error => error.message,
+    Error, message: key => key, errorMessage: error => error.message, failureText: (error, fallback = 'common.error') => error instanceof Error ? error.message : fallback,
     useRef: ref,
     useState(value) { const cell = ref(typeof value === 'function' ? value() : value); return [cell.current, next => { cell.current = typeof next === 'function' ? next(cell.current) : next; }]; },
     useCallback(fn, deps) { const cell = ref(); if (!same(cell.current?.deps, deps)) cell.current = { fn, deps }; return cell.current.fn; },
@@ -61,7 +61,7 @@ test('failed entry and the rendered Retry share one loading/error owner', async 
   const p = panel(); const entry = p.actions.refreshLobby();
   assert.equal(p.view.lobbyLoading, true);
   p.calls[0].reject(Error('offline')); await entry; p.Render();
-  assert.equal(nodes(lobby(p), node => node.props?.role === 'alert')[0].props.children, 'offline');
+  assert.equal(nodes(lobby(p), node => node.props?.role === 'alert')[0].props.title, 'offline');
   const retry = nodes(lobby(p), node => node.type === 'Button' && node.props.children === 'common.retry')[0];
   retry.props.onClick();
   assert.equal(p.view.lobbyError, ''); assert.equal(p.view.lobbyLoading, true);

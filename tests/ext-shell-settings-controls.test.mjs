@@ -48,7 +48,8 @@ async function fixture(t, { shared = false, read } = {}) {
     './asset-card': { AssetCard: () => null },
     './token-name': { tokenLabel: view => view.name },
     './token-data': { liveView: (_c, view) => view },
-    '../chat/history-scope': { EmptyState: passthrough, HistoryMore: () => null },
+    '../chat/history-scope': { HistoryMore: () => null },
+    '../ui/empty-state': { EmptyState: passthrough },
     '@palside/shared/navigation': { publicShareUrl: value => value },
     'lucide-react': Object.fromEntries(['ArrowUpRight', 'Coins', 'Image', 'Link2'].map(name => [name, () => null])),
   };

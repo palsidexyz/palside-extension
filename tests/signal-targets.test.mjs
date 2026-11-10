@@ -40,7 +40,7 @@ function fixture() {
   set('document', { body, baseURI: 'https://example.com/', elementFromPoint: () => body, querySelectorAll: () => charts, createRange() { return {
     setStart(node, offset) { this.startContainer = node; this.startOffset = offset; },
     setEnd(node, offset) { this.endContainer = node; this.endOffset = offset; },
-    getClientRects: () => [rect],
+    getClientRects: () => [rect], getBoundingClientRect: () => rect,
     toString() { const nodes = []; const collect = node => { if (node.nodeType === 3) nodes.push(node); else node.children.forEach(collect); }; collect(body);
       const start = nodes.indexOf(this.startContainer), end = nodes.indexOf(this.endContainer);
       return nodes.slice(start, end + 1).map((node, i) => node.data.slice(i === 0 ? this.startOffset : 0, start + i === end ? this.endOffset : node.length)).join(''); },
@@ -64,22 +64,26 @@ test('the words under the pointer come first; empty space and bad points are no 
     assert.deepEqual([quote.nth, quote.of], [0, 1]);
     const spot = resolveSignalSpot(target);
     assert.equal(spot.level, 0); assert.equal(spot.box.toString(), quote.exact); assert.equal(spotAlive(spot), true);
+    // The press point inside the words' box travels with the quote, so the signal lands where it was pressed.
+    assert.deepEqual([quote.x, quote.y, spot.x, spot.y], [0.1, 0.5, 0.1, 0.5]);
     assert.deepEqual(captureSignalTarget(NaN, 10), { kind: 'page' });
     document.caretPositionFromPoint = () => null;
     assert.deepEqual(kinds(captureSignalTarget(10, 10)), ['element']); // the paragraph itself, by its text
   } finally { env.restore(); }
 });
 
-test('ticking numbers still match: digits compare as 0 and whitespace collapses', () => {
+test('ticking numbers still match: a number of any length compares as 0 and whitespace collapses', () => {
   const env = fixture();
   try {
-    assert.equal(textKey('Price  $0.001234\nUSD'), 'Price $0.000000 USD');
+    assert.equal(textKey('Price  $0.001234\nUSD'), 'Price $0 USD');
     const text = env.text('Price $0.001234 USD');
     env.pressText(text, 9);
     const target = captureSignalTarget(10, 10);
     text.value = 'Price $0.001240 USD';
     const spot = resolveSignalSpot(target);
     assert.equal(spot.level, 0); assert.equal(spot.box.startContainer, text);
+    text.value = 'Price $12.5 USD';
+    assert.equal(resolveSignalSpot(target).box.toString(), '$12.5 USD', 'the number keeps its whole new length');
   } finally { env.restore(); }
 });
 
@@ -215,7 +219,7 @@ test('private and hidden subtrees are unread and a match never spans them', () =
   try {
     env.text('hello'); env.text('secret', env.element('input'), true); env.text('world');
     env.text('helloworld', env.element('div', env.body, { style: { display: 'none' } }), true);
-    const quote = { kind: 'quote', exact: 'helloworld', prefix: '', suffix: '', nth: 0, of: 1 };
+    const quote = { kind: 'quote', exact: 'helloworld', prefix: '', suffix: '', nth: 0, of: 1, x: 0.5, y: 0.5 };
     assert.equal(resolveSignalSpot({ kind: 'spot', anchors: [quote] }), undefined);
     const visible = env.text('helloworld');
     assert.equal(resolveSignalSpot({ kind: 'spot', anchors: [quote] }).box.startContainer, visible);
@@ -231,8 +235,8 @@ test('one capture walks the page once, and a page past the caps falls through in
     const before = env.styleReads();
     captureSignalTarget(10, 10);
     assert.ok(env.styleReads() - before < 1000, `style reads: ${env.styleReads() - before}`);
-    for (let i = 0; i < 20_001; i++) env.element('span');
-    assert.equal(resolveSignalSpot({ kind: 'spot', anchors: [{ kind: 'quote', exact: 'known target', prefix: '', suffix: '', nth: 0, of: 1 }] }), undefined);
+    env.text('x'.repeat(4_000_001), env.element('div'));
+    assert.equal(resolveSignalSpot({ kind: 'spot', anchors: [{ kind: 'quote', exact: 'known target', prefix: '', suffix: '', nth: 0, of: 1, x: 0.5, y: 0.5 }] }), undefined);
   } finally { env.restore(); }
 });
 
@@ -243,5 +247,17 @@ test('a detached or hidden spot is not alive', () => {
     const spot = resolveSignalSpot({ kind: 'spot', anchors: [{ kind: 'element', tag: 'button', label: 'Swap', nth: 0, of: 1, x: 0.5, y: 0.5 }] });
     assert.equal(spotAlive(spot), true);
     button.style = { display: 'none' }; assert.equal(spotAlive(spot), false);
+  } finally { env.restore(); }
+});
+
+test('a digit after a Latin letter names the row, so loose matches keep Token1 and Token2 apart', () => {
+  const env = fixture();
+  try {
+    assert.equal(textKey('Token12 $1,234.5 成交量7万'), 'Token12 $0 成交量0万');
+    const text = env.text('Token1 Buy');
+    env.pressText(text, 8);
+    const target = captureSignalTarget(10, 10);
+    text.value = 'Token2 Buy';
+    assert.equal(resolveSignalSpot({ kind: 'spot', anchors: target.anchors.filter(anchor => anchor.kind === 'quote') }), undefined);
   } finally { env.restore(); }
 });

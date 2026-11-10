@@ -24,13 +24,15 @@
 .button[data-size="sm"] { min-height: 32px; padding: 6px 12px; }
 .button[data-size="lg"] { min-height: 44px; padding: 12px 20px; }
 .button[data-variant="primary"] { background: var(--ui-accent); color: var(--ui-on-accent); }
+/* Ink pill: the solid secondary action. Hover deepens the ink, never fades it. */
+.button[data-variant="solid"] { background: var(--ui-solid); color: var(--ui-on-solid); }
 .button[data-variant="danger"] { background: var(--ui-danger); color: var(--ui-on-danger); }
 .button[data-variant="quiet"] { background: transparent; color: var(--ui-ink-muted); }
 .button[aria-expanded="true"] { background: var(--ui-control-recess); color: var(--ui-text-primary); }
 .button[data-loading] { cursor: progress; }
 .button:disabled, .button[aria-disabled="true"]:not([data-loading]) { opacity: .45; cursor: default; }
-/* A primary action that is not ready yet reads as neutral, never as a faded accent. */
-.button[data-variant="primary"]:disabled:not([data-loading]), .button[data-variant="primary"][aria-disabled="true"]:not([data-loading]) { opacity: 1; background: var(--ui-disabled-surface); color: var(--ui-text-secondary); }
+/* A primary or solid action that is not ready yet reads as neutral, never as a faded accent. */
+.button:is([data-variant="primary"], [data-variant="solid"]):disabled:not([data-loading]), .button:is([data-variant="primary"], [data-variant="solid"])[aria-disabled="true"]:not([data-loading]) { opacity: 1; background: var(--ui-disabled-surface); color: var(--ui-text-secondary); }
 .button:focus-visible { outline: var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset: var(--ui-focus-offset); }
 .button[aria-pressed="true"] { background: var(--ui-accent-soft); color: var(--ui-ink-accent); }
 /* Fixed outer geometry. Feedback stays inside the existing control surface. */
@@ -51,6 +53,7 @@
   .button:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-control-hover); }
   .button[data-variant="quiet"]:not(:disabled):not([aria-disabled="true"]):hover { color: var(--ui-text-primary); }
   .button[data-variant="primary"]:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-accent-hover); }
+  .button[data-variant="solid"]:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-solid-hover); }
   .button[data-variant="danger"]:not(:disabled):not([aria-disabled="true"]):hover { background: color-mix(in srgb, var(--ui-danger) 90%, black); }
   .button[aria-pressed="true"]:not(:disabled):not([aria-disabled="true"]):hover { background: var(--ui-accent-soft); }
 }

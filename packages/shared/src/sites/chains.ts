@@ -12,5 +12,10 @@ export const siteChains: readonly SitePages[] = ([
   ['etherscan', 'Ethereum'], ['basescan', 'Base'], ['bscscan', 'BNB Chain'], ['robinhood-chain', 'Robinhood'],
   ['solscan', 'Solana'], ['solana-explorer', 'Solana'], ['solana-fm', 'Solana'], ['orb', 'Solana'],
 ] as const).map(([id, chain]) => ({ id, chain }));
+/** Sites whose token pages live on another host than the catalog domain. */
+export const siteAliases: readonly SitePages[] = [
+  // gopluslabs.io/token-security/… redirects to the console host with the same path.
+  { id: 'goplus', aliases: ['console.gopluslabs.io'] },
+];
 /** Explorers covering several chains, each named in the URL. */
 export const multiChainExplorers: ReadonlySet<string> = new Set(['oklink', 'blockchair']);

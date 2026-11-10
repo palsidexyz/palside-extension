@@ -7,7 +7,7 @@ import styles from "./button.module.css";
 
 type NativeButtonProps = ComponentPropsWithRef<"button">;
 export type ButtonProps = NativeButtonProps & {
-  variant?: "surface" | "primary" | "danger" | "quiet";
+  variant?: "surface" | "solid" | "primary" | "danger" | "quiet";
   size?: "xs" | "sm" | "md" | "lg";
   loading?: boolean;
   loadingLabel?: string;

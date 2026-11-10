@@ -68,3 +68,29 @@ export function readSiteIcon(value: unknown): SiteIcon | undefined {
   if (typeof src !== 'string' || !/^data:image\/(?:png|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(src) || src.length > SITE_ICON_LENGTH) return undefined;
   return plate === 'light' || plate === 'dark' ? { src, plate } : { src };
 }
+
+/** How a site's own icon is drawn: `glyph` when it has transparent corners — a mark, drawn bare like a tab's favicon — else a
+ *  full tile that fills the face. A glyph that is nearly all white or all black takes the plate of the theme it would vanish in. */
+export type IconFace = { glyph: boolean; plate?: SiteIcon['plate'] };
+
+/** The share of a mark's visible pixels that must be near black or near white for it to need a plate. */
+const GLYPH_TONE = 0.8;
+
+/** Reads {@link IconFace} from square RGBA pixels `size` wide. */
+export function iconFace(pixels: ArrayLike<number>, size: number): IconFace {
+  const alpha = (x: number, y: number) => pixels[(y * size + x) * 4 + 3] ?? 0;
+  const edge = Math.min(1, size - 1), far = size - 1 - edge;
+  const glyph = [alpha(edge, edge), alpha(far, edge), alpha(edge, far), alpha(far, far)].some(value => value < 128);
+  if (!glyph) return { glyph };
+  let visible = 0, black = 0, white = 0;
+  for (let index = 0; index + 3 < pixels.length; index += 4) {
+    if (pixels[index + 3]! < 128) continue;
+    visible++;
+    const luminance = (0.2126 * pixels[index]! + 0.7152 * pixels[index + 1]! + 0.0722 * pixels[index + 2]!) / 255;
+    if (luminance < 0.2) black++;
+    else if (luminance > 0.86) white++;
+  }
+  if (!visible) return { glyph };
+  // Only a mark that is nearly all one tone vanishes; a coloured mark on a white or black disc (Google's G) stays readable bare.
+  return black / visible >= GLYPH_TONE ? { glyph, plate: 'light' } : white / visible >= GLYPH_TONE ? { glyph, plate: 'dark' } : { glyph };
+}

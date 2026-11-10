@@ -1,5 +1,6 @@
 'use client';
 import { tagKey, tagLabel } from '../../../domain/account/profile-tags';
+import { askFollowGroup } from '../annotations/follow-group';
 import { useTranslations } from 'use-intl';
 import { useEffect, useState } from 'react';
 import { ArrowLeftRight, AtSign, ChevronRight, Footprints, PenLine, UserRoundPlus, X } from 'lucide-react';
@@ -15,8 +16,9 @@ import { openTransfer } from '../wallet/payment-sheet';
 import card from './person-card.module.css';
 import { TokenName,tokenWaiting } from '../assets/token-name';
 import { liveView } from '../assets/token-data';
+import { displayHost } from '../../../domain/assets/site-host';
 
-const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const hostOf = (url: string) => displayHost(url) ?? '';
 
 /** Who, how they relate to this team, their intro and tags, what they are looking at, and the three things you can do with them — all visible, nothing behind ⋯. */
 export function PersonCard({ c }: { c: PalsideController }) {
@@ -69,7 +71,7 @@ export function PersonCard({ c }: { c: PalsideController }) {
       <small>{t('extension.web.viewing')}</small>
       <span className={card.watchingRow}><Token view={view} size="sm" waiting={tokenWaiting(c, view)} /><b><TokenName c={c} view={view} /></b><em>{view.source || hostOf(view.url)}</em><ChevronRight size={16} aria-hidden="true" /></span>
     </button>}
-    {self ? <div className={card.actions} data-single>
+    {self ? <div className={card.actions}>
       <button type="button" className={card.action} onClick={() => { close(); c.go('profile'); }}><PenLine size={18} /><span>{t('extension.copy.editProfile')}</span></button>
     </div> : teammate && <div className={card.actions}>
       <Tooltip content={t('extension.dynamic.mentionPerson', { name: person.name })}>
@@ -79,7 +81,7 @@ export function PersonCard({ c }: { c: PalsideController }) {
         <button type="button" className={card.action} aria-disabled={reason ? true : undefined} disabled={busy} onClick={() => void poke()}><UserRoundPlus size={18} /><span>{t('extension.web.bringOver')}</span></button>
       </Tooltip>}
       {c.live && <Tooltip content={following ? t('extension.member.stopFollowing') : t('extension.member.follow')}>
-        <button type="button" className={card.action} aria-pressed={following} onClick={() => { setSocialUi({ follow: following ? undefined : { teamId: c.current, personId: person.id } }); close(); }}><Footprints size={18} /><span>{following ? t('extension.web.followingShort') : t('extension.web.followShort')}</span></button>
+        <button type="button" className={card.action} aria-pressed={following} onClick={() => { const follow = () => { setSocialUi({ follow: following ? undefined : { teamId: c.current, personId: person.id, startedAt: Date.now() } }); close(); }; if (following) follow(); else void askFollowGroup().finally(follow); }}><Footprints size={18} /><span>{following ? follow?.paused ? t('extension.web.followPausedShort') : t('extension.web.followingShort') : t('extension.web.followShort')}</span></button>
       </Tooltip>}
       {/* 转账 sits with the other teammate actions while the chain is open; it needs the teammate's verified wallet. */}
       {chainEnabled && <Tooltip content={transferReason ?? t('extension.wallet.transferTo', { name: person.name })}>

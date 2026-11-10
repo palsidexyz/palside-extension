@@ -157,7 +157,7 @@ export function ImageEditor({ src, name, mode = 'edit', teamId, command, standal
     </header>
     <div className={s.canvasArea}>
       <div ref={stage} className={s.stage} inert={blocked} aria-label={name || t('extension.image.view')} />
-      {!state.ready && !state.error && <div className={s.status} role="status">{t('common.loading')}</div>}
+      {!state.ready && !state.error && <div className={s.status} role="status">{t('extension.copy.loading')}</div>}
       {remote && <div className={s.handoff}><span>{t('extension.image.inWindow')}</span><Button ref={returnButton} size="sm" onClick={() => void returnToPanel()} loading={busy}>{t('extension.image.returnPanel')}</Button></div>}
     </div>
     {(failure || state.error) && <p className={s.error} role="alert">{failure || t('extension.copy.imageReadFailed')}</p>}

@@ -110,7 +110,7 @@ function Session() {
     try { await flush(); if (epoch.current === started) window.close(); }
     catch (error) { if (epoch.current === started) setFailure(errorMessage(error)); }
   }
-  if (!session || session.status !== 'open') return <div role="status" style={{ padding: 24 }}><p>{text(failure) || (session ? t('extension.image.sessionEnded') : t('common.loading'))}</p><Button size="sm" onClick={() => window.close()}>{t('common.close')}</Button></div>;
+  if (!session || session.status !== 'open') return <div role="status" style={{ padding: 24 }}><p>{text(failure) || (session ? t('extension.image.sessionEnded') : t('extension.copy.loading'))}</p><Button size="sm" onClick={() => window.close()}>{t('common.close')}</Button></div>;
   return <>
     <ImageEditor standalone documentRef={documentRef} src={session.source.src} name={session.source.name} mode={session.mode} snapshot={session.document as ImageDocumentSnapshot | undefined} onDocumentChange={session.mode === 'edit' ? enqueue : undefined} onSave={save} onClose={() => void close()} />
     {failure && <p role="alert" style={{ position: 'fixed', bottom: 120, left: 16, right: 16, padding: 12, background: 'var(--ui-canvas)', color: 'var(--ui-danger)', zIndex: 1 }}>{text(failure)}</p>}

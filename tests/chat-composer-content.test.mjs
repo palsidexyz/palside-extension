@@ -31,7 +31,7 @@ function sender(live = true) {
   const context = {
     disconnected: false, draftConflict: false, canWrite: true, canSend,
     current: 'team', data: { self: 'self' }, team: { memberIds: ['member'] },
-    draft: { automaticCard: { url: 'https://a.test', assetId: 'a' }, dismissedUrls: ['https://b.test'], text: '  hello @Member @Out  ', attachment: { kind: 'image', src: 'blob:image' }, ref: { caption: 'quote' }, replyTo: 'parent', mentions: [{ id: 'member', label: 'Member' }, { id: 'outsider', label: 'Out' }, { id: 'member', label: 'Absent' }] },
+    draft: { automaticCard: { url: 'https://a.test', assetId: 'a' }, dismissedUrls: ['https://b.test'], text: '  hello @Member @Out  ', attachment: { kind: 'image', src: 'blob:image' }, replyTo: 'parent', mentions: [{ id: 'member', label: 'Member' }, { id: 'outsider', label: 'Out' }, { id: 'member', label: 'Absent' }] },
     crypto: { randomUUID: () => 'message-id' }, Date: { now: () => 1234 },
     live: live ? { state: { drafts: { team: { revision: 7 } } } } : undefined,
     draftRevisions: { current: { team: 5 } }, draftQueue: { current: Promise.resolve() }, blockedDrafts: { current: new Set() },
@@ -45,7 +45,7 @@ function sender(live = true) {
   const createActions = live ? load('apps/extension/src/features/palside/chat/live-actions.ts').createLiveDraftActions : load('apps/extension/src/features/palside/chat/memory-actions.ts').createMemoryDraftActions;
   return { context, calls, send: (...args) => createActions({ ...context, view: context }, () => context).send(...args) };
 }
-const expectedMessage = { id: 'message-id', teamId: 'team', author: 'self', text: 'hello @Member @Out', time: '', timestamp: 1234, attachment: { kind: 'image', src: 'blob:image' }, ref: { caption: 'quote' }, replyTo: 'parent', mentionIds: ['member'], status: 'sending' };
+const expectedMessage = { id: 'message-id', teamId: 'team', author: 'self', text: 'hello @Member @Out', time: '', timestamp: 1234, attachment: { kind: 'image', src: 'blob:image' }, replyTo: 'parent', mentionIds: ['member'], status: 'sending' };
 
 test('send uses the same message fields in live and preview and preserves preview drafts for other teams', async () => {
   for (const live of [true, false]) {

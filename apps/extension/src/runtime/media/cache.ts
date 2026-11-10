@@ -11,6 +11,10 @@ import type { CacheEntry } from '../storage/storage';
 import type { RuntimeDevice } from '../account/device';
 import type { PalsideService } from '../composition/core';
 import { expired } from '../../domain/chat/expiry.ts';
+import { ApiError } from '../transport/api';
+
+/** A profile picture that failed to load is asked for again after this, or the service's Retry-After when longer. */
+const AVATAR_RETRY_MS = 30_000;
 
 export class LocalDataRuntime {
   readonly runtime: PalsideService;
@@ -19,10 +23,16 @@ export class LocalDataRuntime {
   eventTimes = new Map<string, number>();
   preparedViews = new Map<string, number>();
   mediaUrls = new Map<string, string>();
+  /** Forget everything learned under the previous device session. */
+  reset() {
+    this.eventTimes.clear(); this.preparedViews.clear();
+    for (const url of this.mediaUrls.values()) URL.revokeObjectURL(url);
+    this.mediaUrls.clear(); this.mediaLoads.clear(); this.avatarLoads.clear(); this.avatarFailures.clear();
+  }
   readableTeam(teamId: string, timestamp: number, roomId?: string) {
     return this.runtime.state.remoteTeams.find(team => team.id === teamId && (roomId === undefined || team.roomId === roomId) && team.periods.some(period => timestamp >= period.joinedAt && (period.leftAt === null || timestamp <= period.leftAt)));
   }
-  expiresAt(message: Message, timestamp = message.timestamp) {
+  expiresAt(message: Pick<Message, 'teamId' | 'expiresAt' | 'timestamp'>, timestamp = message.timestamp) {
     const runtime = this.runtime;
     const team = runtime.state.remoteTeams.find(t => t.id === message.teamId) ?? runtime.state.data.teams.find(t => t.id === message.teamId);
     return messageExpiry(message.expiresAt, timestamp, team?.retentionDays);
@@ -37,6 +47,8 @@ export class LocalDataRuntime {
     const account = runtime.auth.session?.account.id;
     if (account) this.evictCachedContent([...this.mediaUrls.keys()].map(id => `${account}:cache:media:${id}`));
     runtime.emit();
+    // Profile pictures were released with everything else; read the account again so they come back.
+    if (account) runtime.auth.requestRefresh();
     return result;
   }
   async expireLocalContent() {
@@ -44,10 +56,6 @@ export class LocalDataRuntime {
     const scope = runtime.auth.scope();
     const session = runtime.auth.session;
     const now = Date.now();
-    // Cached content loads before the first membership snapshot on a cold start.
-    // This controls local retention only; commands still require remoteTeams.
-    const readable = (teamId: string) => runtime.auth.snapshotAt === 0 || runtime.state.remoteTeams.some(team => team.id === teamId && team.joined);
-    for (const [id, receipt] of runtime.interactions.annotationDeletions) if (receipt.expiresAt <= now) runtime.interactions.annotationDeletions.delete(id);
     if (runtime.auth.directoryExpiresAt && runtime.auth.directoryExpiresAt <= now) { runtime.auth.directoryExpiresAt = 0; runtime.state.data.teams = []; runtime.state.data.people = runtime.state.data.people.filter(p => p.id === runtime.state.data.self); runtime.emit(); }
     const removed = new Set<string>(); let changed = false;
     const invite = runtime.state.data.pendingInvite;
@@ -80,22 +88,10 @@ export class LocalDataRuntime {
     for (const id of removed) { this.eventTimes.delete(id); runtime.timeline.edits.delete(id); if (!runtime.sending.inFlight.has(id)) runtime.sending.outgoing.delete(id); }
     if (removed.size) runtime.state.data.messages = runtime.state.data.messages.filter(message => !removed.has(message.id));
     if (changed || removed.size) { this.pruneMedia(); changed = true; }
-    const itemExpiries = new Map(runtime.interactions.stickyRecords.map(item => [item.id, item.expiresAt]));
-    const retainedStickies = runtime.interactions.stickyRecords.filter(item => {
-      const expiresAt = messageExpiry(item.expiresAt, item.timestamp, runtime.state.remoteTeams.find(team => team.id === item.teamId)?.retentionDays);
-      if (item.expiresAt !== expiresAt) { item.expiresAt = expiresAt; changed = true; }
-      return item.expiresAt > now && readable(item.teamId);
-    });
-    const removedStickies = runtime.interactions.stickyRecords.filter(item => !retainedStickies.includes(item));
-    runtime.interactions.stickyRecords = retainedStickies;
-    if (removedStickies.length) {
-      changed = true;
-      if (session) for (const item of removedStickies) if (!runtime.interactions.stickyRecords.some(current => current.id === item.id)) await scope.wait(runtime.storage.remove(`${session.account.id}:cache:item:${item.id}`));
-    }
-    runtime.interactions.refreshStickies();
     if (runtime.state.pokes) { const pokes = runtime.state.pokes.filter(poke => poke.at + POKE_DISPLAY > now); if (pokes.length !== runtime.state.pokes.length) { runtime.state.pokes = pokes; changed = true; } }
 
     if (this.pruneViews()) changed = true;
+    if (await scope.wait(runtime.signals.pruneRecords(record => this.expiresAt(record, record.timestamp) > now))) changed = true;
     if (changed) runtime.emit();
     if (session) {
       await scope.wait(Promise.all([...removed].flatMap(id => [`${session.account.id}:cache:${id}`, `${session.account.id}:cache:media:event:${id}`, `${session.account.id}:notified:${id}`, `${session.account.id}:outgoing:${id}`]).map(key => runtime.storage.remove(key))));
@@ -113,29 +109,47 @@ export class LocalDataRuntime {
           this.evictCachedContent(evicted);
         }
       }
-      for (const item of runtime.interactions.stickyRecords) {
-        if (itemExpiries.get(item.id) === item.expiresAt) continue;
-        // Maintenance only shortens records that remain in the cache.
-        if (!await scope.wait(runtime.storage.get(`${session.account.id}:cache:item:${item.id}`))) continue;
-        const evicted = await scope.wait(runtime.storage.cache(session.account.id, `item:${item.id}`, { kind: 'stickies', item }, item.expiresAt));
-        this.evictCachedContent(evicted);
-      }
     }
     if (now - this.lastCleanup >= MINUTE_MS) { this.lastCleanup = now; await scope.wait(runtime.storage.cleanup(now).catch(() => { if (scope.current()) this.lastCleanup = 0; })); }
   }
-  async avatar(id: string | null) {
+  /** Profile pictures being read, and ones that failed: not asked again before `until` (never, for one that is gone). */
+  private avatarLoads = new Map<string, Promise<string | undefined>>();
+  private avatarFailures = new Map<string, { until: number; session: unknown }>();
+  avatar(id: string | null): Promise<string | undefined> {
     const runtime = this.runtime;
+    const session = runtime.auth.session; if (!id || !session) return Promise.resolve(undefined);
+    const key = `avatar:${id}`; const cached = this.mediaUrls.get(key); if (cached) return Promise.resolve(cached);
+    const failure = this.avatarFailures.get(key);
+    if (failure && failure.session === session && failure.until > Date.now()) return Promise.resolve(undefined);
+    const running = this.avatarLoads.get(key); if (running) return running;
     const scope = runtime.auth.scope();
-    const session = runtime.auth.session; if (!id || !session) return undefined;
-    const key = `avatar:${id}`; const cached = this.mediaUrls.get(key); if (cached) return cached;
-    try {
-      // Profiles follow current access and updates; keep only a temporary displayed copy.
-      const blob = new Blob([await scope.wait(runtime.api.media(id))]); if (runtime.auth.session !== session) return undefined;
-      const existing = this.mediaUrls.get(key); if (existing) return existing;
-      const url = URL.createObjectURL(blob); this.mediaUrls.set(key, url); return url;
-    } catch { scope.check(); return undefined; }
+    const work = (async () => {
+      try {
+        // Profiles follow current access and updates; keep only a temporary displayed copy.
+        const blob = new Blob([await scope.wait(runtime.api.media(id))]); if (runtime.auth.session !== session) return undefined;
+        this.avatarFailures.delete(key);
+        const existing = this.mediaUrls.get(key); if (existing) return existing;
+        const url = URL.createObjectURL(blob); this.mediaUrls.set(key, url); return url;
+      } catch (error) {
+        scope.check();
+        const gone = error instanceof ApiError && [404, 410].includes(error.status);
+        this.avatarFailures.set(key, { until: gone ? Infinity : Date.now() + Math.max(AVATAR_RETRY_MS, error instanceof ApiError ? error.retryAfterMs ?? 0 : 0), session });
+        return undefined;
+      }
+    })();
+    this.avatarLoads.set(key, work); void work.finally(() => { if (this.avatarLoads.get(key) === work) this.avatarLoads.delete(key); }).catch(() => {});
+    return work;
   }
-  async cachedMedia(id: string, load: () => Promise<Blob>, expiresAt: () => number) {
+  /** Media being read: a second caller for the same item (the sent copy and its echo, two views) shares the one request. */
+  private mediaLoads = new Map<string, Promise<string>>();
+  cachedMedia(id: string, load: () => Promise<Blob>, expiresAt: () => number): Promise<string> {
+    const key = `${this.runtime.auth.session?.account.id}:${id}`;
+    const running = this.mediaLoads.get(key); if (running) return running;
+    const work = this.readMedia(id, load, expiresAt);
+    this.mediaLoads.set(key, work); void work.finally(() => { if (this.mediaLoads.get(key) === work) this.mediaLoads.delete(key); }).catch(() => {});
+    return work;
+  }
+  private async readMedia(id: string, load: () => Promise<Blob>, expiresAt: () => number) {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     const session = runtime.auth.session; if (!session) throw new MessageError(uiMessage('extension.runtime.signInFirst'));
@@ -166,6 +180,7 @@ export class LocalDataRuntime {
     for (const key of keys) {
       if (!key.startsWith(prefix)) continue;
       const id = key.slice(prefix.length);
+      if (runtime.signals.evicted(id)) continue;
       if (id.startsWith('media:')) { const mediaId = id.slice(6); const url = this.mediaUrls.get(mediaId); if (url) { URL.revokeObjectURL(url); urls.add(url); this.mediaUrls.delete(mediaId); } }
       else if (!id.startsWith('item:') && id !== 'directory') events.add(id);
     }
@@ -253,7 +268,7 @@ export class LocalDataRuntime {
       // Blob URLs are runtime-only. The separate Blob record shares this cache budget.
       const cached = { ...value, ...(value.attachment?.kind === 'image' ? { attachment: { ...value.attachment, src: '' } } : {}) };
       delete cached.liveArrival;
-      const entry = { id: value.id, value: { message: cached, timestamp: item.timestamp, views: runtime.state.data.views.filter(v => value.attachment?.kind === 'asset' && v.id === value.attachment.assetId || !value.recalled && v.id === value.ref?.view.id) }, expiresAt: this.expiresAt(value, item.timestamp) };
+      const entry = { id: value.id, value: { message: cached, timestamp: item.timestamp, views: runtime.state.data.views.filter(v => value.attachment?.kind === 'asset' && v.id === value.attachment.assetId) }, expiresAt: this.expiresAt(value, item.timestamp) };
       if (this.messagePage?.session === session) { this.messagePage.entries.push({ ...entry, roomId: team.roomId }); continue; }
       const evicted = await scope.wait(runtime.storage.cache(session.account.id, entry.id, entry.value, entry.expiresAt));
       if (runtime.auth.session !== session) return;

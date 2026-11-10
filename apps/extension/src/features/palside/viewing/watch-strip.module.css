@@ -1,9 +1,11 @@
-/* Top slot: one 44px row from the left edge — 在看 chips as wide as their content (two at most, shrinking together when long), or one card
-   across the row — and a +N square. Never scrolls, never cut off. */
+/* Top slot: one 44px row from the left edge — 在看 chips in two half-row places (one chip alone keeps its half), or one card across the
+   row — and a +N square. Never scrolls, never cut off. */
 .region { --watch-more:44px; overflow:hidden; flex-shrink:0; }
 .strip { display:flex; gap:6px; height:52px; padding:0 16px 8px; }
 .card { flex:1; min-width:0; }
-.chip { position:relative; display:flex; flex:0 1 auto; align-items:stretch; min-width:0; height:44px; padding:3px; overflow:clip; overflow-clip-margin:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.chip { transition:background-color .3s var(--ui-ease-feedback); position:relative; display:flex; flex:1 1 0; align-items:stretch; min-width:0; height:44px; padding:3px; overflow:clip; overflow-clip-margin:3px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+/* A chip never passes half the row: one alone keeps its place, and a second one grows into the other half without moving it. */
+.strip > .chip { max-width:calc(50% - 3px); }
 .chip > [data-token-lock] { align-self:center; margin-inline:-6px 2px; }
 /* The page's content: the current layer in flow, a leaving one rolled out above it on top of the same place. */
 .wrap { position:relative; display:flex; flex:1 1 auto; min-width:0; overflow:clip; overflow-clip-margin:3px; }
@@ -15,6 +17,9 @@
 .text strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-callout); line-height:18px; font-weight:600; letter-spacing:-.01em; }
 .text small { display:flex; align-items:center; gap:3px; overflow:hidden; font-size:var(--ui-type-caption); line-height:14px; color:var(--ui-text-secondary); white-space:nowrap; }
 .text small svg { flex:none; }
+.text[data-one] { display:flex; align-items:center; gap:3px; }
+.text[data-one] strong { flex:0 1 auto; min-width:0; }
+.text[data-one] > svg { flex:none; color:var(--ui-text-secondary); }
 /* A token chip: the name opens its 弹幕 (the whole chip but the source line is that target), the source line opens the page. */
 .target[data-split] { position:relative; }
 .roomName { display:block; max-width:100%; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
@@ -35,37 +40,26 @@
 /* A face keeps its place; who is in it cross-fades. */
 .face { position:relative; display:grid; flex:none; width:20px; height:20px; border-radius:50%; box-shadow:0 0 0 1.5px var(--stack-edge); }
 .faceLayer { position:absolute; inset:0; display:grid; border-radius:50%; }
+/* 跟看: the followed teammate's chip takes the accent tint — the only accent in the row — and their face a ring. */
+.chip[data-follow] { --stack-edge:var(--ui-accent-soft); background:var(--ui-accent-soft); }
+.faceLayer[data-followed] { box-shadow:0 0 0 1.5px var(--ui-accent); transition:box-shadow .2s; }
+/* Paused (you took over the follow tab): the ring stays, quieter. */
+.chip[data-follow-paused] .faceLayer[data-followed] { box-shadow:0 0 0 1.5px var(--ui-text-secondary); }
+@media(prefers-reduced-motion:reduce) { .chip { transition:none; } }
 .face [data-presence] { display:none; }
 .rest { position:relative; display:flex; align-items:center; justify-content:center; flex:none; white-space:nowrap; min-width:20px; height:20px; padding:0 3px; border-radius:var(--ui-radius-pill); background:color-mix(in srgb, var(--ui-text-primary) 9%, var(--stack-edge)); box-shadow:0 0 0 1.5px var(--stack-edge); color:var(--ui-text-primary); font-size:var(--ui-type-caption); line-height:1; font-weight:600; font-variant-numeric:tabular-nums; }
 .more { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:1 1 auto; min-width:var(--watch-more); height:44px; padding:0 14px 0 12px; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:600 var(--ui-type-callout)/1 var(--font-geist-mono), ui-monospace, monospace; cursor:pointer; }
 .more:hover, .more[aria-expanded="true"] { background:var(--ui-control-hover); }
 .more:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
-/* +N fills what the chips leave: the hidden pages' marks lead (overlapping, cut first when the bar is narrow), the count keeps the far edge. */
-.moreMarks { display:flex; flex:1; align-items:center; min-width:0; overflow:hidden; }
-.moreMark { display:grid; flex:none; border-radius:50%; box-shadow:0 0 0 1.5px var(--ui-control-surface); }
-.moreMark + .moreMark { margin-left:-6px; }
-.moreMark > [data-token-size][data-token-size] { --token-size:20px; }
-.more:hover .moreMark, .more[aria-expanded="true"] .moreMark { box-shadow:0 0 0 1.5px var(--ui-control-hover); }
 .more > b { flex:none; }
-/* A card holding the row (跟看, 喊你来看, connection) keeps the width; +N goes back to its 44px square, count only. */
-.card ~ .more { flex:none; width:var(--watch-more); padding:0; justify-content:center; }
-.card ~ .more .moreMarks { display:none; }
+/* Chips and cards share the row in equal widths; +N is a 44px square, count only. */
+.card ~ .more, .chip ~ .more { flex:none; width:var(--watch-more); padding:0; justify-content:center; }
 /* +N: the chips and waiting 喊你来看 the row has no room for, as full-width rows. */
 .moreList { display:flex; flex-direction:column; gap:4px; }
 /* The popup's generic button rows must not reshape the chips inside it. */
 .moreList .target { width:auto; min-height:0; padding:0 6px; gap:8px; border-radius:calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs) var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px); corner-shape:var(--ui-corner-shape); font:inherit; }
 .moreList .count { width:auto; min-height:0; padding:0 7px 0 4px; gap:0; border-radius:var(--ui-radius-xs) calc(var(--ui-radius-l) - 3px) calc(var(--ui-radius-l) - 3px) var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); }
-.moreList .pokeOpen { width:auto; min-height:0; padding:0 12px; justify-content:center; font-size:var(--ui-type-footnote); line-height:16px; font-weight:600; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
-.moreList .pokeOpen:hover { background:color-mix(in srgb, var(--ui-text-primary) 86%, var(--ui-canvas)); }
-.moreList .chip { height:44px; }
-.pokeRow { display:flex; align-items:center; gap:8px; min-height:48px; padding:0 6px 0 10px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
-.pokeRow [data-presence] { display:none; }
-.pokeText { display:flex; flex:1; flex-direction:column; min-width:0; }
-.pokeText strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--ui-type-callout); line-height:18px; font-weight:600; }
-.pokeText small { display:flex; align-items:center; gap:4px; min-width:0; overflow:hidden; font-size:var(--ui-type-caption); line-height:14px; color:var(--ui-text-secondary); white-space:nowrap; }
-.pokeText small > [data-token-size][data-token-size] { --token-size:14px; }
-.pokeText small > [data-token-size] > :not(:first-child) { display:none; }
-.pokeOpen { flex:none; height:28px; padding:0 12px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-text-primary); color:var(--ui-canvas); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; }
+.moreList .chip { flex:none; height:44px; }
 /* 合流时刻: the chip briefly takes the accent tint, then settles. */
 .merge { position:absolute; inset:0; border-radius:inherit; corner-shape:inherit; pointer-events:none; background:color-mix(in srgb, var(--ui-accent) 22%, transparent); }
 .target:hover,.count:hover,.sourceTarget:hover,.copy:hover { background:var(--ui-control-hover); }
@@ -90,6 +84,7 @@
 .loadingIcon[data-slot="spinner"] { animation-duration:1s; }
 @media (prefers-reduced-motion:reduce) { .chip { transition:none; } }
 
-.morePopover { --popover-width:320px; padding:12px; }
+/* One chip wide (set as it opens): the rows line up with the chips above. */
+.morePopover { --popover-width:calc(var(--watch-column, 156px) + 8px); min-width:0; padding:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
 
 .menu:popover-open { animation:none; }

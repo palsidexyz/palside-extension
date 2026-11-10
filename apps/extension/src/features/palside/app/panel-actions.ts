@@ -12,7 +12,7 @@ export type PanelActions = {
   resolveDraftConflict: (keepLocal: boolean) => Promise<void>;
   run: <N extends CommandName>(...args: CommandArgs<N>) => Promise<CommandResult<N> | undefined>;
   guarded: <N extends CommandName>(name: N, payload: CommandPayload<N>, again: () => unknown) => Promise<CommandResult<N> | undefined>;
-  /** 网页互动 for one site: on or off there, and its 弹幕, 信号 and 便利贴. Chrome is asked by the caller, in the click. */
+  /** 网页互动 for one site: on or off there, and its 弹幕 and 信号. Chrome is asked by the caller, in the click. */
   setSite: (host: string, patch: Partial<SiteInteraction>) => Promise<void>;
   setFavorites: (update: (old: Favorites) => Favorites) => Promise<void>;
   /** 共享在看's key, kept until pressed again. */

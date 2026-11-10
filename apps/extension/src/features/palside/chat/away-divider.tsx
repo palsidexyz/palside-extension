@@ -35,6 +35,6 @@ export function AwayDivider({ c, views }: { c: PalsideController; views: Viewing
   const t = useTranslations();
   return <div className={s.divider} role="separator">
     <span><CountText text={t('extension.top.awayTitle', { count: views.length })} value={views.length} /></span>
-    <span className={s.tokens}>{views.slice(0, 3).map(view => <Tooltip key={view.id} content={tokenLabel(view, t)}><button type="button" className={s.token} aria-label={t('extension.top.openDetails', { name: tokenLabel(view, t) })} onClick={() => c.selectAsset(view.id)}><Token view={view} size="sm" /></button></Tooltip>)}{views.length > 3 && <small>+{views.length - 3}</small>}</span>
+    <span className={s.tokens}>{views.slice(0, 3).map(view => <Tooltip key={view.id} content={tokenLabel(view, t, c)}><button type="button" className={s.token} aria-label={t('extension.top.openDetails', { name: tokenLabel(view, t, c) })} onClick={() => c.selectAsset(view.id)}><Token view={view} size="sm" /></button></Tooltip>)}{views.length > 3 && <small>+{views.length - 3}</small>}</span>
   </div>;
 }

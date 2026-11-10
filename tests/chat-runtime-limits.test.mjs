@@ -33,3 +33,14 @@ for (const kind of ['text', 'image', 'failed-image']) test(`receive cap applies 
   assert.equal(f.runtime.state.data.messages[0].text, emoji.repeat(CHAT_TEXT_MAX * 2));
   assert.equal(f.timeline.edits.get('$message').text, emoji.repeat(CHAT_TEXT_MAX * 2));
 });
+
+test('history from a departed member asks for one snapshot, then a joiner is still recognized', async () => {
+  const f = fixture(); let refreshes = 0;
+  f.runtime.state.remoteTeams[0].people = [];
+  f.runtime.refresh = async () => { refreshes++; };
+  for (let n = 0; n < 5; n++) await f.timeline.consume(f.event({ msgtype: 'm.text', body: `old ${n}` }, `$old${n}`));
+  assert.equal(refreshes, 1); assert.equal(f.runtime.state.data.messages.length, 0);
+  f.runtime.state.remoteTeams[0].people = [{ id: 'peer', matrixId: '@peer' }];
+  await f.timeline.consume(f.event({ msgtype: 'm.text', body: 'back' }, '$back'));
+  assert.equal(refreshes, 1); assert.equal(f.runtime.state.data.messages.at(-1).text, 'back');
+});

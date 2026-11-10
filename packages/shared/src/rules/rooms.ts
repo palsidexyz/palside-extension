@@ -25,8 +25,6 @@ export const ROOM_REPLAY_WINDOW_MS = HOUR_MS;
 export const ROOM_REPLAY_COUNT = 20;
 /** Milliseconds between messages; paces page replay; docs/product/danmaku.md#弹幕视图. */
 export const ROOM_REPLAY_GAP_MS = 600;
-/** Votes; enables stance percentages; docs/product/danmaku.md#弹幕视图. */
-export const ROOM_STANCE_MIN_VOTES = 5;
 /** Milliseconds; samples hot-board viewers; docs/product/danmaku.md#弹幕视图. */
 export const ROOM_HOT_SAMPLE_MS = 30_000;
 /** Milliseconds; coalesces hot-board pushes; docs/product/danmaku.md#弹幕视图. */

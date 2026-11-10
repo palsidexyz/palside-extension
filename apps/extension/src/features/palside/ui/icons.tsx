@@ -1,21 +1,10 @@
 import type { ReactNode, SVGProps } from 'react';
-import { Highlighter, MapPin } from 'lucide-react';
+import { ChartCandlestick, MapPin } from 'lucide-react';
 import type { InteractionFeature } from '../../../domain/annotations/interaction';
-import type { Stance } from '../../../runtime/rooms/contract-types';
 
 /** Drawn on lucide's grid (24px, 2px round strokes) so they sit beside lucide icons. */
 function Glyph({ size = 16, children, ...props }: SVGProps<SVGSVGElement> & { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>{children}</svg>;
-}
-
-/** 看多 / 观望 / 看空: one family — a ring with the direction inside: up, level, down. */
-export function StanceIcon({ value, size }: { value: Stance; size?: number }) {
-  return <Glyph size={size}>
-    <circle cx="12" cy="12" r="9" />
-    {value === 'bull' && <><path d="M9 15 15 9" /><path d="M10 9h5v5" /></>}
-    {value === 'hold' && <><path d="M7.5 12h9" /><circle cx="12" cy="12" r=".5" fill="currentColor" /></>}
-    {value === 'bear' && <><path d="M9 9l6 6" /><path d="M15 10v5h-5" /></>}
-  </Glyph>;
 }
 
 /** 弹幕: lines of different lengths passing at different heights, the way danmaku crosses a page. */
@@ -45,7 +34,7 @@ export function ShareIcon({ size, className }: { size?: number; className?: { ce
 }
 
 /** The three 网页互动 features, as drawn in settings. */
-export const featureIcons: Record<InteractionFeature, () => ReactNode> = { signal: () => <MapPin size={16} />, sticky: () => <Highlighter size={16} /> };
+export const featureIcons: Record<InteractionFeature, () => ReactNode> = { signal: () => <MapPin size={16} />, chart: () => <ChartCandlestick size={16} /> };
 
 const chromeSector = 'M6.68 14A20 20 0 0 1 41.32 14H24A10 10 0 0 0 15.34 29Z';
 /** Chrome, in its own colours: marks what Chrome itself grants, next to the permission's name as Chrome words it. */

@@ -24,7 +24,7 @@ import { TeamAvatar } from './team-avatar';
 import { ReceivedInvites } from './invites';
 import type { DiscoveryActions } from './use-discovery';
 import s from './lobby.module.css';
-import base from '../app/palside.module.css';
+import { EmptyState } from '../ui/empty-state';
 
 
 export function Lobby({ c }: { c: PalsideController & DiscoveryActions }) {
@@ -70,9 +70,9 @@ export function Lobby({ c }: { c: PalsideController & DiscoveryActions }) {
       </button>;
     })}</div>}
     {c.lobbyMore[tab === 'applications' ? 'applications' : 'teams'] && teams.length > 0 && <MoreSentinel key={tab} loading={c.lobbyLoadingMore} failed={c.lobbyMoreFailed} onMore={() => void c.loadMoreLobby(tab === 'applications' ? 'applications' : 'teams')} />}
-    {c.lobbyError && <div className={base.empty} data-fill><p role="alert">{c.lobbyError}</p><Button loadingLabel={t('common.working')} size="sm" loading={c.lobbyLoading} onClick={() => void c.refreshLobby()}>{t('common.retry')}</Button></div>}
-    {!teams.length && !c.lobbyError && c.lobbyLoading && <div className={base.empty} data-fill><p role="status">{t('extension.copy.loadingTeamsEllipsis')}</p></div>}
-    {!teams.length && !c.lobbyError && !c.lobbyLoading && <div className={base.empty} data-fill><p>{tab === 'applications' ? t('extension.copy.noApplications') : query.trim() ? t('extension.copy.noTeamsFound') : t('extension.copy.noRecruitment')}</p>{tab === 'recruiting' && query.trim() && <Button onClick={() => setQuery('')}>{t('extension.copy.clearFilter')}</Button>}</div>}
+    {c.lobbyError && <EmptyState role="alert" title={c.lobbyError}><Button loadingLabel={t('common.working')} size="sm" loading={c.lobbyLoading} onClick={() => void c.refreshLobby()}>{t('common.retry')}</Button></EmptyState>}
+    {!teams.length && !c.lobbyError && c.lobbyLoading && <EmptyState role="status" title={t('extension.copy.loadingTeamsEllipsis')} />}
+    {!teams.length && !c.lobbyError && !c.lobbyLoading && <EmptyState title={tab === 'applications' ? t('extension.copy.noApplications') : query.trim() ? t('extension.copy.noTeamsFound') : t('extension.copy.noRecruitment')}>{tab === 'recruiting' && query.trim() && <Button onClick={() => setQuery('')}>{t('extension.copy.clearFilter')}</Button>}</EmptyState>}
     </div>
   </>;
 }
@@ -83,9 +83,14 @@ export function Recruitment({ c }: { c: PalsideController }) {
   const [note, setNote] = useState('');
   const pending = Boolean(c.discoveryTeams.find(t => t.id === c.recruitmentId)?.requested) || c.requests.some(request => request.teamId === c.recruitmentId && request.personId === c.data.self);
   const team = c.discoveryTeams.find(item => item.id === c.recruitmentId && (isRecruiting(item, c.now) || pending || item.joined || Boolean(item.applicationStatus && (item.applicationExpiresAt ?? 0) > c.now)));
-  if (!team && c.lobbyLoading) return <div className={base.empty} data-fill><p role="status">{t('extension.copy.loadingTeamsEllipsis')}</p></div>;
-  if (!team && c.lobbyError) return <div className={base.empty} data-fill><p role="alert">{c.lobbyError}</p><Button onClick={() => void c.refreshLobby()}>{t('common.retry')}</Button></div>;
-  if (!team) return <div className={base.empty} data-fill><Clock3 /><p>{t('extension.copy.teamUnavailable')}</p><Button onClick={() => c.go('lobby')}>{t('extension.copy.backLobby')}</Button></div>;
+  // A member opening their own squad's link (from the website, recruiting or not) goes straight into its chat.
+  const member = c.teams.find(item => item.id === c.recruitmentId && item.joined && !item.readonly)?.id;
+  const enter = useEffectEvent((id: string) => c.chooseTeam(id));
+  useEffect(() => { if (member) enter(member); }, [member]);
+  if (member) return <EmptyState role="status" title={t('extension.copy.loadingTeamsEllipsis')} />;
+  if (!team && c.lobbyLoading) return <EmptyState role="status" title={t('extension.copy.loadingTeamsEllipsis')} />;
+  if (!team && c.lobbyError) return <EmptyState role="alert" title={c.lobbyError}><Button onClick={() => void c.refreshLobby()}>{t('common.retry')}</Button></EmptyState>;
+  if (!team) return <EmptyState icon={<Clock3 />} title={t('extension.copy.teamUnavailable')}><Button onClick={() => c.go('lobby')}>{t('extension.copy.backLobby')}</Button></EmptyState>;
   const owner = c.people.find(person => person.id === team.owner);
   const ownerName = owner?.name || team.ownerName || t('common.member');
   const count = team.memberCount ?? team.memberIds.length;

@@ -5,9 +5,9 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { identifyPage, shortAddress, publicShareUrl, websiteIdentity } from '../packages/shared/src/navigation.ts';
 import { tokenName, resolveTokenMetadata } from '../apps/extension/src/runtime/viewing/token-name.ts';
-import { pageName } from '../apps/extension/src/runtime/viewing/page-title.ts';
+import { pageLabel, pageName } from '../apps/extension/src/runtime/viewing/page-title.ts';
 import { pageView, readView, validateView } from '../apps/extension/src/runtime/viewing/view-snapshot.ts';
-import { pageFavicon } from '../apps/extension/src/runtime/viewing/viewing.ts';
+import { iconDataUrl } from '../apps/extension/src/runtime/viewing/viewing.ts';
 import { TokenProfiles } from '../apps/extension/src/runtime/viewing/token-profiles.ts';
 import { assetKey } from '../apps/extension/src/domain/annotations/interaction.ts';
 
@@ -17,7 +17,7 @@ const identity=identifyPage(url,['gmgn.ai']);
 const source=ts.createSourceFile('sharing.ts',readFileSync('apps/extension/src/runtime/viewing/sharing.ts','utf8'),ts.ScriptTarget.Latest,true);
 const classNode=source.statements.find(ts.isClassDeclaration);
 const members=classNode.members.filter(n=>['tokenView','prepareView'].includes(n.name?.getText(source))).map(n=>n.getText(source)).join('\n');
-const context={TOKEN_NAME_WAIT_MS:50,assetKey,tokenName,resolveTokenMetadata,pageView,readView,identifyPage,publicShareUrl,websiteIdentity,pageName,pageFavicon,URL,AbortController,setTimeout,clearTimeout,Date};
+const context={TOKEN_NAME_WAIT_MS:50,assetKey,tokenName,resolveTokenMetadata,pageView,readView,identifyPage,publicShareUrl,websiteIdentity,pageName,pageLabel,iconDataUrl,URL,AbortController,setTimeout,clearTimeout,Date};
 vm.runInNewContext(ts.transpileModule(`class Metadata { ${members} };globalThis.Metadata=Metadata;`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);
 /** `ensure` is the directory client's: it settles when `answer` is called (or never), or at once with `reply`, so a busy machine cannot outlast the wait. */
 function fixture(reply){

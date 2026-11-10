@@ -13,7 +13,6 @@ export const presetTagIds = ['short-term', 'long-term', 'meme', 'on-chain', 'def
 /** Custom profile tags are stored trimmed with inner whitespace collapsed. */
 export const normalizeTagText = (value: string) => value.trim().replace(/\s+/g, ' ');
 
-export const stances = ['bull', 'hold', 'bear'] as const;
 export const ROOM_KEY_PATTERN = /^token:[A-Za-z ]{2,24}:[A-Za-z0-9]{20,64}$/;
 export type RoomKey = string;
 /** Shape check only; a room key never resolves to a page address. */

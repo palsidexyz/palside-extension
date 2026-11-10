@@ -20,7 +20,7 @@ export async function roomTabCommand(this: RuntimeCommands, command: Extract<Com
   const runtime = this.runtime;
   const page = p.page ? identifyPage(p.page) : null;
   if (page?.kind === 'pool' || page?.kind === 'address') void runtime.pages.resolve(page).catch(() => {});
-  return runtime.rooms.tabChanged({ asset: p.asset, site: p.site });
+  return runtime.rooms.tabChanged({ asset: p.asset, site: p.site, ...p.windowId === undefined ? {} : { windowId: p.windowId } });
 }
 
 export async function roomOpenCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-open" }>) {
@@ -45,20 +45,15 @@ export async function roomMoreCommand(this: RuntimeCommands) {
 return runtime.rooms.more();
 }
 
-export async function roomFindCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-find" }>) {
-  return this.runtime.rooms.find(command.payload.key, command.payload.id);
-}
-
 export async function roomRetractCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-retract" }>) {
  const p = command.payload ?? {};
     const runtime = this.runtime;
 return runtime.rooms.retract(p.id);
 }
 
-export async function roomStanceCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-stance" }>) {
- const p = command.payload ?? {};
-    const runtime = this.runtime;
-return runtime.rooms.stance(p.key, p.value);
+export async function roomLikeCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-like" }>) {
+  const p = command.payload ?? {};
+  return this.runtime.rooms.like(p.key, p.id, p.liked);
 }
 
 export async function roomSummaryCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-summary" }>) {
@@ -145,13 +140,13 @@ export const roomsHandlers = {
   'room-watch': roomWatchCommand,
   'room-panels': roomPanelsCommand,
   'room-tab': roomTabCommand,
+  'room-retry': function roomRetryCommand(this: RuntimeCommands) { return this.runtime.rooms.retry(); },
   'room-open': roomOpenCommand,
   'room-close': roomCloseCommand,
   'room-send': roomSendCommand,
   'room-more': roomMoreCommand,
-  'room-find': roomFindCommand,
   'room-retract': roomRetractCommand,
-  'room-stance': roomStanceCommand,
+  'room-like': roomLikeCommand,
   'room-summary': roomSummaryCommand,
   'room-people': roomPeopleCommand,
   'room-hot': roomHotCommand,

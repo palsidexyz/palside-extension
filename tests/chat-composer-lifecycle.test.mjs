@@ -205,7 +205,7 @@ test('edit actions reject recalled, missing and non-editable originals', () => {
 test('keep-local conflict resolution submits explicit empty values for every optional draft field', async () => {
   const f = actionFixture(); f.state.view.draft = { text: '@Alice' }; f.state.blockedDrafts.current.add('team');
   const result = f.actions().resolveDraftConflict(true); await settle();
-  assert.deepEqual(plain(f.requests[0].payload.patch), { text: '@Alice', attachment: null, replyTo: null, replyRange: null, ref: null, mentions: [], automaticCard: null, dismissedUrls: [] });
+  assert.deepEqual(plain(f.requests[0].payload.patch), { text: '@Alice', attachment: null, replyTo: null, replyRange: null, mentions: [], automaticCard: null, dismissedUrls: [] });
   const remote = { mentions: [{ id: 'alice', label: 'Alice' }], automaticCard: { url: 'https://a.test', assetId: 'a' }, dismissedUrls: ['https://a.test'] };
   Object.assign(remote, f.requests[0].payload.patch);
   assert.deepEqual(plain(remote.mentions), []);
@@ -218,7 +218,7 @@ function composerFixture(c, extras = {}) {
   const tags = ['Spinner', 'VisuallyHidden', 'ArrowUp', 'Check', 'Gift', 'ImageIcon', 'Plus', 'Pencil', 'X', 'IconButton', 'ImageEditor', 'DraftConflict', 'AssetCard', 'ComposerRows', 'EditLine', 'ReplyLine', 'ReactionPicker', 'StateGlyph', 'CaptureTool', 'PageStrip', 'InteractToggle', 'ShareToggle', 'Action', 'PersonAvatar'];
   const globals = { ...h.globals, ...Object.fromEntries(tags.map(tag => [tag, tag])),
     h: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }), Fragment: 'fragment',
-    useTranslations: () => key => key, useMention: () => ({ close() {}, detect() {}, keyDown() {} }), useLinkCard() {},
+    useTranslations: () => key => key, useMention: () => ({ close() {}, detect() {}, keyDown() {} }), useLinkCard() {}, useAddressCard: () => ({ pasted() {}, candidates: [], pick() {} }),
     assetView() {}, quotedText: () => '', s: {}, refStyles: {}, TEXT_MAX: 4000, IMAGE_LIMIT: {}, uiMessage: key => key, errorMessage: error => error.message,
     ...extras,
   };
@@ -320,7 +320,7 @@ test('runtime draft metadata survives persistence and manual attachment replacem
   assert.equal(saved.value.automaticCard, undefined);
   assert.deepEqual(plain(saved.value.dismissedUrls), ['https://b.test', 'https://a.test']);
   assert.deepEqual(plain(saved.value.attachment), replacement);
-  await handlers.draftCommand.call({ runtime }, parseCommand({ name: 'draft', payload: { accountId: 'self', teamId: 'team', revision: saved.revision, patch: { text: '@Alice', mentions: [], attachment: null, replyTo: null, replyRange: null, ref: null, automaticCard: null, dismissedUrls: [] } } }));
+  await handlers.draftCommand.call({ runtime }, parseCommand({ name: 'draft', payload: { accountId: 'self', teamId: 'team', revision: saved.revision, patch: { text: '@Alice', mentions: [], attachment: null, replyTo: null, replyRange: null, automaticCard: null, dismissedUrls: [] } } }));
   const kept = await storage.get('self:draft:team');
   assert.equal(kept.value.automaticCard, undefined);
   assert.deepEqual(plain(kept.value.mentions), []);

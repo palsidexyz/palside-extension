@@ -45,7 +45,9 @@ export function danmaku(bg: Background) {
       // The card on hover shows who said it, so the author goes out with a portrait; a retraction meanwhile still wins.
       void bg.roomPagePerson(item.author).then(({ mate, ...author }) => {
         if (projections.get(port) !== projection || !projection.sent.has(item.id)) return;
-        post(port, { type: 'danmaku', items: [{ id: item.id, key: item.key, text: item.text, ...(queued?.replay ? { replay: true as const } : {}), timestamp: item.createdAt, author, self: item.author.id === bg.state?.account?.id, mate }] });
+        const room = bg.state?.rooms?.current, self = item.author.id === bg.state?.account?.id;
+        const likes = room?.key === item.key ? room.likes?.[item.id]?.count : undefined;
+        post(port, { type: 'danmaku', items: [{ id: item.id, key: item.key, text: item.text, ...(queued?.replay ? { replay: true as const } : {}), timestamp: item.createdAt, author, self, mate, ...(likes ? { likes } : {}) }] });
       });
     }
     if (projection.queue.length && projections.get(port) === projection) projection.timer = bg.setTimeout(() => release(port, info, projection), ROOM_REPLAY_GAP_MS);

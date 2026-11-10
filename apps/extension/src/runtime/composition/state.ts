@@ -14,8 +14,8 @@ export function defaultPreferences(): Preferences {
   };
 }
 
-type PreferencePatch = Pick<Preferences, 'current' | 'hiddenStickies' | 'forgottenTeams' | 'notificationPreview' | 'notifications' | 'share' | 'siteInteraction' | 'favorites' | 'rooms' | 'toured'>;
-const preferenceFields = ['current', 'hiddenStickies', 'forgottenTeams', 'notificationPreview', 'notifications', 'share', 'siteInteraction', 'favorites', 'rooms', 'toured'] as const;
+type PreferencePatch = Pick<Preferences, 'current' | 'forgottenTeams' | 'notificationPreview' | 'notifications' | 'share' | 'siteInteraction' | 'favorites' | 'rooms' | 'toured'>;
+const preferenceFields = ['current', 'forgottenTeams', 'notificationPreview', 'notifications', 'share', 'siteInteraction', 'favorites', 'rooms', 'toured'] as const;
 
 /** Only these user-editable fields may be patched; policy and onboarding have their own writers. */
 export function readPreferencePatch(input: Record<string, unknown>): Partial<PreferencePatch> | undefined {
@@ -27,7 +27,6 @@ export function readPreferencePatch(input: Record<string, unknown>): Partial<Pre
       case 'current':
         if (typeof value !== 'string') return;
         patch.current = value; break;
-      case 'hiddenStickies':
       case 'forgottenTeams':
         if (!Array.isArray(value) || value.some(id => typeof id !== 'string')) return;
         patch[key] = [...new Set((value as string[]).toReversed())].slice(0, 500).reverse(); break;
@@ -100,7 +99,6 @@ export function emptyState(): RuntimeState {
       signupDifficulty: 0,
     },
     invitations: {},
-    items: { stickies: [] },
   };
 }
 

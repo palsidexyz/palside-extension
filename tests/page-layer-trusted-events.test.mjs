@@ -6,7 +6,7 @@ import ts from 'typescript';
 
 // Exercise the registered handler itself with no ambient page or extension authority.
 const actions = new Set(['click', 'dblclick', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mouseup', 'keydown', 'keyup', 'wheel', 'input', 'mouseenter', 'mouseleave', 'dragstart', 'selectstart']);
-for (const file of ['page-layer/signals', 'page-layer/capture', 'runtime/media/image-workspace', 'page-layer/picker', 'page-layer/danmaku-renderer', 'page-layer/sticky-projection', 'page-layer/reference-outline', 'page-layer/selection-menu']) {
+for (const file of ['page-layer/signals', 'page-layer/capture', 'runtime/media/image-workspace', 'page-layer/danmaku-renderer']) {
   test(`${file} user-action listeners return before touching state for synthetic events`, () => {
     const source = ts.createSourceFile(file + '.ts', readFileSync(new URL(`../apps/extension/src/${file}.ts`, import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true);
     const definitions = new Map(), listeners = [];

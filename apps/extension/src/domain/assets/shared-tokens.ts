@@ -22,7 +22,7 @@ function collectTokens({ messages, now }: TokensInput): SharedToken[] {
   for (const message of messages) {
     const at = message.timestamp;
     if (message.recalled || message.removedByOwner || message.status !== 'sent' || at === undefined || !Number.isFinite(at) || at > now || message.expiresAt !== undefined && message.expiresAt <= now) continue;
-    const views = [message.attachment?.kind === 'asset' ? message.attachment.view : undefined, message.ref?.view];
+    const views = [message.attachment?.kind === 'asset' ? message.attachment.view : undefined];
     const counted = new Set<AssetKey>();
     for (const view of views) {
       const asset = viewAsset(view);

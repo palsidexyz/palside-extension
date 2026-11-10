@@ -5,8 +5,8 @@ import type { Background } from './index.ts';
 import type { Port } from './context.ts';
 
 /**
- * A side panel on the `palside/panel` port: it announces its window in `hello`, receives state, language, danmaku settings, site icons and
- * page status, and reports activity. A restarted worker takes its first state from the offscreen snapshot.
+ * A side panel on the `palside/panel` port: it announces its window in `hello`, receives state, language, danmaku settings, site icons,
+ * page status and the update status, and reports activity. A restarted worker takes its first state from the offscreen snapshot.
  */
 export function panel(bg: Background) {
   const { browser } = bg;
@@ -32,6 +32,7 @@ export function panel(bg: Background) {
       reportRoomPanels();
       bg.danmaku.sendDanmakuSettings(port);
       bg.siteIcons.send(port);
+      bg.updates.panelConnected(port);
       bg.sharing.updateDeviceState();
       void bg.language.refresh().then(value => { if (bg.panels.has(port)) bg.post(port, { type: 'language', state: value }); });
 
@@ -40,10 +41,12 @@ export function panel(bg: Background) {
           // 网页互动 pauses in a window without a panel and resumes when one opens there.
           const opened = ![...bg.panels.values()].includes(message.windowId);
           bg.panels.set(port, message.windowId);
+          // Opening a panel is working in that window.
+          if (opened) bg.panelWindows.focused(message.windowId);
           void bg.roomTab.refresh();
           if (opened) bg.pages.pagePolicyChanged(false);
-          bg.stickies.deliverPendingSticky(port, message.windowId);
           bg.sharing.updateDeviceState();
+          bg.follow.sendStatus(port, message.windowId);
           pendingActivity ||= !bg.state && message.activity === true;
           void bg.sharing.observer.refresh(message.activity === true);
           void bg.pages.pushPageStatus();
@@ -64,13 +67,14 @@ export function panel(bg: Background) {
       port.onDisconnect.addListener(() => {
         const windowId = bg.panels.get(port);
         bg.panels.delete(port);
+        bg.updates.panelClosed();
         void bg.roomTab.refresh();
         reportRoomPanels();
         bg.sharing.updateDeviceState();
         if (windowId !== undefined) {
           const lastForWindow = ![...bg.panels.values()].includes(windowId);
           if (bg.capture.captures.get(windowId)?.panel === port || lastForWindow) bg.capture.discardCapture(windowId);
-          if (lastForWindow) { bg.selection.resetWindowSelection(windowId); bg.pages.pagePolicyChanged(false); }
+          if (lastForWindow) { bg.pages.pagePolicyChanged(false); bg.follow.panelClosed(windowId); }
         }
         if (port.sender?.documentId) {
           void bg.run({ name: 'visible-drop', payload: { panel: port.sender.documentId } }).catch(() => {});
@@ -98,7 +102,7 @@ export function panel(bg: Background) {
           if (windowId !== undefined) void bg.pages.restoreActivePage(windowId).catch(() => {});
         }
         // Reconnecting ports send activity=false and must never reclaim device selection.
-        await bg.sharing.observer.refresh(activity && window?.focused === true, true);
+        await bg.sharing.observer.refresh(activity && window?.focused === true);
       }).catch(() => { bg.post(port, { type: 'error', message: uiMessage('common.connectionLost') }); });
     },
   };

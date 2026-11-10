@@ -15,7 +15,7 @@ const base = () => ({ id: '0123456789abcdef', teamId: 'team', url: 'https://exam
 
 test('signals accept every supported kind and nearest-first anchors', () => {
   for (const kind of signalKinds) assert.equal(readSignal({ ...base(), kind }, now).kind, kind);
-  const target = spot({ kind: 'quote', exact: 'Public text', prefix: '', suffix: '', nth: 1, of: 3 }, { kind: 'element', tag: 'button', label: 'Buy', nth: 0, of: 1, x: 0.5, y: 0.5 }, { kind: 'chart', x: 0.2, y: 0.8 });
+  const target = spot({ kind: 'quote', exact: 'Public text', prefix: '', suffix: '', nth: 1, of: 3, x: 0.25, y: 0.5 }, { kind: 'element', tag: 'button', label: 'Buy', nth: 0, of: 1, x: 0.5, y: 0.5 }, { kind: 'chart', x: 0.2, y: 0.8 });
   assert.deepEqual(readSignal({ ...base(), target, emote: 'popcorn' }, now).target, target);
   // Clocks disagree between members: a send time within the skew window is accepted either way.
   for (const sentAt of [now - SIGNAL_CLOCK_SKEW, now + SIGNAL_CLOCK_SKEW]) assert.ok(readSignal({ ...base(), sentAt }, now));

@@ -13,9 +13,9 @@ const message = (id, patch = {}) => ({ id, key: key(address), text: id, author: 
 function fixture({ messages = [], site = true, saved = {}, state: patch = {} } = {}) {
   const calls = [], opened = [], injected = [], timers = new Map(), stored = { ...saved };
   const controls = { focused: 10, tabs: [{ id: 1, windowId: 10, active: true, url: url(address), status: 'complete' }] };
-  let state = { authenticated: true, account: { id: 'alice' }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, preferences: { current: '', rooms: {}, notifications: 'off', hiddenStickies: [] }, remoteTeams: [], items: { stickies: [] }, data: { views: [], messages: [], people: [] }, drafts: {}, rooms: { current: { key: key(address), loading: false, messages }, blocked: [], avatars: {} }, ...patch };
+  let state = { authenticated: true, account: { id: 'alice' }, connection: { service: 'ready', messaging: 'ready', networkOnline: true }, preferences: { current: '', rooms: {}, notifications: 'off' }, remoteTeams: [], data: { views: [], messages: [], people: [] }, drafts: {}, rooms: { current: { key: key(address), loading: false, messages }, blocked: [], avatars: {} }, ...patch };
   const browser = {
-    runtime: { id: 'qa', getURL: path => `chrome-extension://qa${path}`, getContexts: async () => [{}], onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event(), sendMessage: async ({ command }) => { calls.push(command); return command.name === 'snapshot' ? { ok: true, value: state } : { ok: true }; } },
+    runtime: { id: 'qa', getURL: path => `chrome-extension://qa${path}`, getContexts: async () => [{}], onMessage: event(), onMessageExternal: event(), onConnect: event(), onInstalled: event(), onUpdateAvailable: event(), sendMessage: async ({ command }) => { calls.push(command); return command.name === 'snapshot' ? { ok: true, value: state } : { ok: true }; } },
     tabs: { query: async options => controls.tabs.filter(tab => (!options.active || tab.active) && (options.windowId === undefined || tab.windowId === options.windowId)), onActivated: event(), onUpdated: event(), onRemoved: event() },
     windows: { getLastFocused: async () => ({ id: controls.focused, focused: true }), get: async id => ({ id, focused: controls.focused === id }), onFocusChanged: event(), onRemoved: event() },
     sidePanel: { open: async options => { opened.push(options); }, setPanelBehavior: async () => {} },
@@ -75,7 +75,7 @@ test('once per tab and token survives reconnect and token switching, expires aft
 test('all public-room display conditions apply independently of interaction features and team membership', async t => {
   const cases = [
     f => f.update({ preferences: { ...f.state().preferences, rooms: { off: true } } }),
-    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true, sticky: true } } } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['https://gmgn.ai/*'] }); },
     f => f.primary.port.onDisconnect.emit(),
     f => f.update({ rooms: { ...f.state().rooms, current: { key: key(other), messages: [message('wrong', { key: key(other) })] } } }),
@@ -83,7 +83,7 @@ test('all public-room display conditions apply independently of interaction feat
   ];
   for (const disable of cases) {
     const f = fixture({ messages: [message('a'), message('b')] }); t.after(f.close); await flush();
-    f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: true, signal: false, sticky: false } } } }); await flush();
+    f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: true, signal: false } } } }); await flush();
     const p = f.page(); await flush(); assert.equal(p.flights().length, 1, 'works with no team and both interaction features off');
     await disable(f); await flush(); f.tick();
     assert.equal(p.flights().length, 1); assert.ok(p.removed().includes('a'));
@@ -117,19 +117,21 @@ test('room-tab follows the most recently focused panel window, emits null on non
   const f = fixture(); t.after(f.close); await flush();
   const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(command => command.payload);
   // room-tab carries the token and the registry site only: never a name or an icon.
-  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}`, site: 'gmgn' });
+  assert.deepEqual(tabs().at(-1), { asset: `Ethereum:${address}`, site: 'gmgn', windowId: 10 });
   f.controls.tabs.push({ ...f.controls.tabs[0], id: 2, windowId: 20, url: url(other) });
-  f.panel(20); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${address}`);
+  // Opening the side panel in a window is working in it: 弹幕 follows that window at once.
+  f.panel(20); await flush(); assert.deepEqual([tabs().at(-1).asset, tabs().at(-1).windowId], [`Ethereum:${other}`, 20]);
+  f.controls.focused = 10; f.browser.windows.onFocusChanged.emit(10); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${address}`);
   f.controls.focused = 20; f.browser.windows.onFocusChanged.emit(20); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${other}`);
   f.controls.focused = 30; f.browser.windows.onFocusChanged.emit(30); await flush(); assert.equal(tabs().at(-1).asset, `Ethereum:${other}`);
-  f.controls.tabs[1].url = 'https://gmgn.ai/'; f.browser.tabs.onUpdated.emit(2, { url: 'https://gmgn.ai/' }, f.controls.tabs[1]); await flush(); assert.deepEqual(tabs().at(-1), { asset: null });
+  f.controls.tabs[1].url = 'https://gmgn.ai/'; f.browser.tabs.onUpdated.emit(2, { url: 'https://gmgn.ai/' }, f.controls.tabs[1]); await flush(); assert.deepEqual(tabs().at(-1), { asset: null, windowId: 20 });
   await assert.rejects(f.bg.commands.panelCommand({ name: 'room-tab', payload: { asset: `Ethereum:${address}` } }, f.primary.port.sender.url));
   const count = tabs().length; await f.bg.roomTab.refresh(); assert.equal(tabs().length, count);
 });
 
 test('room-tab follows a token only on an added site, and follows or drops it as Chrome grants or revokes the site', async t => {
   const f = fixture({ site: false }); t.after(f.close); await flush();
-  const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(command => command.payload);
+  const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(({ payload: { windowId: _window, ...payload } }) => payload);
   assert.ok(tabs().length && tabs().every(payload => payload.asset === null), 'a visible address without site access never reports its token');
   f.host.grantedOrigins.add('https://gmgn.ai/*'); f.browser.permissions.onAdded.emit({ origins: ['https://gmgn.ai/*'] }); await flush();
   assert.equal(tabs().at(-1).asset, `Ethereum:${address}`);
@@ -143,7 +145,7 @@ test('enabled, density and area persist; a named view still sends room-tab only 
   await f.bg.danmaku.saveDanmakuSettings({ enabled: true, density: 'high' });
   assert.equal(f.stored['palside:danmaku'].density, 'high'); assert.equal(f.stored['palside:danmaku'].area, 50);
   f.update({ data: { ...f.state().data, views: [{ kind: 'asset', chain: 'Ethereum', address, name: 'Token', logo: 'https://evil.example/logo.png' }] } }); await flush();
-  assert.deepEqual(f.calls.filter(command => command.name === 'room-tab').at(-1).payload, { asset: `Ethereum:${address}`, site: 'gmgn' });
+  assert.deepEqual(f.calls.filter(command => command.name === 'room-tab').at(-1).payload, { asset: `Ethereum:${address}`, site: 'gmgn', windowId: 10 });
 });
 
 test('another tab gets its own replay and a missing grant or capture-only admission cannot show room flights', async t => {
@@ -222,7 +224,7 @@ test('room payment timers expire packets without state events', async t => {
 test('room payment projections clear for permission, tab, account, team and display lifecycle changes', async t => {
   const cases = [
     f => f.update({ preferences: { ...f.state().preferences, rooms: { off: true } } }),
-    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true, sticky: true } } } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['https://gmgn.ai/*'] }); },
     f => f.primary.port.onDisconnect.emit(),
     f => f.update({ authenticated: false }),
@@ -230,7 +232,7 @@ test('room payment projections clear for permission, tab, account, team and disp
     f => f.update({ preferences: { ...f.state().preferences, current: 'other-team' } }),
     f => f.update({ rooms: { ...f.state().rooms, current: { key: key(other), messages: [], loading: true } } }),
     f => { f.controls.tabs[0].url = url(other); f.browser.tabs.onUpdated.emit(1, { url: url(other) }, f.controls.tabs[0]); },
-    f => f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.controls.tabs[0]),
+    (f, p) => { p.port.onDisconnect.emit(); f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.controls.tabs[0]); },
     f => f.browser.tabs.onRemoved.emit(1, { windowId: 10 }),
     (f, p) => p.port.onDisconnect.emit(),
   ];
@@ -265,7 +267,7 @@ test('room payments require a site grant and matching page and cannot reuse a re
 test('a pool page names its URL until the server finds its token, then follows the token and enables webpage danmaku', async t => {
   const f = fixture({ messages: [message('token')] }); t.after(f.close); await flush();
   const pool = `https://dexscreener.com/ethereum/${other}`;
-  const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(command => command.payload);
+  const tabs = () => f.calls.filter(command => command.name === 'room-tab').map(({ payload: { windowId: _window, ...payload } }) => payload);
   f.host.grantedOrigins.add('https://dexscreener.com/*');
   f.controls.tabs[0].url = pool; f.browser.tabs.onUpdated.emit(1, { url: pool }, f.controls.tabs[0]); await flush();
   assert.deepEqual(tabs().at(-1), { asset: null, page: pool });

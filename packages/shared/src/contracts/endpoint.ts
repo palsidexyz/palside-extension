@@ -4,12 +4,12 @@ import { empty, operationKey } from './common.ts';
 import { JSON_BODY_BYTES } from '../rules/media.ts';
 import { errors, errorSchemas, sessionErrors, signatureErrors, transportErrors } from './errors.ts';
 import type { ErrorCode } from './errors.ts';
-export const rateLimitNames = ['entry', 'accountCreate', 'deviceCreateIp', 'deviceCreateAccount', 'deviceRemove', 'accountDelete', 'invitePreview', 'publicLobby', 'publicAvatar', 'recruitment', 'application', 'teamCreate', 'teamJoin', 'inviteRegenerate', 'profileEdit', 'avatarUpload', 'report', 'imageUpload', 'snapshot', 'viewing', 'reaction', 'readState', 'mediaRead', 'roomLease', 'roomMessages', 'roomRead', 'roomReport', 'roomBlocks', 'roomSummary', 'roomPeople', 'roomHot', 'roomStance', 'roomRetract', 'teamInviteRead', 'teamInviteOptions', 'teamInviteSend', 'teamInviteAccept', 'teamInviteIgnore', 'teamInviteAvatar', 'teamInvitePermission', 'roomAvatar', 'tokenResolve', 'tokenSearch', 'tokenLogo', 'session'] as const;
+export const rateLimitNames = ['entry', 'accountCreate', 'deviceCreateIp', 'deviceCreateAccount', 'deviceRemove', 'accountDelete', 'invitePreview', 'publicLobby', 'publicAvatar', 'recruitment', 'application', 'teamCreate', 'teamJoin', 'inviteRegenerate', 'profileEdit', 'avatarUpload', 'report', 'imageUpload', 'snapshot', 'viewing', 'reaction', 'readState', 'mediaRead', 'roomLease', 'roomMessages', 'roomRead', 'roomReport', 'roomBlocks', 'roomSummary', 'roomPeople', 'roomHot', 'roomLike', 'roomRetract', 'teamInviteRead', 'teamInviteOptions', 'teamInviteSend', 'teamInviteAccept', 'teamInviteIgnore', 'teamInviteAvatar', 'teamInvitePermission', 'roomAvatar', 'tokenResolve', 'tokenSearch', 'tokenLogo', 'session'] as const;
 type RateLimitName = typeof rateLimitNames[number];
 export type RateLimit = { name: RateLimitName; enforcement?: 'success' | 'operation'; when?: 'regenerate' | 'new-publication' | 'new-application' | 'avatar' | 'non-avatar' };
 export type Auth = 'public' | 'signed' | 'bearer' | 'optional-bearer';
 export type Body<S extends TSchema = TSchema> = { kind: 'none' | 'json' | 'binary'; maxBytes: number; schema: S; caps?: Readonly<Record<string, number>> };
-export type Response<S extends TSchema = TSchema> = { kind: 'json' | 'binary' | 'sse'; schema: S; statuses?: readonly number[] };
+export type Response<S extends TSchema = TSchema> = { kind: 'json' | 'binary'; schema: S; statuses?: readonly number[] };
 export const noBody = { kind: 'none', maxBytes: 0, schema: Type.Undefined() } as const;
 export const jsonBody = <S extends TSchema>(schema: S) => ({ kind: 'json', maxBytes: JSON_BODY_BYTES, schema } as const);
 export const jsonResponse = <S extends TSchema>(schema: S, statuses: readonly number[] = [200]) => ({ kind: 'json', schema, statuses } as const);
@@ -53,7 +53,7 @@ export function pathFor<E extends { path: string; params: TSchema; query: TSchem
 
 /** Response schemas include each declared error status.
  * decodeContract validates and normalizes requests and responses at the transport boundary.
- * SSE and binary responses are written as streams/bytes without JSON serialization.
+ * Binary responses are written as bytes without JSON serialization.
  */
 export function routeSchema<E extends Endpoint>(endpoint: E) {
   const responses: Record<number, (E['response']['schema'] | typeof errorSchemas[ErrorCode])[]> = {};

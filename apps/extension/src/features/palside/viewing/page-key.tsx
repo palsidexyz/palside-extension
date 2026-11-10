@@ -6,7 +6,7 @@ import { Globe, Layers } from 'lucide-react';
 import { Tooltip } from '@palside/ui/tooltip';
 import { siteAllows } from '../../../domain/annotations/interaction';
 import { requestSitesAccess, requestTabs } from '../../../runtime/browser/permissions';
-import { pageFavicon, tabIcon } from '../../../runtime/viewing/viewing';
+import { iconDataUrl } from '../../../runtime/viewing/viewing';
 import { capability } from '../settings/access';
 import { captureSocialUi } from '../annotations/social-state';
 import { SiteFace } from '../assets/site-logo';
@@ -43,7 +43,7 @@ export function askSiteAccess(host: string) {
 
 export function siteState(c: PalsideController, waiting?: string): SiteState {
   if (!c.live) return !c.pageHost ? 'none' : c.localSites.includes(c.pageHost) && siteAllows(c.siteInteraction, c.pageHost) ? 'on' : 'off';
-  const { state } = capability(c, 'pick');
+  const { state } = capability(c, 'interact');
   if (state === 'blocked') return 'none';
   if (state === 'pending') return waiting === '' ? 'asking' : 'loading';
   if (state === 'access') return !c.pageHost ? waiting === '' ? 'asking' : 'blind' : waiting === c.pageHost ? 'asking' : 'lock';
@@ -58,14 +58,14 @@ export function pageSite(c: PalsideController): Site | undefined {
   const host = c.pageHost;
   if (!host) return;
   const page = c.live?.page;
-  return siteOf(c, host, pageFavicon(page?.favicon) ?? tabIcon(page?.icon));
+  return siteOf(c, host, iconDataUrl(page?.favicon) ?? iconDataUrl(page?.icon));
 }
 
 /** Chrome names the tab, and it is no website Palside can work on: a browser page, a local file, or a local, private or ported address. */
 export function pageUnusable(c: PalsideController) {
   const page = c.live?.page;
   if (!page) return false;
-  return capability(c, 'pick').state === 'blocked' || Boolean(page.url && !c.pageHost);
+  return capability(c, 'interact').state === 'blocked' || Boolean(page.url && !c.pageHost);
 }
 
 /**

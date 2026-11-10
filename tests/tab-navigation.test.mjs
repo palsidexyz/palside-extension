@@ -77,8 +77,8 @@ test('ordinary chat links reuse the current matching tab and otherwise open a ne
 });
 
 
-test('sharing waits a full second per stable page and stops immediately', async t => {
-  const { createTabObserver } = await import('../apps/extension/src/runtime/browser/tab-observer.ts');
+test('sharing publishes a page after a short settle, skips pages passed through, and stops immediately', async t => {
+  const { createTabObserver, SHARE_SETTLE_MS } = await import('../apps/extension/src/runtime/browser/tab-observer.ts');
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let policy = { key: 'account:team' }, page = { tabId: 1, windowId: 1, url: 'https://example.com/' };
   const published = []; let clears = 0;
@@ -86,14 +86,15 @@ test('sharing waits a full second per stable page and stops immediately', async 
   t.after(() => observer.dispose());
   const tick = async ms => { t.mock.timers.tick(ms); await new Promise(resolve => setImmediate(resolve)); };
   await observer.refresh();
-  await tick(500);
+  await tick(SHARE_SETTLE_MS / 2);
   assert.deepEqual(published, []);
   page = { ...page, tabId: 2, url: 'https://other.example/' };
   await observer.refresh();
-  await tick(999);
+  await tick(SHARE_SETTLE_MS - 1);
   assert.deepEqual(published, []);
   await tick(1);
-  assert.deepEqual(published, ['https://other.example']);
+  assert.deepEqual(published, ['https://other.example/']);
+  assert.ok(SHARE_SETTLE_MS <= 200);
   await observer.refresh();
   const before = clears;
   policy = undefined;

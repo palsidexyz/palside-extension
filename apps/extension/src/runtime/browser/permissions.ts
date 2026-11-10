@@ -14,7 +14,7 @@ async function permissionRequested(request: Promise<boolean>): Promise<boolean> 
   return allowed;
 }
 
-type PermissionKind = 'sites' | 'tabs' | 'notifications';
+type PermissionKind = 'sites' | 'tabs' | 'notifications' | 'tabGroups';
 const requests = new Map<PermissionKind, Set<Promise<boolean>>>();
 const removals = new Map<PermissionKind, Promise<unknown>>();
 export const permissionRemovalPending = (kind: PermissionKind) => removals.has(kind);
@@ -124,8 +124,21 @@ export function requestTabs(host = browser): Promise<boolean> {
   return requestPermission('tabs', () => host.permissions.request({ permissions: ['tabs', 'favicon'] }));
 }
 
+/** 跟看's tab group gets a name and colour: Chrome's 查看和管理您的标签页组. Call synchronously from the click. */
+export function requestTabGroups(host = browser): Promise<boolean> {
+  return requestPermission('tabGroups', () => host.permissions.request({ permissions: ['tabGroups'] }));
+}
+
+export async function revokeTabGroups(current = () => true): Promise<boolean> {
+  return removePermission('tabGroups', async () => current() && (await command('permissions-remove', { kind: 'tabGroups' })).removed);
+}
+
 export async function revokeTabs(current = () => true): Promise<boolean> {
   return removePermission('tabs', async () => current() && (await command('permissions-remove', { kind: 'tabs' })).removed && !await tabsGranted());
+}
+
+export async function tabGroupsGranted(): Promise<boolean> {
+  return (await command('permissions-get')).tabGroups;
 }
 
 export async function tabsGranted(): Promise<boolean> {

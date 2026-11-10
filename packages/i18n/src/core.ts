@@ -18,7 +18,7 @@ export function translator(locale: unknown) {
 }
 export function renderMessage(locale: unknown, value: TextMessage) { return translator(locale)(value.key, value.values); }
 /** The one short date and time: 10月20日 22:00 / Oct 20, 22:00, with the year only when it is not this year. */
-function shortDateTime(date: Date, locale: Locale, now: number) {
+export function shortDateTime(date: Date, locale: Locale, now = Date.now()) {
   return new Intl.DateTimeFormat(locale, { ...(date.getFullYear() === new Date(now).getFullYear() ? {} : { year: 'numeric' }), month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
 }
 /** A list clock: today as 24 hour time, earlier days as the short date and time. */
@@ -85,4 +85,9 @@ export function errorMessage(error: unknown): TextMessage {
     if (isPlainErrorCode(code)) return message(`extension.errors.${code}`);
   }
   return message('common.error');
+}
+
+/** What a failed action shows: the error's own text when it is one of ours, else `fallback` for that action. */
+export function failureText(error: unknown, fallback = 'common.error'): TextMessage {
+  return error instanceof Error ? errorMessage(error) : message(fallback);
 }

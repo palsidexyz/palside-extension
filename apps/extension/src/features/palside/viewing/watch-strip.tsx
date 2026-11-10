@@ -1,9 +1,9 @@
 'use client';
 import { Spinner } from '@palside/ui/spinner';
-import { errorMessage, message as uiMessage } from '@palside/i18n';
+import { message as uiMessage,failureText } from '@palside/i18n';
 
 import { useTranslations } from 'use-intl';
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
 import { ArrowUpRight, ChevronDown, Copy } from 'lucide-react';
 import { motionPresets } from '@palside/design/motion';
@@ -11,9 +11,10 @@ import { Tooltip } from '@palside/ui/tooltip';
 import { Popover, PopoverTrigger, PopoverContent, usePopoverContext } from '@palside/ui/popover';
 import { shortAddress } from '@palside/shared/navigation';
 import { PersonAvatar, Token } from '../ui/primitives';
-import { captureSocialUi } from '../annotations/social-state';
-import { PokeRow, type TopCard } from '../annotations/reminders';
+import { captureSocialUi, useSocialUi } from '../annotations/social-state';
+import type { TopCard } from '../annotations/reminders';
 import type { Person } from '../../../domain/account/model';
+import type { Viewing } from '../../../domain/assets/model';
 import { ChainLogo } from '../assets/chain-identity';
 import { SiteLogo } from '../assets/site-logo';
 import { siteAt } from '../settings/site-catalog';
@@ -22,12 +23,26 @@ import { openRoom, roomKeyFor, roomsOn } from '../rooms/rooms';
 import { overtake, placeSlots, rankedKeys, sourceLabel, stickyFaces, watchGroups, type WatchGroup, type WatchSlot, type WatchSource } from './watch-groups';
 import type { PalsideController } from '../app/use-palside';
 import s from './watch-strip.module.css';
-import { TokenName,tokenLabel,tokenWaiting } from '../assets/token-name';
+import { NamePending,TokenName,tokenLabel,tokenWaiting } from '../assets/token-name';
 import { liveView } from '../assets/token-data';
+import { displayHost } from '../../../domain/assets/site-host';
 
-/** A website's domain as people say it: the host without www. */
-function siteDomain(input: string) {
-  try { return new URL(input).hostname.replace(/^www\./, ''); } catch { return undefined; }
+/** How long a shared page may stay without its title or icon before its domain and first letter stand in. */
+const PAGE_WAIT_MS = 6000;
+
+/** What a shared page is still waiting for: both arrive just after the address, and the sender republishes them in place. */
+function usePageWaiting(view: Viewing) {
+  const website = view.kind === 'website';
+  const untitled = website && view.disclosure === 'page' && displayHost(view.url) === view.name.replace(/^www\./, '');
+  const missing = untitled || website && !view.logo;
+  const [gaveUp, setGaveUp] = useState<string>();
+  useEffect(() => {
+    if (!missing) return;
+    const timer = setTimeout(() => setGaveUp(view.url), PAGE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [missing, view.url]);
+  const waiting = gaveUp !== view.url;
+  return { title: untitled && waiting, face: website && !view.logo && waiting };
 }
 
 function linkHint(input: string, home: string) {
@@ -35,14 +50,15 @@ function linkHint(input: string, home: string) {
   return `${url.host}\n${url.pathname === '/' && !url.search && !url.hash ? home : `${url.pathname}${url.search}${url.hash}`}`;
 }
 
-type WatchChipProps = { group: WatchGroup; c: PalsideController; onMenu: (open: boolean) => void; onOpenPage?: (url: string) => void; merges: string[]; pop: string[]; listed?: boolean };
+type WatchChipProps = { group: WatchGroup; c: PalsideController; onMenu: (open: boolean) => void; onOpenPage?: (url: string) => void; merges: string[]; pop: string[]; listed?: boolean; followed?: string };
 
 function WatchChip(props: WatchChipProps) {
   return <Popover boundarySelector="[data-palside-app]" align="start"><WatchChipContent {...props} /></Popover>;
 }
 
-function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop, listed }: WatchChipProps) {
+function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop, listed, followed }: WatchChipProps) {
   const t = useTranslations();
+  const followPaused = Boolean(useSocialUi().follow?.paused);
   const present = useIsPresent(); const reduced = useReducedMotion();
   const { anchorRef, layerRef, close } = usePopoverContext();
   const [menu, setMenu] = useState<WatchSource[] | null>(null);
@@ -54,20 +70,15 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop, listed }:
   const multiple = group.sources.length > 1;
   const single = group.sources[0];
   // Under the name: a token's source site, a website's own domain — so the two read apart before they are opened.
-  const caption = multiple ? <CountText text={t('extension.dynamic.sourceCount', { count: group.sources.length })} value={group.sources.length} /> : group.view.kind === 'asset' ? single?.view.source : single && siteDomain(single.url);
+  // A site outside the catalog is named by its domain: one line, never the domain twice.
+  const pageWaiting = usePageWaiting(group.view);
+  const sameName = !pageWaiting.title && !multiple && group.view.kind === 'website' && Boolean(single) && displayHost(single!.url) === group.view.name.replace(/^www\./, '');
+  const caption = sameName ? undefined : multiple ? <CountText text={t('extension.dynamic.sourceCount', { count: group.sources.length })} value={group.sources.length} /> : group.view.kind === 'asset' ? single?.view.source : single && displayHost(single.url);
   useEffect(() => { if (!present) { const focused = menuOpen.current || layerRef.current?.contains(document.activeElement) || anchorRef.current === document.activeElement; close(false); onMenu(false); if (focused) anchorRef.current?.closest('[data-palside-app]')?.querySelector<HTMLTextAreaElement>('[data-message-input]')?.focus({ preventScroll: true }); } }, [present, close, onMenu, layerRef, anchorRef]);
   useEffect(() => () => { if (menuOpen.current) owner.current?.querySelector<HTMLTextAreaElement>('[data-message-input]')?.focus({ preventScroll: true }); onMenu(false); }, [onMenu]);
   // The place took another page: the old page's source menu closes with it.
   const shownKey = useRef(group.key);
   useEffect(() => { if (shownKey.current === group.key) return; shownKey.current = group.key; close(false); setMenu(null); }, [group.key, close]);
-  // The content rolls in place; the chip's width follows it instead of jumping.
-  const wrap = useRef<HTMLDivElement>(null); const measured = useRef<{ key: string; width: number } | undefined>(undefined);
-  useLayoutEffect(() => {
-    const el = wrap.current; if (!el) return;
-    const width = el.getBoundingClientRect().width; const last = measured.current;
-    if (last && last.key !== group.key && !reduced && Math.abs(last.width - width) > .5) el.animate?.([{ width: `${last.width}px` }, { width: `${width}px` }], { duration: 300, easing: 'cubic-bezier(.22,1,.36,1)' });
-    measured.current = { key: group.key, width };
-  });
   async function open(url: string) {
     if (openingRequest.current || !present) return;
     const session = captureSocialUi();
@@ -77,7 +88,7 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop, listed }:
       else if (c.live) await c.live.openPage(url);
       else window.open(url, '_blank', 'noopener,noreferrer');
       if (session.current()) close();
-    } catch (error) { if (session.current()) c.setNotice(error instanceof Error ? errorMessage(error) : uiMessage('extension.copy.openPageFailed')); }
+    } catch (error) { if (session.current()) c.setNotice(failureText(error, 'extension.copy.openPageFailed')); }
     finally { openingRequest.current = false; setOpening(undefined); }
   }
   function activate() {
@@ -91,28 +102,30 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop, listed }:
   }
   // A token chip has two targets: its name opens the token's 弹幕, the source line under it opens the page.
   const room = roomsOn(c) && group.view.kind === 'asset' ? roomKeyFor(group.view) : undefined;
-  const viewName = tokenLabel(group.view, t);
+  const viewName = tokenLabel(group.view, t, c);
   const roomLabel = t('extension.room.tab', { name: viewName });
   const sourceHint = multiple ? t('extension.copy.selectSource') : t('extension.dynamic.openSource', { name: (single?.view.source ?? t('extension.copy.sourcePage')) ?? '' });
   const press = { onPointerDown: () => { pressed.current = signature; }, onPointerCancel: () => { pressed.current = undefined; }, onKeyDown: () => { pressed.current = signature; } };
   const captionLine = <>{caption}{opening ? <Spinner size={12} className={s.loadingIcon} /> : multiple || menu ? <ChevronDown size={12} /> : <ArrowUpRight size={12} />}</>;
   const rows = menu ? [...menu.map(old => group.sources.find(source => source.key === old.key) ?? { ...old, members: [] }), ...group.sources.filter(source => !menu.some(old => old.key === source.key))] : [];
   const enter = reduced ? motionPresets.reduced : motionPresets.feedback;
-  return <motion.div initial={listed ? false : { opacity: 0, width: 0, marginRight: -6 }} animate={{ opacity: 1, width: 'auto', marginRight: 0 }} exit={{ opacity: 0, width: 0, marginRight: -6 }} transition={enter} className={s.chip} data-together={group.members.some(member => member.id === c.data.self) || undefined} aria-hidden={!present || undefined} data-watch-key={group.key}>
-    <div ref={wrap} className={s.wrap}><AnimatePresence initial={false}><ChipLayer key={group.key}>{live => <>
+  return <motion.div initial={listed ? false : { opacity: 0, flexGrow: 0, marginRight: -6 }} animate={{ opacity: 1, flexGrow: 1, marginRight: 0 }} exit={{ opacity: 0, flexGrow: 0, marginRight: -6 }} transition={enter} className={s.chip} data-together={group.members.some(member => member.id === c.data.self) || undefined} data-follow={followed && group.members.some(member => member.id === followed) || undefined} data-follow-paused={followPaused && followed && group.members.some(member => member.id === followed) || undefined} aria-hidden={!present || undefined} data-watch-key={group.key}>
+    <div className={s.wrap}><AnimatePresence initial={false}><ChipLayer key={group.key}>{live => <>
     {room ? <div className={s.target} data-split>
       <Token view={group.view} size="sm" waiting={tokenWaiting(c, group.view)} />
       <span className={s.text}>
         <Tooltip content={roomLabel}><button type="button" className={s.roomName} disabled={!present || !live} aria-label={roomLabel} onClick={() => { if (present) openRoom(c, room); }}><strong><TokenName c={c} view={group.view} /></strong></button></Tooltip>
         <Tooltip content={sourceHint}><AnchorButton type="button" className={s.sourceLine} disabled={!present || !live} aria-busy={Boolean(opening) || undefined} aria-disabled={Boolean(opening) || undefined} aria-label={opening ? t('extension.dynamic.openingPage', { name: viewName }) : multiple ? t('extension.copy.selectSource') : t('extension.room.openOn', { name: single?.view.source ?? t('extension.copy.sourcePage') })} aria-haspopup={multiple || menu ? 'dialog' : undefined} aria-expanded={multiple || menu ? Boolean(menu) : undefined} {...press} onClick={activate}>{captionLine}</AnchorButton></Tooltip>
       </span>
-    </div> : <Tooltip content={group.view.kind === 'asset' ? `${group.view.chain} · ${viewName}\n${group.view.address ? shortAddress(group.view.address) : ''}\n${sourceHint}` : multiple ? t('extension.copy.selectPage') : single ? linkHint(single.url, t('extension.copy.websiteHome')) : group.view.name}>
+    </div> : <Tooltip content={group.view.kind === 'asset' ? `${group.view.chain} · ${viewName}\n${group.view.address ? shortAddress(group.view.address) : ''}\n${sourceHint}` : multiple ? t('extension.copy.selectPage') : single ? `${sameName || pageWaiting.title ? '' : `${viewName}\n`}${linkHint(single.url, t('extension.copy.websiteHome'))}` : group.view.name}>
       <AnchorButton className={s.target} type="button" disabled={!present || !live} aria-busy={Boolean(opening) || undefined} aria-disabled={Boolean(opening) || undefined} aria-label={opening ? t('extension.dynamic.openingPage', { name: viewName }) : t('extension.dynamic.openSource', { name: viewName })} aria-haspopup={multiple || menu ? 'dialog' : undefined} aria-expanded={multiple || menu ? Boolean(menu) : undefined} {...press} onClick={activate}>
-        <Token view={group.view} size="sm" waiting={tokenWaiting(c, group.view)} /><span className={s.text}><strong><TokenName c={c} view={group.view} /></strong><small>{captionLine}</small></span>
+        <Token view={group.view} size="sm" waiting={pageWaiting.face ? 'name' : tokenWaiting(c, group.view)} />{sameName
+          ? <span className={s.text} data-one><strong><TokenName c={c} view={group.view} /></strong>{captionLine}</span>
+          : <span className={s.text}><strong>{pageWaiting.title ? <NamePending /> : <TokenName c={c} view={group.view} />}</strong><small>{captionLine}</small></span>}
       </AnchorButton>
     </Tooltip>}
     </>}</ChipLayer></AnimatePresence></div>
-    <Tooltip content={t('extension.copy.viewWatchers')}><button className={s.count} disabled={!present || Boolean(onOpenPage)} aria-label={t('extension.dynamic.viewingPeople', { name: viewName, count: (group.members.length) ?? '' })} onClick={() => { c.setMemberFilter(group.key); c.go('members'); }}><AvatarStack c={c} members={group.members} page={group.key} pop={pop} /></button></Tooltip>
+    <Tooltip content={t('extension.copy.viewWatchers')}><button className={s.count} disabled={!present || Boolean(onOpenPage)} aria-label={t('extension.dynamic.viewingPeople', { name: viewName, count: (group.members.length) ?? '' })} onClick={() => { c.setMemberFilter(group.key); c.go('members'); }}><AvatarStack c={c} members={group.members} page={group.key} pop={pop} followed={followed} /></button></Tooltip>
     {merges.map(merge => <MergeEffect key={merge} />)}
     <PopoverContent aria-label={t('extension.dynamic.sourcesFor', { name: viewName })} className={s.menu}
       onToggle={event => { if (event.target !== event.currentTarget) return; const shown = event.newState === 'open'; menuOpen.current = shown; if (shown) owner.current = anchorRef.current?.closest('[data-palside-app]') ?? null; onMenu(shown); if (!shown) setMenu(null); else layerRef.current?.focus({ preventScroll: true }); }}>
@@ -157,12 +170,12 @@ function AnchorButton({ ref: outer, ...props }: ComponentProps<'button'>) {
 /** Up to two faces — the user first when they are here too — then a +N disc for everyone else. Faces keep their places:
  *  one changes only when that person leaves (the next person fades in where they were) or the user arrives; everyone else
  *  coming and going only rolls the +N. A new page in the chip brings its own faces. */
-function AvatarStack({ c, members, page, pop }: { c: PalsideController; members: Person[]; page: string; pop: string[] }) {
+function AvatarStack({ c, members, page, pop, followed }: { c: PalsideController; members: Person[]; page: string; pop: string[]; followed?: string }) {
   const reduced = useReducedMotion();
-  const ids = members.map(member => member.id); const signature = `${page}|${ids.join(',')}`;
-  const [kept, setKept] = useState(() => ({ signature, page, faces: stickyFaces([], ids, c.data.self) }));
+  const ids = members.map(member => member.id); const signature = `${page}|${ids.join(',')}|${followed ?? ''}`;
+  const [kept, setKept] = useState(() => ({ signature, page, faces: stickyFaces([], ids, c.data.self, 2, followed) }));
   let faces = kept.faces;
-  if (kept.signature !== signature) { faces = stickyFaces(kept.page === page ? kept.faces : [], ids, c.data.self); setKept({ signature, page, faces }); }
+  if (kept.signature !== signature) { faces = stickyFaces(kept.page === page ? kept.faces : [], ids, c.data.self, 2, followed); setKept({ signature, page, faces }); }
   const shown = faces.map(id => members.find(member => member.id === id)).filter((member): member is Person => Boolean(member));
   const rest = members.length - shown.length;
   const fade = reduced ? motionPresets.reduced : { duration: .22, ease: motionPresets.feedback.ease };
@@ -171,7 +184,7 @@ function AvatarStack({ c, members, page, pop }: { c: PalsideController; members:
   return <span className={s.stack} aria-hidden="true">
     <AnimatePresence initial={false}>
       {shown.map((face, i) => <motion.span key={i} className={s.face} {...seat(i === 0)} transition={fade}>
-        <AnimatePresence initial={false}><motion.span key={face.id} className={s.faceLayer} data-self={face.id === c.data.self || undefined}
+        <AnimatePresence initial={false}><motion.span key={face.id} className={s.faceLayer} data-self={face.id === c.data.self || undefined} data-followed={face.id === followed || undefined}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={reduced ? fade : { ...fade, delay: pop.includes(face.id) ? .12 : 0 }}>
           <PersonAvatar person={face} size="xs" />
         </motion.span></AnimatePresence>
@@ -204,9 +217,9 @@ const MERGE_GAP = 3_000;
 /** A hidden page must stay this far ahead of a shown one for this long before it takes that place. */
 const OVERTAKE_AFTER = 1_500;
 
-/** The top slot under the team header: one 44px row. Usually the 在看 chips in two fixed places, each as wide as its content — the rest
- *  under a +N bar that fills the rest of the row with the hidden pages' marks; a 跟看 / 喊你来看 / connection card takes the row instead,
- *  and what it covers moves under +N. Same height either way. A place keeps its page while anyone is on it; when its page empties the
+/** The top slot under the team header: one 44px row. Usually the 在看 chips in two fixed half-row places — one chip alone keeps its half, so a
+ *  second page fills the other half without moving it — the rest under a +N square; only a connection or read-only card takes the row instead,
+ *  and what it covers moves under +N. 跟看 marks the followed teammate's chip and keeps it in a shown place. Same height either way. A place keeps its page while anyone is on it; when its page empties the
  *  next page rolls into the same place, so one person switching pages changes one chip in place. */
 export function WatchStrip({ c, onOpenPage, top }: { c: PalsideController; onOpenPage?: (url: string) => void; top?: TopCard }) {
   const t = useTranslations();
@@ -257,47 +270,53 @@ export function WatchStrip({ c, onOpenPage, top }: { c: PalsideController; onOpe
   // Two places that keep their pages; see placeSlots.
   const [places, setPlaces] = useState<{ seq: number; slots: WatchSlot[] }>(() => { let seq = 0; return { slots: placeSlots([], keys, () => ++seq), seq }; });
   let seq = places.seq; const slots = places.slots;
-  const placed = placeSlots(slots, keys, () => ++seq);
+  const follow = useSocialUi().follow;
+  const followed = follow && follow.teamId === c.current ? follow.personId : undefined;
+  const followKey = followed ? groups.find(group => group.members.some(member => member.id === followed))?.key : undefined;
+  const filledSlots = placeSlots(slots, keys, () => ++seq);
+  // The followed teammate's page is never left under +N: it rolls into the quieter place, like an overtake.
+  const quieter = filledSlots.length ? filledSlots.reduce((a, b) => (groups.find(group => group.key === b.key)?.members.length ?? 0) < (groups.find(group => group.key === a.key)?.members.length ?? 0) ? b : a) : undefined;
+  const placed = followKey && quieter && !filledSlots.some(slot => slot.key === followKey) ? filledSlots.map(slot => slot.id === quieter.id ? { ...slot, key: followKey } : slot) : filledSlots;
   if (placed.length !== slots.length || placed.some((slot, i) => slot.id !== slots[i]!.id || slot.key !== slots[i]!.key)) setPlaces({ seq, slots: placed });
   // A clearly busier hidden page takes the quieter place only after staying ahead, and never under the pointer.
-  const lead = top ? undefined : overtake(placed, groups, keys);
+  // The followed page's place is not up for an overtake.
+  const contest = (current: WatchSlot[], items: WatchGroup[], order: string[], kept?: string) => overtake(current.filter(slot => slot.key !== kept), items, order.filter(key => key !== kept));
+  const lead = top ? undefined : contest(placed, groups, keys, followKey);
   const leadSignature = lead ? `${lead.id}>${lead.key}` : '';
-  const latestKeys = useRef(keys);
-  useEffect(() => { latestKeys.current = keys; });
+  const latestKeys = useRef(keys); const latestFollow = useRef(followKey);
+  useEffect(() => { latestKeys.current = keys; latestFollow.current = followKey; });
   const held = hover || focus || menu;
   useEffect(() => {
     if (!leadSignature || held) return;
     const timeout = setTimeout(() => setPlaces(current => {
-      const now = overtake(current.slots, latest.current, latestKeys.current);
+      const now = contest(current.slots, latest.current, latestKeys.current, latestFollow.current);
       return now && `${now.id}>${now.key}` === leadSignature ? { ...current, slots: current.slots.map(slot => slot.id === now.id ? now : slot) } : current;
     }), OVERTAKE_AFTER);
     return () => clearTimeout(timeout);
   }, [leadSignature, held]);
-  const chip = (key: string, id: string | number = key, listed = false) => <WatchChip key={id} listed={listed} group={groups.find(group => group.key === key)!} c={c} onMenu={setMenu} onOpenPage={onOpenPage} merges={merges.filter(merge => merge.key === key).map(merge => merge.id)} pop={merges.filter(merge => merge.key === key).flatMap(merge => merge.joiners)} />;
+  const chip = (key: string, id: string | number = key, listed = false) => <WatchChip key={id} listed={listed} followed={followed} group={groups.find(group => group.key === key)!} c={c} onMenu={setMenu} onOpenPage={onOpenPage} merges={merges.filter(merge => merge.key === key).map(merge => merge.id)} pop={merges.filter(merge => merge.key === key).flatMap(merge => merge.joiners)} />;
   const shown = top ? [] : placed;
-  const hidden = top ? keys.filter(key => !top.person || !groups.find(group => group.key === key)!.members.some(member => member.id === top.person)) : keys.filter(key => !placed.some(slot => slot.key === key));
-  const waiting = top?.waiting ?? [];
-  const more = hidden.length + waiting.length;
+  const hidden = top ? keys : keys.filter(key => !placed.some(slot => slot.key === key));
+  const more = hidden.length;
+  // The +N list is one chip wide: its rows match the chips in the row above it. Measured as +N is pressed, before the list is placed.
+  const stripRef = useRef<HTMLDivElement>(null);
+  function fitColumn() {
+    const strip = stripRef.current; if (!strip) return;
+    const style = getComputedStyle(strip), gap = parseFloat(style.columnGap) || 0;
+    const square = strip.querySelector<HTMLElement>(`.${s.more}`)?.getBoundingClientRect().width ?? 0;
+    strip.style.setProperty('--watch-column', `${(strip.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - square - 2 * gap) / 2}px`);
+  }
   return <motion.div className={s.region} initial={false} animate={{ height: retainingSpace || filled ? 52 : 0, opacity: filled ? 1 : 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback} inert={!filled} aria-hidden={!filled || undefined}>
-  <div data-watch-strip className={s.strip} aria-label={t('extension.copy.teamViewing')} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} onFocusCapture={() => setFocus(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocus(false); }} data-reduced-motion={Boolean(reduced)}>
+  <div ref={stripRef} data-watch-strip className={s.strip} aria-label={t('extension.copy.teamViewing')} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} onFocusCapture={() => setFocus(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocus(false); }} data-reduced-motion={Boolean(reduced)}>
     {top ? <motion.div key={top.key} className={s.card} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={reduced ? motionPresets.reduced : motionPresets.feedback}>{top.card}</motion.div>
       : <AnimatePresence initial={false}>{shown.map(slot => chip(slot.key, slot.id))}</AnimatePresence>}
-    {more > 0 && <Popover boundarySelector="[data-palside-app]" align="start">
-      <PopoverTrigger asChild><button type="button" className={s.more} aria-label={t('extension.top.more', { count: more })} title={t('extension.top.more', { count: more })}>
-        {/* The rest of the row: the hidden pages' marks, overlapping, then the count at the far edge. */}
-        <span className={s.moreMarks} aria-hidden="true">{hidden.slice(0, 3).map(key => <span key={key} className={s.moreMark}><Token view={groups.find(group => group.key === key)!.view} size="xs" /></span>)}</span>
+    {more > 0 && <Popover boundarySelector="[data-palside-app]" align="end">
+      <PopoverTrigger asChild onPointerDown={fitColumn} onKeyDown={fitColumn}><button type="button" className={s.more} aria-label={t('extension.top.more', { count: more })} title={t('extension.top.more', { count: more })}>
         <b>+<Count value={more} /></b></button></PopoverTrigger>
       <PopoverContent aria-label={t('extension.top.more', { count: more })} className={s.morePopover}>
-        <MoreViewing c={c} waiting={waiting}>{hidden.map(key => chip(key, key, true))}</MoreViewing>
+        <div className={s.moreList}>{hidden.map(key => chip(key, key, true))}</div>
       </PopoverContent>
     </Popover>}
   </div></motion.div>;
 }
 
-function MoreViewing({ c, waiting, children }: { c: PalsideController; waiting: TopCard['waiting']; children: ReactNode }) {
-  const { close } = usePopoverContext();
-  return <div className={s.moreList}>
-    {waiting.map(poke => <PokeRow key={poke.id} c={c} poke={poke} onDone={close} />)}
-    {children}
-  </div>;
-}

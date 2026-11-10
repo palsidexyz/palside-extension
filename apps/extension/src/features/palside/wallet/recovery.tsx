@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'use-intl';
+import { useLocale, useTranslations } from 'use-intl';
+import { localeOrEnglish, shortDateTime } from '@palside/i18n';
 import { Button } from '@palside/ui/button';
 import type { PalsideController } from '../app/use-palside';
 import { PalsAmount } from './amount';
@@ -10,7 +11,7 @@ import s from './wallet.module.css';
 
 /** Separate paged ledger view: checking one operation never occupies the payment slot. */
 export function WalletRecoveryList({ c }: { c: PalsideController }) {
-  const t = useTranslations(), wallet = c.live?.state.wallet, command = c.live?.command;
+  const t = useTranslations(), locale = localeOrEnglish(useLocale()), wallet = c.live?.state.wallet, command = c.live?.command;
   const recovery = wallet?.recovery;
   const accountId = c.live?.state.account?.id;
   const requests = usePaymentRequest(c, c.screen);
@@ -44,7 +45,7 @@ export function WalletRecoveryList({ c }: { c: PalsideController }) {
       <div className={s.recoveryHead}><strong>{t(recordLabels[item.order.kind])}</strong><span>{t(`extension.wallet.${recoveryLabel(item)}`)}</span></div>
       <strong className={s.recoveryAmount}><PalsAmount value={item.order.amount} hidden={wallet?.preferences.hideAmounts} /></strong>
       <p className={s.mono}>{item.order.recipient}</p>
-      <time>{new Date(item.order.createdAt).toLocaleString()}</time>
+      <time>{shortDateTime(new Date(item.order.createdAt), locale)}</time>
       <p className={s.mono}>{item.order.id}</p>
       {item.relay?.fundsReserved && ['cancelled', 'expired'].includes(item.relay.state) && <p className={s.note}>{t('extension.wallet.recoveryReserved')}</p>}
       {errors[item.order.id] && <p className={s.error} role="alert">{t('extension.wallet.recoveryUnavailable')}</p>}

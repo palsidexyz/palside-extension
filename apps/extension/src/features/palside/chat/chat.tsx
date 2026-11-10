@@ -10,11 +10,14 @@ import { Count, CountText } from '../ui/motion-details';
 import { WatchStrip } from '../viewing/watch-strip';
 import { MoreTeamPayments, TeamPaymentCard, useTeamPayments } from '../wallet/team-feed';
 import { useTopCard } from '../annotations/reminders';
+import { PageHintRow, usePageHints } from '../annotations/page-hint';
+import { DRAWING_RUN, emoteRun, mergeSignalRuns } from '../../../domain/annotations/signal-runs';
 import { AwayDivider, useAway } from './away-divider';
 import { unreadMentions } from '../../../domain/chat/unread-mentions';
 import { Composer } from './composer';
 import { ReadonlyDraft } from '../feedback/readonly-draft';
 import { ChatHeader } from './chat-header';
+import { FollowBar } from '../annotations/follow-bar';
 import { panelTabsShown } from '../app/panel-tabs';
 import { MessageItem } from './message-item';
 import { NewTeam, showsNewTeam } from '../teams/new-team';
@@ -125,6 +128,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
   const input = useRef<HTMLTextAreaElement>(null);
   const top = useTopCard(c);
   const away = useAway(c);
+  const hints = usePageHints(c);
   function changeTeam(id: string) { c.chooseTeam(id); clearJump(); }
   async function send() {
     const follow = timeline.sendIntent();
@@ -150,19 +154,25 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
   const dayOf = new Map<string, string>();
   // Messages arrive in the runtime's chat order and are never re-sorted here: a pending send's written time and a confirmed
   // one's service time are not comparable, so sorting by time would move rows as they confirm.
-  const entries = interleaveTimed(c.currentMessages, payments);
+  const merged = mergeSignalRuns(interleaveTimed(c.currentMessages, [...payments, ...hints]), item => {
+    if (!('entry' in item) || !('hint' in item.entry) || item.entry.hint.kind === 'poke') return;
+    const { hint, timestamp } = item.entry;
+    return { person: hint.personId, page: hint.view?.id ?? hint.url ?? '', kind: hint.kind === 'drawing' ? DRAWING_RUN : hint.emote ? emoteRun(hint.emote) : hint.signal ?? 'attention', day: dayKey(timestamp) };
+  });
   let previous: Message | undefined;
   // Days only move forward: a pending send written just before midnight still joins the day its confirmed neighbours are in.
   let dayAt = -Infinity;
-  entries.forEach(entry => {
+  merged.forEach(({ entry, latest, counts }) => {
     const time = 'entry' in entry ? entry.entry.timestamp : entry.message.timestamp;
     const timestamp = time === undefined ? undefined : (dayAt = Math.max(dayAt, time));
-    const key = dayKey(timestamp) || 'undated';
+    // A row without a time yet (a pending send) stays in the day it is written into instead of opening another one.
+    const key = timestamp === undefined ? days.at(-1)?.key ?? 'undated' : dayKey(timestamp);
     if (days.at(-1)?.key !== key) {
       days.push({ key, label: timestamp === undefined ? t('extension.copy.today') : dayLabel(timestamp, locale, t('extension.copy.today')), items: [] });
       previous = undefined;
     }
     const day = days[days.length - 1]!;
+    if ('entry' in entry && 'hint' in entry.entry) { day.items.push(<PageHintRow key={entry.entry.id} c={c} item={'entry' in latest && 'hint' in latest.entry ? latest.entry.hint : entry.entry.hint} counts={counts} />); previous = undefined; return; }
     if ('entry' in entry) {
       day.items.push(<TeamPaymentCard key={`payment-${entry.entry.id}`} c={c} item={entry.entry} />);
       previous = undefined;
@@ -180,13 +190,15 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     if (!message.recalled || leaving.has(message.id)) previous = message;
   });
   return <div className={s.chat} hidden={c.screen !== 'chat'}><SendFlightContext value={flight}><ReactionStage c={c}>
-    {!panelTabsShown(c) && <ChatHeader c={c} onTeam={changeTeam} />}
+    {!panelTabsShown(c) && <><ChatHeader c={c} onTeam={changeTeam} /><FollowBar c={c} /></>}
     <WatchStrip key={c.current} c={c} top={top} />
     <div className={navigation.viewport}>
     <div ref={list} className={`${s.timeline} ${navigation.list}`} aria-label={t('extension.copy.chatMessages')} tabIndex={0}>
     <div ref={content} className={`${navigation.content} ${!c.currentMessages.length ? navigation.emptyContent : ''}`}>
 
       {c.currentMessages.length > 0 && c.live?.state.history?.[c.current]?.loading && <div className={s.historyStatus} role="status" aria-live="polite">{t('extension.copy.loading')}</div>}
+      {/* Without key backup a device reads only what arrived after it signed in: say so once, where the readable history begins. */}
+      {(c.scenario === 'history' || (c.live?.state.history?.[c.current]?.missingKeys ?? 0) > 0) && <div className={s.dateLabel}><span>{t('extension.copy.historyBefore')}</span></div>}
       {!c.currentMessages.length && !payments.length && <div className={s.empty}>{showsNewTeam(c)
         ? <NewTeam c={c} />
         : c.canWrite ? <NewTeam c={c} invite={false} /> : <><MessageCircle size={24} strokeWidth={1.3} /><h2>{t('extension.copy.noViewableMessages')}</h2></>}</div>}

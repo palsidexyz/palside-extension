@@ -33,14 +33,14 @@ export function ReadonlyDraft({ c }: { c: PalsideController }) {
 function KeptDraft({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const draft = c.draft;
-  if (!c.draftConflict && !draft.text && !draft.attachment && !draft.ref && !draft.replyTo) return null;
+  if (!c.draftConflict && !draft.text && !draft.attachment && !draft.replyTo) return null;
   const snapshot = assetView(draft.attachment);
   const view = snapshot && liveView(c, snapshot);
-  const copy = [draft.text, draft.ref?.caption, draft.ref?.view.url, view?.url].filter(Boolean).join('\n');
+  const copy = [draft.text, view?.url].filter(Boolean).join('\n');
   function remove() {
     const teamId = c.current;
     c.setConfirmation({ title: uiMessage('extension.copy.clearDraft'), description: uiMessage('extension.copy.clearDraftDescription'), action: uiMessage('extension.copy.clearDraft'), confirm: async () => {
-      c.updateDraft({ text: '', attachment: undefined, ref: undefined, replyTo: undefined, replyRange: undefined, mentions: [] }, teamId);
+      c.updateDraft({ text: '', attachment: undefined, replyTo: undefined, replyRange: undefined, mentions: [] }, teamId);
       try { await c.flushDraft(teamId); }
       catch (error) { c.updateDraft(draft, teamId); throw error; }
     } });
@@ -49,7 +49,6 @@ function KeptDraft({ c }: { c: PalsideController }) {
       <DraftConflict c={c} />
       <div className={s.replyDraft}><span>{t('extension.copy.readonlyDraft')}</span>{copy && <Action label={t('extension.copy.copy')} onClick={() => void c.copy(copy)}><Copy /></Action>}<Action label={t('extension.copy.clearDraft')} onClick={remove}><Trash2 /></Action></div>
       {draft.text && <div className={s.composerInput}><textarea rows={1} readOnly aria-label={t('extension.copy.readonlyDraft')} value={draft.text} /></div>}
-      {draft.ref && <div className={s.replyDraft}><span>{draft.ref.caption}</span></div>}
       {view && <AssetCard view={view} onOpen={() => c.selectAsset(view.id)} />}
       {draft.attachment?.kind === 'image' && <div className={s.imageDraft}>
         <img src={draft.attachment.src} alt={draft.attachment.name} /><span>{draft.attachment.name}</span>

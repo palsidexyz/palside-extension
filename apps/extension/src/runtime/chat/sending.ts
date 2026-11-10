@@ -11,9 +11,8 @@ import { encryptAttachment } from 'matrix-encrypt-attachment';
 import type { RoomMessageEventContent } from 'matrix-js-sdk/lib/@types/events';
 import { ApiError } from '../transport/api';
 import type { RevisionedDraft } from '../storage/storage';
-import { validateView,readView } from '../viewing/view-snapshot';
+import { validateView } from '../viewing/view-snapshot';
 import { SendLanes,SendPacer,THROTTLE_RETRIES,throttleWait } from './send-pacer';
-import { readMessageRefTarget,readRefCaption } from '../../domain/annotations/social';
 import { assetView } from '../../domain/assets/model';
 import { canSend,emptyDraft,readQuoteRange,type Draft,type Message } from '../../domain/chat/model';
 import type { Outgoing } from './outgoing';
@@ -33,6 +32,11 @@ export class SendingRuntime {
   readonly pacer = new SendPacer();
   queued = new Map<string, { teamId: string; at: number }>();
   readonly lanes = new SendLanes();
+  /** Forget everything learned under the previous device session. */
+  reset() {
+    this.outgoing.clear(); this.sendRequests.clear(); this.inFlight.clear(); this.editOriginals.clear();
+    this.pacer.clear(); this.queued.clear();
+  }
   async send(message: Message, revision: number): Promise<unknown> {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
@@ -109,12 +113,6 @@ export class SendingRuntime {
     const eligibility = teamSendGuard(runtime, team.id);
     const people = liveMembers(team);
     message = this.outgoing.get(message.id)?.message ?? message;
-    if (message.ref) {
-      const target = readMessageRefTarget(message.ref.target); const caption = readRefCaption(message.ref.caption, target); const view = await scope.wait(readView(message.ref.view));
-      guard();
-      if (!target || !caption || !view || view.kind === 'website' && view.disclosure !== 'page') throw new MessageError(uiMessage('extension.runtime.tokenIdentityUnknown'));
-      message = { ...message, ref: { target, caption, view } };
-    }
     if (message.attachment?.kind === 'asset' && !validateView(assetView(message.attachment))) throw new MessageError(uiMessage('extension.runtime.removeInvalidToken'));
     if (!canSend(message)) throw new MessageError(uiMessage('extension.runtime.messageRequired'));
     await scope.wait(requireEncryptedSend(client, team.roomId, people, guard));
@@ -137,11 +135,10 @@ export class SendingRuntime {
       }
       if (packet.createdAt + DAY <= Date.now()) throw new MessageError(uiMessage('extension.runtime.outgoingExpired'));
       message = packet.message;
-      if (message.ref) runtime.cache.upsertView(message.ref.view);
       runtime.state.data.messages = orderMessages([...runtime.state.data.messages.filter(m => m.id !== message.id), { ...message, failure: undefined, status: 'sending' }]); runtime.emit();
       await scope.wait(this.releaseDraft(session, team.id, packet.draftRevision ?? revision)); guard();
       const mentions = liveMembers(team).filter(p => message.mentionIds?.includes(p.id)).map(p => p.matrixId);
-      const content: RoomMessageEventContent & Record<string, unknown> = { 'm.mentions': { user_ids: mentions }, msgtype: MsgType.Text, body: message.text, 'com.palside.asset': packet.asset, ...(message.ref ? { 'com.palside.ref': message.ref } : {}), ...(message.replyTo ? { 'm.relates_to': { 'm.in_reply_to': { event_id: message.replyTo } }, ...(message.replyRange ? { 'com.palside.reply_range': message.replyRange } : {}) } : {}) };
+      const content: RoomMessageEventContent & Record<string, unknown> = { 'm.mentions': { user_ids: mentions }, msgtype: MsgType.Text, body: message.text, 'com.palside.asset': packet.asset, ...(message.replyTo ? { 'm.relates_to': { 'm.in_reply_to': { event_id: message.replyTo } }, ...(message.replyRange ? { 'com.palside.reply_range': message.replyRange } : {}) } : {}) };
       if (message.attachment?.kind === 'image') {
         const blob = await scope.wait((await scope.wait(fetch(message.attachment.src))).blob());
         if (blob.size > IMAGE_LIMIT.maxBytes || !IMAGE_MIME_TYPES.some(type => type === blob.type)) throw new MessageError(uiMessage('extension.runtime.imageSizeLimit'));

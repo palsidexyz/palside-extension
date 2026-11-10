@@ -1,6 +1,6 @@
 import { errorMessage,message as uiMessage } from '@palside/i18n';
 import { requestSitesAccess,revokeAllSitesKeepingHosts,revokeSiteAccess } from '../../../runtime/browser/permissions';
-import { emptyFavorites,readFavorites,readSiteInteractions,siteInteraction,type Favorites,type SiteInteraction } from '../../../domain/annotations/interaction';
+import { emptyFavorites,readFavorites,readSiteInteractions,siteInteraction,withSiteInteraction,type Favorites,type SiteInteraction } from '../../../domain/annotations/interaction';
 import type { PanelState } from '../app/use-panel-state';
 import type { PanelActions } from '../app/panel-actions';
 export function createLivePageActions(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'setSite' | 'setFavorites' | 'toggle' | 'enableSites' | 'removeSite'> {
@@ -12,7 +12,7 @@ function setSite(host: string, patch: Partial<SiteInteraction>) {
 
     return preferences.update('siteInteraction', old => {
         const sites = readSiteInteractions(old) ?? {};
-        return { ...sites, [host]: { ...siteInteraction(sites, host), ...patch } };
+        return withSiteInteraction(sites, host, { ...siteInteraction(sites, host), ...patch });
     }) ?? Promise.resolve();
 }
 

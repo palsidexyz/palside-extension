@@ -49,6 +49,7 @@ function chat(messages, payments = [], overrides = {}) {
   const { SendFlights } = productionModules(timers)(`${base}send-flight.ts`);
   const flights = new SendFlights();
   const { interleaveTimed } = productionModules(timers)('apps/extension/src/domain/chat/order.ts');
+  const { mergeSignalRuns } = productionModules(timers)('apps/extension/src/domain/annotations/signal-runs.ts');
   const input = { closest: () => ({}), checkVisibility: () => false };
   let refs = 0;
   const context = {
@@ -57,10 +58,10 @@ function chat(messages, payments = [], overrides = {}) {
     useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}],
     useMemo: fn => fn(), useCallback: fn => fn, useLayoutEffect() {}, useEffect() {},
     useChatTimeline: () => ({ sendIntent: () => () => false }), unreadMentions: () => [],
-    useTopCard: () => undefined, useAway: () => ({}), showsNewTeam: () => false, panelTabsShown: () => false, NewTeam: 'NewTeam', SendFlights: function () { return flights; },
-    captureComposer: () => ({}), interleaveTimed, MINUTE_MS: 60 * 1000,
+    useTopCard: () => undefined, usePageHints: () => [], useAway: () => ({}), showsNewTeam: () => false, panelTabsShown: () => false, NewTeam: 'NewTeam', SendFlights: function () { return flights; },
+    captureComposer: () => ({}), interleaveTimed, mergeSignalRuns, MINUTE_MS: 60 * 1000,
     s: new Proxy({}, { get: (_, key) => key }), navigation: {},
-    ...Object.fromEntries(['MessageItem', 'TeamPaymentCard', 'SendFlightContext', 'ReactionStage', 'ChatHeader', 'WatchStrip', 'MoreTeamPayments', 'AnimatePresence', 'FloatingDate', 'Composer', 'ReadonlyDraft'].map(name => [name, name])),
+    ...Object.fromEntries(['MessageItem', 'TeamPaymentCard', 'PageHintRow', 'SendFlightContext', 'ReactionStage', 'ChatHeader', 'FollowBar', 'WatchStrip', 'MoreTeamPayments', 'AnimatePresence', 'FloatingDate', 'Composer', 'ReadonlyDraft'].map(name => [name, name])),
     ...overrides,
   };
   const Chat = execute(declarations('chat.tsx', ['groupWindow', 'continues', 'dayKey', 'dayLabel', 'Chat']), 'Chat', context);

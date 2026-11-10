@@ -6,6 +6,8 @@ import { danmakuAreaRect,createMediaClock,pruneDanmaku,activeDanmaku,removeDanma
 import type { DanmakuAreaRect,Flight } from './danmaku-helpers';
 import type { OverlayHost } from './overlay-host';
 import { face } from './overlay-host';
+
+const SVG = 'http://www.w3.org/2000/svg';
 export function measureDanmakuArea(area: DanmakuSettings['area'] = 25): DanmakuAreaRect {
   return danmakuAreaRect(innerWidth, innerHeight, area);
 }
@@ -38,6 +40,8 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     if (value.packets.length) { const button = document.createElement('button'); button.className = 'room-packet'; button.textContent = context.labels.packet || ''; button.addEventListener('click', open); paymentsArea.append(button); }
   }
   const arrivals = new Map<string, number>();
+  /** Replayed lines the screen has no room for yet; they fly as lines finish. A full screen simply skips live lines. */
+  let waiting: PageDanmaku[] = [];
   const renders = new Map<() => HTMLElement, string>();
   let areaFrame: number | undefined;
   function relativeTime(data: PageDanmaku) {
@@ -45,6 +49,17 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     const minutes = Math.round((data.timestamp - Date.now()) / MINUTE_MS);
     const format = new Intl.RelativeTimeFormat(context.labels.locale, { numeric: 'auto' });
     return Math.abs(minutes) < 60 ? format.format(minutes, 'minute') : format.format(Math.round(minutes / 60), 'hour');
+  }
+
+  /** A line's 点赞: lucide's thumbs-up and the count, after the text in the line's own ink. */
+  function likesMark(count: number) {
+    const mark = document.createElement('span');
+    mark.className = 'dm-likes';
+    const svg = document.createElementNS(SVG, 'svg');
+    for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(name, value);
+    for (const d of ['M7 10v12', 'M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z']) { const path = document.createElementNS(SVG, 'path'); path.setAttribute('d', d); svg.append(path); }
+    mark.append(svg, String(count));
+    return mark;
   }
 
   /** Text only, as on video sites; who said it waits for hover. Teammates are tinted and your own line is framed. */
@@ -58,6 +73,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     if (data.self) element.dataset.self = '';
     else if (data.mate) element.dataset.mate = '';
     element.textContent = data.text;
+    if (data.likes) element.append(likesMark(data.likes));
     element.addEventListener('click', event => { if (event.isTrusted === false) return; send({ type: 'open-room', key: data.key }); });
     return element;
   }
@@ -102,7 +118,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     hideCard();
   }
   function resumeDanmaku() {
-    if (danmakuSettings.enabled && !context.picking && !context.reducedMotion) media.play();
+    if (danmakuSettings.enabled && !context.reducedMotion) media.play();
   }
 
   function danmakuComment(data: PageDanmaku, time: number) {
@@ -131,6 +147,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     removeDanmaku(danmaku, flight => Boolean(flight.render && removed.has(renders.get(flight.render)!)));
     for (const [render, id] of renders) if (removed.has(id)) renders.delete(render);
     for (const element of staticArea.querySelectorAll<HTMLElement>('[data-id]')) if (removed.has(element.dataset.id!)) element.remove();
+    waiting = waiting.filter(item => !removed.has(item.id));
     if (hovered && !hovered.element.isConnected) release();
   }
   function trimFlights() {
@@ -150,16 +167,20 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
       if (arrivals.has(item.id)) continue;
       arrivals.set(item.id, now + MINUTE_MS);
       if (arrivals.size > 256) arrivals.delete(arrivals.keys().next().value!);
-      if ((context.reducedMotion ? staticArea.childElementCount : activeDanmaku(danmaku).length) >= danmakuLimits[danmakuSettings.density]) continue;
-      if (context.reducedMotion) {
-        const element = line(item);
-        element.addEventListener('mouseenter', event => { if (event.isTrusted === false) return; release(); hovered = { element, last: performance.now(), frame: 0 }; showCard(element, item); });
-        element.addEventListener('mouseleave', event => { if (event.isTrusted === false) return; if (hovered?.element === element) release(); });
-        staticArea.append(element);
-        later(() => element.remove(), 5_000);
-      } else { const comment = danmakuComment(item, media.currentTime); renders.set(comment.render, item.id); danmaku.emit(comment); }
+      if (!screenFull()) fly(item);
+      else if (item.replay) waiting.push(item);
     }
     resumeDanmaku();
+  }
+  const screenFull = () => (context.reducedMotion ? staticArea.childElementCount : activeDanmaku(danmaku).length) >= danmakuLimits[danmakuSettings.density];
+  function fly(item: PageDanmaku) {
+    if (context.reducedMotion) {
+      const element = line(item);
+      element.addEventListener('mouseenter', event => { if (event.isTrusted === false) return; release(); hovered = { element, last: performance.now(), frame: 0 }; showCard(element, item); });
+      element.addEventListener('mouseleave', event => { if (event.isTrusted === false) return; if (hovered?.element === element) release(); });
+      staticArea.append(element);
+      later(() => element.remove(), 5_000);
+    } else { const comment = danmakuComment(item, media.currentTime); renders.set(comment.render, item.id); danmaku.emit(comment); }
   }
 
   function syncMotion() {
@@ -172,6 +193,7 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     danmaku.comments.length = 0;
     danmaku._.position = 0;
     renders.clear();
+    waiting = [];
     staticArea.replaceChildren();
     if (context.reducedMotion) media.pause();
     else resumeDanmaku();
@@ -182,6 +204,9 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     pruneDanmaku(danmaku, cutoff);
     trimFlights();
     for (const [id, expiry] of arrivals) if (expiry <= Date.now()) arrivals.delete(id);
+    if (waiting.length && !screenFull() && danmakuSettings.enabled) { fly(waiting.shift()!); resumeDanmaku(); }
+    // Nothing left to draw: the frame loops stop until the next line.
+    else if (!waiting.length && !hovered && !activeDanmaku(danmaku).length) media.pause();
   }, SECOND_MS);
 
   function syncDanmakuArea() {
@@ -221,21 +246,17 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
         danmaku.hide();
         danmaku.comments.length = 0; danmaku._.position = 0;
         staticArea.replaceChildren();
-      paymentsArea.replaceChildren();
+        paymentsArea.replaceChildren();
         renders.clear();
+        waiting = [];
       }
       syncDanmakuArea();
-    },
-    setPicking(on: boolean) {
-      context.picking = on;
-      danmakuArea.style.visibility = on ? 'hidden' : '';
-      staticArea.style.visibility = on ? 'hidden' : '';
-      if (on) { release(); media.pause(); } else resumeDanmaku();
     },
     update: enqueue, remove: removeFlights, updatePayments,
     clear() {
       renders.clear();
       arrivals.clear();
+      waiting = [];
       release();
       danmaku.comments.length = 0;
       danmaku._.position = 0;

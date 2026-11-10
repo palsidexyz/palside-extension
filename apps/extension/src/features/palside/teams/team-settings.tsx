@@ -2,7 +2,7 @@
 import { LevelChip } from './team-level';
 import type { TeamRetentionDays } from '@palside/shared/contracts/team-model';
 
-import { errorMessage, message as uiMessage } from '@palside/i18n';
+import { message as uiMessage,failureText } from '@palside/i18n';
 import { useRef, useState } from 'react';
 import { useTranslations } from 'use-intl';
 import { ArrowRightLeft, Bell, ChevronRight, Clock, LogOut, Trash2, Users, UserPlus } from 'lucide-react';
@@ -49,7 +49,7 @@ export function TeamSettings({ c }: { c: PalsideController }) {
       }
     };
     if (isShorterRetention(days, retention)) c.setConfirmation({ title: uiMessage('extension.copy.retentionShorterTitle'), description: uiMessage('extension.dynamic.retentionShorterDescription', { period: text(retentionPeriod(days)) }), confirm: apply });
-    else void apply().catch(error => c.setConfirmation({ title: uiMessage('common.error'), description: error instanceof Error ? errorMessage(error) : uiMessage('common.error'), action: uiMessage('common.retry'), confirm: apply }));
+    else void apply().catch(error => c.setConfirmation({ title: uiMessage('common.error'), description: failureText(error), action: uiMessage('common.retry'), confirm: apply }));
   }
   const members = () => { c.setMemberFilter(undefined); c.go('members'); };
   const dissolve = () => c.setConfirmation({ title: uiMessage('extension.copy.dissolveTitle'), description: uiMessage('extension.copy.dissolveDescription'), action: uiMessage('extension.copy.dissolveTeam'), danger: true, confirm: () => { const { current, team } = c; const done = () => c.exitTeam(current, uiMessage('extension.start.dissolvedNotice', { name: team.name })); if (c.live) return c.live.command('dissolve', { teamId: current }).then(done); c.setTeams(old => old.map(item => item.id === current ? { ...item, joined: false, readonly: true, readonlyReason: 'dissolved', published: false } : item)); done(); } });

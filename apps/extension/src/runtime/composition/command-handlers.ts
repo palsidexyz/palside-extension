@@ -12,9 +12,10 @@ export async function diagnosticsCommand(this: RuntimeCommands) {
       return {
         connection: { networkOnline, service, messaging, retrying },
         sync: runtime.auth.client?.getSyncState() ?? null,
-        sseOpen: runtime.auth.sseOpen,
+        liveOpen: runtime.auth.liveOpen,
         teams: runtime.state.remoteTeams.filter(team => team.joined).length,
         errors: runtime.diagnosticErrors.snapshot(),
+        latency: runtime.diagnosticLatency?.snapshot() ?? {},
       } satisfies RuntimeDiagnostics;
 }
 

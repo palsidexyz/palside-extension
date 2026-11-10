@@ -11,7 +11,6 @@ import { Tooltip } from '@palside/ui/tooltip';
 import { personFor } from '../../../domain/account/model';
 import { relatedMessages, viewingKey, type Viewing } from '../../../domain/assets/model';
 import { firstSharer, viewAsset } from '../../../domain/annotations/social';
-import { Writer, visibleStickies } from '../annotations/sticky-list';
 import { setSocialUi } from '../annotations/social-state';
 import { isFavoritePage, toggleFavoritePage } from '../favorites/favorites';
 import { DanmakuIcon } from '../ui/icons';
@@ -19,10 +18,9 @@ import { Action, PersonAvatar, Token } from '../ui/primitives';
 import { SiteLogo } from './site-logo';
 import { siteAt, type Site } from '../settings/site-catalog';
 import { Faces } from '../rooms/danmaku-view';
-import { StancePoll } from '../rooms/stance-poll';
 import { pageIssue } from '../feedback/session-notice';
 import { openRoom, openTokenSite, roomKeyFor, roomView, roomsOn, tokenSiteChoice, useRoomRead } from '../rooms/rooms';
-import { pageScopeUrl } from '../../../domain/annotations/interaction';
+import { samePage } from '../../../domain/annotations/interaction';
 import type { PalsideController } from '../app/use-palside';
 import s from './asset-discussion.module.css';
 import { TokenName } from './token-name';
@@ -65,7 +63,7 @@ export function AssetHeaderActions({ c, asset }: { c: PalsideController; asset: 
 
 /**
  * 详情: identity on one line with who is watching, one row of equal actions, then a rule — above it what you can do, below it what
- * people say: the token's 看法 and the current team's 聊天 and 便利贴.
+ * people say: the current team's 聊天.
  */
 export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; asset: Viewing; onJump: (id: string) => void }) {
   const t = useTranslations();
@@ -73,7 +71,7 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
   const live = c.live, page = live?.page;
   const { roomKey, summary, participantSite, sources, view } = detailView(c, asset);
   const read = useRoomRead(c, 'summary', roomKey);
-  const current = Boolean(page?.url && (pageScopeUrl(page.url) === pageScopeUrl(asset.url) || key && page.asset === key));
+  const current = Boolean(page?.url && (samePage(page.url, asset.url) || key && page.asset === key));
   const site = siteAt(c, view.url, view.kind === 'website' ? view.logo : undefined);
   const [sharing, setSharing] = useState(false);
   const latest = useRef(c);
@@ -93,12 +91,12 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
   }
   // Tokens list every site that can show them, default first; other pages keep the sources seen for them.
   const choice = tokenSiteChoice(c, view, participantSite);
-  const here = (url: string) => Boolean(current && pageScopeUrl(url) === pageScopeUrl(page?.url));
+  const here = (url: string) => Boolean(current && samePage(url, page?.url));
   const targets: OpenTarget[] = choice.site
     ? [choice.site, ...choice.sites.filter(site => site.id !== choice.site!.id)].filter(site => !here(site.url)).map(site => ({ key: site.id, name: site.name, site, go: () => openTokenSite(c, site) }))
     : choice.sites.length ? [] : sources.filter(source => !here(source.url)).map(source => { const site = siteAt(c, source.url, source.kind === 'website' ? source.logo : undefined); return { key: source.url, name: site?.name ?? source.source, site, go: () => open(source) }; });
   const acts = Boolean(roomKey || c.canWrite || targets.length);
-  // Who is watching and the 看法 shares are live: without the service they are not shown at all rather than shown stale.
+  // Who is watching is live: without the service they are not shown at all rather than shown stale.
   const reachable = !pageIssue(c, 'service');
   return <div className={s.detail}>
     <header className={s.identity}>
@@ -117,7 +115,6 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
       <OpenAction targets={targets} />
     </div>}
     {reachable && roomKey && read.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback>}
-    {reachable && roomKey && summary && <StancePoll c={c} roomKey={roomKey} stance={summary.stance} />}
     {live && c.team.joined && <TeamRecords c={c} asset={view} onJump={onJump} />}
   </div>;
 }
@@ -138,7 +135,7 @@ function OpenAction({ targets }: { targets: OpenTarget[] }) {
   </Menu>;
 }
 
-/** 聊天 or 便利贴 about this page, two rows until 全部 N; a group with nothing in it is not shown. */
+/** 聊天 about this page, two rows until 全部 N; a group with nothing in it is not shown. */
 function RecordGroup({ title, rows }: { title: string; rows: ReactNode[] }) {
   const t = useTranslations();
   const [all, setAll] = useState(false);
@@ -149,23 +146,20 @@ function RecordGroup({ title, rows }: { title: string; rows: ReactNode[] }) {
   </div>;
 }
 
-/** The current team: its name beside who shared first, what was said, its 便利贴, and a note for the whole token. */
+/** The current team: its name beside who shared first, and what was said. */
 function TeamRecords({ c, asset, onJump }: { c: PalsideController; asset: Viewing; onJump: (id: string) => void }) {
   const t = useTranslations();
   const locale = useLocale();
   const key = viewAsset(asset);
   const first = key ? firstSharer(c.currentMessages, key) : undefined;
   const said = key ? [...relatedMessages(c.currentMessages, asset.id, c.data.views)].reverse().filter(message => message.id !== first?.id) : [];
-  const notes = visibleStickies(c, key ?? { url: asset.url }).filter(item => !(c.live?.state.preferences.hiddenStickies ?? []).includes(item.id)).sort((a, b) => b.timestamp - a.timestamp);
   const name = (id: string) => id === c.data.self ? t('extension.page.you') : personFor(c.people, id, t('common.member')).name;
   const row = (id: string, author: string, text: string, at: number, onClick: () => void) => <button key={id} type="button" className={s.recordRow} onClick={onClick}><PersonAvatar person={personFor(c.people, author, t('common.member'))} size="xs" /><span><b>{name(author)}</b>{text}</span><time>{relativeTime(at, locale, c.now)}</time></button>;
   return <section className={s.team} aria-label={t('extension.discussion.team')}>
     <h3 className={s.teamHead}><span>{c.team.name}</span>
       {first ? <span className={s.first}><PersonAvatar person={personFor(c.people, first.author, t('common.member'))} size="xs" /><span>{t.rich('extension.discussion.firstShared', { name: name(first.author), b: chunks => <b>{chunks}</b> })} · {relativeTime(first.timestamp ?? c.now, locale, c.now)}</span></span>
-        : !said.length && !notes.length && <span className={s.first}><span>{t('extension.discussion.noDiscussion')}</span></span>}
+        : !said.length && <span className={s.first}><span>{t('extension.discussion.noDiscussion')}</span></span>}
     </h3>
     <RecordGroup title={t('extension.discussion.chat')} rows={said.map(message => row(message.id, message.author, message.text || t('extension.copy.tokenQuote'), message.timestamp ?? c.now, () => onJump(message.id)))} />
-    <RecordGroup title={t('extension.web.sticky')} rows={notes.map(note => row(note.id, note.author, note.text, note.timestamp, () => setSocialUi({ stickies: key ? { asset: key, focus: note.id } : { url: asset.url, focus: note.id } })))} />
-    {key && c.canWrite && <Writer c={c} asset={key} className={s.writer} />}
   </section>;
 }

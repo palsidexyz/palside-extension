@@ -1,0 +1,13 @@
+/* 切换链: the chain chip of a token card with a ⌄, the same 16px tag as the card's chain; its menu lists the chains. */
+.trigger { display:inline-flex; flex:none; align-items:center; gap:2px; height:18px; padding:0 3px 0 6px; border:0; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-caption); font-weight:600; line-height:18px; white-space:nowrap; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
+.trigger svg { color:var(--ui-text-secondary); }
+.trigger:hover, .trigger[aria-expanded=true] { background:var(--ui-control-hover); }
+.trigger:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.menu { --popover-width:240px; padding:6px; }
+.head { padding:6px 10px 4px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; }
+.option { display:flex; flex:1; align-items:center; gap:6px; min-width:0; }
+.chain { flex:none; }
+.name { min-width:0; overflow:hidden; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); text-overflow:ellipsis; white-space:nowrap; }
+.count { flex:none; margin-left:auto; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-variant-numeric:tabular-nums; }
+.option svg { flex:none; margin-left:auto; color:var(--ui-text-primary); }
+.count + svg { margin-left:4px; }

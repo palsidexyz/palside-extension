@@ -14,6 +14,7 @@ import { READ_FLUSH_DELAY,text } from '../composition/state';
 import type { RuntimeCommands } from '../composition/dispatch';
 import type { HandlerRegistry } from '../composition/handler-registry';
 import { liveMembers } from '../../domain/teams/model.ts';
+import { keptMentions } from '../../domain/chat/mentions.ts';
 
 export async function externalShareCommand(this: RuntimeCommands, command: Extract<Command, { name: "external-share" }>) {
  const p = command.payload ?? {};
@@ -122,7 +123,7 @@ export async function draftCommand(this: RuntimeCommands, command: Extract<Comma
 
       if (p.accountId !== id) throw new MessageError(uiMessage('extension.runtime.draftAccountChanged'));
       const patch = { ...(p.patch as Partial<Draft>) };
-      if (patch.attachment === null) patch.attachment = undefined; if (patch.replyTo === null) patch.replyTo = undefined; if (patch.ref === null) patch.ref = undefined;
+      if (patch.attachment === null) patch.attachment = undefined; if (patch.replyTo === null) patch.replyTo = undefined;
       if (patch.automaticCard === null) patch.automaticCard = undefined;
       // A quote range only means something with its reply: it is cleared with the reply and checked like wire input.
       if ('replyRange' in patch) patch.replyRange = readQuoteRange(patch.replyRange);
@@ -181,7 +182,10 @@ export async function editCommand(this: RuntimeCommands, command: Extract<Comman
       await scope.wait(client.decryptEventIfNeeded(source)); check();
       if (source.isDecryptionFailure()) throw new MessageError(uiMessage('extension.runtime.messageNotDecrypted'));
       const originalContent = source.getOriginalContent();
-      const newContent = { ...originalContent, msgtype: originalContent.msgtype ?? MsgType.Text, body: originalContent.msgtype === 'm.image' ? originalContent.body : text(p.text), 'com.palside.caption': originalContent.msgtype === 'm.image' ? text(p.text) : undefined, 'm.mentions': { user_ids: [] } };
+      // 方案 A: the original mentions still written as @name stay (with their reminder); removed ones go; an edit adds none.
+      const kept = keptMentions(text(p.text), runtime.state.data.people, original.mentionIds ?? []);
+      const editedMentions = people.filter(person => kept.includes(person.id) && person.matrixId).map(person => person.matrixId!);
+      const newContent = { ...originalContent, msgtype: originalContent.msgtype ?? MsgType.Text, body: originalContent.msgtype === 'm.image' ? originalContent.body : text(p.text), 'com.palside.caption': originalContent.msgtype === 'm.image' ? text(p.text) : undefined, 'm.mentions': { user_ids: editedMentions } };
       const content = { ...newContent, body: `* ${newContent.body}`, 'm.new_content': newContent, 'm.relates_to': { rel_type: 'm.replace', event_id: original.id } };
       const fingerprint = [...new Uint8Array(await scope.wait(crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ id: original.id, text: p.text, base: p.baseEditedAt })))))].map(byte => byte.toString(16).padStart(2, '0')).join('');
       check();
@@ -199,7 +203,7 @@ export async function editCommand(this: RuntimeCommands, command: Extract<Comman
         await scope.wait(runtime.storage.remove(pendingKey));
       }
       finally { if (scope.current()) { runtime.sending.editOriginals.delete(txn); } }
-    await scope.wait(runtime.refresh()); return { done: true };
+    return { done: true };
 }
 
 export async function recallCommand(this: RuntimeCommands, command: Extract<Command, { name: "recall" }>) {
@@ -209,7 +213,7 @@ export async function recallCommand(this: RuntimeCommands, command: Extract<Comm
     const scope = runtime.auth.scope();
  const teamId = text('teamId' in p ? p.teamId : undefined);
  runtime.auth.requireConnection(); const team = runtime.state.remoteTeams.find(t => t.id === teamId && t.joined); if (!team || !runtime.auth.client) throw new MessageError(uiMessage('extension.runtime.teamUnavailable')); await scope.wait(runtime.auth.client.redactEvent(team.roomId, text(p.id)));
-    await scope.wait(runtime.refresh()); return { done: true };
+    return { done: true };
 }
 
 export const chatHandlers = {

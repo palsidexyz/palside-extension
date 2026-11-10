@@ -7,7 +7,7 @@ export type CapabilityAccess = { site: boolean; active?: boolean; allUrls?: bool
 
 /** An unknown address needs access. A visible address alone never proves activeTab (tabs also reveals it). */
 export function pageCapabilities(tab: CapabilityTab | undefined, access: CapabilityAccess): PageCapabilities {
-  const all = (value: PageCapability): PageCapabilities => ({ capture: { ...value }, pick: { ...value }, danmaku: { ...value }, signal: { ...value }, share: { ...value } });
+  const all = (value: PageCapability): PageCapabilities => ({ capture: { ...value }, interact: { ...value }, danmaku: { ...value }, signal: { ...value }, share: { ...value } });
   const blocked = (reason: BlockReason) => all({ state: 'blocked', reason });
   if (!tab || tab.id === undefined || tab.id < 0) return blocked('none');
   if (tab.incognito) return blocked('private');
@@ -22,5 +22,5 @@ export function pageCapabilities(tab: CapabilityTab | undefined, access: Capabil
   if (store) return { ...blocked('store'), share };
   if (tab.status === 'loading') return { ...all({ state: 'pending' }), share };
   const interaction: PageCapability = { state: access.site ? 'ready' : 'access' };
-  return { capture: { state: access.allUrls || access.active ? 'ready' : 'access' }, pick: { ...interaction }, danmaku: share.state === 'blocked' ? { ...share } : { ...interaction }, signal: share.state === 'blocked' ? { ...share } : { ...interaction }, share };
+  return { capture: { state: access.allUrls || access.active ? 'ready' : 'access' }, interact: { ...interaction }, danmaku: share.state === 'blocked' ? { ...share } : { ...interaction }, signal: share.state === 'blocked' ? { ...share } : { ...interaction }, share };
 }

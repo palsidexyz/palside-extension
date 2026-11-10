@@ -3,7 +3,7 @@ import { MINUTE_MS } from '@palside/shared/units';
 import { AVATAR_BYTES, IMAGE_MIME_TYPES } from '@palside/shared/rules/media';
 import { INVITE_PASSWORD_LENGTH, TEAM_DESCRIPTION_LENGTH, TEAM_JOINED_LIMIT, TEAM_MEMBER_LIMIT, TEAM_NAME_LENGTH, TEAM_OWNED_LIMIT } from '@palside/shared/rules/teams';
 import { normalizeInvitePassword } from '@palside/shared/contracts/rules';
-import { deadlineTime, errorMessage, localeOrEnglish, message as uiMessage } from '@palside/i18n';
+import { deadlineTime,localeOrEnglish,message as uiMessage,failureText } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
@@ -15,6 +15,7 @@ import { InlineFeedback } from '@palside/ui/inline-feedback';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@palside/ui/menu';
 import { prepareImage } from '@palside/ui/lib/image';
 import { Brand } from '../ui/brand';
+import { EmptyState } from '../ui/empty-state';
 import { Action } from '../ui/primitives';
 import { Count, CountText } from '../ui/motion-details';
 import { useTextState } from '../ui/text';
@@ -80,14 +81,14 @@ export function TeamStartForm({ c }: { c: PalsideController }) {
       if (version !== avatarVersion.current) return;
       const image = await readImage(blob);
       if (version === avatarVersion.current) setUpload(image);
-    } catch (failure) { if (version === avatarVersion.current) setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.imageReadFailed')); }
+    } catch (failure) { if (version === avatarVersion.current) setError(failureText(failure, 'extension.copy.imageReadFailed')); }
     finally { if (version === avatarVersion.current) setProcessing(false); }
   }
   async function create() {
     if (!ready) return;
     setBusy(true); setError('');
     try { await c.createTeam(name, description, src); }
-    catch (failure) { setError(failure instanceof Error ? errorMessage(failure) : uiMessage('common.error')); }
+    catch (failure) { setError(failureText(failure)); }
     finally { setBusy(false); }
   }
   return <div className={s.body}>
@@ -181,7 +182,7 @@ export function JoinPage({ c }: { c: PalsideController }) {
     } catch (failure) {
       if (!isActive()) return;
       if (errorCode(failure) === 'JOIN_BLOCKED') { open({ invite: '', blocked: true }); return; }
-      setError(failure instanceof Error ? errorMessage(failure) : uiMessage('extension.copy.invalidInvitation'));
+      setError(failureText(failure, 'extension.copy.invalidInvitation'));
     } finally { running.current = false; if (isActive()) setBusy(false); }
   }
   useEffect(() => { if (pending && !started.current) { started.current = true; void preview(pending); } });
@@ -260,7 +261,7 @@ function JoinPrompt({ c, prompt, close, isActive }: { c: PalsideController; prom
     } catch (failure) {
       if (!isActive()) return;
       const code = errorCode(failure);
-      const message = failure instanceof Error ? errorMessage(failure) : uiMessage('common.error');
+      const message = failureText(failure);
       if (passwordErrors.has(code)) {
         setNeedsPassword(true); setValue(''); setFieldError(message);
         if (code === 'INVITE_PASSWORD_REQUIRED' && c.live) {
@@ -270,7 +271,7 @@ function JoinPrompt({ c, prompt, close, isActive }: { c: PalsideController; prom
             if (refreshed) { setPreview(refreshed); setLockedUntil(refreshed.lockedUntil ?? 0); setNeedsPassword(refreshed.passwordRequired); }
           } catch (refreshFailure) {
             if (!isActive()) return;
-            setNotice(refreshFailure instanceof Error ? errorMessage(refreshFailure) : uiMessage('common.error'));
+            setNotice(failureText(refreshFailure));
             setEnded(terminalJoinErrors.has(errorCode(refreshFailure)));
           }
         }
@@ -298,7 +299,7 @@ function JoinPrompt({ c, prompt, close, isActive }: { c: PalsideController; prom
 export function FormerTeams({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const teams = formerTeams(c);
-  if (!teams.length) return <div className={base.empty} data-fill><History /><p>{t('extension.start.noFormerTeams')}</p></div>;
+  if (!teams.length) return <EmptyState icon={<History />} title={t('extension.start.noFormerTeams')} />;
   const reason = (team: Team) => t(team.readonlyReason === 'removed' ? 'extension.start.removed' : team.readonlyReason === 'dissolved' ? 'extension.start.dissolved' : 'extension.start.left');
   return <div className={s.formerList}>{teams.map(team => <div key={team.id} className={s.formerRow}>
     <button type="button" className={s.formerOpen} onClick={() => c.openFormerTeam(team.id)}>

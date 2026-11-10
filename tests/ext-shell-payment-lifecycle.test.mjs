@@ -33,7 +33,7 @@ function production() {
   const modules = {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
     'use-intl': { useTranslations: () => translate, useLocale: () => 'en' },
-    '@palside/i18n': { errorMessage: error => error.message, clockTime: String, localeOrEnglish: value => value },
+    '@palside/i18n': { errorMessage: error => error.message, clockTime: String, deadlineTime: String, shortDateTime: date => String(date.getTime()), localeOrEnglish: value => value },
     '@palside/shared/navigation': { shortAddress: value => value },
     '@palside/shared/rules/wallet': { CHAIN_RULES },
     '@palside/shared/rules/teams': { TEAM_MEMBER_LIMIT },

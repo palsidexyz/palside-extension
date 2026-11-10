@@ -1,5 +1,5 @@
-import test from 'node:test'; import assert from 'node:assert/strict'; import { DiagnosticErrors, diagnostics } from '../apps/extension/src/runtime/diagnostics/diagnostics.ts';
-test('diagnostics ring buffer is capped and excludes values',()=>{const e=new DiagnosticErrors();for(let i=0;i<12;i++)e.record({code:`E_${i}`},i);const out=diagnostics({version:'1',ua:'ua',locale:'en',connection:{networkOnline:true,service:'ready',messaging:'ready',retrying:false},sync:'SYNCING',sseOpen:true,access:{tabs:true,site:false},pageLayer:{enabled:false,registered:false},teams:2,errors:e.snapshot()}).text;assert.match(out,/E_11/);assert.doesNotMatch(out,/E_0/);assert.doesNotMatch(out,/secret|url|token/i)});
+import test from 'node:test'; import assert from 'node:assert/strict'; import { DiagnosticErrors, DiagnosticLatency, diagnostics } from '../apps/extension/src/runtime/diagnostics/diagnostics.ts';
+test('diagnostics ring buffer is capped and excludes values',()=>{const e=new DiagnosticErrors();for(let i=0;i<12;i++)e.record({code:`E_${i}`},i);const out=diagnostics({version:'1',ua:'ua',locale:'en',connection:{networkOnline:true,service:'ready',messaging:'ready',retrying:false},sync:'SYNCING',liveOpen:true,access:{tabs:true,site:false},pageLayer:{enabled:false,registered:false},teams:2,errors:e.snapshot()}).text;assert.match(out,/E_11/);assert.doesNotMatch(out,/E_0/);assert.doesNotMatch(out,/secret|url|token/i)});
 
 const { registerHooks } = await import('node:module');
 const hooks = registerHooks({ resolve(specifier, context, next) {
@@ -15,16 +15,18 @@ hooks.deregister();
 
 function runtimeFixture() {
   const errors = new DiagnosticErrors(); errors.record({ code: 'SYNC_FAILED', message: 'SYNTHETIC_SECRET' }, 1000);
+  const latency = new DiagnosticLatency(); latency.record('viewing', 1000, 1120); latency.record('viewing', 2000, 2080); latency.record('signal', 'not a time', 5000);
   return {
     initialise: async () => {},
     state: { connection: { networkOnline: true, service: 'ready', messaging: 'unavailable', retrying: true }, remoteTeams: [{ joined: true }, { joined: false }], secret: 'SYNTHETIC_SECRET' },
-    auth: { client: { getSyncState: () => 'RECONNECTING' }, sseOpen: false }, diagnosticErrors: errors,
+    auth: { client: { getSyncState: () => 'RECONNECTING' }, liveOpen: false }, diagnosticErrors: errors, diagnosticLatency: latency,
   };
 }
 test('offscreen diagnostics uses only runtime host APIs and returns serializable metrics', async () => {
   const result = await new RuntimeCommands(runtimeFixture()).execute({ name: 'diagnostics' });
   assert.deepEqual(result, {
-    connection: { networkOnline: true, service: 'ready', messaging: 'unavailable', retrying: true }, sync: 'RECONNECTING', sseOpen: false, teams: 1, errors: [{ code: 'SYNC_FAILED', at: 1000 }],
+    connection: { networkOnline: true, service: 'ready', messaging: 'unavailable', retrying: true }, sync: 'RECONNECTING', liveOpen: false, teams: 1, errors: [{ code: 'SYNC_FAILED', at: 1000 }],
+    latency: { viewing: { count: 2, median: 120, p90: 120 } },
   });
   assert.deepEqual(structuredClone(result), result);
   assert.doesNotMatch(JSON.stringify(result), /SYNTHETIC_SECRET/);
@@ -43,7 +45,7 @@ test('background assembles diagnostics with worker grants, registrations and ver
   assert.equal(result.ok, true);
   assert.deepEqual(Object.keys(result.value), ['text']);
   assert.deepEqual(result.value.text.split('\n'), [
-    'Extension: 1.2.3', `Browser UA: ${navigator.userAgent}`, 'Locale: zh-CN', 'Network online: true', 'Service: ready', 'Messaging: unavailable', 'Retrying: true', 'Sync: RECONNECTING', 'SSE open: false', 'Access tabs: true', 'Access site: false', 'Page layer enabled: false', 'Page layer registered: true', 'Teams: 1', 'Errors:', '1970-01-01T00:00:01.000Z SYNC_FAILED',
+    'Extension: 1.2.3', `Browser UA: ${navigator.userAgent}`, 'Locale: zh-CN', 'Network online: true', 'Service: ready', 'Messaging: unavailable', 'Retrying: true', 'Sync: RECONNECTING', 'Live socket open: false', 'Access tabs: true', 'Access site: false', 'Page layer enabled: false', 'Page layer registered: true', 'Teams: 1', 'Latency (median / p90 ms, includes clock difference):', '  viewing: 120 / 120 (2)', 'Errors:', '1970-01-01T00:00:01.000Z SYNC_FAILED',
   ]);
   assert.deepEqual(calls, [{ permissions: ['tabs'] }, { origins: ['<all_urls>'] }]);
   assert.doesNotMatch(result.value.text, /SYNTHETIC_SECRET/);

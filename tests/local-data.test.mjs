@@ -1,4 +1,4 @@
-import { MIB, DAY_MS } from '@palside/shared/units';
+import { MIB, DAY_MS, HOUR_MS } from '@palside/shared/units';
 import test from 'node:test'; import assert from 'node:assert/strict'; import { cacheUsage, clearCache } from '../apps/extension/src/runtime/media/local-data.ts';
 test('cache usage and clear delegate to owned cache only', async()=>{let cleared=0;const s={cacheBytes:async()=>42,clearCache:async()=>{cleared++}};assert.deepEqual(await cacheUsage(s),{bytes:42});assert.deepEqual(await clearCache(s),{bytes:42});assert.equal(cleared,1)});
 
@@ -136,4 +136,24 @@ test('unreadable vaults use the incomplete-session path', async t => {
   const auth = new SessionRuntime(runtime);
   auth.revokeDevice = async value => { revoked.push(value); }; auth.clearDevice = async () => { auth.session = undefined; };
   await auth.start(); assert.deepEqual(revoked, [session]); assert.deepEqual(runtime.state.error, { key: 'extension.runtime.loginIncomplete' });
+});
+
+test('profile pictures share one read and a failed one waits before it is asked again', async t => {
+  const { LocalDataRuntime } = await import('../apps/extension/src/runtime/media/cache.ts');
+  const { ApiError } = await import('../apps/extension/src/runtime/transport/api.ts');
+  const reads = []; let fail;
+  const session = { account: { id: 'me' } };
+  const runtime = { auth: { session, scope: () => ({ wait: work => work, check() {}, current: () => true }) }, api: { media: async id => { reads.push(id); if (fail) throw fail; return new ArrayBuffer(1); } } };
+  t.mock.method(URL, 'createObjectURL', () => 'blob:avatar'); t.mock.timers.enable({ apis: ['Date'] });
+  const cache = new LocalDataRuntime(runtime);
+  const [first, second] = await Promise.all([cache.avatar('a'), cache.avatar('a')]);
+  assert.equal(first, 'blob:avatar'); assert.equal(second, 'blob:avatar'); assert.deepEqual(reads, ['a']);
+  fail = new ApiError(503, { error: 'SERVICE_UNAVAILABLE' });
+  assert.equal(await cache.avatar('b'), undefined); assert.equal(await cache.avatar('b'), undefined);
+  assert.deepEqual(reads, ['a', 'b'], 'a failure is remembered');
+  t.mock.timers.tick(30_000); fail = undefined;
+  assert.equal(await cache.avatar('b'), 'blob:avatar'); assert.deepEqual(reads, ['a', 'b', 'b']);
+  fail = new ApiError(404, { error: 'MEDIA_UNAVAILABLE' });
+  await cache.avatar('c'); t.mock.timers.tick(HOUR_MS); await cache.avatar('c');
+  assert.deepEqual(reads.filter(id => id === 'c'), ['c'], 'a removed picture is not asked for again');
 });

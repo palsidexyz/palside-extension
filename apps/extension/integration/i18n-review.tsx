@@ -26,7 +26,7 @@ const initial: RuntimeState = {
   data: { ...palsideFixtures, messages: palsideFixtures.messages.map((value, index) => ({ ...value, timestamp: Date.now() - (20 - index) * MINUTE_MS })) }, drafts: {},
   preferences: { current: 'night', share: true, notifications: 'off', toured: true },
   remoteTeams: palsideFixtures.teams.map(team => ({ reason: null, revision: 0, inviteSuspended: false, id: team.id, name: team.name, description: team.description, ownerId: team.owner, roomId: '!fixture:test', avatarId: null, memberCount: team.memberIds.length, joined: team.joined, publishedAt: null, recruitmentExpiresAt: null, retentionDays: 7, membersCanInvite: false, memberIds: team.memberIds, people: [], periods: [], preferences: { muted: false, readIds: [], revision: 0 }, requests: [], bans: [], transfer: null })),
-  config: { websiteUrl: 'http://localhost:3000', signupDifficulty: 0 }, invitations: {}, items: { stickies: [] },
+  config: { websiteUrl: 'http://localhost:3000', signupDifficulty: 0 }, invitations: {},
 };
 if (params.get('scene') === 'state') {
   initial.data = { ...initial.data, messages: [

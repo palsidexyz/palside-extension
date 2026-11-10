@@ -18,12 +18,28 @@ export function validateExtensionManifest(manifest, websiteOrigin = RELEASE_WEBS
   if (releaseBuild ? 'key' in manifest : manifest.key !== EXTENSION_PUBLIC_KEY) errors.push(releaseBuild ? 'Store manifests must not contain a key; the store assigns the published ID' : 'Local manifests must pin the published extension ID through its key');
   if (manifest.host_permissions?.length) errors.push('Installation must not grant host permissions; the API is reached through CORS');
   if (JSON.stringify(manifest.optional_host_permissions ?? []) !== JSON.stringify(['<all_urls>'])) errors.push('Optional host permissions must be exactly <all_urls>');
-  if (JSON.stringify(manifest.optional_permissions) !== JSON.stringify(['notifications', 'tabs', 'favicon'])) errors.push('Only notifications, and tabs with favicon (共享在看), may be optional');
+  if (JSON.stringify(manifest.optional_permissions) !== JSON.stringify(['notifications', 'tabs', 'favicon', 'tabGroups'])) errors.push('Only notifications, tabs with favicon (共享在看) and tabGroups (跟看) may be optional');
   if (manifest.content_scripts?.length) errors.push('Unexpected public or automatic injection: content_scripts');
   if (manifest.web_accessible_resources?.length && JSON.stringify(manifest.web_accessible_resources) !== JSON.stringify([{ resources: ['signals/*'], matches: ['http://*/*', 'https://*/*'], use_dynamic_url: true }])) errors.push('Only bundled signal artwork may be public, behind a per-session dynamic URL');
   if (JSON.stringify(manifest.externally_connectable) !== JSON.stringify({ matches: [`${websiteOrigin}/*`] })) errors.push('External messages must come only from the website, with no extension ids');
   const policy = manifest.content_security_policy?.extension_pages ?? '';
   if (policy !== extensionPagePolicy(apiOrigin)) errors.push('Extension pages must run only bundled scripts and crypto WebAssembly, and connect only to the API and registry logo hosts');
+  return errors;
+}
+
+/**
+ * 看盘批注's chart bridge: the one script that runs in a page's main world, where TradingView's API lives. The background loads it
+ * into one top-frame document at a time, only where the page layer runs with signals on. It must use no extension API, hold no
+ * squad data and reach no network: it reads chart geometry and dispatches it on the chart frame's element.
+ */
+export const chartBridgePolicy = { file: 'chart-bridge.js', world: 'MAIN' };
+export function validateChartBridge(source) {
+  const errors = [];
+  if (typeof source !== 'string' || !source.length) return ['Missing chart-bridge.js build asset'];
+  if (source.length > 24_000) errors.push('The chart bridge must stay small');
+  for (const [pattern, reason] of [[/\bchrome\s*\.|\bbrowser\s*\.\s*runtime/, 'extension API'], [/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource/, 'network access'], [/postMessage|localStorage|sessionStorage|indexedDB|document\.cookie/, 'messaging or storage'], [/\beval\s*\(|new Function/, 'dynamic code']]) {
+    if (pattern.test(source)) errors.push(`The chart bridge must not use ${reason}`);
+  }
   return errors;
 }
 

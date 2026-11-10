@@ -1,0 +1,11 @@
+/* 热门 search: the field above the chain pills; matches fill the same grey board as the ranking, one 58px row each. */
+.field { flex:none; margin-bottom:14px; }
+.results { display:flex; flex-direction:column; padding:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.row { display:grid; grid-template-columns:32px minmax(0, 1fr) auto; align-items:center; gap:10px; width:100%; min-height:58px; padding:0 8px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-primary); font:inherit; text-align:left; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
+.row > :first-child { --token-size:32px; }
+.row:hover { background:var(--ui-control-hover); }
+.row:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+.name { display:flex; flex-direction:column; min-width:0; }
+.name strong { overflow:hidden; font-size:var(--ui-type-body); line-height:20px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+.name small { display:flex; align-items:center; gap:5px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; }
+.count { color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); white-space:nowrap; font-variant-numeric:tabular-nums; }

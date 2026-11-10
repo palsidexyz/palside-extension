@@ -1,7 +1,6 @@
 import { CHAT_TEXT_MAX } from '@palside/shared/rules/messages';
 import type { Message as MessageContent,Draft as DraftContent } from '@palside/shared/models/chat';
 import type { TextValue } from '@palside/i18n';
-import type { PageRef } from '../annotations/social.ts';
 import { expired } from './expiry.ts';
 export type { Attachment } from '@palside/shared/models/chat';
 
@@ -16,8 +15,6 @@ export type Message = MessageContent & {
   mentionIds?: string[];
   recalled?: boolean;
   removedByOwner?: boolean;
-  /** A page reference travels inside the encrypted message and shares its lifetime. */
-  ref?: PageRef;
   /** Which part of the replied message is quoted; see `QuoteRange`. */
   replyRange?: QuoteRange;
 };
@@ -27,7 +24,7 @@ export type Message = MessageContent & {
  */
 export type QuoteRange = { start: number; end: number; base: number };
 export type Draft = DraftContent & {
-  mentions?: { id: string; label: string }[]; ref?: PageRef; replyRange?: QuoteRange;
+  mentions?: { id: string; label: string }[]; replyRange?: QuoteRange;
   /** Automatic-card ownership and suppression belong to the local draft, never the message. */
   automaticCard?: { url: string; assetId: string };
   dismissedUrls?: string[];
@@ -44,7 +41,7 @@ export function emojiOnly(text: string) {
   const parts = Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text.replace(/\s+/g, '')), part => part.segment);
   return parts.length > 0 && parts.length <= 3 && parts.every(part => /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(part) && !/\p{L}/u.test(part) && (Array.from(part).length > 1 || /\p{Emoji_Presentation}/u.test(part)));
 }
-export function canSend(draft: Draft) { return Boolean(draft.text.trim() || draft.attachment || draft.ref) && characterLength(draft.text) <= CHAT_TEXT_MAX; }
+export function canSend(draft: Draft) { return Boolean(draft.text.trim() || draft.attachment) && characterLength(draft.text) <= CHAT_TEXT_MAX; }
 /** A quote range from storage or the wire, or undefined when it is not a well-formed, non-empty range. */
 export function readQuoteRange(value: unknown): QuoteRange | undefined {
   if (!value || typeof value !== 'object') return;

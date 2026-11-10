@@ -1,4 +1,5 @@
 import { VIEWING_TTL_MS, VIEWING_CLOCK_SKEW_MS, VIEWING_RENEW_MS, VIEWING_MESSAGE_LENGTH } from '@palside/shared/rules/interactions';
+import { retryDelayMs } from '@palside/shared/backoff';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { connectionStatus } from '../transport/connection';
 import type { MatrixEvent } from 'matrix-js-sdk';
@@ -10,15 +11,20 @@ import { pageView,readView } from './view-snapshot';
 import { assetKey } from '../../domain/annotations/interaction.ts';
 import type { Viewing } from '../../domain/assets/model';
 import { identifyPage,publicShareUrl,websiteIdentity } from '@palside/shared/navigation';
-import { pageName } from './page-title';
+import { pageLabel } from './page-title';
 import type { Preferences } from '../../domain/account/preferences';
 import type { RuntimeDevice } from '../account/device';
-import { pageFavicon } from './viewing';
+import { iconDataUrl } from './viewing';
 import { tokenPage,type LookupPage } from './page-resolver.ts';
 import type { PalsideService } from '../composition/core';
 
-/** How long 共享在看 and link cards wait for the token directory before using the short address. */
+/** A failed 在看 publish waits 5 s, doubling up to 2 min, before the same page is tried again. */
+const VIEWING_RETRY = { baseMs: 5_000, maxMs: 120_000 };
+
+/** How long link cards wait for the token directory before using the short address. */
 export const TOKEN_NAME_WAIT_MS = 3000;
+/** 共享在看 waits this long for a token's name or a pool's token, then publishes what is known and corrects it once when the answer arrives. */
+export const SHARE_NAME_WAIT_MS = 300;
 
 export class SharingRuntime {
   readonly runtime: PalsideService;
@@ -35,6 +41,8 @@ export class SharingRuntime {
   activeViewing = new Map<string, { teamId: string; order: number; sequence: number; expiresAt: number }>();
   selectedDevice = false;
   publishing = false;
+  /** A page whose publish failed, and when it may be tried again. */
+  private failedView?: string; private failures = 0; private retryAt = 0;
   viewingExpiryTimer?: ReturnType<typeof setTimeout>;
   viewingTimer?: ReturnType<typeof setTimeout>;
   publishedAt = 0;
@@ -42,16 +50,23 @@ export class SharingRuntime {
   ownViewing?: { view: Viewing; teamId: string; expiresAt: number };
   peerViewing = new Map<string, { view: Viewing; teamId: string; expiresAt: number }>();
   peerViewingVersions = new Map<string, number>();
-  /** The token's display name: waits up to `TOKEN_NAME_WAIT_MS` for the directory, then the best name known. */
-  /** A pool or chainless contract page's token, waiting up to `TOKEN_NAME_WAIT_MS` for the server; undefined when it has none or is late. */
-  async pageToken(page: LookupPage, signal?: AbortSignal) {
+  /** Forget everything learned under the previous device session. */
+  reset() {
+    this.invalidatePage();
+    this.publishing = false; this.selectedDevice = false; this.pagePreview = false; this.failedView = undefined; this.failures = 0; this.retryAt = 0;
+    this.peerViewing.clear(); this.peerViewingVersions.clear(); this.activeViewing.clear(); this.viewingOrder = 0;
+    clearTimeout(this.viewingExpiryTimer); this.viewingExpiryTimer = undefined;
+    this.preferencesQueue = Promise.resolve(); this.persistedPreferences = undefined;
+  }
+  /** A pool or chainless contract page's token, waiting up to `wait` ms for the server; undefined when it has none or is late. */
+  async pageToken(page: LookupPage, signal?: AbortSignal, wait = TOKEN_NAME_WAIT_MS) {
     const runtime = this.runtime;
     let asset = runtime.pages.get(page.url);
     if (asset === undefined) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       asset = await runtime.auth.scope().wait(Promise.race([
         runtime.pages.resolve(page),
-        new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), TOKEN_NAME_WAIT_MS); signal?.addEventListener('abort', () => resolve(undefined), { once: true }); }),
+        new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), wait); signal?.addEventListener('abort', () => resolve(undefined), { once: true }); }),
       ])).finally(() => clearTimeout(timer));
     }
     return asset ? tokenPage(page, asset) : undefined;
@@ -79,13 +94,13 @@ export class SharingRuntime {
     const host = new URL(parsedUrl).hostname;
     const identity = identifyPage(parsedUrl, undefined, 'page');
     if (!identity) return;
-    const logo = pageFavicon(favicon);
+    const logo = iconDataUrl(favicon);
     const token = identity.kind === 'pool' || identity.kind === 'address' ? await this.pageToken(identity, signal) : identity.kind === 'asset' ? identity : undefined;
     if (signal?.aborted) return;
     if (!token) {
       const website = identity.kind === 'website' ? identity : websiteIdentity(parsedUrl, 'page');
       if (!website) return;
-      return { ...pageView(website, { name: pageName(title, host) ?? host, logo }), source: host };
+      return { ...pageView(website, { name: pageLabel(title, host), logo }), source: host };
     }
     return await this.tokenView(token, signal, identity.kind === 'pool' || identity.kind === 'address' ? identity.kind : undefined);
   }
@@ -112,13 +127,15 @@ export class SharingRuntime {
     const scope = runtime.auth.scope();
     const content = event.getContent(); const team = runtime.state.remoteTeams.find(t => t.id === content.teamId && t.joined && t.id === runtime.state.preferences.current);
     const person = team?.people.find(p => p.matrixId === event.getSender() && team.memberIds.includes(p.id));
-    if (!person || !team || typeof content.expiresAt !== 'number' || content.expiresAt <= Date.now() || content.expiresAt > Date.now() + VIEWING_TTL_MS + VIEWING_CLOCK_SKEW_MS) return;
+    // Expiry times are service time (the sender's and the lease's), so members' clocks need not agree.
+    const clock = runtime.signals, now = clock.serviceNow();
+    if (!person || !team || typeof content.expiresAt !== 'number' || content.expiresAt <= now || content.expiresAt > now + VIEWING_TTL_MS + VIEWING_CLOCK_SKEW_MS) return;
     const version = (this.peerViewingVersions.get(person.id) ?? 0) + 1; this.peerViewingVersions.set(person.id, version);
     const view = await scope.wait(readView(content.view));
     const lease = this.activeViewing.get(person.id);
-    if (!lease || lease.teamId !== team.id || lease.order !== content.order || lease.sequence !== content.sequence || lease.expiresAt <= Date.now()) return;
-    if (runtime.auth.session !== session || this.peerViewingVersions.get(person.id) !== version || runtime.state.preferences.current !== team.id || content.expiresAt <= Date.now() || !runtime.state.remoteTeams.some(t => t.id === team.id && t.joined && t.memberIds.includes(person.id))) return;
-    if (view) { view.id = `${view.id}:member:${person.id}`; this.peerViewing.set(person.id, { view, teamId: team.id, expiresAt: Math.min(content.expiresAt, lease.expiresAt) }); runtime.cache.upsertView(view); this.expireViewing(); }
+    if (!lease || lease.teamId !== team.id || lease.order !== content.order || lease.sequence !== content.sequence || lease.expiresAt <= clock.serviceNow()) return;
+    if (runtime.auth.session !== session || this.peerViewingVersions.get(person.id) !== version || runtime.state.preferences.current !== team.id || content.expiresAt <= clock.serviceNow() || !runtime.state.remoteTeams.some(t => t.id === team.id && t.joined && t.memberIds.includes(person.id))) return;
+    if (view) { runtime.diagnosticLatency?.record('viewing', clock.toLocal(content.expiresAt - VIEWING_TTL_MS)); view.id = `${view.id}:member:${person.id}`; this.peerViewing.set(person.id, { view, teamId: team.id, expiresAt: clock.toLocal(Math.min(content.expiresAt, lease.expiresAt)) }); runtime.cache.upsertView(view); this.expireViewing(); }
   }
   private viewingInput = '';
   expireViewing() {
@@ -163,27 +180,32 @@ export class SharingRuntime {
     }
     const signature = JSON.stringify([team.id, page]);
     if (signature === this.publishedView && Date.now() - this.publishedAt < VIEWING_RENEW_MS) return;
+    // The same page failed a moment ago: wait out its backoff. Another page publishes at once.
+    if (signature === this.failedView && Date.now() < this.retryAt) return;
     const session = runtime.auth.session; const order = this.viewingOrder; const sequence = ++this.viewingSequence;
     const current = () => runtime.auth.session === session && this.page === page && this.viewingOrder === order && this.mayObserve() && runtime.state.preferences.current === team.id;
     this.publishing = true;
     try {
-      if (!await scope.wait(runtime.foreground(page.url)) || !current()) return;
       const eligibility = teamSendGuard(runtime, team.id, true);
       const check = () => { eligibility.check(); if (!current() || !this.selectedDevice) throw new MessageError(uiMessage('extension.runtime.sharingNotReady')); };
       const cryptoApi = eligibility.client.getCrypto(); if (!cryptoApi) throw new MessageError(uiMessage('extension.runtime.sharingNotReady'));
-      const expiresAt = Date.now() + VIEWING_TTL_MS;
+      const expiresAt = runtime.signals.serviceNow() + VIEWING_TTL_MS;
+      // Whether the page is still what this device's panel window shows is asked while the payload encrypts.
+      const visible = scope.wait(runtime.foreground(page.url)); visible.catch(() => {});
       const encrypt = (view: Viewing) => scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, eligibility.users, session.matrix, 'com.palside.viewing', { teamId: team.id, order, sequence, view, expiresAt }, check)));
       let sent = page; let messages = await scope.wait(encrypt(sent));
       if (JSON.stringify(messages).length > VIEWING_MESSAGE_LENGTH && sent.logo) { sent = { ...page, logo: undefined }; messages = await scope.wait(encrypt(sent)); }
       if (JSON.stringify(messages).length > VIEWING_MESSAGE_LENGTH) throw new MessageError(uiMessage('extension.runtime.sharingIncomplete'));
-      if (!current() || !await scope.wait(runtime.foreground(page.url)) || !current()) return;
+      if (!current() || !await visible || !current()) return;
       check();
       const result = await scope.wait(runtime.api.request('viewing.update', { body: { teamId: team.id, order, sequence, messages } }));
       if (!current()) return;
       check();
-      this.selectedDevice = result.selected; this.publishedView = signature; this.publishedAt = Date.now();
-      this.ownViewing = result.selected && 'expiresAt' in result && result.expiresAt ? { view: sent, teamId: team.id, expiresAt: result.expiresAt } : undefined; this.expireViewing();
+      this.selectedDevice = result.selected; this.publishedView = signature; this.publishedAt = Date.now(); this.failedView = undefined; this.failures = 0;
+      this.ownViewing = result.selected && 'expiresAt' in result && result.expiresAt ? { view: sent, teamId: team.id, expiresAt: runtime.signals.toLocal(result.expiresAt) } : undefined; this.expireViewing();
     } catch { scope.check();
+      this.failures = signature === this.failedView ? this.failures + 1 : 1; this.failedView = signature;
+      this.retryAt = Date.now() + retryDelayMs(this.failures, VIEWING_RETRY);
     } finally { if (scope.current()) {
       this.publishing = false;
       if (this.page && (this.page !== page || this.viewingOrder !== order) && runtime.auth.session === session) void this.publishViewing().catch(() => {});

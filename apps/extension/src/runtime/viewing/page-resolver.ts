@@ -11,7 +11,7 @@ type Item = { pool: string; chain: TokenChain } | { address: string };
 /** Resolves to `undefined` when the directory cannot be asked now (signed out); nothing is remembered. */
 export type PageLookup = (item: Item) => Promise<TokenResolution | undefined>;
 
-/** When one EVM address is a token on several chains: Palside's own chain first. The choice UI comes later; every candidate is kept. */
+/** When one EVM address is a token on several chains: the person's pick for that address, else Palside's own chain first. Every candidate is kept. */
 export const PAGE_CHAIN_ORDER: readonly TokenChain[] = ['robinhood', 'base', 'bnb', 'ethereum', 'solana'];
 export const PAGE_TOKEN_TTL_MS = 7 * DAY_MS;
 export const PAGE_RETRY_MS = 30 * SECOND_MS;
@@ -28,6 +28,8 @@ type Entry = { asset: string | null | undefined; candidates: string[]; until: nu
 export class PageResolver {
   private entries = new Map<string, Entry>();
   private flights = new Map<string, Promise<string | null | undefined>>();
+  /** The chain the person picked for an address found on several chains: lower-case address → asset key. Memory only. */
+  private chosen = new Map<string, string>();
   private readonly lookup: PageLookup;
   private readonly answer: (asset: string, entry: TokenEntry) => void;
   private readonly changed: () => void;
@@ -57,15 +59,43 @@ export class PageResolver {
       try { result = await this.lookup(page.kind === 'pool' ? { pool: page.pool, chain: networkTokenChain[page.chain] } : { address: page.address }); }
       catch { result = undefined; if (this.epoch === epoch) this.store(page.url, { asset: undefined, candidates: [], until: this.now() + PAGE_RETRY_MS }); return undefined; }
       if (this.epoch !== epoch || !result) return undefined;
-      if (result.status === 'unavailable') { this.store(page.url, { asset: undefined, candidates: [], until: this.now() + PAGE_RETRY_MS }); return undefined; }
-      const tokens = [...result.tokens].sort((a, b) => PAGE_CHAIN_ORDER.indexOf(a.chain) - PAGE_CHAIN_ORDER.indexOf(b.chain));
-      const candidates = tokens.flatMap(token => { const asset = assetKey(tokenChainNetwork[token.chain], token.address); if (asset) this.answer(asset, token); return asset ? [asset] : []; });
+      if (result.status === 'unavailable' && !result.tokens.length) { this.store(page.url, { asset: undefined, candidates: [], until: this.now() + PAGE_RETRY_MS }); return undefined; }
+      const candidates = this.prefer(result.tokens.flatMap(token => { const asset = assetKey(tokenChainNetwork[token.chain], token.address); if (asset) this.answer(asset, token); return asset ? [asset] : []; }));
       const asset = candidates[0] ?? null;
-      this.store(page.url, { asset, candidates, until: this.now() + (asset ? PAGE_TOKEN_TTL_MS : TOKEN_MISSING_RECHECK_MS) });
+      // Some chains read, another not: show what was read and ask again soon, so the unread chain can still join the choice.
+      this.store(page.url, { asset, candidates, until: this.now() + (result.status === 'unavailable' ? PAGE_RETRY_MS : asset ? PAGE_TOKEN_TTL_MS : TOKEN_MISSING_RECHECK_MS) });
       return asset;
     })().finally(() => { if (this.flights.get(page.url) === work) this.flights.delete(page.url); });
     this.flights.set(page.url, work);
     return work;
+  }
+
+  /** Candidate assets in display order: the person's pick for the address first, then Palside's chain order. */
+  prefer(assets: string[]): string[] {
+    const rank = (asset: string) => { const chain = networkTokenChain[asset.slice(0, asset.indexOf(':')) as Network]; return chain ? PAGE_CHAIN_ORDER.indexOf(chain) : PAGE_CHAIN_ORDER.length; };
+    const picked = assets.length > 1 ? this.chosen.get(addressOf(assets[0]!)) : undefined;
+    return [...assets].sort((a, b) => Number(b === picked) - Number(a === picked) || rank(a) - rank(b));
+  }
+
+  /** Remembers `asset` as the person's chain for its address, and moves every page showing that address onto it. */
+  choose(asset: string): boolean {
+    const address = addressOf(asset);
+    let found = false;
+    for (const [url, entry] of [...this.entries]) {
+      if (!entry.candidates.includes(asset)) continue;
+      found = true;
+      if (entry.asset !== asset) this.store(url, { ...entry, asset, candidates: [asset, ...entry.candidates.filter(item => item !== asset)] });
+    }
+    this.chosen.delete(address); this.chosen.set(address, asset);
+    while (this.chosen.size > PAGE_LIMIT) this.chosen.delete(this.chosen.keys().next().value!);
+    return found;
+  }
+
+  /** Pages whose address is a token on several chains: `url → candidates`, current first, for the chain picker. */
+  choices(): Record<string, string[]> {
+    const out: Record<string, string[]> = {}, now = this.now();
+    for (const [url, entry] of [...this.entries].slice(-PAGE_EXPOSED)) if (entry.until > now && entry.candidates.length > 1) out[url] = entry.candidates;
+    return out;
   }
 
   private store(url: string, entry: Entry) {
@@ -75,7 +105,7 @@ export class PageResolver {
     if (previous?.asset !== entry.asset) this.changed();
   }
 
-  clear() { this.epoch++; this.flights.clear(); if (!this.entries.size) return; this.entries.clear(); this.changed(); }
+  clear() { this.epoch++; this.flights.clear(); this.chosen.clear(); if (!this.entries.size) return; this.entries.clear(); this.changed(); }
 
   /** Recent answers, newest last: `url → asset` or `null`, for the background and panel. */
   pick(): Record<string, string | null> {
@@ -84,6 +114,8 @@ export class PageResolver {
     return out;
   }
 }
+
+function addressOf(asset: string) { return asset.slice(asset.indexOf(':') + 1).toLowerCase(); }
 
 /** A looked-up page as its token, keeping the page's own URL and site. */
 export function tokenPage(page: LookupPage, asset: string): Extract<PageIdentity, { kind: 'asset' }> {

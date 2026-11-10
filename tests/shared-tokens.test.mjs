@@ -9,13 +9,12 @@ const asset = value => `${value.chain}:${value.address}`;
 const a = view('abc'), b = view('def');
 const message = (id, patch = {}) => ({ id, teamId: 'team', author: 'friend', status: 'sent', text: '', time: '12:00', timestamp: now - 10, expiresAt: now + 100, ...patch });
 const card = value => ({ kind: 'asset', assetId: value.id, view: value });
-const ref = value => ({ view: value, target: { kind: 'quote', exact: 'Public text', prefix: '', suffix: '' }, caption: 'Public text' });
 
-test('shared tokens count each asset once per message and include token references but exclude ordinary webpages', () => {
+test('shared tokens count each token card once and exclude ordinary webpages', () => {
   const website = { ...a, id: 'web', kind: 'website', name: 'News', url: 'https://example.com/news' };
-  const messages = [message('both', { attachment: card(a), ref: ref(a) }), message('reference', { ref: ref(a) }), message('two-tokens', { attachment: card(a), ref: ref(b) }), message('website-ref', { ref: ref(website) }), message('website-card', { attachment: card(website) })];
+  const messages = [message('one', { attachment: card(a) }), message('two', { attachment: card(a) }), message('other', { attachment: card(b) }), message('website-card', { attachment: card(website) })];
   const tokens = sharedTokens({ messages, now, order: 'discussed' });
-  assert.deepEqual(tokens.map(item => [item.asset, item.messages]), [[asset(a), 3], [asset(b), 1]]);
+  assert.deepEqual(tokens.map(item => [item.asset, item.messages]), [[asset(a), 2], [asset(b), 1]]);
 });
 
 test('shared tokens include retained messages and omit expired, recalled, pending and future messages', () => {
@@ -27,7 +26,7 @@ test('shared tokens include retained messages and omit expired, recalled, pendin
 
 test('recent and discussed orders reuse one list with latest source and message attribution', () => {
   const latestA = view('abc', 'Latest A');
-  const messages = [message('a-old', { timestamp: now - 20, attachment: card(a) }), message('a-new', { timestamp: now - 10, ref: ref(latestA) }), message('b-new', { timestamp: now - 1, attachment: card(b) })];
+  const messages = [message('a-old', { timestamp: now - 20, attachment: card(a) }), message('a-new', { timestamp: now - 10, attachment: card(latestA) }), message('b-new', { timestamp: now - 1, attachment: card(b) })];
   const input = { messages, now };
   const recent = sharedTokens({ ...input, order: 'recent' });
   const discussed = sharedTokens({ ...input, order: 'discussed' });

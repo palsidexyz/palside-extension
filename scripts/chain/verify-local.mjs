@@ -53,33 +53,34 @@ async function claim(packetId, recipient, amount, salt = zeroHash, next = zeroHa
     return decodeEventLog({ abi: redPacketAbi, data: log.data, topics: log.topics }).eventName === 'PacketClaimed';
   }));
 }
-// All three kinds use exact allowance, indexed events, externally signed typed data and real transactions.
+// Squad equal, squad random and room random packets use exact allowance, indexed events, externally signed typed data and real transactions.
+const cases = [{ kind: 0, random: false }, { kind: 0, random: true }, { kind: 1, random: true }];
 const pending = [];
-for (const token of tokens) for (const kind of [0, 1, 2]) {
+for (const token of tokens) for (const { kind, random } of cases) {
   const salt = id();
   const packetId = keccak256(encodeAbiParameters([{ type: 'address' }, { type: 'bytes32' }], [payer, salt]));
   const total = parseEther('4');
   const allocationSalt0 = id();
   const allocationSalt1 = id();
   const secondHash = hashShare(packetId, 1, parseEther('3'), allocationSalt1, zeroHash);
-  const allocationHash = kind === 2 ? hashShare(packetId, 0, parseEther('1'), allocationSalt0, secondHash) : zeroHash;
+  const allocationHash = random ? hashShare(packetId, 0, parseEther('1'), allocationSalt0, secondHash) : zeroHash;
   await approve(token, deployment.redPacket, total);
-  const receipt = await send(deployment.redPacket, redPacketAbi, 'createPacket', [token, salt, kind, total, 2, kind === 2 ? 0n : parseEther('2'), allocationHash]);
+  const receipt = await send(deployment.redPacket, redPacketAbi, 'createPacket', [token, salt, kind, total, 2, random ? 0n : parseEther('2'), allocationHash]);
   assert.equal(await publicClient.readContract({ address: token, abi: mockPalsAbi, functionName: 'allowance', args: [payer, deployment.redPacket] }), 0n);
   const created = receipt.logs.filter(log => log.address.toLowerCase() === deployment.redPacket.toLowerCase()).map(log => decodeEventLog({ abi: redPacketAbi, data: log.data, topics: log.topics })).find(log => log.eventName === 'PacketCreated');
   assert.ok(created);
   assert.equal(created.args.packetId, packetId);
   assert.equal(created.args.token.toLowerCase(), token.toLowerCase());
   assert.equal(created.args.sender.toLowerCase(), payer.toLowerCase());
-  pending.push({ token, kind, packetId, allocationSalt0, secondHash });
+  pending.push({ token, kind, random, packetId, allocationSalt0, secondHash });
 }
 for (const token of tokens) assert.equal(await balance(deployment.redPacket, token), parseEther('12'));
-for (const { token, kind, packetId, allocationSalt0, secondHash } of pending.sort((a, b) => a.kind - b.kind)) {
+for (const { token, random, packetId, allocationSalt0, secondHash } of pending) {
   const otherToken = tokens.find(address => address !== token);
   const otherBalance = await balance(deployment.redPacket, otherToken);
   const packet = await publicClient.readContract({ address: deployment.redPacket, abi: redPacketAbi, functionName: 'packets', args: [packetId] });
   assert.equal(packet[1].toLowerCase(), token.toLowerCase());
-  if (kind === 2) {
+  if (random) {
     await claim(packetId, bob, parseEther('1'), allocationSalt0, secondHash);
   } else {
     await claim(packetId, bob, parseEther('2'));
@@ -87,9 +88,9 @@ for (const { token, kind, packetId, allocationSalt0, secondHash } of pending.sor
   }
   assert.equal(await balance(deployment.redPacket, otherToken), otherBalance);
 }
-await wallet.request({ method: 'evm_increaseTime', params: [3600 + 7200] });
+await wallet.request({ method: 'evm_increaseTime', params: [86400 + 7200] });
 await wallet.request({ method: 'evm_mine' });
-for (const { token, packetId } of pending.filter(packet => packet.kind === 2)) {
+for (const { token, packetId } of pending.filter(packet => packet.random)) {
   const otherToken = tokens.find(address => address !== token);
   const otherBalance = await balance(deployment.redPacket, otherToken);
   await send(deployment.redPacket, redPacketAbi, 'refundExpired', [packetId], carol);
@@ -97,9 +98,9 @@ for (const { token, packetId } of pending.filter(packet => packet.kind === 2)) {
 }
 for (const [index, token] of tokens.entries()) {
   assert.equal(await balance(deployment.redPacket, token), 0n);
-  assert.equal(await balance(bob, token) - initial[index].bob, parseEther('5'));
-  assert.equal(await balance(carol, token) - initial[index].carol, parseEther('4'));
-  assert.equal(initial[index].payer - await balance(payer, token), parseEther('9'));
+  assert.equal(await balance(bob, token) - initial[index].bob, parseEther('4'));
+  assert.equal(await balance(carol, token) - initial[index].carol, parseEther('2'));
+  assert.equal(initial[index].payer - await balance(payer, token), parseEther('6'));
   assert.equal(await balance(payer, token) + await balance(bob, token) + await balance(carol, token), initial[index].payer + initial[index].bob + initial[index].carol);
 }
-console.log('PASS: local Anvil typed-data signatures, three packet kinds, claims/refund, exact approvals and two-token isolation/conservation');
+console.log('PASS: local Anvil typed-data signatures, squad equal/random and room packets, claims/refunds, exact approvals and two-token isolation/conservation');

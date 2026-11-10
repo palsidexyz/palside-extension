@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pageName } from '../apps/extension/src/runtime/viewing/page-title.ts';
+import { pageLabel, pageName } from '../apps/extension/src/runtime/viewing/page-title.ts';
 
 test('cleans token and market titles', () => {
   assert.equal(pageName('PEPE $0.00001 | GMGN.AI', 'gmgn.ai'), 'PEPE');
@@ -23,4 +23,12 @@ test('collapses whitespace and truncates by grapheme', () => {
   assert.equal(pageName('  Hello   world  ', 'example.com'), 'Hello world');
   const long = pageName(`${'界'.repeat(100)} | Example`, 'example.com');
   assert.equal(Array.from(long).length, 80);
+});
+
+test('a website card outside the catalog takes the site name its title gives, never the bare host', () => {
+  assert.equal(pageLabel('Bankr', 'bankr.bot'), 'Bankr');
+  assert.equal(pageLabel('Fix parser bug · GitHub', 'github.com'), 'Fix parser bug');
+  assert.equal(pageLabel('bankr.bot', 'bankr.bot'), undefined, 'a raw domain title adds nothing');
+  assert.equal(pageLabel('Welcome', 'bankr.bot'), 'Welcome');
+  assert.equal(pageLabel('DEX Screener', 'dexscreener.com'), undefined, 'catalog sites keep their catalog name');
 });

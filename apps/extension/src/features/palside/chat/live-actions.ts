@@ -1,4 +1,4 @@
-import { errorMessage,message as uiMessage,MessageError } from '@palside/i18n';
+import { errorMessage,message as uiMessage,MessageError,failureText } from '@palside/i18n';
 import { readonlyNotice } from '../../../runtime/transport/connection';
 import { canSend,characterLength,draftAttachmentPatch,emptyDraft,type Attachment,type Draft,type Message } from '../../../domain/chat/model';
 import type { PanelState } from '../app/use-panel-state';
@@ -38,7 +38,7 @@ async function resolveDraftConflict(keepLocal: boolean) {
     try {
         await draftQueue.current;
         if (keepLocal)
-            await live.command('draft', { accountId: data.self, teamId, revision: live.state.drafts[teamId]?.revision ?? 0, patch: { ...draft, attachment: draft.attachment ?? null, replyTo: draft.replyTo ?? null, replyRange: draft.replyRange ?? null, ref: draft.ref ?? null, mentions: draft.mentions ?? [], automaticCard: draft.automaticCard ?? null, dismissedUrls: draft.dismissedUrls ?? [] } });
+            await live.command('draft', { accountId: data.self, teamId, revision: live.state.drafts[teamId]?.revision ?? 0, patch: { ...draft, attachment: draft.attachment ?? null, replyTo: draft.replyTo ?? null, replyRange: draft.replyRange ?? null, mentions: draft.mentions ?? [], automaticCard: draft.automaticCard ?? null, dismissedUrls: draft.dismissedUrls ?? [] } });
         if ((draftVersions.current[teamId] ?? 0) !== version)
             return;
         blockedDrafts.current.delete(teamId);
@@ -47,7 +47,7 @@ async function resolveDraftConflict(keepLocal: boolean) {
         setOptimisticDrafts(old => { const next = { ...old }; delete next[teamId]; return next; });
     }
     catch (error) {
-        setNotice(error instanceof Error ? errorMessage(error) : uiMessage('extension.copy.draftUnsaved'));
+        setNotice(failureText(error, 'extension.copy.draftUnsaved'));
     }
     finally {
         resolvingDrafts.current.delete(teamId);
@@ -88,7 +88,7 @@ async function send(prepare?: (message: Message) => void): Promise<boolean> {
     }
     if (!canWrite || !canSend(draft))
         return false;
-    const message: Message = { id: crypto.randomUUID(), teamId: current, author: data.self, text: draft.text.trim(), time: '', timestamp: Date.now(), attachment: draft.attachment, ref: draft.ref, replyTo: draft.replyTo, ...(draft.replyTo && draft.replyRange ? { replyRange: draft.replyRange } : {}), mentionIds: draft.mentions?.filter(p => draft.text.includes(`@${p.label}`) && team.memberIds.includes(p.id)).map(p => p.id), status: 'sending' };
+    const message: Message = { id: crypto.randomUUID(), teamId: current, author: data.self, text: draft.text.trim(), time: '', timestamp: Date.now(), attachment: draft.attachment, replyTo: draft.replyTo, ...(draft.replyTo && draft.replyRange ? { replyRange: draft.replyRange } : {}), mentionIds: draft.mentions?.filter(p => draft.text.includes(`@${p.label}`) && team.memberIds.includes(p.id)).map(p => p.id), status: 'sending' };
     prepare?.(message);
     {
         const revision = Math.max(draftRevisions.current[current] ?? 0, live.state.drafts[current]?.revision ?? 0);

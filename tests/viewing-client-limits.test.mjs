@@ -1,3 +1,4 @@
+import { MINUTE_MS } from '@palside/shared/units';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { tokenName } from '../apps/extension/src/runtime/viewing/token-name.ts';
@@ -26,12 +27,24 @@ test('viewing receive tolerance is the lease TTL plus clock skew', async () => {
   const { SharingRuntime } = productionModules({ readView: async () => { reads++; return { id: 'page' }; }, Date })('apps/extension/src/runtime/viewing/sharing.ts');
   const now = Date.now(); const person = { id: 'peer', matrixId: '@peer' }, team = { id: 'one', joined: true, people: [person], memberIds: ['peer'] };
   const session = {};
-  const runtime = { auth: { session, scope: () => ({ wait: p => p }) }, state: { preferences: { current: 'one' }, remoteTeams: [team] }, cache: { upsertView() {} } };
+  const runtime = { auth: { session, scope: () => ({ wait: p => p }) }, state: { preferences: { current: 'one' }, remoteTeams: [team] }, cache: { upsertView() {} }, signals: { serviceNow: () => Date.now(), toLocal: time => time } };
   const sharing = new SharingRuntime(runtime); sharing.expireViewing = () => {};
   sharing.activeViewing.set('peer', { teamId: 'one', order: 1, sequence: 1, expiresAt: now + VIEWING_TTL_MS });
   const event = expiresAt => ({ isEncrypted: () => true, isDecryptionFailure: () => false, getType: () => 'com.palside.viewing', getSender: () => '@peer', getContent: () => ({ teamId: 'one', order: 1, sequence: 1, expiresAt, view: {} }) });
   await sharing.consumeViewing(event(now + VIEWING_TTL_MS + VIEWING_CLOCK_SKEW_MS + 10_000), session); assert.equal(reads, 0);
   await sharing.consumeViewing(event(now + VIEWING_TTL_MS + VIEWING_CLOCK_SKEW_MS), session); assert.equal(reads, 1); assert.equal(sharing.peerViewing.get('peer').expiresAt, now + VIEWING_TTL_MS);
+});
+test('viewing expiry is service time: a receiver whose clock runs a minute ahead still shows a teammate, and expires them on its own clock', async () => {
+  const { SharingRuntime } = productionModules({ readView: async () => ({ id: 'page' }), Date })('apps/extension/src/runtime/viewing/sharing.ts');
+  const ahead = MINUTE_MS, service = Date.now(); const person = { id: 'peer', matrixId: '@peer' }, team = { id: 'one', joined: true, people: [person], memberIds: ['peer'] };
+  const session = {};
+  // This device's clock is a minute ahead of the service: local = service + 60 s.
+  const runtime = { auth: { session, scope: () => ({ wait: p => p }) }, state: { preferences: { current: 'one' }, remoteTeams: [team] }, cache: { upsertView() {} }, signals: { serviceNow: () => Date.now() - ahead, toLocal: time => time + ahead } };
+  const sharing = new SharingRuntime(runtime); sharing.expireViewing = () => {};
+  const expiresAt = service - ahead + VIEWING_TTL_MS;
+  sharing.activeViewing.set('peer', { teamId: 'one', order: 1, sequence: 1, expiresAt });
+  await sharing.consumeViewing({ isEncrypted: () => true, isDecryptionFailure: () => false, getType: () => 'com.palside.viewing', getSender: () => '@peer', getContent: () => ({ teamId: 'one', order: 1, sequence: 1, expiresAt, view: {} }) }, session);
+  assert.equal(sharing.peerViewing.get('peer')?.expiresAt, expiresAt + ahead);
 });
 test('Olm message IDs use the shared event ID cap', () => {
   const envelope = { algorithm: 'm.olm.v1.curve25519-aes-sha2', sender_key: 'key', ciphertext: {}, 'org.matrix.msgid': 'a'.repeat(EVENT_ID_LENGTH) };
