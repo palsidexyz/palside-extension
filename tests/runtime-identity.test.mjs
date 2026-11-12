@@ -20,10 +20,10 @@ test('signed API request retries AUTH_EXPIRED once using Date clock offset and e
   t.mock.method(globalThis, 'fetch', async (_url, init) => {
     calls.push(init);
     if (calls.length === 1) return new Response(JSON.stringify({ error: 'AUTH_EXPIRED' }), { status: 401, headers: { Date: serverDate.toUTCString() } });
-    return new Response(JSON.stringify({ token: 'token', account: { id: identity.publicKey, nickname: '', bio: '', tags: [], avatarId: null, acceptTeamInvites: true, matrixId: '@self:test', revision: 0 }, matrix: { userId: '@self:test', deviceId: 'SELF' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ token: 'token', account: { id: identity.publicKey, nickname: '', bio: '', tags: [], avatarId: null, acceptTeamInvites: true, matrixId: '@self:test', wallet: null, revision: 0 }, matrix: { userId: '@self:test', deviceId: 'SELF' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
   const result = await new Api('https://service.example.test').request('accounts.create', { body: { label: 'Mac · Chrome' }, secretKey: identity.secretKey, difficulty: 0 });
-  assert.deepEqual(result, { token: 'token', account: { id: identity.publicKey, nickname: '', bio: '', tags: [], avatarId: null, acceptTeamInvites: true, matrixId: '@self:test', revision: 0 }, matrix: { userId: '@self:test', deviceId: 'SELF' } }); assert.equal(calls.length, 2);
+  assert.deepEqual(result, { token: 'token', account: { id: identity.publicKey, nickname: '', bio: '', tags: [], avatarId: null, acceptTeamInvites: true, matrixId: '@self:test', wallet: null, revision: 0 }, matrix: { userId: '@self:test', deviceId: 'SELF' } }); assert.equal(calls.length, 2);
   const first = JSON.parse(Buffer.from(calls[0].headers.Authorization.slice(6), 'base64').toString());
   const second = JSON.parse(Buffer.from(calls[1].headers.Authorization.slice(6), 'base64').toString());
   assert.ok(second.created_at > first.created_at);

@@ -25,6 +25,7 @@
     "./person-avatars": "./src/person-avatars.ts",
     "./signals": "./src/signals.ts",
     "./signal-art": "./src/signal-art/index.ts",
+    "./like-art": "./src/like-art.ts",
     "./models/*": "./src/models/*.ts",
     "./units": "./src/units.ts",
     "./backoff": "./src/backoff.ts",

@@ -410,18 +410,18 @@ test('random packet allocation conserves bigint amount and uses independent comm
 });
 test('binding is signed by both local wallet and identity and rejects server substitutions', async () => {
   const accountId = deriveIdentity(mnemonic).publicKey, now = Date.now();
-  const challenge = { id: '0x' + 'a'.repeat(64), accountId, chainId: 4663, address, nonce: '0x' + 'b'.repeat(64), expiresAt: now + 120000 };
-  const signed = await signWalletBinding(mnemonic, challenge, { accountId, address, chainId: 4663 }, now);
-  const binding = { accountId, chainId: 4663, address, proof: signed.proof, boundAt: now };
-  assert.equal(verifyWalletBinding(binding, accountId, 4663, address), true);
-  assert.equal(verifyWalletBinding({ ...binding, address: recipient }, accountId, 4663, recipient), false);
-  await assert.rejects(signWalletBinding(mnemonic, { ...challenge, chainId: 31337 }, { accountId, address, chainId: 4663 }, now), /MISMATCH/);
+  const signed = await signWalletBinding(mnemonic, accountId, now);
+  assert.equal(signed.address, address.toLowerCase());
+  const binding = { accountId, address: signed.address, proof: signed.proof, boundAt: now };
+  assert.equal(verifyWalletBinding(binding, accountId, address), true);
+  assert.equal(verifyWalletBinding({ ...binding, address: recipient }, accountId, recipient), false);
+  assert.equal(verifyWalletBinding(binding, 'f'.repeat(64)), false);
+  await assert.rejects(signWalletBinding(mnemonic, 'f'.repeat(64), now), /MISMATCH/);
 });
 test('public person projection verifies wallets and clears removed wallet bindings', async () => {
   const accountId = deriveIdentity(mnemonic).publicKey, now = Date.now();
-  const challenge = { id: '0x' + 'a'.repeat(64), accountId, chainId: 4663, address, nonce: '0x' + 'b'.repeat(64), expiresAt: now + 120000 };
-  const signed = await signWalletBinding(mnemonic, challenge, { accountId, address, chainId: 4663 }, now);
-  const wallet = { accountId, chainId: 4663, address, proof: signed.proof, boundAt: now };
+  const signed = await signWalletBinding(mnemonic, accountId, now);
+  const wallet = { accountId, address: signed.address, proof: signed.proof, boundAt: now };
   let result = { wallet }, current = true, emissions = 0;
   const peer = { id: 'other', name: 'Other' };
   const runtime = {
@@ -432,7 +432,7 @@ test('public person projection verifies wallets and clears removed wallet bindin
   };
   const service = new WalletRuntime(runtime);
   assert.equal(await service.person(accountId), result);
-  assert.deepEqual(runtime.state.data.people[0], { id: accountId, name: 'Person', walletAddress: address, walletVerified: true });
+  assert.deepEqual(runtime.state.data.people[0], { id: accountId, name: 'Person', walletAddress: address.toLowerCase(), walletVerified: true });
   assert.equal(runtime.state.data.people[1], peer);
   const known = runtime.state.data.people;
   result = { wallet: { ...wallet, address: recipient } };
@@ -832,7 +832,7 @@ test('preference commands require the initiating account at the transport bounda
 
 test('quick-pay uses server limits with hard caps and whole PALS arithmetic', () => {
   const input = { kind: 'tip', messageId: 'message', amount: '1' };
-  assert.deepEqual(quickPayLimits({ single: '9999', daily: '99999' }), { single: 250n, daily: 1000n });
+  assert.deepEqual(quickPayLimits({ single: '9999999', daily: '99999999' }), { single: 250_000n, daily: 1_000_000n });
   assert.deepEqual(quickPayLimits({ single: '20', daily: '40' }), { single: 20n, daily: 40n });
   assert.equal(smallPaymentStatus(input, 20n * unit, 20n * unit, 18, { single: '20', daily: '40' }), 'allowed');
   assert.equal(smallPaymentStatus(input, 20n * unit + 1n, 0n, 18, { single: '20', daily: '40' }), 'password');

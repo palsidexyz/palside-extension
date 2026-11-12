@@ -245,7 +245,8 @@ test('replayed lines wait for room on a full screen while live lines are skipped
 test('danmaku area takes its share of the viewport height from the top and ignores charts', () => {
   const env = fixture();
   try {
-    assert.deepEqual(measureDanmakuArea(), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.25 });
+    assert.deepEqual(measureDanmakuArea(), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.5 });
+    assert.deepEqual(measureDanmakuArea(25), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.25 });
     assert.deepEqual(measureDanmakuArea(50), { top: 0, left: 0, width: innerWidth, height: innerHeight * 0.5 });
     assert.deepEqual(measureDanmakuArea(100), { top: 0, left: 0, width: innerWidth, height: innerHeight });
   } finally { env.restore(); }

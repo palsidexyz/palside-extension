@@ -4,7 +4,7 @@ export type { DanmakuArea, DanmakuSpeed, DanmakuSize, DanmakuSettings } from '..
 
 export type DanmakuAreaRect = { top: number; left: number; width: number; height: number };
 /** Lines drift through a band from the top of the viewport, the way video sites size their danmaku area. */
-export function danmakuAreaRect(width: number, height: number, area: DanmakuArea = 25): DanmakuAreaRect {
+export function danmakuAreaRect(width: number, height: number, area: DanmakuArea = 50): DanmakuAreaRect {
   return { top: 0, left: 0, width, height: height * area / 100 };
 }
 export type MediaClock = EventTarget & { currentTime: number; paused: boolean; playbackRate: number; play(): void; pause(): void };

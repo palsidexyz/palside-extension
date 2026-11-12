@@ -51,7 +51,7 @@ export async function restoreLocalData(this: SessionRuntime, session: RuntimeDev
       guard();
       if (saved) { runtime.state.data.teams = saved.teams; runtime.state.data.people = saved.people; this.directoryExpiresAt = saved.expiresAt; }
     }
-    runtime.state.data.people = [{ id: session.account.id, name: session.account.nickname || '', color: color(session.account.id) }, ...runtime.state.data.people.filter(p => p.id !== session.account.id)];
+    runtime.state.data.people = [{ id: session.account.id, name: session.account.nickname || '', color: color(session.account.id), walletAddress: session.account.wallet ?? undefined }, ...runtime.state.data.people.filter(p => p.id !== session.account.id)];
     const storedPreferences = await runtime.storage.get<unknown>(`${session.account.id}:preferences`);
     guard();
     runtime.state.preferences = readPreferences(storedPreferences);

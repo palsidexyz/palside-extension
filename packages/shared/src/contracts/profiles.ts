@@ -1,7 +1,7 @@
 import Type, { type StaticDecode as Static } from 'typebox';
 import { denseArray, contractString, strictObject } from './validation.ts';
 import { id, matrixId, count, text } from './common.ts';
-import { walletBinding } from './chain.ts';
+import { chainAddress, walletBinding } from './chain.ts';
 import { normalizeTagText, presetTagIds } from './rules.ts';
 import { NICKNAME_LENGTH, BIO_LENGTH, TAG_COUNT, TAG_LENGTH } from '../rules/accounts.ts';
 export const walletPerson = strictObject({ wallet: Type.Union([walletBinding, Type.Null()]) });
@@ -16,7 +16,8 @@ export const profileTags = Type.Decode(denseArray(profileTag, { maxItems: TAG_CO
   const seen = new Set<string>();
   return tags.filter(tag => { const key = 'preset' in tag ? `preset:${tag.preset}` : `text:${tag.text.toLowerCase()}`; if (seen.has(key)) return false; seen.add(key); return true; });
 });
-export const personFields = { id, nickname: text(NICKNAME_LENGTH), avatarId: Type.Union([id, Type.Null()]) };
+/** `wallet` is the account's 零钱 address as the service holds it: what every surface shows as the account ID, null until the account binds one. */
+export const personFields = { id, nickname: text(NICKNAME_LENGTH), avatarId: Type.Union([id, Type.Null()]), wallet: Type.Union([chainAddress, Type.Null()]) };
 export const person = strictObject(personFields);
 export const account = strictObject({ ...personFields, acceptTeamInvites: Type.Boolean(), bio: text(BIO_LENGTH), tags: profileTags, matrixId, revision: count });
 export type Account = Static<typeof account>;

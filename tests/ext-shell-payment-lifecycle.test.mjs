@@ -11,7 +11,7 @@ import * as walletModel from '../apps/extension/src/domain/wallet/model.ts';
 import { TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
 import { graphemeLength } from '../packages/shared/src/contracts/rules.ts';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
-import { CHAIN_RULES } from '@palside/shared/rules/wallet';
+import { CHAIN_RULES, TIP_AMOUNTS } from '@palside/shared/rules/wallet';
 
 const require = createRequire(import.meta.url), h = React.createElement;
 const { window, document } = parseHTML('<html><body></body></html>');
@@ -35,7 +35,9 @@ function production() {
     'use-intl': { useTranslations: () => translate, useLocale: () => 'en' },
     '@palside/i18n': { errorMessage: error => error.message, clockTime: String, deadlineTime: String, shortDateTime: date => String(date.getTime()), localeOrEnglish: value => value },
     '@palside/shared/navigation': { shortAddress: value => value },
-    '@palside/shared/rules/wallet': { CHAIN_RULES },
+    '@palside/ui/address-copy': { AddressCopy: ({ display }) => display },
+    '../assets/chain-identity': { ChainLogo: () => null },
+    '@palside/shared/rules/wallet': { CHAIN_RULES, TIP_AMOUNTS },
     '@palside/shared/rules/teams': { TEAM_MEMBER_LIMIT },
     '@palside/shared/contracts/rules': { graphemeLength },
     '@palside/shared/rules/accounts': { PIN_LENGTH },
@@ -303,19 +305,19 @@ test('packet blessing input counts composed emoji as one of 24 graphemes', async
   assert.equal(f.container.querySelector(selector).value, 'e\u0301'.repeat(24));
 });
 
-test('tip input keeps only digits and explains the 10000 cap in the existing button', async t => {
+test('tip input keeps only digits and explains the 10,000,000 cap in the existing button', async t => {
   const f = await fixture(t);
   await f.view(() => h(f.components.TipPayment, { c: f.c, messageId: 'message', onClose() {} }));
   await f.click(f.button('extension.wallet.custom'));
-  await f.input('input[placeholder="0"]', 'PALS 1,000.01');
-  assert.equal(f.container.querySelector('input').value, '100001');
+  await f.input('input[placeholder="0"]', 'PALS 1,000,000.01');
+  assert.equal(f.container.querySelector('input').value, '100000001');
   assert.equal(f.button('extension.wallet.tipLimit').disabled, true);
   await f.input('input[placeholder="0"]', '9'.repeat(100));
   assert.equal(f.button('extension.wallet.tipLimit').disabled, true);
-  await f.input('input[placeholder="0"]', '10000');
+  await f.input('input[placeholder="0"]', '10000000');
   assert.equal(f.button('extension.wallet.tipAmount').disabled, false);
   await f.click(f.button('extension.wallet.tipAmount'));
-  assert.equal(f.calls.find(([name]) => name === 'wallet-review')[1].input.amount, String(10000n * 10n ** 18n));
+  assert.equal(f.calls.find(([name]) => name === 'wallet-review')[1].input.amount, String(10_000_000n * 10n ** 18n));
 });
 
 test('packet amount rendering preserves large integer and fractional PALS and USD exactly', async t => {
@@ -363,8 +365,8 @@ test('small-payment settings show server limits bounded by client caps', async t
   f.c.live.state.wallet.config.quickPay = { single: '25', daily: '75' };
   await f.view(() => h(f.components.WalletSettings, { c: f.c }));
   assert.match(f.container.textContent, /"single":"25","daily":"75"/);
-  f.c.live.state.wallet.config.quickPay = { single: '500', daily: '2000' }; await f.render();
-  assert.match(f.container.textContent, /"single":"250","daily":"1000"/);
+  f.c.live.state.wallet.config.quickPay = { single: '500000', daily: '2000000' }; await f.render();
+  assert.match(f.container.textContent, /"single":"250,000","daily":"1,000,000"/);
 });
 
 test('wallet copy has matching language keys and describes the actual packet refund timing', () => {

@@ -93,8 +93,9 @@ const pageAsset = 'Robinhood:0x020bfc650a365f8bb26819deaabf3e21291018b4';
 // team invites in 添加小队; invite = the invite sheet for Kenji; detail = 代币详情 with 在看; blocked = 已屏蔽; rooms=off switches 参与弹幕 off.
 const roomKey = `token:${pageAsset}`;
 const otherKey = 'token:Robinhood:0x39dbed3a2bd333467115de45665cc57f813c4571';
-const stranger = (id: string, nickname: string) => ({ id, nickname, avatarId: null });
-const roomPeople = [stranger('kenji-0x91c4', 'Kenji'), stranger('zed-0x3c2a', 'Zed'), stranger('nova-0x7e10', 'Nova'), { id: 'robin', nickname: 'Robin', avatarId: null }, { id: data.self, nickname: '测试成员', avatarId: null }];
+// Strangers carry a synthetic 零钱 address, so their cards and rows show an account ID like everyone else's.
+const stranger = (id: string, nickname: string) => ({ wallet: `0x${[...id].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 7).toString(16).padStart(8, '0').repeat(5)}`, id, nickname, avatarId: null });
+const roomPeople = [stranger('kenji-0x91c4', 'Kenji'), stranger('zed-0x3c2a', 'Zed'), stranger('nova-0x7e10', 'Nova'), { wallet: null, id: 'robin', nickname: 'Robin', avatarId: null }, { wallet: null, id: data.self, nickname: '测试成员', avatarId: null }];
 const roomLine = (id: string, author: (typeof roomPeople)[number], text: string, ago: number, extra = {}) => ({ id, key: roomKey, author, text, folded: false, reported: false, createdAt: now - ago * MINUTE_MS, ...extra });
 const roomFaces = roomPeople.slice(0, 3);
 const roomMessages = scene === 'room-empty' ? [] : [roomLine('r1', roomPeople[0]!, '池子刚加了一倍', 9), roomLine('r2', roomPeople[3]!, '跟上了，看 5 分钟线', 7), roomLine('r3', roomPeople[1]!, 'dev 钱包刚卖了一部分，注意', 5), roomLine('r4', roomPeople[2]!, '这币要拉 10 倍，私聊带你', 4, { folded: true }), roomLine('r5', roomPeople[4]!, '哪个钱包', 1)];
@@ -133,7 +134,7 @@ function Review() {
   const signalConfig = useRef(defaultSignalSettings);
   const [state, setState] = useState<RuntimeState>({
     revision: 0, ready: true, authenticated: true, connection: { networkOnline: params.get('offline') !== '1', service: params.get('service') === 'down' ? 'unavailable' : 'ready', messaging: params.get('messaging') === 'down' ? 'unavailable' : 'ready', retrying: false, outdated: params.get('outdated') === '1' },
-    account: { id: data.self, nickname: '测试成员', bio: '', tags: data.people.find(person => person.id === data.self)?.tags ?? [], avatarId: null, matrixId: '@review:example.test', revision: 0, acceptTeamInvites: params.get('accept') !== '0' }, data,
+    account: { wallet: null, id: data.self, nickname: '测试成员', bio: '', tags: data.people.find(person => person.id === data.self)?.tags ?? [], avatarId: null, matrixId: '@review:example.test', revision: 0, acceptTeamInvites: params.get('accept') !== '0' }, data,
     drafts: scene === 'ref' ? { night: { value: { text: '这里量很大', ref: { target: { kind: 'quote', exact: '24h 成交额 $1.2M，持有人 3,412', prefix: '', suffix: '' }, caption: '24h 成交额 $1.2M，持有人 3,412', view: data.views[0]! } }, revision: 1 } } as never : scene === 'draft' ? { night: { value: { text: '看这个', attachment: { kind: 'asset', assetId: 'page-github', view: data.views.at(-1)! } }, revision: 1 } } as never : {},
     rooms, tokens: hotNames,
     preferences: { toured: params.get('tour') !== '1', rooms: { off: params.get('rooms') === 'off' }, share: params.get('share') !== '0' && on.includes('share'), siteInteraction, current: 'night', notifications: params.get('notify') === 'off' ? 'off' : 'all', notificationPreview: true, hiddenStickies: scene === 'stickies' ? ['k5'] : [] },

@@ -40,17 +40,17 @@ test('danmaku sizes accept supported values and default missing or invalid setti
   assert.equal(normalizeDanmakuSettings(null).size, 'md');
 });
 
-test('danmaku area is a band from the top of the viewport, a quarter by default', () => {
-  assert.deepEqual(danmakuAreaRect(800, 600), { top: 0, left: 0, width: 800, height: 150 });
+test('danmaku area is a band from the top of the viewport, half the viewport by default', () => {
+  assert.deepEqual(danmakuAreaRect(800, 600), { top: 0, left: 0, width: 800, height: 300 });
   assert.deepEqual(danmakuAreaRect(800, 600, 50), { top: 0, left: 0, width: 800, height: 300 });
   assert.deepEqual(danmakuAreaRect(800, 600, 75), { top: 0, left: 0, width: 800, height: 450 });
   assert.deepEqual(danmakuAreaRect(800, 600, 100), { top: 0, left: 0, width: 800, height: 600 });
 });
 
-test('danmaku areas are the viewport bands; anything else starts at the top quarter', () => {
-  assert.equal(normalizeDanmakuSettings({ area: 'full' }).area, 25);
+test('danmaku areas are the viewport bands; anything else starts at the top half', () => {
+  assert.equal(normalizeDanmakuSettings({ area: 'full' }).area, 50);
   assert.equal(normalizeDanmakuSettings({ area: 75 }).area, 75);
-  assert.equal(normalizeDanmakuSettings({ area: 40 }).area, 25);
+  assert.equal(normalizeDanmakuSettings({ area: 40 }).area, 50);
 });
 
 

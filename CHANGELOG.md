@@ -2,6 +2,18 @@
 
 Each version matches a Chrome Web Store release. The GitHub release attaches the exact store package with its build provenance.
 
+## v0.1.5
+
+- **Your account ID is your wallet address**: member cards, settings and live comments show a short 0x address; click it to copy the full one. The security page shows the full address.
+- **View your wallet elsewhere**: the recovery phrase also opens the same address in MetaMask or Trust Wallet.
+- Other people's balances are never shown.
+- Live comments use the top half of the page by default, and likes share one style.
+- Tip amounts and contract addresses are easier to read, with thousands separators and one-click copy.
+
+Requires desktop Chrome 130 or later. Accounts, squads and messages from earlier versions were reset with this update.
+
+账号 ID 改为你的零钱地址：成员卡、设置和弹幕显示缩短的 0x 地址，点一下复制完整地址，安全页显示完整地址；用同一组助记词可以在 MetaMask 或 Trust Wallet 中看到同一个地址；不显示他人余额；弹幕默认占网页上半部分，点赞样式统一；打赏金额加千位分隔，合约地址一键复制。需要桌面版 Chrome 130 或更高版本；本次更新重置了此前的账号、小队和消息。
+
 ## v0.1.4
 
 - **Shared drawing on charts**: draw on TradingView charts (including DEX Screener) and share your lines with your squad, with a laser pointer for quick marks. A chat note jumps to the line.

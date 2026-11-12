@@ -1,0 +1,10 @@
+/* The account ID: the short 零钱 address in Geist Mono, one unbreakable piece wherever it sits. */
+.text, .id { font:500 var(--ui-type-footnote)/16px var(--font-geist-mono),monospace; letter-spacing:0; white-space:nowrap; }
+/* On cards it copies in place: the same spot draws a check and says 已复制, then returns. */
+.id { display:inline-flex; align-items:center; gap:3px; margin:0; padding:0; border:0; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:none; color:inherit; cursor:pointer; transition:color .18s; }
+.id:hover { color:var(--ui-text-primary); }
+.id[data-copied] { color:var(--ui-ink-success); }
+.done { display:inline-flex; align-items:center; gap:3px; }
+.id svg { flex:none; width:12px; height:12px; }
+.id:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
+@media (prefers-reduced-motion:reduce) { .id { transition:none; } }

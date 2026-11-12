@@ -9,7 +9,7 @@ import { permissionRemovalPending, requestNotifications, revokeNotifications } f
 import { openShortcuts, shortcutKeys } from '../../../runtime/browser/shortcuts';
 import { setSocialUi } from '../annotations/social-state';
 import { LanguageSetting } from './language-setting';
-import { accountLabel } from '../account/account-label';
+import { AccountIdText } from '../account/account-id';
 import { Brand } from '../ui/brand';
 import { AppearanceSetting } from './appearance';
 import { ShareIcon } from '../ui/icons';
@@ -55,7 +55,7 @@ export function Settings({ c }: { c: PalsideController }) {
     <SettingGroup>
       <button type="button" className={s.profile} onClick={() => c.go('profile')} aria-label={t('extension.copy.editPersonalProfile')}>
         <PersonAvatar person={c.me} size="lg" />
-        <span className={s.identity}><strong>{c.me.name}</strong><small>{accountLabel(c.data.self)}</small></span>
+        <span className={s.identity}><strong>{c.me.name}</strong><AccountIdText address={c.me.walletAddress} /></span>
         <ChevronRight size={16} aria-hidden="true" />
       </button>
       <SettingItem icon={<Wallet size={16} />} title={t('extension.wallet.title')} value={!wallet?.config?.enabled ? t(pending ? 'extension.wallet.pending' : 'extension.wallet.soon') : balance !== undefined ? <PalsAmount value={balance} hidden={wallet.preferences.hideAmounts} /> : undefined} onClick={() => { if (pending) c.go('wallet'); else whenWalletOpen(c, () => c.go('wallet')); }} />

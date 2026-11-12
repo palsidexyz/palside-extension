@@ -8,7 +8,7 @@ import { Count, CountText, Swap } from '../ui/motion-details';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { motionPresets } from '@palside/design/motion';
-import { ArrowUp, ArrowUpRight, Ban, Check, ChevronDown, Copy, Flag, Gift, HandCoins, MessageCircle, MoreHorizontal, ThumbsUp, Undo2, UserPlus, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, Ban, Check, ChevronDown, Copy, Flag, Gift, HandCoins, MessageCircle, MoreHorizontal, Undo2, UserPlus, X } from 'lucide-react';
 import { Tooltip } from '@palside/ui/tooltip';
 import { ROOM_TEXT_MAX } from '@palside/shared/rules/rooms';
 import type { InviteOptions, RoomMessage, RoomPerson } from '../../../runtime/rooms/contract-types';
@@ -20,18 +20,17 @@ import { Menu, MenuTrigger, MenuContent, MenuItem } from '@palside/ui/menu';
 import { TeamAvatar } from '../teams/team-avatar';
 import { Action, PersonAvatar, Token } from '../ui/primitives';
 import { SettingGroup } from '../settings/setting-rows';
-import { accountLabel } from '../account/account-label';
+import { AccountId, AccountIdText, accountHandle } from '../account/account-id';
 import { capability } from '../settings/access';
 import { characterLength } from '../../../domain/chat/model';
 import { type Person } from '../../../domain/account/model';
 import { openRoom, roomElsewhere, roomPerson, roomView, roomsOn, tabRoomKey, teammateIds, useRoomRead, useRoomOpening, useRoomDrafts, tokenSiteChoice, openTokenSite, useShownRoomKey } from './rooms';
 import type { Viewing } from '../../../domain/assets/model';
-import { DanmakuIcon, HotIcon } from '../ui/icons';
+import { DanmakuIcon, HotIcon, LikeIcon } from '../ui/icons';
 import { SiteFace, SiteLogo } from '../assets/site-logo';
 import { openSiteSheet, pageSite, pageUnusable } from '../viewing/page-key';
 import { allSites, siteAllows } from '../../../domain/annotations/interaction';
 import { RoomPayments, TipPayment } from '../wallet/room-payments';
-import type { WalletPerson } from '@palside/shared/contracts/profiles';
 import { PalsAmount } from '../wallet/amount';
 import { setSocialUi, useSocialUi } from '../annotations/social-state';
 import type { PalsideController } from '../app/use-palside';
@@ -249,23 +248,31 @@ function RoomLine({ c, message, mate, open, onShow }: { c: PalsideController; me
   </div>;
 }
 
-/** 点赞: one press likes the line and again takes it back; the thumb pops and the count rolls. Own lines show their count only. */
+/** 点赞: always on the line's right, at the foot of the text. One press likes and fills the thumb (it pops with a small burst); again takes it back. Own lines show their count only. */
 function LineLike({ c, message, self }: { c: PalsideController; message: RoomMessage; self: boolean }) {
   const t = useTranslations();
   const reduced = useReducedMotion();
+  // Only a press of this button animates; a liked state that arrives from the server or on mount just shows.
+  const [pressed, setPressed] = useState(false);
   const like = c.live?.state.rooms.current?.likes?.[message.id];
   const count = like?.count ?? 0, liked = Boolean(like?.liked);
   const label = count ? t('extension.room.likes', { count }) : t('extension.room.like');
+  const pop = liked && pressed && !reduced;
   const body = <>
-    <motion.span key={String(liked)} initial={reduced || !liked ? false : { scale: .5, rotate: -16 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 560, damping: 16 }}><ThumbsUp aria-hidden="true" /></motion.span>
+    <motion.span key={String(liked)} className={d.likeIcon} initial={pop ? { scale: .55, rotate: -18 } : false} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 560, damping: 14 }}>
+      <LikeIcon size={15} filled={liked} />
+      {pop && <span className={d.likeBurst} aria-hidden="true">{LIKE_SPARKS.map(([x, y]) => <motion.i key={`${x},${y}`} initial={{ x: 0, y: 0, scale: 1, opacity: 1 }} animate={{ x, y, scale: .3, opacity: 0 }} transition={{ duration: .5, ease: 'easeOut' }} />)}</span>}
+    </motion.span>
     {count > 0 && <Count value={count} />}
   </>;
   if (self) return count ? <span className={d.like} data-count="" role="img" aria-label={label}>{body}</span> : null;
-  const toggle = () => { void c.live?.command('room-like', { key: message.key, id: message.id, liked: !liked }).catch(error => c.setNotice(errorMessage(error))); };
+  const toggle = () => { setPressed(true); void c.live?.command('room-like', { key: message.key, id: message.id, liked: !liked }).catch(error => c.setNotice(errorMessage(error))); };
   return <Tooltip content={liked ? t('extension.room.unlike') : label}>
     <button type="button" className={d.like} data-count={count ? '' : undefined} aria-pressed={liked} aria-label={liked ? t('extension.room.unlike') : t('extension.room.like')} onClick={toggle}>{body}</button>
   </Tooltip>;
 }
+/** Six sparks 12px out, the first straight up. */
+const LIKE_SPARKS = Array.from({ length: 6 }, (_, index) => { const angle = index / 6 * Math.PI * 2 - Math.PI / 2; return [Math.round(Math.cos(angle) * 12), Math.round(Math.sin(angle) * 12)] as const; });
 
 /** The line's tip total: springs in, then the coin pops while the amount rolls up as more tips land. */
 function TipChip({ value }: { value: string }) {
@@ -281,7 +288,7 @@ function TipGroupLine({ c, accountIds, amount }: { c: PalsideController; account
   const t = useTranslations();
   const room = c.live?.state.rooms;
   const known = [...room?.current?.faces ?? [], ...room?.people?.people ?? [], ...room?.current?.messages.map(message => message.author) ?? []];
-  const people = accountIds.map(id => known.find(person => person.id === id) ?? { id, nickname: '', avatarId: null });
+  const people = accountIds.map(id => known.find(person => person.id === id) ?? { id, nickname: '', avatarId: null, wallet: null });
   const names = people.map(person => person.id === c.data.self ? t('extension.page.you') : roomPerson(c, person, t('common.member')).name);
   const label = names.length > 2 ? t('extension.wallet.tipPeople', { names: names.slice(0, 2).join('、'), count: names.length }) : names.join('、');
   return <div className={d.tipLine}><Faces c={c} people={people.slice(-3)} /><Swap k={String(names.length)}><span>{label}</span></Swap><span>{t('extension.wallet.tipped')}</span><PalsAmount value={amount} /></div>;
@@ -362,28 +369,23 @@ export function RoomPersonSheet({ c }: { c: PalsideController }) {
   const social = useSocialUi(), id = social.roomPerson;
   const [tipping, setTipping] = useState(false);
   const tipMessage = c.live?.state.rooms.current?.messages.find(item => item.id === social.roomPersonMessage && item.author.id === id && !item.folded);
-  const command = c.live?.command, chainEnabled = c.live?.state.wallet?.config?.enabled, chainRevision = c.live?.state.chainRevision;
-  const [chainPerson, setChainPerson] = useState<{ id: string; value: WalletPerson }>();
-  useEffect(() => { if (!id || !chainEnabled) return; let current = true; void command?.('wallet-person', { accountId: id }).then(value => { if (current) setChainPerson({ id, value }); }, () => { if (current) setChainPerson(undefined); }); return () => { current = false; }; }, [command, id, chainEnabled, chainRevision]);
-  const chain = chainPerson?.id === id ? chainPerson?.value : undefined;
   const close = () => setSocialUi({ roomPerson: undefined });
   const rooms = c.live?.state.rooms;
   const found = id ? [...rooms?.current?.faces ?? [], ...rooms?.people?.people ?? [], ...rooms?.current?.messages.map(message => message.author) ?? []].find(person => person.id === id) : undefined;
-  const person = found && roomPerson(c, found, t('common.member'));
+  const person = found && roomPerson(c, found, t('common.member')), address = person?.walletAddress;
   const blocked = Boolean(person && rooms?.blocked.some(item => item.id === person.id));
   function report() {
     if (!person) return;
-    close(); c.setReportTarget({ kind: 'account', targetId: person.id, preview: `${person.name} ${accountLabel(person.id)}` }); c.go('report');
+    close(); c.setReportTarget({ kind: 'account', targetId: person.id, preview: [person.name, accountHandle(person)].filter(Boolean).join(' ') }); c.go('report');
   }
   if (tipping && tipMessage) return <TipPayment c={c} messageId={tipMessage.id} onClose={() => { setTipping(false); close(); }} />;
   return <Sheet open={Boolean(person)} onOpenChange={open => { if (!open) close(); }} boundarySelector="[data-palside-app]" aria-labelledby="room-person-title" className={`${ac.sheet} ${card.person}`}>
     {person && <>
       <header className={card.head}>
         <PersonAvatar person={person} size="lg" />
-        <div className={card.name}><h2 id="room-person-title">{person.name}</h2><p><span className={card.handle}>{accountLabel(person.id)}</span></p></div>
+        <div className={card.name}><h2 id="room-person-title">{person.name}</h2>{address && <p><span className={card.handle}><AccountId c={c} address={address} /></span></p>}</div>
         <Action label={t('extension.copy.closeProfile')} onClick={close}><X /></Action>
       </header>
-      {chain?.wallet && <button type="button" className={card.walletAddress} aria-label={t('extension.wallet.address')} onClick={() => void c.copy(chain.wallet!.address)}>{chain.wallet.address}</button>}
       {(person.bio || person.tags?.length) && <div className={card.about}>{person.bio && <p className={card.bio}>{person.bio}</p>}{person.tags?.length ? <ul className={card.tags}>{person.tags.map(tag => <li key={tagKey(tag)}>{tagLabel(tag, t)}</li>)}</ul> : null}</div>}
       <div className={card.actions}>
         {tipMessage && <button type="button" className={card.action} onClick={() => whenWalletOpen(c, () => setTipping(true))}><Gift size={18} /><span>{t('extension.wallet.tip')}</span></button>}
@@ -489,7 +491,7 @@ export function RoomPeople({ c }: { c: PalsideController }) {
     {read.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback>}
     {drawn.length ? <SettingGroup title={t('extension.room.speakers')}>{drawn.map(person => <button key={person.id} type="button" className={d.personRow} onClick={() => showPerson(c, person)}>
       <PersonAvatar person={person} size="sm" />
-      <span><strong>{person.id === c.data.self ? t('extension.page.you') : person.name}</strong><small>{accountLabel(person.id)}</small></span>
+      <span><strong>{person.id === c.data.self ? t('extension.page.you') : person.name}</strong><AccountIdText address={person.walletAddress} /></span>
       {person.mate && <span className={d.mate}>{t('extension.room.mate')}</span>}
     </button>)}</SettingGroup> : read.status !== 'error' ? <EmptyState title={people ? t('extension.room.noSpeakers') : t('extension.copy.loading')} fill={false} /> : null}
   </>;
@@ -506,7 +508,7 @@ export function BlockedPeople({ c }: { c: PalsideController }) {
     const person = roomPerson(c, item, t('common.member'));
     return <div key={person.id} className={d.personRow}>
       <PersonAvatar person={person} size="sm" />
-      <span><strong>{person.name}</strong><small>{accountLabel(person.id)}</small></span>
+      <span><strong>{person.name}</strong><AccountIdText address={person.walletAddress} /></span>
       <Button size="sm" variant="surface" className={d.unblock} onClick={() => void c.run('room-block', { accountId: person.id, blocked: false })}>{t('extension.room.unblock')}</Button>
     </div>;
   })}</SettingGroup></>;

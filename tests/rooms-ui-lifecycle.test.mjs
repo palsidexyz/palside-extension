@@ -52,7 +52,7 @@ function fixture() {
     message: key => key, errorMessage: error => error.message, characterLength: text => [...text].length,
     HOT_CHAIN_ORDER: [null, 'Robinhood', 'Solana', 'BNB Chain', 'Base', 'Ethereum'], ...units, ROOM_TEXT_MAX: 200, TEAM_MEMBER_LIMIT: 30, viewAsset: view => view?.id,
     tokenNamed, withProfile, shortAddress, tokenPageUrl, siteById, tokenLabel: view => view.name, tokenWaiting: () => undefined, TokenName: 'TokenName',
-    capability: () => ({ state: 'on' }), accountLabel: id => id, pageUnusable: () => false, pageIssue: () => undefined, ConnectionState: 'ConnectionState',
+    capability: () => ({ state: 'on' }), AccountId: 'AccountId', AccountIdText: 'AccountIdText', accountHandle: person => person?.walletAddress, pageUnusable: () => false, pageIssue: () => undefined, ConnectionState: 'ConnectionState',
   };
   function load(file) {
     if (modules.has(file)) return modules.get(file);

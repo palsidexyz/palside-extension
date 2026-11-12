@@ -25,7 +25,7 @@ async function verify() {
   const storage = new ClientStorage(name);
   const service = new PalsideService(undefined, undefined, storage);
   service.initialise = async () => {};
-  const session: RuntimeDevice = { token: 'synthetic', storageKey: [], account: { bio: '', tags: [], id: 'qa', nickname: 'QA', avatarId: null, matrixId: '@qa:test', revision: 1, acceptTeamInvites: true }, matrix: { userId: '@qa:test', deviceId: 'test' } };
+  const session: RuntimeDevice = { token: 'synthetic', storageKey: [], account: { wallet: null, bio: '', tags: [], id: 'qa', nickname: 'QA', avatarId: null, matrixId: '@qa:test', revision: 1, acceptTeamInvites: true }, matrix: { userId: '@qa:test', deviceId: 'test' } };
   const team: TeamSnapshot = { reason: null, revision: 0, inviteSuspended: false, id: 'team', name: '测试小队', description: '', avatarId: null, ownerId: 'qa', roomId: '!qa:test', memberCount: 1, joined: true, publishedAt: null, recruitmentExpiresAt: null, retentionDays: 7, memberIds: ['qa'], people: [], periods: [], preferences: { muted: false, readIds: [], revision: 1 }, requests: [], bans: [], transfer: null, membersCanInvite: false };
   const { auth } = service;
   auth.session = session; auth.cryptoInitialised = true;
@@ -100,7 +100,7 @@ function Review() {
   const [state, setState] = useState(() => {
     const service = new PalsideService(); const state = service.state;
     state.data = structuredClone(palsideFixtures); state.ready = true; state.authenticated = true;
-    state.account = { bio: '', tags: [], id: state.data.self, nickname: '测试成员', avatarId: null, matrixId: '@qa:test', revision: 1, acceptTeamInvites: true };
+    state.account = { wallet: null, bio: '', tags: [], id: state.data.self, nickname: '测试成员', avatarId: null, matrixId: '@qa:test', revision: 1, acceptTeamInvites: true };
     state.preferences.current = state.data.teams[0]!.id;
     state.connection = { ...healthy, service: scene === 'service' || scene === 'empty' || scene === 'readonly' ? 'unavailable' : 'ready', messaging: scene === 'sync' ? 'unavailable' : scene === 'connecting' ? 'connecting' : scene === 'crypto' ? 'failed' : 'ready', networkOnline: scene !== 'network' };
     if (scene === 'readonly') { state.data.teams[0]!.readonly = true; state.data.teams[0]!.readonlyReason = 'removed'; }

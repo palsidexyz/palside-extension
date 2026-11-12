@@ -35,11 +35,11 @@ export async function fetchSnapshot(this: SessionRuntime) {
       )));
       const ownAvatar = snapshot.account.avatarId ? avatars.get(snapshot.account.avatarId) : undefined;
       if (this.session !== requestRuntimeDevice) return;
-      const people = new Map<string, Person>([[snapshot.account.id, { id: snapshot.account.id, name: snapshot.account.nickname || '', bio: snapshot.account.bio, tags: snapshot.account.tags, color: color(snapshot.account.id), avatar: ownAvatar }]]);
+      const people = new Map<string, Person>([[snapshot.account.id, { id: snapshot.account.id, name: snapshot.account.nickname || '', bio: snapshot.account.bio, tags: snapshot.account.tags, color: color(snapshot.account.id), avatar: ownAvatar, walletAddress: snapshot.account.wallet ?? undefined }]]);
       for (const team of snapshot.teams) {
         for (const p of team.people) {
           const avatar = p.avatarId ? avatars.get(p.avatarId) : undefined;
-          people.set(p.id, { id: p.id, name: p.nickname || '', bio: p.bio, tags: p.tags, deleted: p.deleted, color: color(p.id), avatar });
+          people.set(p.id, { id: p.id, name: p.nickname || '', bio: p.bio, tags: p.tags, deleted: p.deleted, color: color(p.id), avatar, walletAddress: p.wallet ?? undefined });
         }
         for (const p of team.requests) if (!people.has(p.accountId)) people.set(p.accountId, { id: p.accountId, name: p.nickname || '', deleted: p.deleted, color: color(p.accountId), avatar: undefined });
       }
@@ -80,7 +80,7 @@ export async function fetchSnapshot(this: SessionRuntime) {
       this.snapshotAt = Date.now(); this.snapshotReadAt = Math.max(this.snapshotReadAt, snapshot.readAt);
       runtime.state.account = snapshot.account; runtime.state.rooms.acceptInvites = snapshot.account.acceptTeamInvites ?? true; runtime.state.remoteTeams = snapshot.teams;
       for (const [account, state] of presence) snapshot.presence[account] = state;
-      runtime.state.data.people = [...people.values()].map(p => ({ ...p, walletAddress: old.get(p.id)?.walletAddress, walletVerified: old.get(p.id)?.walletVerified, viewing: old.get(p.id)?.viewing, presence: this.liveOpen && presenceVersion === this.presenceVersion ? (deviceStates.some(state => state === snapshot.presence[p.id]) ? snapshot.presence[p.id] as DeviceState : undefined) : old.get(p.id)?.presence }));
+      runtime.state.data.people = [...people.values()].map(p => ({ ...p, walletAddress: p.walletAddress ?? old.get(p.id)?.walletAddress, walletVerified: old.get(p.id)?.walletVerified, viewing: old.get(p.id)?.viewing, presence: this.liveOpen && presenceVersion === this.presenceVersion ? (deviceStates.some(state => state === snapshot.presence[p.id]) ? snapshot.presence[p.id] as DeviceState : undefined) : old.get(p.id)?.presence }));
       runtime.state.data.self = snapshot.account.id; runtime.state.data.teams = teams;
       runtime.state.data.requests = snapshot.teams.flatMap(t => t.requests.map(r => ({ id: `${t.id}:${r.accountId}`, personId: r.accountId, teamId: t.id, text: r.note, createdAt: r.createdAt, expiresAt: r.expiresAt })));
       for (const team of snapshot.teams) if (team.joined && ((team.memberCount ?? team.memberIds.length) > 1 || runtime.state.preferences.startedTeams?.includes(team.id))) await scope.wait(completeTeamStart(runtime, team.id));

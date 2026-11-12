@@ -88,15 +88,13 @@
 .row time { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height:18px; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .menu { position:absolute; top:0; right:2px; opacity:0; transition:opacity .12s ease; }
 .row:hover .menu, .row:focus-within .menu, .menu:has([aria-expanded=true]) { opacity:1; }
-/* 点赞: the line's last column, at the foot of the text. Unliked lines show it only on hover; once liked the count stays. */
-.like { display:inline-flex; align-self:end; align-items:center; gap:3px; height:22px; min-width:22px; margin:0 -2px -1px 0; padding:0 4px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-caption); font-weight:600; line-height:1; font-variant-numeric:tabular-nums; cursor:pointer; transition:opacity .12s ease, color .16s ease, background-color .16s ease; }
-.like svg { width:14px; height:14px; stroke-width:2; }
-.like > span { display:inline-flex; }
-.like:not([data-count]) { opacity:0; }
-.row:hover .like, .row:focus-within .like, .like:focus-visible { opacity:1; }
-button.like:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+/* 点赞: the line's last column, at the foot of the text so the hover ⋯ above never covers it. Always shown; the count joins once anyone likes. */
+.like { display:inline-flex; align-self:end; align-items:center; gap:4px; height:24px; min-width:24px; margin:0 -4px -2px 0; padding:0 6px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; line-height:1; font-variant-numeric:tabular-nums; cursor:pointer; transition:color .16s ease, background-color .16s ease; }
+.likeIcon { position:relative; display:inline-flex; }
+.likeBurst { position:absolute; left:50%; top:50%; width:0; height:0; pointer-events:none; }
+.likeBurst > i { position:absolute; left:-1.5px; top:-1.5px; width:3px; height:3px; border-radius:50%; background:currentColor; }
+button.like:hover { background:var(--ui-control-surface); color:var(--ui-text-primary); }
 .like[aria-pressed=true], button.like[aria-pressed=true]:hover { color:var(--ui-ink-accent); }
-.like[aria-pressed=true] svg { fill:currentColor; fill-opacity:.18; }
 span.like { cursor:default; }
 .folded { display:inline-flex; align-items:center; gap:8px; color:var(--ui-text-secondary); }
 .more { align-self:center; height:24px; margin:4px 0; padding:0 10px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); }

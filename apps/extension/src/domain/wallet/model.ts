@@ -1,4 +1,4 @@
-import { SECOND_MS } from '@palside/shared/units';
+import { QUICK_PAY_LIMITS } from '@palside/shared/rules/wallet';
 import type { ChainClientConfig, ChainOrder, ChainOrderInput } from '@palside/shared/contracts/chain';
 import { chainAmount, palsUnit } from '@palside/shared/chain/amount';
 
@@ -18,8 +18,8 @@ export type WalletBaseState = {
 };
 export function paymentTotal(order: ChainOrder): bigint { return chainAmount(order.amount); }
 export function quickPayLimits(config: ChainClientConfig['quickPay']) {
-  const single = BigInt(config.single), daily = BigInt(config.daily);
-  return { single: single < 250n ? single : 250n, daily: daily < BigInt(SECOND_MS) ? daily : BigInt(SECOND_MS) };
+  const single = BigInt(config.single), daily = BigInt(config.daily), cap = { single: BigInt(QUICK_PAY_LIMITS.single), daily: BigInt(QUICK_PAY_LIMITS.daily) };
+  return { single: single < cap.single ? single : cap.single, daily: daily < cap.daily ? daily : cap.daily };
 }
 export function smallPaymentStatus(input: ChainOrderInput, amount: bigint, spent: bigint, decimals: number, config: ChainClientConfig['quickPay']): 'allowed' | 'password' | 'daily-limit' {
   const unit = palsUnit(decimals), limits = quickPayLimits(config);

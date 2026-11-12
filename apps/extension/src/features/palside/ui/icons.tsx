@@ -1,6 +1,7 @@
 import type { ReactNode, SVGProps } from 'react';
 import { ChartCandlestick, MapPin } from 'lucide-react';
 import type { InteractionFeature } from '../../../domain/annotations/interaction';
+import { LIKE_THUMB_PATHS } from '@palside/shared/like-art';
 
 /** Drawn on lucide's grid (24px, 2px round strokes) so they sit beside lucide icons. */
 function Glyph({ size = 16, children, ...props }: SVGProps<SVGSVGElement> & { size?: number }) {
@@ -14,6 +15,13 @@ export function DanmakuIcon({ size }: { size?: number }) {
     <path d="M4 12h11" /><path d="M19 12h1" />
     <path d="M8 18h8" />
   </Glyph>;
+}
+
+/** 点赞: an outlined thumb until liked, then the same shapes filled solid. */
+export function LikeIcon({ size = 16, filled = false }: { size?: number; filled?: boolean }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={filled ? 1 : 1.7} strokeLinejoin="round" aria-hidden="true" style={{ overflow: 'visible' }}>
+    {LIKE_THUMB_PATHS.map(d => <path key={d} d={d} />)}
+  </svg>;
 }
 
 /** 热门: a filled two-tone flame, orange around a yellow core, flat; the one coloured icon in the header. */

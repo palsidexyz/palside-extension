@@ -36,6 +36,7 @@ async function fixture(t) {
     'use-intl': { useTranslations: () => key => key },
     '@palside/ui/spinner': { Spinner: icon },
     '@palside/ui/tooltip': { Tooltip: passthrough },
+    '@palside/ui/address-copy': { AddressCopy: ({ display, ariaLabel }) => h('button', { 'aria-label': ariaLabel }, display) },
     '@palside/ui/popover': { Popover: passthrough, PopoverTrigger: passthrough, PopoverContent: () => null, usePopoverContext: () => ({ anchorRef: React.useRef(null), layerRef: React.useRef(null), close }) },
     '@palside/i18n': { message: key => key, errorMessage: error => error.message },
     'motion/react': { motion, AnimatePresence: passthrough, useIsPresent: () => true, useReducedMotion: () => false },

@@ -1,18 +1,20 @@
 import { SECOND_MS } from '../units.ts';
 import { encodeAbiParameters, encodeFunctionData, erc20Abi, keccak256, stringToHex, zeroHash, type Address, type Hex } from 'viem';
-import type { ChainClaim, ChainOrder, WalletChallenge } from '../contracts/chain.ts';
+import type { ChainClaim, ChainOrder } from '../contracts/chain.ts';
 import { redPacketAbi as palsideRedPacketAbi } from './generated.ts';
 export const claimTypes = { Claim: [{ name: 'packetId', type: 'bytes32' }, { name: 'recipient', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }] } as const;
 export function claimTypedData(claim: ChainClaim, chainId: number, contract: Address) {
   return { domain: { name: 'PalsideRedPacket', version: '1', chainId, verifyingContract: contract }, types: claimTypes, primaryType: 'Claim' as const,
     message: { packetId: claim.packetId as Hex, recipient: claim.recipient as Address, nonce: BigInt(claim.nonce), deadline: BigInt(Math.floor(claim.deadline / SECOND_MS)) } };
 }
-export function walletBindingTypedData(challenge: WalletChallenge) {
-  return { domain: { name: 'PalsideWalletBinding', version: '1', chainId: challenge.chainId }, primaryType: 'WalletBinding' as const,
-    types: { WalletBinding: [{ name: 'accountId', type: 'string' }, { name: 'wallet', type: 'address' }, { name: 'nonce', type: 'bytes32' }, { name: 'deadline', type: 'uint256' }] } as const,
-    message: { accountId: challenge.accountId, wallet: challenge.address as Address, nonce: challenge.nonce as Hex, deadline: BigInt(Math.floor(challenge.expiresAt / SECOND_MS)) } };
+/** The 零钱 key's half of the account binding. No chain or nonce: the pair is immutable, so a replay can only restate it. */
+export function walletBindingTypedData(accountId: string, address: string) {
+  return { domain: { name: 'PalsideWalletBinding', version: '2' }, primaryType: 'WalletBinding' as const,
+    types: { WalletBinding: [{ name: 'accountId', type: 'string' }, { name: 'wallet', type: 'address' }] } as const,
+    message: { accountId, wallet: address as Address } };
 }
-export function walletIdentityContent(accountId: string, chainId: number, address: string) { return JSON.stringify({ accountId, chainId, wallet: address.toLowerCase() }); }
+/** The identity key's half: the content of its kind-27236 event. */
+export function walletIdentityContent(accountId: string, address: string) { return JSON.stringify({ accountId, wallet: address.toLowerCase() }); }
 export function allocationHashes(packetId: Hex, amounts: readonly string[], salts: readonly string[]) {
   if (amounts.length !== salts.length) throw new Error('Allocation salt count mismatch');
   const hashes: Hex[] = Array.from({ length: amounts.length + 1 }, () => zeroHash);

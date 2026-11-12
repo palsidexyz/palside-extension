@@ -1,4 +1,5 @@
 import { SECOND_MS, MINUTE_MS, DAY_MS } from '@palside/shared/units';
+import { shortAccountAddress } from '@palside/shared/chain/account-address';
 import React, { useLayoutEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createTranslator } from 'use-intl';
@@ -162,7 +163,7 @@ async function reset(next: string, configure?: () => void) {
   state = {
     revision: 0, ready: true, authenticated: true,
     connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
-    account: { bio: '', id: 'you', nickname: '你', avatarId: null, matrixId: '@fixture:example.test', revision: 0, acceptTeamInvites: true, tags: [] },
+    account: { wallet: null, bio: '', id: 'you', nickname: '你', avatarId: null, matrixId: '@fixture:example.test', revision: 0, acceptTeamInvites: true, tags: [] },
     data: structuredClone(palsideFixtures), drafts: {},
     preferences: { current: 'night', share: false, notifications: 'all', notificationPreview: true, toured: true },
     rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} },
@@ -312,7 +313,7 @@ async function memberChecks() {
   c.setMemberFilter(viewingKey(state.data.views[0]!)); await wait();
   assert(text().includes('Robin') && text().includes('Kai') && !buttons(host).some(b => b.textContent === 'Mia') && JSON.stringify(c.team.memberIds) === membership, 'Filtering members by viewing object changes only the displayed list');
   await click('Robin'); const dialog = query<HTMLDialogElement>('dialog[open]');
-  assert(dialog.textContent?.includes('Robin') && dialog.textContent?.includes('robin') && dialog.textContent?.includes('只看 Base 新币') && dialog.querySelector('[data-presence="away"]'), 'A member name opens a card with name, short ID, biography, tags and presence');
+  assert(dialog.textContent?.includes('Robin') && dialog.textContent?.includes(shortAccountAddress('0xf5c5cbb0c3dd22f9459e6a3bf1c6ebc105870eeb')) && dialog.textContent?.includes('只看 Base 新币') && dialog.querySelector('[data-presence="away"]'), 'A member name opens a card with name, short ID, biography, tags and presence');
   for (const label of ['extension.web.mention', 'extension.web.bringOver', 'extension.web.followShort']) assert(button(t(label), dialog), `A teammate card exposes ${t(label)}`);
   await clickKey('extension.web.mention'); assert(c.draft.text.includes('@Robin') && c.screen === 'chat', 'Mentioning a member returns to chat and inserts the mention');
   state.viewingId = 'cashcat'; state.publishedViewing = { viewId: 'cashcat', teamId: 'night', expiresAt: Date.now() + 30000 }; state.data.people.find(person => person.id === 'robin')!.presence = 'active'; await refresh();
@@ -482,7 +483,7 @@ async function roomChecks() {
   await reset('room', () => {
     const key = `token:${viewAsset(state.data.views[0]!)}`;
     state.data.teams[1]!.memberIds.push('alice');
-    state.rooms.current = { key, site: 'gmgn', count: 3, likes: { line1: { count: 2, liked: true }, line3: { count: 1, liked: false } }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
+    state.rooms.current = { key, site: 'gmgn', count: 3, likes: { line1: { count: 2, liked: true }, line3: { count: 1, liked: false } }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { wallet: null, id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
   });
   state.rooms.pinned = state.rooms.current!.key; state.rooms.current!.loading = false; state.rooms.current!.hasMore = false; c.go('room'); await refresh();
   assert(query('[data-room-line="line1"]').getAttribute('data-mate') === 'true' && !query('[data-room-line="line2"]').hasAttribute('data-mate'), 'Room authors in any joined team are marked as teammates');

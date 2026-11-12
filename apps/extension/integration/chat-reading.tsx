@@ -32,7 +32,7 @@ data.teams = data.teams.slice(0, 2).map(t => ({ ...t, memberIds: [...t.memberIds
 data.messages = [...Array.from({ length: 30 }, (_, i) => message(`m${i}`, i === 18 ? { replyTo: 'm3' } : i === 3 ? { replyTo: 'm1' } : {})), ...Array.from({ length: 15 }, (_, i) => message(`other${i}`, { teamId: 'weekend' }))];
 let state: RuntimeState = {
   revision: 0, ready: true, rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} }, authenticated: true, connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
-  account: { bio: '', tags: [], id: data.self, nickname: '阅读验收', avatarId: null, matrixId: '@reading:example.test', revision: 0, acceptTeamInvites: true }, data, 
+  account: { wallet: null, bio: '', tags: [], id: data.self, nickname: '阅读验收', avatarId: null, matrixId: '@reading:example.test', revision: 0, acceptTeamInvites: true }, data, 
   drafts: {}, preferences: { share: false, current: 'night', notifications: 'off', toured: true },
   remoteTeams: [], config: { websiteUrl: '', signupDifficulty: 0 }, invitations: {}, history: { night: { missingKeys: 0, loaded: false, loading: false }, weekend: { missingKeys: 0, loaded: true, loading: false } },
 };

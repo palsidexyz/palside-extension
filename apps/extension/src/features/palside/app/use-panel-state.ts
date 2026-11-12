@@ -249,7 +249,7 @@ export function usePanelState({ data: initialData, live, scenario = 'normal', si
     return { ...person, name: person.deleted ? t('common.deletedMember') : person.name || t(self ? 'common.self' : 'common.member'), presence: visible ? person.presence : undefined, viewing: visible && !(self && expiredOwn) ? viewId : undefined };
   });
 
-  const me = people.find(p => p.id === data.self) ?? { id: '', name: '', color: '#e9edf0' };
+  const me = people.find(p => p.id === data.self) ?? { id: '', name: '', color: '#e9edf0', walletAddress: undefined as string | undefined };
 
   useEffect(() => { mounted.current = true; const urls = objectUrls.current; return () => { mounted.current = false; urls.forEach(url => URL.revokeObjectURL(url)); }; }, []);
 

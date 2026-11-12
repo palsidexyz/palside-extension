@@ -16,7 +16,7 @@ export async function verifyRuntimeBoundaries(initial: RuntimeState, check: (val
   runtime.state = structuredClone(initial);
   runtime.state.data.messages = [];
   runtime.state.drafts = {};
-  runtime.state.remoteTeams = [remoteTeam({ id: 'night', roomId: '!night:example.test', memberIds: ['you', 'mia'], people: [{ bio: '', tags: [], deleted: false, id: 'mia', nickname: 'Mia', avatarId: null, matrixId: '@mia:example.test' }] })];
+  runtime.state.remoteTeams = [remoteTeam({ id: 'night', roomId: '!night:example.test', memberIds: ['you', 'mia'], people: [{ wallet: null, bio: '', tags: [], deleted: false, id: 'mia', nickname: 'Mia', avatarId: null, matrixId: '@mia:example.test' }] })];
   const session = { token: 'fixture-only', account: runtime.state.account!, matrix: { userId: '@you:example.test', deviceId: 'fixture' }, storageKey: Array<number>(32).fill(0), crypto: 'ready' as const };
   runtime.auth.session = session;
   const room = { oldState: { paginationToken: 'more' as string | null } };

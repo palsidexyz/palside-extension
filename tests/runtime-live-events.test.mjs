@@ -59,7 +59,7 @@ test('pushes deliver every room event and invite count; malformed ones are dropp
   try {
     sockets[0].ready();
     const key = 'token:Solana:So11111111111111111111111111111111111111112';
-    const events = [{ key, type: 'message', message: { id: 'm', key, author: { id: 'peer', nickname: 'Peer', avatarId: null }, text: 'hello', createdAt: 1, folded: false, reported: false } }, { key, type: 'folded', id: 'm' }, { key, type: 'retract', id: 'm' }, { key, type: 'count', count: 3 }, { key, type: 'likes', id: 'm', count: 2 }];
+    const events = [{ key, type: 'message', message: { id: 'm', key, author: { id: 'peer', nickname: 'Peer', avatarId: null, wallet: null }, text: 'hello', createdAt: 1, folded: false, reported: false } }, { key, type: 'folded', id: 'm' }, { key, type: 'retract', id: 'm' }, { key, type: 'count', count: 3 }, { key, type: 'likes', id: 'm', count: 2 }];
     for (const room of events) sockets[0].message(event('room', room));
     for (const count of [2, 0, -1]) sockets[0].message(event('team-invites', { pending: count }));
     sockets[0].message('not json');

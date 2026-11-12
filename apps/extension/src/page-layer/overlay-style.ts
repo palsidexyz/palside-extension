@@ -21,8 +21,8 @@ export const overlayStyles = `
     .dm[data-size=sm]{font-size:20px;line-height:26px}
     .dm[data-size=lg]{font-size:28px;line-height:34px}
     .dm[data-mate]{color:var(--pl-dm-mate)}
-    .dm-likes{display:inline-flex;align-items:center;gap:.16em;margin-left:.4em;font-size:.62em;vertical-align:.12em;opacity:.9}
-    .dm-likes svg{width:1em;height:1em;overflow:visible;filter:drop-shadow(0 0 1px var(--pl-outline))}
+    .dm-likes{margin-left:.36em}
+    .dm-likes svg{display:inline-block;width:.86em;height:.86em;margin-right:.12em;vertical-align:-.08em;overflow:visible}.dm-likes path{stroke:var(--pl-outline);stroke-width:2.4px;paint-order:stroke}
     .dm[data-replay]{opacity:calc(var(--dm-opacity,1) * .6)}
     .dm[data-self]{background:var(--pl-dm-self-fill);box-shadow:inset 0 0 0 1px var(--pl-dm-self)}
     .stage[data-theme=light] .dm[data-self]{background:var(--pl-dm-self-fill-light)}

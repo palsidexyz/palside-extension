@@ -1,4 +1,5 @@
 import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
+import { LIKE_THUMB_PATHS } from '@palside/shared/like-art';
 import Danmaku from 'danmaku/dist/esm/danmaku.dom.js';
 import type { PageDanmaku,PageDown,PageUp,DanmakuSettings } from '../runtime/browser/page-protocol';
 import { defaultDanmakuSettings,normalizeDanmakuSettings,danmakuLimits } from '../runtime/browser/page-protocol';
@@ -8,7 +9,7 @@ import type { OverlayHost } from './overlay-host';
 import { face } from './overlay-host';
 
 const SVG = 'http://www.w3.org/2000/svg';
-export function measureDanmakuArea(area: DanmakuSettings['area'] = 25): DanmakuAreaRect {
+export function measureDanmakuArea(area: DanmakuSettings['area'] = 50): DanmakuAreaRect {
   return danmakuAreaRect(innerWidth, innerHeight, area);
 }
 export function createDanmakuRenderer(context: OverlayHost, send: (message: PageUp) => void) {
@@ -51,13 +52,13 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     return Math.abs(minutes) < 60 ? format.format(minutes, 'minute') : format.format(Math.round(minutes / 60), 'hour');
   }
 
-  /** A line's 点赞: lucide's thumbs-up and the count, after the text in the line's own ink. */
+  /** A line's 点赞: the solid thumb and the count after the words, at the words' own size, ink and stroke. */
   function likesMark(count: number) {
     const mark = document.createElement('span');
     mark.className = 'dm-likes';
     const svg = document.createElementNS(SVG, 'svg');
-    for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(name, value);
-    for (const d of ['M7 10v12', 'M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z']) { const path = document.createElementNS(SVG, 'path'); path.setAttribute('d', d); svg.append(path); }
+    for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'currentColor', stroke: 'currentColor', 'stroke-width': '1', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(name, value);
+    for (const d of LIKE_THUMB_PATHS) { const path = document.createElementNS(SVG, 'path'); path.setAttribute('d', d); svg.append(path); }
     mark.append(svg, String(count));
     return mark;
   }

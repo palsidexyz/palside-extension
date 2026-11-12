@@ -19,7 +19,7 @@ const result:{checks:string[];error?:string;cleaned?:boolean}={checks:[]};
 const databaseName=`palside-retention-ui-${crypto.randomUUID()}`, storage=new ClientStorage(databaseName);
 const service=new PalsideService(undefined,undefined,storage), {auth,cache}=service;
 const now=Date.now(),  teamId='night', imageId='$qa-expiry-image', cardId='$qa-expiry-card', linkId='$qa-expiry-link';
-const session:RuntimeDevice={token:'synthetic-only',storageKey:[],account:{ bio: '', tags: [], id:'you',nickname:'验收成员',matrixId:'@qa:example.test',avatarId:null,revision:1, acceptTeamInvites: true},matrix:{userId:'@qa:example.test',deviceId:'fixture-device'}};
+const session:RuntimeDevice={token:'synthetic-only',storageKey:[],account:{ wallet: null, bio: '', tags: [], id:'you',nickname:'验收成员',matrixId:'@qa:example.test',avatarId:null,revision:1, acceptTeamInvites: true},matrix:{userId:'@qa:example.test',deviceId:'fixture-device'}};
 const imageKey=`${session.account.id}:cache:media:event:${imageId}`;
 let imageUrl='', unsubscribe=()=>{};
 function check(value:unknown,message:string):asserts value {if(!value)throw Error(message);result.checks.push(message);}
@@ -32,7 +32,7 @@ async function prepare(){
   await service.initialise();auth.session=session;
   const data=structuredClone(palsideFixtures);data.teams=data.teams.filter(t=>t.id===teamId);data.teams[0]={...data.teams[0]!,owner:'you',memberIds:['you'],unread:0};data.people=data.people.filter(p=>p.id==='you').map(p=>({...p,viewing:undefined}));data.requests=[];
   const asset=data.views.find(view=>view.kind==='asset')!;data.views=[asset];
-  Object.assign(service.state,{authenticated:true,account:session.account,data,preferences:{web:{share:true,interact:true},current:teamId,notifications:'off'},remoteTeams:[remoteTeam({id:teamId,roomId:'!retention:example.test',periods:[{joinedAt:now-40*day,leftAt:null}],people:[{ bio: '', tags: [], deleted: false, id:'you',nickname:'验收成员',avatarId:null,matrixId:session.account.matrixId}],memberIds:['you']})]});
+  Object.assign(service.state,{authenticated:true,account:session.account,data,preferences:{web:{share:true,interact:true},current:teamId,notifications:'off'},remoteTeams:[remoteTeam({id:teamId,roomId:'!retention:example.test',periods:[{joinedAt:now-40*day,leftAt:null}],people:[{ wallet: null, bio: '', tags: [], deleted: false, id:'you',nickname:'验收成员',avatarId:null,matrixId:session.account.matrixId}],memberIds:['you']})]});
   const blob=await (await fetch('/avatars/avatar-frog.webp')).blob();imageUrl=await cache.cachedMedia(`event:${imageId}`,async()=>blob,()=>now+day);
   data.messages=[{id:imageId,teamId,author:'you',text:'临期图片说明',time:'12:00',status:'sent',attachment:{kind:'image',name:'fox.webp',src:imageUrl}},{id:cardId,teamId,author:'you',text:'临期代币说明',time:'12:01',status:'sent',attachment:{kind:'asset',assetId:asset.id,view:asset}},{id:linkId,teamId,author:'you',text:'临期链接 https://example.com/',time:'12:02',status:'sent'},{id:'$qa-reply',teamId,author:'you',text:'回复正文应保留',time:'12:03',status:'sent',replyTo:imageId}];
   for(const message of data.messages){const time=message.id==='$qa-reply'?now:now-29*day;cache.eventTimes.set(message.id,time);await cache.cacheMessage(message,time);}

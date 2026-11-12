@@ -23,7 +23,7 @@ async function run() {
   const storage = new ClientStorage(name);
   const service = new PalsideService(undefined, undefined, storage);
   const { auth, cache } = service;
-  const session: RuntimeDevice = { token: 'synthetic-session', storageKey: [], account: { bio: '', tags: [], id: 'fixture-account', nickname: 'fixture', avatarId: 'fixture-avatar', matrixId: '@fixture:local.test', revision: 1, acceptTeamInvites: true }, matrix: { userId: '@fixture:local.test', deviceId: 'fixture-device' } };
+  const session: RuntimeDevice = { token: 'synthetic-session', storageKey: [], account: { wallet: null, bio: '', tags: [], id: 'fixture-account', nickname: 'fixture', avatarId: 'fixture-avatar', matrixId: '@fixture:local.test', revision: 1, acceptTeamInvites: true }, matrix: { userId: '@fixture:local.test', deviceId: 'fixture-device' } };
   const result: { checks: string[]; cleaned?: boolean; error?: string } = { checks: [] };
   try {
     const initialise = service.initialise, refresh = service.refresh, upload = service.api.upload, originalFetch = window.fetch;
@@ -132,7 +132,7 @@ async function run() {
 
     const local: Message = { id: 'bubble-transaction', teamId: 'bubble-team', author: session.account.id, text: 'bubble fixture', time: '12:00', status: 'sending' };
     const confirmedId = '$bubble-event';
-    service.state.remoteTeams = [remoteTeam({ id: local.teamId, roomId: '!bubble:local.test', periods: [{ joinedAt: now - SECOND_MS, leftAt: null }], people: [{ bio: '', tags: [], deleted: false, id: session.account.id, nickname: 'fixture', avatarId: null, matrixId: session.account.matrixId }], memberIds: [session.account.id] })];
+    service.state.remoteTeams = [remoteTeam({ id: local.teamId, roomId: '!bubble:local.test', periods: [{ joinedAt: now - SECOND_MS, leftAt: null }], people: [{ wallet: null, bio: '', tags: [], deleted: false, id: session.account.id, nickname: 'fixture', avatarId: null, matrixId: session.account.matrixId }], memberIds: [session.account.id] })];
     service.state.data.messages = [local];
     service.sending.outgoing.set(local.id, { message: local, createdAt: now, eventId: confirmedId });
     const emitted: number[] = [];

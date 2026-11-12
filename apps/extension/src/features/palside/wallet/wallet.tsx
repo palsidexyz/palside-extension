@@ -1,6 +1,6 @@
 'use client';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import { localeOrEnglish, shortDateTime } from '@palside/i18n';
 import { motion, useReducedMotion } from 'motion/react';
@@ -23,24 +23,10 @@ import type { ApiResult } from '../../../runtime/transport/api';
 import { WalletRecoveryList } from './recovery';
 import { recordLabels } from './recovery-state';
 import { EmptyState } from '../ui/empty-state';
+import { useCopied } from '../ui/use-copied';
 import s from './wallet.module.css';
 
 
-/** Copy feedback follows the latest clipboard result. */
-function useCopied(c: PalsideController): [boolean, (value: string) => void, string | undefined] {
-  const [copied, setCopied] = useState(false), [failedValue, setFailedValue] = useState<string>();
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined), attemptRef = useRef(0);
-  useEffect(() => () => { attemptRef.current++; clearTimeout(timerRef.current); }, []);
-  return [copied, value => {
-    const attempt = ++attemptRef.current;
-    clearTimeout(timerRef.current); setCopied(false); setFailedValue(undefined);
-    void c.copy(value).then(success => {
-      if (attempt !== attemptRef.current) return;
-      if (!success) { setFailedValue(value); return; }
-      setCopied(true); timerRef.current = setTimeout(() => setCopied(false), 1400);
-    });
-  }, failedValue];
-}
 function ManualCopy({ value }: { value: string | undefined }) {
   const t = useTranslations();
   return value === undefined ? null : <Input aria-label={t('extension.copy.copyManual')} readOnly value={value} onFocus={event => event.currentTarget.select()} />;

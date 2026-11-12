@@ -2,12 +2,14 @@ import { NEW_ACCOUNT_MS } from './accounts.ts';
 import { MINUTE_MS, DAY_MS, HOUR_MS } from '../units.ts';
 /** Chain IDs; admits wallet bindings and deployed payment networks; docs/product/wallet.md#状态与限制. */
 export const SUPPORTED_CHAINS = [4663, 31337] as const;
+/** Whole PALS; tip quick amounts, default first-middle; docs/product/wallet.md#打赏. */
+export const TIP_AMOUNTS = { options: ['10000', '50000', '100000'], initial: '50000' } as const;
 /** Chain IDs; restricts production deployment choices; docs/product/wallet.md#状态与限制. */
 export const PRODUCTION_CHAINS = [SUPPORTED_CHAINS[0]] as const;
 /** Milliseconds; hides prices and warns operators when the chain head is stale; docs/product/wallet.md#状态与限制. */
 export const CHAIN_PRICE_MAX_AGE_MS = 5 * MINUTE_MS;
 /** PALS per payment and UTC day; defaults and caps operator quick-pay settings; docs/product/wallet.md#收款与转账. */
-export const QUICK_PAY_LIMITS = { single: '250', daily: '1000' } as const;
+export const QUICK_PAY_LIMITS = { single: '250000', daily: '1000000' } as const;
 /** Claims per transaction; bounds automatic packet settlement; docs/product/wallet.md#红包. */
 export const SETTLE_BATCH = 20;
 /** Counts and milliseconds; bounds payment orders, packet eligibility and sponsorship; docs/product/wallet.md#状态与限制. */
@@ -21,7 +23,7 @@ export const CHAIN_RULES = Object.freeze({
   /** Milliseconds; groups tips to the same message; docs/product/wallet.md#打赏. */
   tipGroupMs: 30_000,
   /** Whole PALS; caps a custom tip amount; docs/product/wallet.md#打赏. */
-  maxTipPals: 10_000,
+  maxTipPals: 10_000_000,
   /** Graphemes; limits a packet blessing; docs/product/wallet.md#红包. */
   blessingLength: 24,
   /** Active packets per token; caps simultaneous room packets; docs/product/wallet.md#红包. */
@@ -43,5 +45,3 @@ export const PACKET_SETTLEMENT_MS = 2 * HOUR_MS;
 export const SPONSORED_DAILY_LIMIT = { min: 0, max: 10_000 } as const;
 /** PALS in base units; defaults the operator minimum liquidity for displaying prices; docs/product/wallet.md#状态与限制. */
 export const CHAIN_MINIMUM_LIQUIDITY = '0';
-/** Milliseconds; validates wallet binding challenges and identity proof freshness; docs/product/wallet.md#开通与身份. */
-export const WALLET_BINDING_TTL_MS = 5 * MINUTE_MS;

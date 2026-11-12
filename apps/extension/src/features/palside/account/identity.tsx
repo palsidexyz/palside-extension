@@ -1,11 +1,12 @@
 'use client';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { localeOrEnglish,pastTime,message as uiMessage,type TextValue,failureText } from '@palside/i18n';
-import { npubEncode } from '@palside/shared/identity';
+import { accountAddress } from '@palside/shared/chain/account-address';
+import { useCopied } from '../ui/use-copied';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useTranslations } from 'use-intl';
 import { useEffect, useState } from 'react';
-import { Copy, Eye, EyeOff, Fingerprint, KeyRound, Laptop } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, Fingerprint, KeyRound, Laptop } from 'lucide-react';
 import { Button } from '@palside/ui/button';
 import { PinInput, Field } from '@palside/ui/field';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
@@ -18,8 +19,14 @@ import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import i from './identity.module.css';
 
-/** The account's npub, or '' when the id is not a valid key — that one row then stays out instead of the whole page failing. */
-function accountKey(id: string) { try { return npubEncode(id); } catch { return ''; } }
+/** The full account ID: the 零钱 address in EIP-55 case, as two 21-character lines so every character can be checked at any width. */
+function AccountIdRow({ c, address }: { c: PalsideController; address: string }) {
+  const t = useTranslations(), [copied, copy] = useCopied(c), full = accountAddress(address);
+  return <SettingControl icon={<Fingerprint size={16} />}>
+    <span className={i.accountId} title={full}><span>{full.slice(0, 21)}</span><span>{full.slice(21)}</span></span>
+    <Action label={t(copied ? 'extension.copy.copied' : 'extension.copy.copyAccountId')} onClick={() => copy(full)}>{copied ? <Check /> : <Copy />}</Action>
+  </SettingControl>;
+}
 
 function PhraseGrid({ phrase, hidden = false }: { phrase: readonly string[]; hidden?: boolean }) {
   return <ol className={i.phrase} data-hidden={hidden || undefined} aria-hidden={hidden || undefined}>{phrase.map((word, index) => <li key={index}><span>{index + 1}</span>{word}</li>)}</ol>;
@@ -46,7 +53,7 @@ export function Security({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const text = useText();
   const live = c.live!;
-  const npub = accountKey(c.data.self);
+  const address = c.me.walletAddress;
   const [phrase, setPhrase] = useState<string[]>();
   const [revealing, setRevealing] = useState(false);
   const [shown, setShown] = useState(false);
@@ -61,9 +68,7 @@ export function Security({ c }: { c: PalsideController }) {
     return () => { current = false; };
   }, [command, load]);
   return <div className={i.page}>
-    {npub && <SettingGroup title={t('extension.copy.accountId')}>
-      <SettingControl icon={<Fingerprint size={16} />}><span className={i.accountId} title={npub}><span>{npub.slice(0, -8)}</span><span>{npub.slice(-8)}</span></span><Action label={t('extension.copy.copyAccountId')} onClick={() => void c.copy(npub)}><Copy /></Action></SettingControl>
-    </SettingGroup>}
+    {address && <SettingGroup title={t('extension.copy.accountId')}><AccountIdRow c={c} address={address} /></SettingGroup>}
     <SettingGroup title={<>{t('extension.copy.recoveryPhrase')}<HelpTip label={t('extension.copy.phraseSafety')} content={[t('extension.copy.phraseWarningLost'), t('extension.copy.phraseWarningWallet'), t('extension.copy.phraseWarningNeverAsk')].join('\n')} /></>}>
       {phrase ? <div className={i.panel}>
         <PhraseGrid phrase={phrase} hidden={!shown} />

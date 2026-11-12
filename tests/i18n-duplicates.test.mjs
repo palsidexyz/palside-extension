@@ -14,7 +14,6 @@ const messages = Object.fromEntries(await Promise.all(['en', 'zh-CN'].map(async 
 ])));
 
 const allowedDuplicates = [
-  { keys: ['common.member', 'extension.web.member'], reason: 'A person fallback label versus the membership role shown in the website preview.' },
   { keys: ['extension.copy.remove', 'extension.copy.removeDevice'], reason: 'Different objects: captain removal of a message versus account device removal.' },
   { keys: ['extension.copy.imageFormats', 'extension.errors.IMAGE_TYPE'], reason: 'Error code lookup is separate from image-picker guidance.' },
   { keys: ['extension.chart.show', 'extension.copy.showPhrase', 'extension.room.show'], reason: 'Different actions: show a teammate\'s chart lines, reveal a recovery phrase, expand a folded message.' },

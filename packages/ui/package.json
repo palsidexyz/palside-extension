@@ -12,6 +12,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./address-copy": "./src/components/address-copy/index.ts",
     "./avatar": "./src/components/avatar/index.ts",
     "./button": "./src/components/button/index.ts",
     "./checkbox": "./src/components/checkbox/index.ts",

@@ -11,6 +11,8 @@ export const chainDeployment = strictObject({ chainId: Type.Enum(SUPPORTED_CHAIN
 export const quickPay = Type.Refine(strictObject({ single: chainAmount, daily: chainAmount }), value => BigInt(value.single) <= BigInt(value.daily) && BigInt(value.single) <= BigInt(QUICK_PAY_LIMITS.single) && BigInt(value.daily) <= BigInt(QUICK_PAY_LIMITS.daily), () => 'Invalid quick pay limits');
 // The operator's view. Clients only ever see chainClientConfig, resolved for their own account.
 export const chainConfig = strictObject({ enabled: Type.Boolean(), audience: Type.Enum(['testers', 'everyone']), testers: Type.Array(identifier, { maxItems: 50, uniqueItems: true }), version: time, deployment: Type.Union([chainDeployment, Type.Null()]), dailySponsoredLimit: Type.Integer({ minimum: SPONSORED_DAILY_LIMIT.min, maximum: SPONSORED_DAILY_LIMIT.max }), quickPay, minimumLiquidity: chainAmount, updatedAt: time });
+/** What the website may publish: the deployment open to everyone, with the token's on-chain total supply when readable. */
+export const chainPublicDeployment = Type.Union([Type.Null(), strictObject({ ...chainDeployment.properties, totalSupply: Type.Union([chainAmount, Type.Null()]) })]);
 export const chainClientConfig = strictObject(Type.Omit(chainConfig, ['audience', 'testers']).properties);
 export const packetInput = strictObject({ kind: Type.Enum(['team', 'room']), scope: identifier, count: Type.Integer({ minimum: 1, maximum: CHAIN_RULES.maxPacketCount }), distribution: Type.Enum(['equal', 'random']), amounts: Type.Array(chainAmount, { minItems: 1, maxItems: CHAIN_RULES.maxPacketCount }), allocationSalts: Type.Array(chainHash, { minItems: 1, maxItems: CHAIN_RULES.maxPacketCount }), blessing: Type.Optional(contractString({ max: CHAIN_RULES.blessingLength, unit: 'grapheme' })) });
 export const chainOrderInput = Type.Union([
@@ -40,15 +42,15 @@ export const chainEvent = Type.Union([
   strictObject({ type: Type.Literal('tip'), roomKey: identifier, groupId: identifier }),
 ]);
 export const walletIdentityProof = strictObject({ id: Type.String({ pattern: '^[0-9a-f]{64}$' }), pubkey: Type.String({ pattern: '^[0-9a-f]{64}$' }), created_at: time, kind: Type.Literal(27236), tags: Type.Array(Type.Array(Type.String())), content: Type.String({ maxLength: 1024 }), sig: Type.String({ pattern: '^[0-9a-f]{128}$' }) });
-export const walletChallenge = strictObject({ id: chainHash, accountId: identifier, chainId: Type.Enum(SUPPORTED_CHAINS), address: chainAddress, nonce: chainHash, expiresAt: time });
-export const walletBinding = strictObject({ accountId: identifier, chainId: Type.Enum(SUPPORTED_CHAINS), address: chainAddress, proof: walletIdentityProof, boundAt: time });
-export const walletBindInput = strictObject({ challengeId: chainHash, signature: Type.String({ pattern: '^0x[0-9a-fA-F]{130}$' }), proof: walletIdentityProof });
+/** An account's 零钱 address, chain-independent and immutable: the identity-signed proof lets any client check the service did not swap it. */
+export const walletBinding = strictObject({ accountId: identifier, address: chainAddress, proof: walletIdentityProof, boundAt: time });
+export const walletBindInput = strictObject({ address: chainAddress, signature: Type.String({ pattern: '^0x[0-9a-fA-F]{130}$' }), proof: walletIdentityProof });
 export const chainBalance = strictObject({ token: chainAddress, chainId: Type.Integer(), address: chainAddress, balance: chainAmount, blockNumber: chainAmount });
 // Records are finalized token movements. amount is this movement, orderAmount is its linked business operation.
 export const chainRecord = strictObject({ id: identifier, transactionHash: chainHash, from: chainAddress, to: chainAddress, amount: chainAmount, blockNumber: chainAmount, transactionIndex: time, logIndex: time, occurredAt: time, kind: Type.Enum(['transfer', 'tip', 'packet', 'claim', 'packet-refund']), status: Type.Literal('confirmed'), orderId: Type.Union([chainHash, Type.Null()]), packetId: Type.Union([chainHash, Type.Null()]), orderAmount: Type.Union([chainAmount, Type.Null()]), part: Type.Enum(['transfer', 'packet', 'claim', 'refund']) });
 export type ChainRecord = StaticDecode<typeof chainRecord>;
 export const chainRecords = strictObject({ items: Type.Array(chainRecord), nextCursor: Type.Union([identifier, Type.Null()]) });
-export type WalletChallenge = StaticDecode<typeof walletChallenge>;
+export type WalletBindInput = StaticDecode<typeof walletBindInput>;
 export type WalletBinding = StaticDecode<typeof walletBinding>;
 export type ChainConfig = StaticDecode<typeof chainConfig>;
 export type ChainClientConfig = StaticDecode<typeof chainClientConfig>;

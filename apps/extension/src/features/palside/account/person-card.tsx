@@ -2,14 +2,14 @@
 import { tagKey, tagLabel } from '../../../domain/account/profile-tags';
 import { askFollowGroup } from '../annotations/follow-group';
 import { useTranslations } from 'use-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeftRight, AtSign, ChevronRight, Footprints, PenLine, UserRoundPlus, X } from 'lucide-react';
 import { errorMessage, message as uiMessage } from '@palside/i18n';
 import { Tooltip } from '@palside/ui/tooltip';
 import { useDialogBehavior } from '@palside/ui/dialog';
 import { setSocialUi, useSocialUi } from '../annotations/social-state';
 import { Action, PersonAvatar, Token } from '../ui/primitives';
-import { accountLabel } from './account-label';
+import { AccountId } from './account-id';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import { openTransfer } from '../wallet/payment-sheet';
@@ -27,7 +27,9 @@ export function PersonCard({ c }: { c: PalsideController }) {
   const [busy, setBusy] = useState(false);
   const person = c.people.find(p => p.id === c.personId);
   const close = () => c.setPersonId(undefined);
-  const { dialogRef, dialogProps } = useDialogBehavior({ open: Boolean(person), onOpenChange: open => { if (!open) close(); } });
+  // Focus starts on 关闭, not on the first control (the account ID), so opening never draws a ring around the ID.
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const { dialogRef, dialogProps } = useDialogBehavior({ open: Boolean(person), onOpenChange: open => { if (!open) close(); }, initialFocusRef: closeRef });
   const command = c.live?.command, personId = person?.id, chainEnabled = c.live?.state.wallet?.config?.enabled;
   useEffect(() => { if (personId && chainEnabled) void command?.('wallet-person', { accountId: personId }).catch(() => {}); }, [command, personId, chainEnabled]);
   if (!person) return null;
@@ -59,9 +61,9 @@ export function PersonCard({ c }: { c: PalsideController }) {
       <PersonAvatar person={person} size="lg" />
       <div className={card.name}>
         <h2>{person.name}</h2>
-        <p><span>{role}</span>{presence && <span data-presence={person.presence}>{presence}</span>}<span className={card.handle}>{accountLabel(person.id)}</span></p>
+        <p><span>{role}</span>{presence && <span data-presence={person.presence}>{presence}</span>}{person.walletAddress && <span className={card.handle}><AccountId c={c} address={person.walletAddress} /></span>}</p>
       </div>
-      <Action label={t('extension.copy.closeProfile')} onClick={close}><X /></Action>
+      <Action ref={closeRef} label={t('extension.copy.closeProfile')} onClick={close}><X /></Action>
     </header>
     {(bio || tags.length > 0) && <div className={card.about}>
       {bio && <p className={card.bio}>{bio}</p>}

@@ -1,0 +1,7 @@
+.address { display:inline-flex; align-items:center; gap:7px; min-width:0; min-height:30px; padding:4px 6px; border:0; border-radius:calc(var(--ui-radius-l) - 4px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; text-align:left; cursor:pointer; transition:background-color .18s, color .18s; }
+.address code { flex:1; min-width:0; overflow:hidden; font-size:var(--ui-type-caption); text-overflow:ellipsis; white-space:nowrap; }
+.address:hover { background:var(--ui-control-hover); }
+.address:active { background:var(--ui-control-recess); }
+.address[data-copied] { color:var(--ui-ink-accent); }
+.glyph { display:inline-grid; place-items:center; width:12px; height:12px; flex:none; }
+.glyph > * { grid-area:1/1; display:block; }

@@ -32,10 +32,10 @@ async function run() {
   }
   const initialiseCrypto = MatrixClient.prototype.initRustCrypto;
   const now = Date.now();
-  const session: RuntimeDevice = { token:'test-only',crypto:'ready',storageKey:[],matrix:{userId:'@offline:local.test',deviceId:'test-device'},account:{ bio: '', tags: [], id:'offline-person',nickname:'离线测试成员',avatarId:null,matrixId:'@offline:local.test',revision:1, acceptTeamInvites: true} };
+  const session: RuntimeDevice = { token:'test-only',crypto:'ready',storageKey:[],matrix:{userId:'@offline:local.test',deviceId:'test-device'},account:{ wallet: null, bio: '', tags: [], id:'offline-person',nickname:'离线测试成员',avatarId:null,matrixId:'@offline:local.test',revision:1, acceptTeamInvites: true} };
   // Startup checks the vault's format; its contents are never opened here.
   const vault = { v: VAULT_VERSION, iterations: VAULT_ITERATIONS, salt: 'A'.repeat(22) + '==', iv: 'A'.repeat(16), ciphertext: 'A'.repeat(22) + '==' };
-  const team: TeamSnapshot = { reason: null, revision: 0, inviteSuspended: false, id:'offline-team',name:'离线查看的小队',description:'',ownerId:session.account.id,roomId:'!synthetic:local.test',avatarId:null,memberCount:1,joined:true,publishedAt:null,recruitmentExpiresAt:null,retentionDays:7,memberIds:[session.account.id],people:[{ bio: '', tags: [], deleted: false, id:session.account.id,nickname:session.account.nickname,avatarId:null,matrixId:session.account.matrixId}],periods:[{joinedAt:now-10000,leftAt:null}],preferences:{muted:false,readIds:[],revision:1},requests:[],bans:[],transfer:null, membersCanInvite: false };
+  const team: TeamSnapshot = { reason: null, revision: 0, inviteSuspended: false, id:'offline-team',name:'离线查看的小队',description:'',ownerId:session.account.id,roomId:'!synthetic:local.test',avatarId:null,memberCount:1,joined:true,publishedAt:null,recruitmentExpiresAt:null,retentionDays:7,memberIds:[session.account.id],people:[{ wallet: null, bio: '', tags: [], deleted: false, id:session.account.id,nickname:session.account.nickname,avatarId:null,matrixId:session.account.matrixId}],periods:[{joinedAt:now-10000,leftAt:null}],preferences:{muted:false,readIds:[],revision:1},requests:[],bans:[],transfer:null, membersCanInvite: false };
   try {
     MatrixClient.prototype.initRustCrypto = async () => {};
     first.auth.session = session;

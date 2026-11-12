@@ -11,7 +11,7 @@ test('danmaku shared request and response schemas count the same graphemes as th
   for (const glyph of ['中', '😀', '👨‍👩‍👧‍👦', '👩🏽‍💻', '🇨🇳', 'e\u0301']) {
     const text = glyph.repeat(ROOM_TEXT_MAX);
     assert.equal(graphemeLength(text), ROOM_TEXT_MAX); assert.equal(textLength(text), ROOM_TEXT_MAX);
-    const row = { id: 'message', key, author: { id: 'author', nickname: 'Author', avatarId: null }, text, createdAt: 1, folded: false, reported: false };
+    const row = { id: 'message', key, author: { id: 'author', nickname: 'Author', avatarId: null, wallet: null }, text, createdAt: 1, folded: false, reported: false };
     assert.equal(decodeContract(roomMessage, row).text, text);
     assert.throws(() => decodeContract(roomMessage, { ...row, text: text + glyph }), ContractDecodeError);
     const body = endpointsById['rooms.send'].body.schema;

@@ -50,7 +50,7 @@ const key = 'token:Solana:So11111111111111111111111111111111111111112';
 function fixture(t, { teams = [], initialEvents = [], identity } = {}) {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 1_000_000 });
   t.mock.method(Math, 'random', () => 0);
-  const account = { id: 'self', nickname: 'Self', bio: '', tags: [], avatarId: null, acceptTeamInvites: true, matrixId: '@self:test', revision: 0 };
+  const account = { id: 'self', nickname: 'Self', bio: '', tags: [], avatarId: null, acceptTeamInvites: true, matrixId: '@self:test', wallet: null, revision: 0 };
   const session = { account, token: 'token', matrix: { userId: '@self:test', deviceId: 'SELF' }, storageKey: Array(32).fill(1), crypto: 'ready' };
   const calls = [], streams = [], gates = new Map(), starts = [], cachedMessages = [], eventSignals = [];
   const server = { account: structuredClone(account), teams, presence: { self: 'active' } };
@@ -364,7 +364,7 @@ test('an invalidated connection attempt disposes its stream without disposing a 
 const initialTeam = {
   id: 'team', name: 'Team', description: '', avatarId: null, memberCount: 2, publishedAt: null, recruitmentExpiresAt: null,
   ownerId: 'peer', roomId: '!team:test', joined: true, reason: null,
-  people: [{ id: 'peer', nickname: 'Peer', avatarId: null, bio: '', tags: [], matrixId: '@peer:test', deleted: false }],
+  people: [{ id: 'peer', nickname: 'Peer', avatarId: null, bio: '', tags: [], matrixId: '@peer:test', wallet: null, deleted: false }],
   memberIds: ['self', 'peer'], revision: 0, retentionDays: 7, membersCanInvite: true,
   periods: [{ joinedAt: 1, leftAt: null }], preferences: { muted: false, readIds: [], revision: 0 }, requests: [], bans: [], transfer: null, inviteSuspended: false,
 };

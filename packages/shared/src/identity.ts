@@ -4,7 +4,7 @@ import { schnorr } from '@noble/curves/secp256k1.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { bech32, base64 } from '@scure/base';
+import { base64 } from '@scure/base';
 import { HDKey } from '@scure/bip32';
 import { generateMnemonic as bip39Generate, mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
@@ -34,7 +34,6 @@ export function isValidMnemonic(mnemonic: string): boolean {
 export type Identity = {
   secretKey: Uint8Array;
   publicKey: string;
-  npub: string;
   secretStorageKey: Uint8Array;
 };
 
@@ -48,25 +47,9 @@ export function deriveIdentity(mnemonic: string): Identity {
   const publicKeyBytes = schnorr.getPublicKey(secretKey);
   const publicKey = bytesToHex(publicKeyBytes);
   const secretStorageKey = hkdf(sha256, seed, new Uint8Array(0), textEncoder.encode('palside/matrix-secret-storage/v1'), 32);
-  return { secretKey: new Uint8Array(secretKey), publicKey, npub: npubEncode(publicKey), secretStorageKey };
+  return { secretKey: new Uint8Array(secretKey), publicKey, secretStorageKey };
 }
 
-export function npubEncode(publicKeyHex: string): string {
-  if (!/^[0-9a-f]{64}$/.test(publicKeyHex)) throw new Error('INVALID_PUBLIC_KEY');
-  return bech32.encodeFromBytes('npub', hexToBytes(publicKeyHex));
-}
-
-export function npubDecode(npub: string): string {
-  const decoded = bech32.decodeToBytes(npub);
-  if (decoded.prefix !== 'npub' || decoded.bytes.length !== 32) throw new Error('INVALID_NPUB');
-  return bytesToHex(decoded.bytes);
-}
-
-export function shortNpub(npub: string): string {
-  npubDecode(npub);
-  const data = npub.slice(npub.indexOf('1') + 1);
-  return `npub1${data.slice(0, 4)}…${data.slice(-4)}`;
-}
 
 type NostrEvent = {
   id: string;

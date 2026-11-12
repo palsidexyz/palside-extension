@@ -44,12 +44,14 @@ export class WalletRuntime {
       // Address is public; only the encrypted mnemonic vault persists signing material.
       if (address) await runtime.storage.put(`${accountId}:wallet-address`, accountId, 'wallet-address', address);
       check();
-      // The binding read here also answers the check after start, so one start asks for it once.
+      // With the mnemonic in hand (login, unlock) the address is bound first, whatever the chain switch says: it is the
+      // account ID everyone sees. The binding read here also answers the check after start, so one start asks for it once.
       let fetched: ApiResult<'chain.wallet'> | undefined;
-      if (!address) {
+      if (mnemonic) fetched = await this.bind(mnemonic, accountId, address, check);
+      else if (!address) {
         try {
           fetched = await runtime.api.request('chain.wallet'); check();
-          if (fetched && verifyWalletBinding(fetched, accountId, fetched.chainId)) address = fetched.address;
+          if (fetched && verifyWalletBinding(fetched, accountId)) address = fetched.address;
         } catch { check(); }
       }
       this.controller?.dispose(); this.keys = keys;
@@ -65,12 +67,9 @@ export class WalletRuntime {
       await controller.start(); check();
       if (controller.snapshot().config?.deployment) {
         try {
-          if (mnemonic) await this.bind(mnemonic, check);
-          else {
-            const binding = fetched !== undefined ? fetched : await runtime.api.request('chain.wallet'); check();
-            if (!binding || !verifyWalletBinding(binding, accountId, controller.snapshot().config!.deployment!.chainId, address)) controller.lock();
-          }
-        } catch (error) { check(); controller.lock(); if (mnemonic) throw error; }
+          const binding = fetched !== undefined ? fetched : await runtime.api.request('chain.wallet'); check();
+          if (!binding || !verifyWalletBinding(binding, accountId, address)) controller.lock();
+        } catch { check(); controller.lock(); }
       }
       return controller;
     })();
@@ -88,16 +87,15 @@ export class WalletRuntime {
     if (!this.controller || this.starting || this.accountId !== this.runtime.auth.session?.account.id) return (await this.start()).snapshot();
     return this.controller.refresh();
   }
-  private async bind(mnemonic: string, check: () => void) {
-    const runtime = this.runtime, controller = this.controller!;
-    const state = controller.snapshot(), chainId = state.config!.deployment!.chainId, address = state.address, accountId = this.accountId!;
+  /** Binds once and re-reads after: the address the service returns must be this mnemonic's, signed by this identity. */
+  private async bind(mnemonic: string, accountId: string, address: string, check: () => void) {
+    const runtime = this.runtime;
     const existing = await runtime.api.request('chain.wallet'); check();
-    if (existing) { if (!verifyWalletBinding(existing, accountId, chainId, address)) throw new Error('WALLET_BINDING_MISMATCH'); return; }
-    const challenge = await runtime.api.request('chain.walletChallenge', { body: { address }, key: crypto.randomUUID() }); check();
-    const body = await signWalletBinding(mnemonic, challenge, { accountId, address, chainId }); check();
-    const bound = await runtime.api.request('chain.walletBind', { body, key: challenge.id }); check();
-    if (!verifyWalletBinding(bound, accountId, chainId, address)) throw new Error('WALLET_BINDING_MISMATCH');
-    await controller.refresh();
+    if (existing) { if (!verifyWalletBinding(existing, accountId, address)) throw new Error('WALLET_BINDING_MISMATCH'); return existing; }
+    const body = await signWalletBinding(mnemonic, accountId); check();
+    const bound = await runtime.api.request('chain.walletBind', { body }); check();
+    if (!verifyWalletBinding(bound, accountId, address)) throw new Error('WALLET_BINDING_MISMATCH');
+    return bound;
   }
   private async paymentController(expected: PaymentOwner) {
     const session = this.runtime.auth.session;
@@ -137,7 +135,7 @@ export class WalletRuntime {
     if (recipientId === accountId || runtime.state.rooms.blocked.some(person => person.id === recipientId)) throw new Error('RECIPIENT_BLOCKED');
     const scope = runtime.auth.scope();
     const binding = (await runtime.api.request('chain.person', { params: { id: recipientId } })).wallet; scope.check();
-    if (!binding || !verifyWalletBinding(binding, recipientId, order.deployment.chainId, order.recipient)) throw new Error('WALLET_BINDING_MISMATCH');
+    if (!binding || !verifyWalletBinding(binding, recipientId, order.recipient)) throw new Error('WALLET_BINDING_MISMATCH');
     if (runtime.state.rooms.blocked.some(person => person.id === recipientId)) throw new Error('RECIPIENT_BLOCKED');
     if (input.kind === 'tip' && !runtime.state.rooms.current?.messages.some(message => message.id === input.messageId && message.author.id === recipientId)) throw new Error('TIP_MESSAGE_UNAVAILABLE');
     if (input.kind === 'transfer' && 'teamId' in input && !runtime.state.remoteTeams.some(team => team.id === input.teamId && team.joined && team.memberIds.includes(accountId) && team.memberIds.includes(recipientId!))) throw new Error('RECIPIENT_NOT_TEAMMATE');
@@ -148,7 +146,7 @@ export class WalletRuntime {
     try {
       const result = await runtime.api.request('chain.person', { params: { id: accountId } }); scope.check();
       const binding = result.wallet;
-      if (binding && !verifyWalletBinding(binding, accountId, binding.chainId)) throw new Error('WALLET_BINDING_MISMATCH');
+      if (binding && !verifyWalletBinding(binding, accountId)) throw new Error('WALLET_BINDING_MISMATCH');
       if (this.personRequests.get(accountId) !== request) return result;
       runtime.state.data.people = runtime.state.data.people.map(person => person.id === accountId ? { ...person, walletAddress: binding?.address, walletVerified: !!binding } : person);
       runtime.emit(); return result;

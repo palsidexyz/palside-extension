@@ -63,8 +63,8 @@ export function teammateIds(c: PalsideController) {
 export function roomPerson(c: PalsideController, person: RoomPerson, fallback: string, mates = teammateIds(c)): Person & { mate: boolean } {
   const known = c.people.find(item => item.id === person.id);
   const mate = mates.has(person.id);
-  if (known) return { ...known, mate };
-  return { id: person.id, name: person.nickname || fallback, color: '#e5e6e9', avatar: c.live?.state.rooms.avatars[person.id], mate };
+  if (known) return { ...known, walletAddress: known.walletAddress ?? person.wallet ?? undefined, mate };
+  return { id: person.id, name: person.nickname || fallback, color: '#e5e6e9', avatar: c.live?.state.rooms.avatars[person.id], walletAddress: person.wallet ?? undefined, mate };
 }
 
 type Opening = { key: RoomKey; status: 'opening' | 'error' };

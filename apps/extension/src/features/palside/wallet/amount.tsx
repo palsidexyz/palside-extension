@@ -7,6 +7,11 @@ export function formatPals(value: string, decimals = 18) {
   const fraction = (amount % unit).toString().padStart(decimals, '0').replace(/0+$/, '');
   return `${amount / unit}${fraction ? `.${fraction}` : ''}`;
 }
+/** Thousands separators on the whole part, matching the rolling counters (en-US grouping). */
+export function groupPals(text: string) {
+  const [whole, fraction] = text.split('.');
+  return `${whole!.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}${fraction ? `.${fraction}` : ''}`;
+}
 export function PalsAmount({ value, decimals = 18, hidden = false, price }: { value?: string; decimals?: number; hidden?: boolean; price?: { numerator: string; denominator: string } | null }) {
   if (hidden) return <span aria-label="••••">••••</span>;
   if (value === undefined) return <span>—</span>;

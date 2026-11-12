@@ -16,14 +16,14 @@ async function run() {
   const database = `palside-asset-qa-${crypto.randomUUID()}`;
   const storage = new ClientStorage(database); const service = new PalsideService(undefined, undefined, storage);
   const { auth } = service;
-  const session: RuntimeDevice = { token: 'synthetic', storageKey: [], account: { bio: '', tags: [], id: 'fixture', nickname: 'fixture', avatarId: null, matrixId: '@fixture:local.test', revision: 0, acceptTeamInvites: true }, matrix: { userId: '@fixture:local.test', deviceId: 'fixture' } };
+  const session: RuntimeDevice = { token: 'synthetic', storageKey: [], account: { wallet: null, bio: '', tags: [], id: 'fixture', nickname: 'fixture', avatarId: null, matrixId: '@fixture:local.test', revision: 0, acceptTeamInvites: true }, matrix: { userId: '@fixture:local.test', deviceId: 'fixture' } };
   const checks: string[] = []; const result: { checks: string[]; error?: string; cleaned?: boolean } = { checks };
   try {
     auth.initialising = Promise.resolve(); auth.session = session;
     service.state.connection = { networkOnline: true, service: "ready", messaging: "ready", retrying: false };
     service.state.authenticated = true; service.state.account = session.account;
     service.state.data.self = session.account.id;
-    const team: TeamSnapshot = { reason: null, revision: 0, inviteSuspended: false, id: 'team', name: 'fixture', description: '', ownerId: 'fixture', roomId: '!fixture:local.test', avatarId: null, memberCount: 1, joined: true, publishedAt: null, recruitmentExpiresAt: null, retentionDays: 7, memberIds: ['fixture'], people: [{ bio: '', tags: [], deleted: false, id: 'fixture', nickname: 'fixture', avatarId: null, matrixId: session.matrix.userId }], periods: [{ joinedAt: 0, leftAt: null }], preferences: { muted: false, readIds: [], revision: 0 }, requests: [], bans: [], transfer: null, membersCanInvite: false };
+    const team: TeamSnapshot = { reason: null, revision: 0, inviteSuspended: false, id: 'team', name: 'fixture', description: '', ownerId: 'fixture', roomId: '!fixture:local.test', avatarId: null, memberCount: 1, joined: true, publishedAt: null, recruitmentExpiresAt: null, retentionDays: 7, memberIds: ['fixture'], people: [{ wallet: null, bio: '', tags: [], deleted: false, id: 'fixture', nickname: 'fixture', avatarId: null, matrixId: session.matrix.userId }], periods: [{ joinedAt: 0, leftAt: null }], preferences: { muted: false, readIds: [], revision: 0 }, requests: [], bans: [], transfer: null, membersCanInvite: false };
     service.state.remoteTeams = [team];
     const url = 'https://gmgn.ai/robinhood/token/0x020bfc650a365f8bb26819deaabf3e21291018b4';
     const canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;

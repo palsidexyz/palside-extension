@@ -2,7 +2,7 @@ import Type from 'typebox';
 import { endpoint, jsonBody, jsonResponse } from '../endpoint.ts';
 import { strictObject } from '../validation.ts';
 import { walletPerson } from '../profiles.ts';
-import { chainAddress, chainAmount, chainBalance, chainClaim, chainClientConfig, chainHash, chainOrder, chainOrderInput, chainRecords, chainPacketDetail, chainTeamFeed, chainRoom, walletBinding, walletBindInput, walletChallenge } from '../chain.ts';
+import { chainAddress, chainAmount, chainBalance, chainClaim, chainClientConfig, chainPublicDeployment, chainHash, chainOrder, chainOrderInput, chainRecords, chainPacketDetail, chainTeamFeed, chainRoom, walletBinding, walletBindInput } from '../chain.ts';
 const id = Type.String({ minLength: 1, maxLength: 256 });
 const hex = Type.String({ pattern: '^0x[0-9a-fA-F]*$' });
 const nullable = <T extends ReturnType<typeof Type.String> | typeof walletBinding>(schema: T) => Type.Union([schema, Type.Null()]);
@@ -23,7 +23,6 @@ export const chainRecoveryItem = strictObject({
 });
 export const chainRecovery = strictObject({ items: Type.Array(chainRecoveryItem, { maxItems: 50 }), nextCursor: Type.Union([id, Type.Null()]) });
 const serviceErrors = ['CHAIN_UNAVAILABLE'] as const;
-const walletWriteErrors = [...serviceErrors, 'CHAIN_DISABLED', 'CHAIN_IDEMPOTENCY_CONFLICT', 'CHAIN_WALLET_IMMUTABLE'] as const;
 const accountErrors = ['ACCOUNT_UNAVAILABLE', 'CHAIN_WALLET_REQUIRED'] as const;
 const paymentErrors = [...serviceErrors, ...accountErrors, 'CHAIN_DISABLED', 'CHAIN_ACCOUNT_UNAVAILABLE', 'TEAM_NOT_FOUND', 'CHAIN_TEAM_REQUIRED', 'ROOM_MESSAGE_NOT_FOUND', 'CHAIN_RECIPIENT_UNAVAILABLE'] as const;
 const orderEvidenceErrors = ['CHAIN_ORDER_NOT_FOUND', 'CHAIN_EVIDENCE_INVALID', 'CHAIN_EVIDENCE_REUSED'] as const;
@@ -35,14 +34,14 @@ export const chainEndpoints = [
   endpoint({ id: 'chain.config', method: 'GET', path: '/chain/config', response: jsonResponse(chainClientConfig), errors: serviceErrors }),
   endpoint({ id: 'chain.wallet', method: 'GET', path: '/chain/wallet', response: jsonResponse(nullable(walletBinding)), errors: serviceErrors }),
   endpoint({ id: 'chain.person', method: 'GET', path: '/chain/people/:id', params: strictObject({ id }), response: jsonResponse(walletPerson), errors: [...serviceErrors, 'ACCOUNT_UNAVAILABLE'] }),
-  endpoint({ id: 'chain.walletChallenge', method: 'POST', path: '/chain/wallet/challenge', ...write, body: jsonBody(strictObject({ address: chainAddress })), response: jsonResponse(walletChallenge), errors: [...walletWriteErrors, 'CHAIN_NOT_CONFIGURED'] }),
-  endpoint({ id: 'chain.walletBind', method: 'POST', path: '/chain/wallet/bind', ...write, body: jsonBody(walletBindInput), response: jsonResponse(walletBinding), errors: [...walletWriteErrors, 'CHAIN_CHALLENGE_INVALID', 'CHAIN_SIGNATURE_INVALID', 'CHAIN_CHALLENGE_EXPIRED', 'CHAIN_WALLET_BOUND'] }),
+  endpoint({ id: 'chain.walletBind', method: 'POST', path: '/chain/wallet/bind', body: jsonBody(walletBindInput), response: jsonResponse(walletBinding), errors: [...serviceErrors, 'CHAIN_WALLET_IMMUTABLE', 'CHAIN_SIGNATURE_INVALID', 'CHAIN_WALLET_BOUND'] }),
   endpoint({ id: 'chain.room', method: 'GET', path: '/chain/rooms', query: strictObject({ key: id }), response: jsonResponse(chainRoom), errors: [...serviceErrors, 'ROOM_NOT_LEASED'] }),
   endpoint({ id: 'chain.packet', method: 'GET', path: '/chain/packets/:id', params: strictObject({ id: chainHash }), response: jsonResponse(chainPacketDetail), errors: [...serviceErrors, ...packetReadErrors, ...accountErrors] }),
   endpoint({ id: 'chain.teamFeed', method: 'GET', path: '/chain/teams/:id/feed', params: strictObject({ id }), query: strictObject({ cursor: Type.Optional(id) }), response: jsonResponse(chainTeamFeed), errors: [...serviceErrors, ...packetReadErrors, 'CHAIN_ORDER_UNAVAILABLE'] }),
   endpoint({ id: 'chain.orders', method: 'POST', path: '/chain/orders', ...write, body: jsonBody(chainOrderInput), response: jsonResponse(chainOrder), errors: [...paymentErrors, 'CHAIN_IDEMPOTENCY_CONFLICT', 'CHAIN_AMOUNT_INVALID', 'CHAIN_RECIPIENT_INVALID', 'CHAIN_PACKET_INVALID', 'CHAIN_TEXT_REJECTED', 'CHAIN_RATE_LIMITED', 'CHAIN_ROOM_FORBIDDEN', 'CHAIN_PACKET_LIMIT'] }),
   endpoint({ id: 'chain.order', method: 'GET', path: '/chain/orders/:id', params: strictObject({ id: chainHash }), response: jsonResponse(chainOrder), errors: [...serviceErrors, ...orderEvidenceErrors] }),
-  endpoint({ id: 'chain.price', method: 'GET', path: '/chain/price', response: jsonResponse(Type.Union([Type.Null(), strictObject({ numerator: chainAmount, denominator: chainAmount, currency: Type.Literal('USD'), source: Type.Literal('pool'), blockNumber: chainAmount, updatedAt: Type.Integer({ minimum: 0 }) })])) }),
+  endpoint({ id: 'chain.public', method: 'GET', path: '/public/chain', auth: 'public', rateLimits: ['publicLobby'], response: jsonResponse(chainPublicDeployment) }),
+  endpoint({ id: 'chain.price', method: 'GET', path: '/chain/price', response: jsonResponse(Type.Union([Type.Null(), strictObject({ numerator: chainAmount, denominator: chainAmount, currency: Type.Literal('USD'), source: Type.Enum(['curve', 'pool']), blockNumber: chainAmount, updatedAt: Type.Integer({ minimum: 0 }) })])) }),
   endpoint({ id: 'chain.balance', method: 'GET', path: '/chain/balance', response: jsonResponse(chainBalance), errors: [...serviceErrors, 'CHAIN_WALLET_REQUIRED', 'CHAIN_INDEX_UNAVAILABLE'] }),
   endpoint({ id: 'chain.records', method: 'GET', path: '/chain/records', query: strictObject({ cursor: Type.Optional(Type.String({ pattern: '^(0|[1-9]\\d{0,77}):(0|[1-9]\\d{0,9}):(0|[1-9]\\d{0,9})$' })), direction: Type.Optional(Type.Union([Type.Literal('all'), Type.Literal('in'), Type.Literal('out')])) }), response: jsonResponse(chainRecords), errors: [...serviceErrors, 'CHAIN_WALLET_REQUIRED', 'CHAIN_INDEX_UNAVAILABLE'] }),
   endpoint({ id: 'chain.relayPrepare', method: 'POST', path: '/chain/relay/prepare', ...write, body: jsonBody(strictObject({ orderId: chainHash })), response: jsonResponse(relayResult), errors: [...relayPaymentErrors, 'CHAIN_SPONSOR_LIMIT'] }),

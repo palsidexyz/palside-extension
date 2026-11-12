@@ -20,7 +20,7 @@ const language = createLanguageController({ storage: { local: { get: async () =>
 const params = new URLSearchParams(location.search);
 const initial: RuntimeState = {
   revision: 0, ready: true, rooms: { summaries: {}, blocked: [], invites: [], acceptInvites: true, avatars: {} }, authenticated: params.get('scene') !== 'login', 
-  account: { bio: '', tags: [], id: 'you', nickname: 'Fixture user', avatarId: null, matrixId: '@fixture:test', revision: 0, acceptTeamInvites: true },
+  account: { wallet: null, bio: '', tags: [], id: 'you', nickname: 'Fixture user', avatarId: null, matrixId: '@fixture:test', revision: 0, acceptTeamInvites: true },
   
   connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
   data: { ...palsideFixtures, messages: palsideFixtures.messages.map((value, index) => ({ ...value, timestamp: Date.now() - (20 - index) * MINUTE_MS })) }, drafts: {},

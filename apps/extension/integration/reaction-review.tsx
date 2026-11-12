@@ -19,7 +19,7 @@ function Review() {
   const [state, setState] = useState<RuntimeState>(() => ({
     ...new PalsideService().state, ready: true, authenticated: true, 
     connection: { networkOnline: true, service: 'ready', messaging: 'ready', retrying: false },
-    account: { bio: '', tags: [], id: 'you', nickname: '你', avatarId: null, matrixId: '@fixture:test', revision: 0, acceptTeamInvites: true },
+    account: { wallet: null, bio: '', tags: [], id: 'you', nickname: '你', avatarId: null, matrixId: '@fixture:test', revision: 0, acceptTeamInvites: true },
     data: palsideFixtures, viewingId: palsideFixtures.views[0]?.id, reactions: [],
     preferences: { web: { share: true, interact: true }, current: 'night', notifications: 'off', toured: true },
   }));

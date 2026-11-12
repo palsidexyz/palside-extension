@@ -58,7 +58,7 @@ export type DanmakuSize = 'sm' | 'md' | 'lg';
 export type DanmakuDensity = 'low' | 'mid' | 'high';
 export const danmakuLimits = { low: 4, mid: 8, high: 14 };
 export type DanmakuSettings = { density: DanmakuDensity; enabled: boolean; area: DanmakuArea; speed: DanmakuSpeed; size: DanmakuSize; opacity: number };
-export const defaultDanmakuSettings: DanmakuSettings = { density: 'mid', enabled: true, area: 25, speed: 144, size: 'md', opacity: 90 };
+export const defaultDanmakuSettings: DanmakuSettings = { density: 'mid', enabled: true, area: 50, speed: 144, size: 'md', opacity: 90 };
 export function normalizeDanmakuSettings(value: unknown): DanmakuSettings {
   if (!value || typeof value !== 'object') return { ...defaultDanmakuSettings };
   const input = value as Record<string, unknown>;

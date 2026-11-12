@@ -53,7 +53,6 @@
       "recoveryReserved": "This payment may still complete, so the funds stay held. Keep checking and don't pay again.",
       "logoutRecovery": "Back up your recovery phrase first; without it you cannot recover your account or wallet. Signing out clears this device's drafts, caches and keys, but does not cancel submitted transactions. After signing back in with the same account, use Payment recovery to check the original operation before paying again.",
       "settings": "Wallet settings",
-      "address": "Wallet address",
       "amount": "Amount",
       "recipient": "Recipient",
       "externalAddress": "Recipient address",
@@ -87,8 +86,9 @@
       "smallDailyLimit": "Your daily quick-pay allowance is insufficient. It resets {reset}; you can also pay with your PIN.",
       "sponsorLimit": "Your daily free network fee allowance is used up. It resets {reset}.",
       "equalAmount": "Shares must be equal. The nearest valid amount is {amount} PALS.",
-      "tipLimit": "Tips are limited to 10,000 PALS each",
+      "tipLimit": "Tips are limited to {max} PALS each",
       "exportKey": "Export private key",
+      "palsContract": "PALS contract",
       "exportWarning": "Your private key controls all funds in this wallet. Keep it safe and never send it to anyone.",
       "exportExpiry": "Hidden automatically after 30 seconds",
       "checkStatus": "Refresh status",
@@ -642,12 +642,9 @@
       "CHAIN_INDEX_UNAVAILABLE": "Onchain records are temporarily unavailable",
       "CHAIN_DISABLED": "Onchain features are currently disabled",
       "CHAIN_SPONSOR_LIMIT": "Today’s free network fee quota is used up. Try again tomorrow.",
-      "CHAIN_NOT_CONFIGURED": "Onchain features have not been configured",
       "CHAIN_WALLET_REQUIRED": "Set up your wallet first",
       "CHAIN_WALLET_IMMUTABLE": "The wallet linked to this account cannot be changed",
       "CHAIN_WALLET_BOUND": "This wallet is already linked to another account",
-      "CHAIN_CHALLENGE_INVALID": "The wallet verification request is invalid. Start again.",
-      "CHAIN_CHALLENGE_EXPIRED": "The wallet verification request expired. Start again.",
       "CHAIN_SIGNATURE_INVALID": "Payment could not be verified",
       "CHAIN_AMOUNT_INVALID": "The payment amount is invalid",
       "CHAIN_TEXT_REJECTED": "This onchain display text is not allowed. Edit it and try again.",
@@ -1221,7 +1218,6 @@
       "thisSite": "This site",
       "pages": "Pages",
       "unsave": "Remove {name} from favorites",
-      "member": "Member",
       "viewing": "Viewing",
       "mention": "Mention",
       "bringOver": "Bring over",
@@ -1550,7 +1546,7 @@
       "demoDanmaku1": "volume picking up",
       "demoDanmaku2": "support near 0.055",
       "demoDanmaku3": "send it!",
-      "demoDanmaku4": "triangle almost done",
+      "demoDanmaku4": "watch the old high",
       "demoDanmaku5": "waiting for a retest",
       "demoDanmaku6": "gm",
       "toolsTitle": "Message tools",
@@ -1578,16 +1574,61 @@
   },
   "website": {
     "docControls": {
-      "initial": "Start",
-      "result": "Result",
-      "selected": "Selection",
-      "draft": "Draft",
-      "sent": "Sent",
       "steps": "Demo steps",
-      "play": "Play once",
+      "play": "Play",
       "pause": "Pause",
       "replay": "Replay",
       "position": "Step {count} of {total}"
+    },
+    "docSteps": {
+      "shareOff": "Off",
+      "shareOn": "Turn on",
+      "shareSwitch": "Switch token",
+      "shareStop": "Turn off",
+      "syncWatching": "Squad watching",
+      "syncMove": "Teammate moves",
+      "syncSort": "Reordered",
+      "followOn": "Following",
+      "followMove": "Page changes",
+      "followOpen": "Opens for you",
+      "overviewPanel": "Side panel",
+      "overviewIncoming": "New message",
+      "overviewReply": "Reply sent",
+      "teamsInvite": "Invite",
+      "teamsJoined": "Joined",
+      "roomOpen": "Danmaku",
+      "roomSend": "Send",
+      "signalReady": "Hold and drag",
+      "signalAttention": "Attention",
+      "signalQuestion": "Question",
+      "captureBefore": "Capture",
+      "captureMark": "Select and mark",
+      "captureSent": "Sent to chat",
+      "drawMate": "Teammate's line",
+      "drawShare": "Share with squad",
+      "drawMine": "Draw a line",
+      "squadBrowse": "Discover",
+      "squadJoined": "Joined",
+      "encryptionSend": "Send",
+      "encryptionTransit": "Encrypted",
+      "encryptionRead": "Decrypted",
+      "hotList": "Trending",
+      "hotRise": "Rank changes",
+      "hotOpen": "Open danmaku",
+      "installStore": "Web Store",
+      "installConfirm": "Confirm",
+      "installAdded": "Added",
+      "keysLocal": "Keys on device",
+      "keysSigned": "Signature only",
+      "sitesList": "Sites",
+      "sitesAsk": "Chrome asks",
+      "signingRefused": "Refused",
+      "packetArrives": "Red packet",
+      "packetSaved": "Deposited",
+      "tipDanmaku": "Pick a message",
+      "tipDone": "Tipped",
+      "pageDanmakuSend": "Send",
+      "pageDanmakuSite": "Another site"
     },
     "docDemo": {
       "shareLabel": "Share viewing: turn it on and your face joins the squad card for the token you are viewing; open another site and the card follows you; turn it off and it disappears",
@@ -1606,7 +1647,7 @@
       "tipLabel": "Tip: choose Tip from a danmaku line’s menu, pick 50 PALS, review and pay; after signing, sending and confirming onchain, the line’s tip total goes up",
       "pageDanmakuLabel": "Danmaku on pages: your line drifts across the token chart; on other sites for the same token you see the same danmaku",
       "recordsLabel": "Wallet records: filter between All, Incoming and Outgoing, and open a claimed red packet to see its amount and transaction",
-      "discoverLabel": "Discover squads: browse recruiting squads by intro and size, request to join, and join once the captain approves",
+      "squadLabel": "Discover squads: recruiting squads appear one at a time; request to join, wait for approval, and once the captain approves your face joins the members and the count goes up by one",
       "encryptionLabel": "End-to-end encryption: messages leave the sender encrypted, stay ciphertext on the server, and open only on members' devices",
       "hotLabel": "Trending: one live danmaku viewer board, showing gains of at least 3 viewers over five minutes",
       "installLabel": "Install: add Palside from the Chrome Web Store; Chrome only confirms the addition and lists no permissions",
@@ -1618,8 +1659,21 @@
       "tokenLead": "The token your Palside wallet uses",
       "tokenNetwork": "Network",
       "tokenAddress": "Contract address",
-      "tokenSupply": "Supply and allocation",
-      "github": "View source on GitHub"
+      "tokenSupply": "Total supply",
+      "contractCopy": "Copy full contract address",
+      "contractAria": "Copy Robinhood Chain contract address {address}",
+      "github": "View source on GitHub",
+      "sharedToken": "Token page",
+      "sharedTokenValue": "Token and source site",
+      "sharedPage": "Web page",
+      "sharedPageValue": "Page title and link",
+      "sharedSignin": "Link with sign-in details",
+      "sharedSigninValue": "Site name only",
+      "sharedNone": "Browser pages, incognito",
+      "sharedNoneValue": "Not shared",
+      "shareKeyOff": "Off",
+      "shareKeyOn": "On",
+      "presenceOffline": "Offline"
     },
     "title": "Palside — Share viewing and encrypted squad chat",
     "description": "See which tokens your squad is researching and discuss them in end-to-end encrypted chat, right in Chrome's side panel.",
@@ -1647,6 +1701,7 @@
       "dark": "Dark",
       "getPalside": "Get Palside",
       "copyright": "© 2026 Palside",
+      "storeTab": "Palside - Chrome Web Store",
       "addChrome": "Add to Chrome",
       "privacy": "Privacy",
       "inviteUnavailable": "This invitation is temporarily unavailable",
@@ -1688,7 +1743,7 @@
       },
       "signal": {
         "title": "Talk right on the chart",
-        "description": "Drop signals, share your drawings and point with the laser, all without leaving the page."
+        "description": "Drop signals, share drawings and see teammates' marks appear live, all without leaving the page."
       },
       "danmaku": {
         "title": "Live market mood",
@@ -1783,18 +1838,8 @@
       "inviteTitle": "Watch tokens with friends",
       "inviteSubtitle": "Watch together · Chat privately"
     },
-    "installed": {
-      "eyebrow": "Installed",
-      "title": "Palside is ready",
-      "stepPuzzle": "Click the puzzle icon at the top right of Chrome",
-      "stepPin": "Pin Palside",
-      "stepOpen": "Click the Palside icon to open the side panel",
-      "continueInvite": "Continue joining",
-      "guideLabel": "Chrome toolbar with the extensions menu open and Palside pinned",
-      "continueTeam": "Return to your squad"
-    },
     "film": {
-      "heroAccessible": "Demo: one click on Share on PONS turns on Share viewing and Page interaction together, the Palside entry joins the chart’s drawing toolbar, and public danmaku cross the chart; you hold ⌥ to send “Look here” and Mia answers “Look together”; Mia boxes the range on PONS and stretches it, and Leo circles the last candles and draws an arrow to the breakout; Robin calls the squad, you follow him from his profile card and Chrome opens the “Following Robin” tab group on CHUMP, where he is; back on your own tab, the group follows Robin in the background as he navigates, opens and closes tabs; you open Robin’s red packet, close the group’s last tab to stop following, and turn sharing off. All demo data is fictional; the candle shapes come from real markets.",
+      "heroAccessible": "Opening demo: one click on Share on PONS turns on Share viewing and Page interaction together; public danmaku cross the chart while the last candle keeps trading. Kai draws a rising support through two higher lows, and Leo circles the last candles, back at the old high. Holding ⌥ opens the signal wheel and sends “Look here” on the pullback’s low; a teammate answers “Look together” on the old high. Robin calls the squad, you follow him from his profile card, and Chrome opens the “Following Robin” tab group on CHUMP. Back on your own tab, the group follows Robin in the background as he navigates, opens and closes tabs. You open Robin's red packet, close the group's last tab to stop following, and turn sharing off. All demo data is fictional.",
       "ranking": "Ranking",
       "holders": "Holders {value}",
       "volume": "24h volume {value}",
@@ -1841,10 +1886,24 @@
       "wishLuck": "Good luck!",
       "wishRide": "Let’s ride",
       "wishThanks": "Thanks for the call",
-      "signalHintSelf": "You signaled {kind} on {place}",
       "drawHint": "{name} drew on {place}",
       "hotQuery": "C",
-      "robinCall": "CHUMP is about to break out of the triangle, follow me"
+      "robinCall": "CHUMP’s pullback looks done, follow me",
+      "robinCallBase": "CHUMP held its pullback, follow me",
+      "robinCallVolume": "CHUMP’s volume is back, follow me",
+      "chat": {
+        "robin": "I’m on CHUMP, PONS is yours",
+        "mia": "PONS just hit FOMO’s trending list",
+        "kai": "Volume is double yesterday’s",
+        "kai2": "Every pullback held, each low higher",
+        "self": "Waiting for a close above the high",
+        "leo": "It’s back at the old high, let me circle it"
+      },
+      "captureKai": "CHUMP just wicked way down",
+      "captureMark": "Holding",
+      "captureReply": "It’s holding, I’m in",
+      "captureMarkHigh": "Old high",
+      "captureReplyHigh": "Old high is the target"
     },
     "workflows": {
       "hot": {
@@ -1853,28 +1912,28 @@
         "description": "Ranked live by who’s watching, so rising tokens stand out at a glance."
       },
       "discover": {
-        "title": "Find traders on your wavelength",
-        "description": "Browse public squads by intro and size, and request to join in one click."
-      },
-      "tip": {
-        "label": "Tips",
-        "title": "Tip the calls that land",
-        "description": "Spot a danmaku you enjoy? Tip its author PALS in one click."
+        "title": "Find your squad",
+        "description": "Browse squads that are recruiting, and join once the captain approves."
       },
       "people": {
         "label": "Follow",
         "title": "Follow traders you trust",
         "description": "Follow a teammate’s pages: your tabs switch as theirs do."
+      },
+      "capture": {
+        "label": "Capture",
+        "title": "Mark it, send it",
+        "description": "Mark up any page and send it straight to your squad."
       }
     },
     "statement": {
       "lineSync": "<sync>Sync the page you are on</sync>, <phrase>see <tokens>the tokens your squad<mates></mates> is tracking</tokens>,</phrase>",
       "lineTalk": "<mark>mark</mark> and <signal>signal</signal> in place, and compare notes as it happens.",
       "encryptedLead": "<privacy>end-to-end encryption</privacy>,",
-      "peekSync": "Share viewing: you and Mia on PONS, Robin and Kai on CASHCAT",
-      "peekTokens": "Member card: Mia is viewing PONS",
-      "peekMark": "Screenshot markup: the breakout circled on the chart",
-      "peekSignal": "Signal: a teammate sends “Look here” on the chart"
+      "peekSync": "Share viewing: you and Mia on the same page",
+      "peekTokens": "Squad viewing: Mia on PONS, Leo on CHUMP, Kai on CASHCAT",
+      "peekMark": "Shared drawings: Leo circles it",
+      "peekSignal": "Signal: “Look here” lands on it"
     },
     "privacy": {
       "perTab": "Asked when needed",

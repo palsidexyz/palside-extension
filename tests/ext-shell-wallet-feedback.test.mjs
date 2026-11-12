@@ -58,6 +58,7 @@ async function fixture(t) {
     const exports = {};
     vm.runInContext(`(function(exports, require) { ${compiled(file)}\n})`, context)(exports, name => {
       if (name.endsWith('.css')) return { default: new Proxy({}, { get: (_, key) => key }), __esModule: true };
+      if (name === '../ui/use-copied') return load('ui/use-copied.ts');
       assert.ok(Object.hasOwn(modules, name), `unmocked import ${name}`); return modules[name];
     });
     return exports;
