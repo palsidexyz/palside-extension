@@ -195,7 +195,8 @@ export class WalletRuntime {
     await controller.handleEvent(event); scope.check();
     runtime.state.chainRevision = (runtime.state.chainRevision ?? 0) + 1;
     const key = runtime.state.rooms.current?.key;
-    if (event.type === 'tip' && event.roomKey === key || event.type === 'packet' && event.scope === key) {
+    // My own room packet changing state (paid, failed) arrives as an order event, so the room's banner follows it too.
+    if (event.type === 'tip' && event.roomKey === key || event.type === 'packet' && event.scope === key || event.type === 'order' && event.order.payload.kind === 'packet' && event.order.payload.packet.scope === key) {
       if (key) {
         // Tips and packets in a busy room arrive in bursts: one read at a time, plus one after it, for the room on screen only.
         let read = this.roomReads.get(key);

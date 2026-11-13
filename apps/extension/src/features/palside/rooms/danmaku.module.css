@@ -103,7 +103,6 @@ span.like { cursor:default; }
 
 /* One-line composer: the page switch, the input, send. */
 .bar { display:flex; align-items:center; gap:6px; flex:none; margin:4px 10px 10px; padding:5px; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
-.bar:focus-within { box-shadow:inset 0 0 0 var(--ui-focus-width) var(--ui-text-secondary); }
 .input { flex:1; min-width:0; height:32px; padding:0 6px; border:0; background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-callout); outline:none; }
 .input::placeholder { color:var(--ui-text-secondary); }
 .counter { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-variant-numeric:tabular-nums; }
@@ -195,13 +194,6 @@ span.like { cursor:default; }
 .siteOpen:focus-visible, .siteMore:focus-visible, .row > button:first-child:focus-visible, .like:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 @media (prefers-reduced-motion:reduce) { .row, .menu, .like { transition:none; } }
 
-/* 互动选项's tabs: 弹幕, 信号 — each with its icon. */
-.settingsTabs [role="tablist"] { display:flex; gap:4px; padding:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
-.settingsTabs [role="tab"] { display:inline-flex; flex:1; align-items:center; justify-content:center; gap:6px; min-width:0; min-height:34px; border:0; border-radius:calc(var(--ui-radius-l) - 4px); corner-shape:var(--ui-corner-shape); background:none; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); white-space:nowrap; cursor:pointer; transition:background-color .18s, color .18s; }
-.settingsTabs [role="tab"] svg { flex:none; width:15px; height:15px; }
-.settingsTabs [role="tab"][aria-selected="true"] { background:var(--ui-canvas); color:var(--ui-text-primary); font-weight:500; }
-.settingsTabs [role="tab"]:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
-@media (prefers-reduced-motion:reduce) { .settingsTabs [role="tab"] { transition:none; } }
 
 .messageMenu { --popover-width:148px; min-width:0; padding:5px; }
 .messageAction { min-height:34px; padding:7px 9px; gap:9px; border-radius:calc(var(--ui-radius-popover) - 5px); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-footnote); }

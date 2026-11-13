@@ -5,7 +5,7 @@ import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { Tooltip } from '@palside/ui/tooltip';
 import { message as uiMessage } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
-import { ArrowUpCircle, CheckCheck, ChevronDown, Compass, Eye, Flame, MoreHorizontal, Plus, Search, Settings2, Star, Users } from 'lucide-react';
+import { ArrowLeft, ArrowUpCircle, CheckCheck, ChevronDown, Compass, Eye, Flame, MoreHorizontal, Plus, Search, Settings2, Star, Users } from 'lucide-react';
 import { TeamAvatar } from '../teams/team-avatar';
 import { formerTeams } from '../teams/team-start';
 import type { Team } from '../../../domain/teams/model';
@@ -15,7 +15,7 @@ import { Button, IconButton } from '@palside/ui/button';
 import { Menu, MenuTrigger, MenuContent, MenuItem } from '@palside/ui/menu';
 import { Popover, PopoverTrigger, PopoverContent, usePopoverContext } from '@palside/ui/popover';
 import { roomCount, roomsOn, useShownRoomKey } from '../rooms/rooms';
-import { PanelSwitch, RoomTitle } from '../app/panel-tabs';
+import { RoomTitle } from '../app/panel-tabs';
 import { PageCapsule } from '../viewing/page-key';
 import { setSocialUi } from '../annotations/social-state';
 import { useExtensionUpdate } from '../feedback/extension-update';
@@ -60,17 +60,16 @@ function usePresenceFit(content: string) {
 }
 
 /** One 52px row on one line: the squad (32px avatar, the name, then who is here — online faces, the member count, or a dashed 邀请 seat,
- *  giving way step by step and finally folding into a badge on the avatar so the name keeps its width), then 36px controls — search or
- *  聊天 | 弹幕, the page key and the menu.
- *  On 弹幕 the title is the token with 👁 N after it (who watches it); 热门代币 sits in the menu.
+ *  giving way step by step and finally folding into a badge on the avatar so the name keeps its width), then 36px controls — search,
+ *  the page key and the menu (热门代币 sits in it). 弹幕 is sent from the composer's 弹 key, not from here.
  *  Other teams and pending invites mark the switcher itself: @N for mentions, otherwise a dot in place of the chevron. A downloaded
  *  extension version marks ⋯ with a dot and leads its menu with 更新到 x.
- *  With 弹幕 on (`tabs`) the row is shared by both pages and stays put: the title is the squad or the token; search moves into the menu. */
-export function ChatHeader({ c, onTeam, tabs }: { c: PalsideController; onTeam: (id: string) => void; tabs?: boolean }) {
+ *  On the 弹幕 page (`room`, opened from 热门 or a token) the row leads with ← back to the chat, then the token. */
+export function ChatHeader({ c, onTeam, room: roomPage }: { c: PalsideController; onTeam: (id: string) => void; room?: boolean }) {
   const t = useTranslations();
   const roomKey = useShownRoomKey(c);
   const update = useExtensionUpdate(c);
-  const room = tabs && c.screen === 'room';
+  const room = roomPage && c.screen === 'room';
   const count = c.team.memberCount ?? c.team.memberIds.length;
   const others = c.people.filter(p => p.id !== c.data.self && p.presence && c.team.memberIds.includes(p.id)).sort((a, b) => Number(b.presence === 'active') - Number(a.presence === 'active'));
   // You are online too: two people here read as two faces and 2, others first so the squad stays in view.
@@ -98,13 +97,13 @@ export function ChatHeader({ c, onTeam, tabs }: { c: PalsideController; onTeam: 
   const extra = online.length - Math.min(online.length, 2);
   const { header, fit } = usePresenceFit([room ? `room:${roomKey ?? ''}:${watching ?? ''}` : c.team.name, alone, online.length, extra, mentions, unread || invites > 0, c.team.readonly].join('|'));
   return <header ref={header} className={`${s.header} ${styles.bar}`}>
-    {room ? <div key="room" className={`${s.teamIdentity} ${styles.identity} ${styles.swap}`} data-fit={fit}><RoomTitle c={c} />
+    {room ? <div key="room" className={`${s.teamIdentity} ${styles.identity} ${styles.swap}`} data-fit={fit}><Action label={t('common.back')} className={styles.back} onClick={() => c.go('chat')}><ArrowLeft /></Action><RoomTitle c={c} />
       {watching !== undefined && <Tooltip content={t('extension.room.watching', { count: watching })}><button type="button" className={styles.presence} data-kind="watch" aria-label={t('extension.room.watching', { count: watching })} onClick={() => { setSocialUi({ people: undefined }); c.go('room-people'); }}>
         <Eye className={styles.glyph} size={14} strokeWidth={2.2} aria-hidden="true" /><span className={styles.number}><Count value={watching} /></span>
       </button></Tooltip>}
     </div> : <>
     <VisuallyHidden asChild><h1>{c.team.name}</h1></VisuallyHidden>
-    <div key="chat" className={`${s.teamIdentity} ${styles.identity} ${tabs ? styles.swap : ''}`} data-fit={fit}>
+    <div key="chat" className={`${s.teamIdentity} ${styles.identity}`} data-fit={fit}>
       <Popover boundarySelector="[data-palside-app]" align="start">
         <PopoverTrigger asChild><button type="button" className={`${s.teamSelect} ${styles.squad}`} aria-label={switchLabel}>
           <TeamAvatar team={c.team} size="md" />
@@ -125,7 +124,7 @@ export function ChatHeader({ c, onTeam, tabs }: { c: PalsideController; onTeam: 
       </button></Tooltip>}
     </div></>}
     <div className={s.tools}>
-      {tabs ? <PanelSwitch c={c} /> : <Action label={t('extension.copy.searchMessages')} className={styles.tool} onClick={search}><Search /></Action>}
+      {!room && <Action label={t('extension.copy.searchMessages')} className={styles.tool} onClick={search}><Search /></Action>}
       {/* The page capsule: this tab's site (its sheet holds 网页互动 here and Chrome's permission), then the 共享在看 key. */}
       <PageCapsule c={c} />
       <Menu boundarySelector="[data-palside-app]" align="end">
@@ -133,7 +132,6 @@ export function ChatHeader({ c, onTeam, tabs }: { c: PalsideController; onTeam: 
         <MenuContent aria-label={t('extension.copy.teamMenu')} className={styles.menu}>
           {update.ready && <><MenuItem icon={<ArrowUpCircle size={16} />} disabled={update.busy} onClick={() => void update.run()}>{t('extension.copy.updateTo', { version: update.ready })}</MenuItem>
           <hr className={styles.separator} /></>}
-          {tabs && <MenuItem icon={<Search size={16} />} onClick={search}>{t('extension.copy.searchMessages')}</MenuItem>}
           <MenuItem icon={<Star size={16} />} onClick={() => { c.go('favorites'); }}>{t('extension.web.myFavorites')}</MenuItem>
           {roomsOn(c) && <MenuItem icon={<Flame size={16} />} onClick={() => { c.go('hot'); }}>{t('extension.hot.tokens')}</MenuItem>}
           <hr className={styles.separator} />

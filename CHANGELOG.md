@@ -2,6 +2,16 @@
 
 Each version matches a Chrome Web Store release. The GitHub release attaches the exact store package with its build provenance.
 
+## v0.1.6
+
+- **Live comments from the chat box**: the chat and live-comment tabs at the top are gone; a 弹 key next to the message box switches it to sending a live comment on the token you're viewing.
+- **Payments show up right away**: transfers and red packets appear in chat the moment you pay, marked as sending until they land on chain, or as failed if the payment did not go through.
+- **Red packets**: opening one shows your share in a bottom sheet with a falling-coins effect.
+
+Requires desktop Chrome 130 or later.
+
+去掉顶部「聊天｜弹幕」切换，输入框旁的「弹」键直接发弹幕；转账和红包付款后立即出现在聊天里，上链前显示发送中，未成功显示已失败；拆红包结果在底部面板展示并带落币效果。需要桌面版 Chrome 130 或更高版本。
+
 ## v0.1.5
 
 - **Your account ID is your wallet address**: member cards, settings and live comments show a short 0x address; click it to copy the full one. The security page shows the full address.

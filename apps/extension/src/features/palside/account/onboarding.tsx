@@ -6,9 +6,10 @@ import { message as uiMessage,type TextValue,failureText } from '@palside/i18n';
 import { ENGLISH_WORDS } from '@palside/shared/identity';
 import { useTranslations } from 'use-intl';
 import { Count, Roll } from '../ui/motion-details';
+import { Band, MarkLogo, WaitNote, useSlow } from '../ui/wait';
 import type { SignupPhase } from '../../../runtime/composition/runtime-state';
-import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { ArrowLeft, Check, Copy, Eye, ShieldAlert, Users } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { ArrowLeft, Check, Copy, Eye, ShieldAlert, Users, WifiOff, X } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { avatarPath, type DefaultAvatarName } from '@palside/shared/person-avatars';
 import { Button } from '@palside/ui/button';
@@ -77,26 +78,47 @@ const signupPhases: SignupPhase[] = ['seal', 'register', 'connect', 'wallet'];
 const phaseTitle = { seal: 'phaseSeal', register: 'phaseRegister', connect: 'phaseConnect', wallet: 'phaseWallet' } as const;
 
 /** Registration names the part the runtime reports it is in; nothing advances on a timer. The mark stays put for the whole wait:
-    its eyes bob like a typing indicator, one bar fills by finished parts, the title rolls, and on success the check is drawn in the same tile. */
+    its eyes blink now and then, a soft band of light passes through the running title, one track split in four fills by finished
+    parts with a sweep in the running quarter, and on success the check is drawn in the same tile. Slow (the same part running for
+    8 s, measured here), offline (the browser says so) and checking (an unanswered request being confirmed) add one quiet line;
+    a failure stops on the part that failed, the mark turns to a cross, and retry or a way back to the PIN sit at the bottom. */
 function Working({ c }: { c: PalsideController }) {
-  const t = useTranslations();
+  const t = useTranslations(), text = useText();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
-  const done = c.working === 'done';
-  const index = done ? signupPhases.length : Math.max(0, signupPhases.indexOf(c.live?.state?.signupPhase ?? 'seal'));
+  const state = c.live?.state, done = c.working === 'done', failed = typeof c.working === 'object' ? c.working : undefined;
+  // The runtime clears its phase when password-set fails; the screen keeps the last part it saw so the failure lands there.
+  const reported = state?.signupPhase ? signupPhases.indexOf(state.signupPhase) : -1, [last, setLast] = useState(0);
+  if (reported >= 0 && reported !== last) setLast(reported);
+  const index = done ? signupPhases.length : reported >= 0 ? reported : last;
+  const running = !done && !failed, offline = running && state?.connection?.networkOnline === false, checking = running && Boolean(state?.signupChecking);
+  const slow = useSlow(running && !offline ? `${index}:${checking}` : undefined);
   const phase = signupPhases[index];
   const title = done ? t(c.flow === 'create' ? 'extension.copy.createDone' : 'extension.copy.restoreDone')
+    : failed ? t(c.flow === 'create' ? 'extension.copy.createFailed' : 'extension.copy.restoreFailed')
+    : checking ? t('extension.copy.signupChecking')
     : phase === 'register' && c.flow === 'restore' ? t('extension.copy.phaseAddDevice') : t(`extension.copy.${phaseTitle[phase ?? 'seal']}`);
-  return <div className={o.working} role="status" aria-live="polite" data-done={done || undefined}>
-    <span className={o.workingMark} aria-hidden="true">
-      <svg className={o.workingLogo} viewBox="0 0 128 128"><rect x="4" y="4" width="120" height="120" rx="32" fill="#CCFF00" /><path d="M38 33H90A4 4 0 0 1 94 37V75A4 4 0 0 1 90 79H59.333Q58 79 56.933 79.8L36.4 95.2Q34 97 34 94V37A4 4 0 0 1 38 33Z" fill="#202121" /><circle className={o.eye} cx="53" cy="56" r="5" fill="#CCFF00" /><circle className={o.eye} cx="75" cy="56" r="5" fill="#CCFF00" /></svg>
-      <svg className={o.workingCheck} viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2L18.5 7.8" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" pathLength={1} /></svg>
-    </span>
-    <h1 ref={heading} tabIndex={-1} className={o.workingTitle}><Roll k={title}>{title}</Roll></h1>
-    <span className={o.phaseBar} role="progressbar" aria-label={t(c.flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')} aria-valuemin={0} aria-valuemax={signupPhases.length} aria-valuenow={index}
-      style={{ '--done': index / signupPhases.length, '--at': Math.min(index, signupPhases.length - 1) / signupPhases.length } as CSSProperties} />
-    {c.live?.state?.signupWaiting && <p className={o.waiting}>{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>}
-  </div>;
+  return <>
+    <div className={o.working} role="status" aria-live="polite" data-done={done || undefined} data-failed={failed ? true : undefined} data-paused={offline || undefined}>
+      <span className={o.workingMark} aria-hidden="true">
+        <MarkLogo className={o.workingLogo} blink={running && !offline} />
+        <svg className={o.workingCheck} viewBox="0 0 24 24"><path d="M5.5 12.5l4.2 4.2L18.5 7.8" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" pathLength={1} /></svg>
+        <X className={o.workingCross} strokeWidth={2.6} />
+      </span>
+      <h1 ref={heading} tabIndex={-1} className={o.workingTitle}><Roll k={title}><Band active={running && !offline}>{title}</Band></Roll></h1>
+      <span className={o.track} role="progressbar" aria-label={t(c.flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')} aria-valuemin={0} aria-valuemax={signupPhases.length} aria-valuenow={index}>
+        {signupPhases.map((item, at) => <i key={item} data-state={at < index ? 'done' : at === index ? failed ? 'failed' : offline ? 'paused' : 'current' : undefined} />)}
+      </span>
+      {failed ? <p className={o.workingError} role="alert">{text(failed.error)}</p>
+        : state?.signupWaiting ? <p className={o.waiting}>{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>
+        : offline ? <WaitNote icon={<WifiOff />}>{t('common.networkOffline')}</WaitNote>
+        : slow ? <WaitNote>{t('common.slowNetwork')}</WaitNote> : null}
+    </div>
+    {failed && <div className={o.footer}>
+      <Button variant="primary" size="lg" onClick={failed.retry}>{t('common.retry')}</Button>
+      <Button size="lg" onClick={failed.back}>{t('extension.copy.changePassword')}</Button>
+    </div>}
+  </>;
 }
 
 /* 共享在看 as the landing film draws it: every token shows two faces and the rest as +N, with the headcount. Four
@@ -388,7 +410,7 @@ function Nickname({ c }: { c: PalsideController }) {
     } catch (cause) { setError(failureText(cause, 'extension.copy.profileSaveFailed')); }
     finally { setBusy(false); }
   }
-  return <Step title={t('extension.copy.yourNameTitle')} lead={t('extension.copy.nicknameLead')} onSubmit={() => void submit()} footer={<Button type="submit" variant="primary" size="lg" loading={busy} loadingLabel={t('common.working')} disabled={!name.trim() || Boolean(invalid)}>{t('extension.copy.finishSetup')}</Button>}>
+  return <Step title={t('extension.copy.yourNameTitle')} onSubmit={() => void submit()} footer={<Button type="submit" variant="primary" size="lg" loading={busy} loadingLabel={t('common.working')} disabled={!name.trim() || Boolean(invalid)}>{t('extension.copy.finishSetup')}</Button>}>
     <Field label={t('extension.copy.nickname')} error={invalid}>{props => <Input {...props} required autoFocus placeholder={t('extension.copy.yourName')} value={name} disabled={busy} onChange={event => { setName(event.target.value); setError(''); }} />}</Field>
     {error && <p className={edge.error} role="alert">{text(error)}</p>}
   </Step>;

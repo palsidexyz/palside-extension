@@ -64,6 +64,8 @@ export async function accountCreateCommand(this: RuntimeCommands, command: Extra
       }
 }
 
+const SIGNUP_CHECK_DELAY_MS = 1_500;
+
 export async function passwordSetCommand(this: RuntimeCommands, command: Extract<Command, { name: "password-set" }>) {
  const p = command.payload ?? {};
     const runtime = this.runtime;
@@ -86,17 +88,30 @@ export async function passwordSetCommand(this: RuntimeCommands, command: Extract
           let result: ApiResult<'accounts.create'>;
           if (runtime.auth.authMode === 'create') {
             runtime.state.config = await attempt.wait(runtime.api.request('system.config', { signal: attempt.signal }));
+            const config = runtime.state.config;
+            const register = async () => {
+              try {
+                return await runtime.api.request('accounts.create', { body, secretKey: identity.secretKey, difficulty: config.signupDifficulty, signal: attempt.signal,
+                  onProofOfWorkSlow: () => { if (attempt.current()) { runtime.state.signupWaiting = true; runtime.emit(); } },
+                });
+              } catch (error) {
+                if (error instanceof ApiError && error.code === 'RESULT_UNKNOWN') throw error;
+                attempt.check();
+                if (!(error instanceof ApiError) || error.code !== 'ACCOUNT_EXISTS') throw error;
+                return await runtime.api.request('devices.create', { body, secretKey: identity.secretKey, signal: attempt.signal });
+              }
+            };
             try {
-              result = await runtime.api.request('accounts.create', { body, secretKey: identity.secretKey, difficulty: runtime.state.config.signupDifficulty, signal: attempt.signal,
-                onProofOfWorkSlow: () => { if (attempt.current()) { runtime.state.signupWaiting = true; runtime.emit(); } },
-              });
-            }
-            catch (error) {
-              if (error instanceof ApiError && error.code === 'RESULT_UNKNOWN') throw error;
-              attempt.check();
-              if (!(error instanceof ApiError) || error.code !== 'ACCOUNT_EXISTS') throw error;
-              result = await runtime.api.request('devices.create', { body, secretKey: identity.secretKey, signal: attempt.signal });
-            } finally { if (attempt.current() && runtime.state.signupWaiting) { runtime.state.signupWaiting = undefined; runtime.emit(); } }
+              try { result = await register(); }
+              catch (error) {
+                // Sent but unanswered: confirm once with the same identity. An account that was created answers ACCOUNT_EXISTS
+                // and this device joins it; one that was not is created now. A second unknown is reported, never guessed.
+                if (!(error instanceof ApiError) || error.code !== 'RESULT_UNKNOWN') throw error;
+                attempt.check(); runtime.state.signupChecking = true; runtime.emit();
+                await attempt.wait(new Promise(resolve => setTimeout(resolve, SIGNUP_CHECK_DELAY_MS)));
+                result = await register();
+              }
+            } finally { if (attempt.current() && (runtime.state.signupWaiting || runtime.state.signupChecking)) { runtime.state.signupWaiting = undefined; runtime.state.signupChecking = undefined; runtime.emit(); } }
           } else result = await runtime.api.request('devices.create', { body, secretKey: identity.secretKey, signal: attempt.signal });
           if (!attempt.current()) {
             await runtime.auth.revokeDevice({ ...result, storageKey });

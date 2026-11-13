@@ -96,7 +96,7 @@ export function Fit({ children, className }: { children: ReactNode; className?: 
   </motion.div>;
 }
 
-/** Three dots that breathe in turn while something is on its way. */
-export function Dots() {
-  return <span className={m.dots} aria-hidden="true"><i /><i /><i /></span>;
+/** Something on its way: the payment stage node at 14px, a thin arc turning round a dot. */
+export function Pending() {
+  return <span className={m.pending} aria-hidden="true" />;
 }

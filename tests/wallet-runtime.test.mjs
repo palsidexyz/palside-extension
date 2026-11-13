@@ -7,6 +7,8 @@ import { decodeFunctionData, encodeAbiParameters, encodeFunctionData, erc20Abi, 
 import { redPacketAbi } from '../packages/shared/src/chain/generated.ts';
 import { orderCalls, orderFingerprint } from '../packages/shared/src/chain/orders.ts';
 import { relayBatchAbi, relayOperationHash, verifyRelaySignatures } from '../packages/shared/src/chain/signing.ts';
+import { operationKey } from '../packages/shared/src/contracts/common.ts';
+import { decodeContract } from '../packages/shared/src/contracts/validation.ts';
 const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith('.') && !/\.[a-z]+$/.test(specifier) && context.parentURL?.includes('/apps/extension/src/')) return next(specifier + '.ts', context);
   return next(specifier, context);
@@ -388,7 +390,9 @@ test('a grab is one idempotent request with no payment order or password, and re
   const packetId = '0x' + 'b'.repeat(64), requests = [], claim = { packetId, status: 'issued', index: 0, amount: String(unit) };
   const runtime = { api: { request: async (...args) => { requests.push(args); return claim; } }, wallet: { start: async () => f.controller } };
   assert.deepEqual(await walletHandlers['wallet-claim'].call({ runtime }, { payload: { packetId } }), claim);
-  assert.deepEqual(requests, [['chain.claim', { params: { id: packetId }, key: `claim:${packetId}` }]]);
+  assert.deepEqual(requests, [['chain.claim', { params: { id: packetId }, key: `claim_${packetId}` }]]);
+  // The transport validates the header before sending; a key outside the shared contract never leaves the extension.
+  assert.equal(decodeContract(operationKey, requests[0][1].key), requests[0][1].key);
   assert.equal(f.controller.snapshot().payment, undefined); assert.deepEqual(f.counts(), { signed: 0, submits: 0 });
 });
 test('dismissal after a rejected gas quote cancels prepared server request and clears pending state', async t => {
@@ -406,6 +410,15 @@ test('random packet allocation conserves bigint amount and uses independent comm
   assert.equal(result.packet.amounts.reduce((sum, amount) => sum + BigInt(amount), 0n), 100n * unit);
   assert.ok(result.packet.amounts.every(amount => BigInt(amount) >= unit));
   assert.equal(new Set(result.packet.allocationSalts).size, 20);
+  assert.ok(result.packet.amounts.every(amount => BigInt(amount) % unit === 0n), 'random shares are whole PALS');
+  for (let round = 0; round < 50; round++) {
+    const tight = createPacketInput({ kind: 'team', scope: 'team', count: 5, distribution: 'random', total: String(6n * unit) }).packet.amounts.map(BigInt);
+    assert.equal(tight.reduce((sum, amount) => sum + amount, 0n), 6n * unit);
+    assert.ok(tight.every(amount => amount >= unit && amount % unit === 0n));
+  }
+  const fractional = createPacketInput({ kind: 'team', scope: 'team', count: 3, distribution: 'random', total: String(10n * unit + unit / 2n) }).packet.amounts.map(BigInt);
+  assert.equal(fractional.reduce((sum, amount) => sum + amount, 0n), 10n * unit + unit / 2n);
+  assert.equal(fractional.filter(amount => amount % unit !== 0n).length, 1);
   assert.throws(() => createPacketInput({ kind: 'team', scope: 'team', count: 3, distribution: 'equal', total: String(10n * unit) }));
 });
 test('binding is signed by both local wallet and identity and rejects server substitutions', async () => {

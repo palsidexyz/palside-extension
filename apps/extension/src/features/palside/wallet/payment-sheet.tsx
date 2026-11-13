@@ -1,14 +1,16 @@
 'use client';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
+import { SECOND_MS } from '@palside/shared/units';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, RotateCcw, WifiOff, X } from 'lucide-react';
 import { errorMessage } from '@palside/i18n';
 import { shortAddress } from '@palside/shared/navigation';
 import { Button, IconButton } from '@palside/ui/button';
 import { PinInput } from '@palside/ui/field';
 import { Sheet } from '@palside/ui/sheet';
+import { Spinner } from '@palside/ui/spinner';
 import { parsePals, terminalPayment, type PaymentPhase, type WalletPayment } from '../../../domain/wallet/model';
 import { personFor, type Person } from '../../../domain/account/model';
 import type { Viewing } from '../../../domain/assets/model';
@@ -16,8 +18,9 @@ import { roomPerson } from '../rooms/rooms';
 import type { PalsideController } from '../app/use-palside';
 import { useText } from '../ui/text';
 import { PersonAvatar, Token } from '../ui/primitives';
-import { Dots, DrawnCheck, Fit, Rise, Step, Swap } from '../ui/motion-details';
-import { PalsAmount, formatPals } from './amount';
+import { DrawnCheck, Fit, Rise, Step, Swap } from '../ui/motion-details';
+import { WaitNote, useSlow } from '../ui/wait';
+import { PalsAmount, formatPals, groupPals } from './amount';
 import { quotaResetText } from './quota';
 import { recordLabels } from './recovery-state';
 import s from './payment.module.css';
@@ -31,6 +34,8 @@ export const PALS = { id: 'pals', name: 'PALS', kind: 'asset', url: '', color: '
 type SheetState = { open: false; session: number } | { open: true; accountId: string; session: number; mode: 'transfer' | 'payment'; recipientId?: string; owned?: string; onDone?: () => void };
 let current: SheetState = { open: false, session: 0 };
 let paymentSession: { accountId: string } | undefined;
+/** How long an opened payment sheet waits for its quoted payment to reach the panel state. */
+const PAYMENT_ARRIVAL_MS = 5 * SECOND_MS;
 const listeners = new Set<() => void>();
 function update(next: SheetState) { current = next; for (const listener of listeners) listener(); }
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -82,8 +87,16 @@ export function PaymentSheet({ c }: { c: PalsideController }) {
   const visible = sheet.open && sheet.accountId === c.live?.state.account?.id && c.live.state.authenticated;
   useEffect(() => { if (visible) void command?.('wallet-reconcile', {}).catch(() => {}); }, [command, visible, sheet.session]);
   const owned = visible && sheet.owned && payment?.id === sheet.owned ? payment : undefined;
-  // A payment-mode sheet whose payment is gone (dismissed elsewhere, account changed) has nothing left to show.
-  useEffect(() => { if (current === sheet && sheet.open && sheet.mode === 'payment' && !owned) update({ open: false, session: sheet.session }); }, [sheet, owned]);
+  // A review's reply can land before the state patch that carries its payment, so the sheet waits for that payment.
+  const arrived = useRef<number | undefined>(undefined);
+  useEffect(() => { if (owned) arrived.current = sheet.session; }, [owned, sheet.session]);
+  // A payment-mode sheet whose payment is gone (dismissed elsewhere, account changed) or never arrives has nothing to show.
+  useEffect(() => {
+    if (current !== sheet || !sheet.open || sheet.mode !== 'payment' || owned) return;
+    if (arrived.current === sheet.session) { update({ open: false, session: sheet.session }); return; }
+    const timer = setTimeout(() => { if (current === sheet) update({ open: false, session: sheet.session }); }, PAYMENT_ARRIVAL_MS);
+    return () => clearTimeout(timer);
+  }, [sheet, owned]);
   function close() {
     if (!sheet.open || current !== sheet) return;
     // Nothing is signed before 付款, so leaving a quote discards it; a payment already on its way keeps settling on its own.
@@ -91,14 +104,21 @@ export function PaymentSheet({ c }: { c: PalsideController }) {
     update({ open: false, session: sheet.session + 1 });
     if (owned?.phase === 'confirmed') sheet.onDone?.();
   }
-  return <Sheet open={Boolean(visible)} onOpenChange={open => { if (!open) close(); }} boundarySelector="[data-palside-app]" aria-labelledby="payment-title" className={s.sheet}>
-    {visible && <PaymentFlow key={sheet.session} c={c} sheet={sheet} mode={sheet.mode} initialRecipient={sheet.recipientId} payment={owned} onClose={close} />}
+  // Until its payment arrives, a payment-mode sheet stays down rather than flash the transfer form.
+  const shown = visible && (sheet.mode !== 'payment' || !!owned);
+  return <Sheet open={shown} onOpenChange={open => { if (!open) close(); }} boundarySelector="[data-palside-app]" aria-labelledby="payment-title" className={s.sheet}>
+    {shown && <PaymentFlow key={sheet.session} c={c} sheet={sheet} mode={sheet.mode} initialRecipient={sheet.recipientId} payment={owned} onClose={close} />}
   </Sheet>;
 }
 
 function PaymentFlow({ c, sheet, mode, initialRecipient, payment, onClose }: { c: PalsideController; sheet: Extract<SheetState, { open: true }>; mode: 'transfer' | 'payment'; initialRecipient?: string; payment?: WalletPayment; onClose: () => void }) {
   const t = useTranslations();
   const step: FlowStep = payment ? stepOf(payment.phase) : 'compose';
+  // A payment that fails after the sheet showed its stages fails in place: the track stays and the stage it reached turns red.
+  const [reached, setReached] = useState<{ id: string; at: number }>();
+  const stage = payment ? STAGES.indexOf(payment.phase as typeof STAGES[number]) : -1;
+  if (payment && stage >= 0 && (reached?.id !== payment.id || reached.at !== stage)) setReached({ id: payment.id, at: stage });
+  const failedAt = payment && step === 'failed' && reached?.id === payment.id ? reached.at : undefined;
   const [seen, setSeen] = useState({ step, dir: 1 });
   if (seen.step !== step) setSeen({ step, dir: ORDER[step] < ORDER[seen.step] ? -1 : 1 });
   const [draft, setDraft] = useState<Draft>({ to: 'mate', recipient: initialRecipient ?? '', address: '', amount: '' });
@@ -111,9 +131,9 @@ function PaymentFlow({ c, sheet, mode, initialRecipient, payment, onClose }: { c
       <h2 id="payment-title" role="status"><Swap k={title}>{title}</Swap></h2>
       <IconButton size="sm" variant="quiet" label={t('common.close')} onClick={onClose}><X size={18} /></IconButton>
     </header>
-    <Fit><Step k={step} dir={seen.dir} className={s.step}>
+    <Fit><Step k={failedAt === undefined ? step : 'busy'} dir={seen.dir} className={s.step}>
       {step === 'compose' && <Compose c={c} sheet={sheet} draft={draft} setDraft={setDraft} fixed={Boolean(initialRecipient)} />}
-      {payment && step !== 'compose' && <Settle c={c} payment={payment} step={step} onClose={onClose} onRestart={mode === 'transfer' ? () => { own(undefined, sheet); if (payment) void c.run('wallet-dismiss', { accountId: sheet.accountId, paymentId: payment.id }); } : undefined} />}
+      {payment && step !== 'compose' && <Settle c={c} payment={payment} step={step} failedAt={failedAt} onClose={onClose} onRestart={mode === 'transfer' ? () => { own(undefined, sheet); if (payment) void c.run('wallet-dismiss', { accountId: sheet.accountId, paymentId: payment.id }); } : undefined} />}
     </Step></Fit>
   </>;
 }
@@ -180,7 +200,7 @@ function AmountBox({ c, value, onChange, error, autoFocus }: { c: PalsideControl
     </label>
     <div className={s.amountFoot}>
       <Swap k={error ?? 'ok'}><span data-error={error ? true : undefined}>{error ?? (value && wallet?.price ? <UsdValue c={c} value={value} /> : ' ')}</span></Swap>
-      {balance !== undefined && <span className={s.available}>{t('extension.wallet.available', { amount: formatPals(balance) })}<button type="button" className={s.max} onClick={() => onChange(formatPals(balance))}>{t('extension.wallet.max')}</button></span>}
+      {balance !== undefined && <span className={s.available}>{t('extension.wallet.available', { amount: groupPals(formatPals(balance)) })}<button type="button" className={s.max} onClick={() => onChange(formatPals(balance))}>{t('extension.wallet.max')}</button></span>}
     </div>
   </motion.div>;
 }
@@ -204,12 +224,17 @@ function usePayee(c: PalsideController, payment: WalletPayment): { person?: Pers
   return { line: t('extension.wallet.packetShares', { count: input.packet.count }), done: t('extension.wallet.packetSent') };
 }
 
-function Settle({ c, payment, step, onClose, onRestart }: { c: PalsideController; payment: WalletPayment; step: FlowStep; onClose: () => void; onRestart?: () => void }) {
+function Settle({ c, payment, step, failedAt, onClose, onRestart }: { c: PalsideController; payment: WalletPayment; step: FlowStep; failedAt?: number; onClose: () => void; onRestart?: () => void }) {
   const t = useTranslations(), locale = useLocale(), text = useText(), reduced = useReducedMotion();
-  const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [checking, setChecking] = useState(false);
+  const [password, setPassword] = useState(''), [busy, setBusy] = useState(false), [refreshing, setRefreshing] = useState(false);
   const payee = usePayee(c, payment), input = payment.input;
   const needsPin = payment.phase === 'password' || payment.passwordRequired;
   const submitted = useRef('');
+  // While it runs: offline is what the browser reports; checking is a submitted payment whose reply was lost and is being
+  // reconciled; slow is the same stage still running after 8 s, measured here.
+  const busyStep = step === 'busy', offline = busyStep && c.live?.state?.connection?.networkOnline === false;
+  const checking = busyStep && payment.phase === 'pending' && Boolean(payment.error);
+  const slow = useSlow(busyStep && !offline ? `${payment.id}:${payment.phase}` : undefined);
   async function pay(pin?: string) {
     if (busy) return; setBusy(true);
     try { await c.live?.command('wallet-confirm', { accountId: c.data.self, paymentId: payment.id, password: pin || undefined }); } catch { /* The payment carries its own error and shakes the cells. */ }
@@ -237,17 +262,23 @@ function Settle({ c, payment, step, onClose, onRestart }: { c: PalsideController
       <motion.div key={payment.error ?? 'pin'} animate={payment.error && !reduced ? { x: [0, -10, 10, -6, 6, -2, 0] } : { x: 0 }} transition={{ duration: .42 }}>
         <PinInput outlined aria-label={t('extension.wallet.password')} value={password} onValueChange={setPassword} autoComplete="off" autoFocus data-autofocus disabled={busy} />
       </motion.div>
-      <p className={s.error} role="alert" data-busy={busy || undefined}><Swap k={busy ? 'busy' : payment.error ?? 'ok'}>{busy ? <Dots /> : payment.error ? failureText : hint}</Swap></p>
+      <p className={s.error} role="alert" data-busy={busy || undefined}><Swap k={busy ? 'busy' : payment.error ?? 'ok'}>{busy ? <Spinner size={14} /> : payment.error ? failureText : hint}</Swap></p>
     </div> : <div className={s.foot}>
       <Swap k={payment.error ?? 'ok'}><p className={s.error} role="alert">{payment.error ? failureText : hint}</p></Swap>
       <Button className={s.primary} variant="primary" size="lg" loading={busy} onClick={() => void pay()}>{t('extension.wallet.pay')}</Button>
     </div>}
   </>;
-  if (step === 'busy') return <>
-    {hero()}
-    <Stages at={STAGES.indexOf(payment.phase as typeof STAGES[number])} labels={[t('extension.wallet.stageSign'), t('extension.wallet.stageSend'), t('extension.wallet.pending')]} />
-    <div className={s.foot}><Button className={s.primary} variant="quiet" loading={checking} onClick={() => { setChecking(true); void c.run('wallet-reconcile', {}).finally(() => setChecking(false)); }}>{t('extension.wallet.checkStatus')}</Button></div>
-  </>;
+  const labels = [t('extension.wallet.stageSign'), t('extension.wallet.stageSend'), t('extension.wallet.pending')];
+  if (step === 'busy') {
+    const prominent = slow || checking;
+    return <>
+      {hero()}
+      <Stages at={STAGES.indexOf(payment.phase as typeof STAGES[number])} mode={offline ? 'offline' : undefined} labels={labels} />
+      <div className={s.noteRow}>{offline ? <WaitNote key="offline" icon={<WifiOff />}>{t('common.networkOffline')}</WaitNote>
+        : checking ? <WaitNote key="checking">{t('extension.wallet.checking')}</WaitNote> : slow ? <WaitNote key="slow">{t('common.slowNetwork')}</WaitNote> : null}</div>
+      <div className={s.foot}><Button className={s.primary} variant={prominent ? 'surface' : 'quiet'} leadingIcon={prominent ? <RotateCcw size={16} /> : undefined} disabled={offline} loading={refreshing} onClick={() => { setRefreshing(true); void c.run('wallet-reconcile', {}).finally(() => setRefreshing(false)); }}>{t('extension.wallet.checkStatus')}</Button></div>
+    </>;
+  }
   if (step === 'done') return <>
     <div className={s.hero}>
       <DrawnCheck />
@@ -258,6 +289,7 @@ function Settle({ c, payment, step, onClose, onRestart }: { c: PalsideController
   </>;
   return <>
     {hero(true)}
+    {failedAt !== undefined && <Stages at={failedAt} mode="failed" labels={labels} />}
     <p className={s.error} role="alert" data-center>{payment.phase === 'expired' ? t('extension.errors.ORDER_EXPIRED') : failureText}</p>
     <div className={s.foot}>
       {onRestart && <Button className={s.primary} variant="primary" size="lg" onClick={onRestart}>{t('extension.wallet.again')}</Button>}
@@ -267,13 +299,15 @@ function Settle({ c, payment, step, onClose, onRestart }: { c: PalsideController
 }
 
 const STAGES = ['signing', 'submitting', 'pending'] as const;
-/** 签名 → 发送 → 确认 on one track: passed stages are checked, the current one breathes, the line fills behind it. */
-function Stages({ at, labels }: { at: number; labels: string[] }) {
+/** 签名 → 发送 → 确认 on one track: passed stages are checked, a thin arc turns around the current one, the line fills behind it.
+    Offline stops the arc and shows the offline glyph; a failure turns the stage it reached into a red cross. */
+function Stages({ at, labels, mode }: { at: number; labels: string[]; mode?: 'offline' | 'failed' }) {
   const reduced = useReducedMotion(), current = Math.max(0, at);
   return <ol className={s.stages} aria-label={labels[current]}>
     <motion.span className={s.stageFill} aria-hidden="true" initial={false} animate={{ scaleX: current / (labels.length - 1) }} transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 34 }} />
-    {labels.map((label, index) => <li key={label} data-state={index < current ? 'done' : index === current ? 'current' : undefined} aria-current={index === current ? 'step' : undefined}>
-      <span className={s.stageNode}>{index < current ? <DrawnCheck size="sm" /> : index === current ? <Dots /> : null}</span>
+    {labels.map((label, index) => <li key={label} data-state={index < current ? 'done' : index === current ? mode ?? 'current' : undefined} aria-current={index === current ? 'step' : undefined}>
+      <span className={s.stageNode}>{index < current ? <DrawnCheck size="sm" /> : index !== current ? null
+        : mode === 'failed' ? <span className={s.stageFailed}><X /></span> : mode === 'offline' ? <WifiOff className={s.stageOffline} /> : <><span className={s.stageSpin} /><span className={s.stageCore} /></>}</span>
       <span>{label}</span>
     </li>)}
   </ol>;

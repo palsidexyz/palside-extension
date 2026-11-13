@@ -15,13 +15,12 @@
 
 .body h2 { margin:0 0 6px; font-size:var(--ui-type-headline); font-weight:600; line-height:1.35; }
 .body p { margin:0; font-size:var(--ui-type-callout); line-height:1.55; color:var(--ui-text-secondary); }
-.pairs { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; margin:0; font-size:var(--ui-type-callout); line-height:1.45; }
-.pairs dt { font-weight:600; }
-.pairs dd { margin:0; color:var(--ui-text-secondary); }
 .tools { display:grid; gap:7px; margin:2px 0 0; padding:0; list-style:none; font-size:var(--ui-type-callout); line-height:1.4; }
 /* Icon, name, then one text column: the description never breaks; keycaps sit beside it when they fit and drop under it, on the same edge, when they don't. */
 .tools li { display:grid; grid-template-columns:18px auto minmax(0, 1fr); align-items:start; column-gap:8px; }
 .tools svg { width:17px; height:17px; margin-top:2px; stroke-width:1.8; }
+/* 弹: the composer's own glyph, still, scaled to the 17px icon line. */
+.tools li > span[aria-hidden] { width:18px; height:18px; margin-top:1px; transform:scale(.82); }
 .tools b { font-weight:600; white-space:nowrap; }
 .tools p { display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; margin:0; min-width:0; color:inherit; line-height:inherit; }
 .tools p > span:first-child { color:var(--ui-text-secondary); white-space:nowrap; }

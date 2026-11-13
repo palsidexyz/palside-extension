@@ -1,7 +1,7 @@
 'use client';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { localeOrEnglish,pastTime,message as uiMessage,type TextValue,failureText } from '@palside/i18n';
-import { accountAddress } from '@palside/shared/chain/account-address';
+import { accountAddress, shortAccountAddress } from '@palside/shared/chain/account-address';
 import { useCopied } from '../ui/use-copied';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { useTranslations } from 'use-intl';
@@ -19,11 +19,11 @@ import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
 import i from './identity.module.css';
 
-/** The full account ID: the 零钱 address in EIP-55 case, as two 21-character lines so every character can be checked at any width. */
+/** The account ID: the full 零钱 address in EIP-55 case on one line when it fits, else the short form; copy and title always carry the full address. */
 function AccountIdRow({ c, address }: { c: PalsideController; address: string }) {
   const t = useTranslations(), [copied, copy] = useCopied(c), full = accountAddress(address);
   return <SettingControl icon={<Fingerprint size={16} />}>
-    <span className={i.accountId} title={full}><span>{full.slice(0, 21)}</span><span>{full.slice(21)}</span></span>
+    <span className={i.accountId} title={full}><span>{full}</span><span>{shortAccountAddress(address)}</span></span>
     <Action label={t(copied ? 'extension.copy.copied' : 'extension.copy.copyAccountId')} onClick={() => copy(full)}>{copied ? <Check /> : <Copy />}</Action>
   </SettingControl>;
 }

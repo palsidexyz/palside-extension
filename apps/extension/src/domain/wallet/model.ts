@@ -8,7 +8,8 @@ export type PaymentPhase = 'review' | 'password' | 'signing' | 'submitting' | 'p
 export type WalletPayment = {
   id: string; input: ChainOrderInput; order: ChainOrder; phase: PaymentPhase;
   passwordRequired: boolean; total: string; error?: string; requestId?: string;
-  signed?: boolean; pendingSince?: number; quickPayResetAt?: number;
+  /** sentAt is when 付款 sent it on its way (signing began): where the chat places it until the service records the submission. */
+  signed?: boolean; sentAt?: number; pendingSince?: number; quickPayResetAt?: number;
 };
 export type WalletPreferences = { smallPayments: boolean; hideAmounts: boolean };
 export type WalletAvailability = 'loading' | 'closed' | 'locked' | 'ready' | 'offline';

@@ -297,7 +297,7 @@ export class WalletController implements WalletControllerPort {
         if (!same(address, this.state.address)) throw new Error('WALLET_ADDRESS_MISMATCH');
       }
       this.ready();
-      payment.phase = 'signing'; payment.error = undefined; await this.savePayment(); this.emit();
+      payment.phase = 'signing'; payment.error = undefined; payment.sentAt ??= this.now(); await this.savePayment(); this.emit();
       const prepared = await this.options.api.prepare(payment.order.id, `${payment.id}_prepare`); this.check();
       if (prepared.orderId !== payment.order.id) throw new Error('ORDER_MISMATCH');
       payment.requestId = prepared.requestId;

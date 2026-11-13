@@ -30,6 +30,7 @@ import s from '../app/palside.module.css';
 import { liveView } from '../assets/token-data';
 import { ChainPicker } from '../assets/chain-picker';
 import { addressFamily } from '@palside/shared/tokens';
+import { DanmakuKey, DanmakuLine } from '../rooms/composer-danmaku';
 
 const TEXT_MAX = 4000;
 
@@ -151,6 +152,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
     // A screenshot belongs to the team it was taken for, even if another team is open when it arrives.
     return live.onCaptured(({ src, teamId }) => attach({ kind: 'image', src, name: t('extension.copy.screenshotName') }, teamId));
   }, [live, attach, t]);
+  const danmakuLine = useRef<HTMLInputElement>(null);
   const pendingShare = live?.state.pendingShare && (!live.state.pendingShareTeamId || live.state.pendingShareTeamId === c.current) ? live.state.pendingShare : undefined;
   return <>
     {editingImage && <ImageEditor src={editingImage.src} name={editingImage.name} teamId={editingImage.teamId} command={c.live?.command} onClose={() => setEditingImage(undefined)} onSave={async src => {
@@ -171,6 +173,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
       <VisuallyHidden role="status">{queue ? t('extension.dynamic.sendPacingStatus', { count: queue.count }) : ''}</VisuallyHidden>
       <div className={s.composer} data-composer-surface data-dragging={dragging || undefined}
         onDragOver={dragOver} onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }} onDrop={drop}>
+        {!edited && <DanmakuLine c={c} lineRef={danmakuLine} />}
         {edited ? <div className={refStyles.refDraft}>
           <EditLine original={edited} />
           <IconButton size="sm" variant="quiet" className={refStyles.remove} label={t('extension.copy.cancelEdit')} onClick={() => c.setEditing(undefined)}><StateGlyph state={t('extension.copy.cancelEdit')}><X size={14} /></StateGlyph></IconButton>
@@ -216,6 +219,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
             </IconButton>
           </div> : <div className={s.tools}>
             {characterLength(c.draft.text) > TEXT_MAX - 200 && <small className={characterLength(c.draft.text) > TEXT_MAX ? s.danger : s.muted}>{characterLength(c.draft.text)}/{TEXT_MAX}</small>}
+            {live && <DanmakuKey c={c} lineRef={danmakuLine} />}
             <IconButton data-film-action="send" size="sm" className={s.sendButton}
               label={c.disconnected ? t('extension.copy.sendWhenConnected') : t('extension.copy.sendMessage')}
               variant={ready ? 'primary' : 'surface'} disabled={c.disconnected || !ready || preparing || c.draftConflict} onClick={() => void send()}>

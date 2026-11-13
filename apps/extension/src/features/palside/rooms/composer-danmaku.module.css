@@ -1,0 +1,51 @@
+/* 弹: the 32px slot beside 发送. A dashed, slightly rounded square around 弹; the button never fills.
+   Grey (no token page), still (ready), dashes running round the box like marquee lights (on). */
+.key.key { flex:none; width:32px; height:32px; background:transparent; color:var(--ui-text-secondary); }
+.key.key:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.key.key[aria-disabled=true] { color:var(--ui-ink-muted); cursor:default; }
+.key.key[aria-disabled=true]:hover { background:transparent; color:var(--ui-ink-muted); }
+.key.key[data-state=on], .key.key[data-state=on]:hover { color:var(--ui-text-primary); }
+
+.glyph { position:relative; display:grid; place-items:center; width:22px; height:22px; }
+/* Beats the icon button's 18px svg rule by specificity. */
+.glyph svg.frame { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.glyph b { position:relative; font-size:var(--ui-type-caption); font-weight:600; line-height:1; letter-spacing:0; }
+.glyph svg.lines { position:relative; width:22px; height:22px; }
+.lines path { stroke:currentColor; stroke-width:1.7; stroke-linecap:round; }
+.dash { stroke:currentColor; stroke-width:1.5; stroke-dasharray:5.5 2.833; fill:none; }
+.key[data-state=on] .dash { animation:marquee 1.2s linear infinite; }
+@keyframes marquee { to { stroke-dashoffset:-8.333px; } }
+
+/* The 弹幕 line opens at the top of the composer, a hairline under it; the squad field below stays as it was. Nothing in it reaches past
+   the slot (which clips while it unfolds): my face sits on the tool icons' left edge, ⌃ and 发送 on 发送's column below. */
+.slot { overflow:hidden; }
+.line { display:flex; align-items:center; gap:8px; margin:0 0 6px; padding:0 0 6px 7px; border-bottom:1px solid var(--ui-border-soft); }
+.line > [data-person-avatar] { flex:none; }
+.field { position:relative; flex:1; min-width:0; height:28px; overflow:hidden; }
+.input { position:relative; z-index:1; width:100%; height:100%; padding:0; border:0; background:none; outline:none; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-callout); }
+.input::placeholder { color:var(--ui-ink-muted); }
+.input:disabled { cursor:default; }
+/* Others' newest lines pass through the empty field, one at a time: name, then what they said. */
+.passing { position:absolute; inset:0; overflow:hidden; color:var(--ui-ink-muted); font-size:var(--ui-type-callout); line-height:28px; white-space:nowrap; text-overflow:ellipsis; pointer-events:none; }
+.passing b { margin-right:6px; color:var(--ui-text-secondary); font-weight:600; }
+.watch { display:inline-flex; flex:none; align-items:center; gap:4px; height:24px; padding:0 7px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
+.watch:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
+.expand.expand { flex:none; margin-left:-4px; border-radius:50%; color:var(--ui-text-secondary); }
+.send.send { flex:none; border-radius:50%; box-shadow:none; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; }
+.send.send:disabled { opacity:1; color:var(--ui-text-secondary); background:var(--ui-control-recess); }
+/* 👁 N and ⌃ give way to 发送 as soon as there is text, and come back when it is gone. */
+.line .send, .line .watch, .line .expand { animation:swapIn .18s var(--ui-ease-feedback); }
+@keyframes swapIn { from { opacity:0; transform:scale(.86); } }
+/* In the composer the line is a quiet 28px row: its round keys shrink to 28px and keep 发送's right edge below. */
+.line .send.send, .line .expand.expand { width:28px; height:28px; min-height:28px; }
+.counter { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-variant-numeric:tabular-nums; }
+.counter[data-over] { color:var(--ui-ink-error); }
+
+/* ⌃: the token's 弹幕 in a bottom sheet — token and 👁 N on top, the list, the full view's bar at its foot. */
+.sheet.sheet { max-height:min(560px, 76%); padding:14px 0 0; }
+.head { display:flex; align-items:center; gap:8px; flex:none; padding:0 10px 10px 16px; border-bottom:1px solid var(--ui-border-soft); }
+.head h2 { min-width:0; margin:0; overflow:hidden; font-size:var(--ui-type-headline); font-weight:600; white-space:nowrap; text-overflow:ellipsis; }
+.headTools { display:flex; align-items:center; gap:2px; margin-left:auto; }
+.list { display:flex; flex:1; flex-direction:column; min-height:0; }
+
+@media (prefers-reduced-motion:reduce) { .key[data-state=on] .dash, .line .send.send, .line .watch, .line .expand.expand { animation:none; } }

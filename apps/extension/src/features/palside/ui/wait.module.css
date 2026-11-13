@@ -1,0 +1,9 @@
+/* Shared waiting language: the blinking mark, the band of light through a running word, and the quiet line under a wait. */
+.eye { transform-box:fill-box; transform-origin:center; animation:blink 3.6s ease-in-out infinite; }
+.band { display:inline-block; -webkit-mask-image:linear-gradient(100deg, #000 0 42%, rgba(0,0,0,.38) 50%, #000 58% 100%); mask-image:linear-gradient(100deg, #000 0 42%, rgba(0,0,0,.38) 50%, #000 58% 100%); -webkit-mask-size:300% 100%; mask-size:300% 100%; animation:band 2.2s cubic-bezier(.45,0,.55,1) infinite; }
+.note { display:flex; align-items:center; justify-content:center; gap:6px; margin:0; min-height:20px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:20px; text-align:center; animation:noteIn .3s var(--ui-ease-feedback) both; }
+.note svg { flex:none; width:14px; height:14px; }
+@keyframes blink { 0%, 90%, 100% { transform:none; } 94% { transform:scaleY(.1); } }
+@keyframes band { from { -webkit-mask-position:100% 0; mask-position:100% 0; } to { -webkit-mask-position:0 0; mask-position:0 0; } }
+@keyframes noteIn { from { opacity:0; transform:translateY(3px); } }
+@media (prefers-reduced-motion:reduce) { .eye, .band, .note { animation:none; } }

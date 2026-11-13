@@ -5,13 +5,14 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTranslations } from 'use-intl';
 import { Button } from '@palside/ui/button';
 import type { PalsideController } from '../app/use-palside';
+import type { ApiResult } from '../../../runtime/transport/api';
 import { Sheet } from '@palside/ui/sheet';
 import { RoomPacketBanner } from './packet';
 import { formatPals, groupPals } from './amount';
 import { PersonAvatar } from '../ui/primitives';
 import { roomPerson } from '../rooms/rooms';
 import { ROOM_PACKET_AFTER_EXPIRY_MS } from './clock';
-import { parsePals } from '../../../domain/wallet/model';
+import { parsePals, type WalletPayment } from '../../../domain/wallet/model';
 import { openPayment, usePaymentRequest } from './payment-sheet';
 import s from './wallet.module.css';
 
@@ -19,9 +20,21 @@ export function RoomPayments({ c, roomKey }: { c: PalsideController; roomKey: st
   const command = c.live?.command, enabled = c.live?.state.wallet?.config?.enabled;
   const data = c.live?.state.chainRoom?.key === roomKey ? c.live.state.chainRoom : undefined;
   useEffect(() => { if (enabled) void command?.('wallet-room', { key: roomKey }).catch(() => {}); }, [command, enabled, roomKey]);
-  const packets = data?.packets.filter(item => item.expiresAt + ROOM_PACKET_AFTER_EXPIRY_MS > c.now) ?? [];
+  const listed = data?.packets.filter(item => item.expiresAt + ROOM_PACKET_AFTER_EXPIRY_MS > c.now) ?? [];
+  // My packet shows from 付款 on, before the service lists it; the listed one replaces it in place.
+  const sending = roomSending(c.live?.state.wallet?.payment, roomKey, c.data.self);
+  const packets = sending && !listed.some(item => item.id === sending.id) ? [...listed, sending] : listed;
   if (!enabled || !packets.length) return null;
   return <div className={s.roomPayments}><RoomPacketBanner c={c} packets={packets} /></div>;
+}
+
+type RoomPacket = ApiResult<'chain.room'>['packets'][number];
+/** The room packet this panel is sending right now, until the service lists it. */
+function roomSending(payment: WalletPayment | undefined, roomKey: string, self: string): RoomPacket | undefined {
+  if (!payment || !['signing', 'submitting', 'pending'].includes(payment.phase)) return undefined;
+  const { input, order } = payment;
+  if (input.kind !== 'packet' || input.packet.kind !== 'room' || input.packet.scope !== roomKey) return undefined;
+  return { id: order.id, accountId: self, kind: 'room', scope: roomKey, status: 'pending', count: input.packet.count, amount: order.amount, claimedCount: 0, claimedAmount: '0', createdAt: payment.sentAt ?? order.createdAt, expiresAt: order.expiresAt };
 }
 
 /** 打赏: the line being thanked, then quick amounts or a custom one; the author receives all of it. */

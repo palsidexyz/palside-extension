@@ -31,7 +31,7 @@ async function fixture(t, { lateScreen = false } = {}) {
     '@palside/shared/rules/accounts': require('@palside/shared/rules/accounts'),
     '@palside/shared/person-avatars': { avatarPath: name => name },
     'motion/react': { useReducedMotion: () => true },
-    'lucide-react': Object.fromEntries(['ArrowLeft', 'Check', 'Copy', 'Eye', 'ShieldAlert', 'Users'].map(name => [name, noop])),
+    'lucide-react': Object.fromEntries(['ArrowLeft', 'Check', 'Copy', 'Eye', 'ShieldAlert', 'Users', 'WifiOff', 'X'].map(name => [name, noop])),
     '@palside/ui/visually-hidden': { VisuallyHidden: ({ children }) => children },
     '@palside/ui/button': { Button: ({ children, onClick, disabled }) => h('button', { onClick, disabled }, children) },
     '@palside/ui/tooltip': { HelpTip: noop },
@@ -40,7 +40,8 @@ async function fixture(t, { lateScreen = false } = {}) {
     '../ui/brand': { Brand: noop },
     '../settings/language-setting': { LanguageSetting: noop },
     '../settings/appearance': { AppearanceSetting: noop },
-    '../ui/motion-details': { Count: noop },
+    '../ui/motion-details': { Count: noop, Roll: noop },
+    '../ui/wait': { Band: noop, MarkLogo: noop, WaitNote: noop, useSlow: () => false },
     '../../../domain/chat/model': { characterLength: text => text.length },
     '../ui/text': { useText: () => value => value, useTextState: () => React.useState('') },
   };

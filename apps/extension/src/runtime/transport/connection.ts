@@ -19,7 +19,7 @@ export function connectionStatus(connection: Connection): ConnectionStatus {
 }
 export const connectionNotices = {
   'update-required': { title: uiMessage('extension.runtime.updateRequiredTitle'), detail: uiMessage('extension.runtime.updateRequiredDetail') },
-  'network-offline': { title: uiMessage('extension.runtime.networkOfflineTitle'), detail: uiMessage('extension.runtime.networkOfflineDetail') },
+  'network-offline': { title: uiMessage('common.networkOffline'), detail: uiMessage('extension.runtime.networkOfflineDetail') },
   'service-unavailable': { title: uiMessage('extension.runtime.serviceUnavailableTitle'), detail: uiMessage('extension.runtime.serviceUnavailableDetail') },
   'messaging-unavailable': { title: uiMessage('extension.runtime.messagingUnavailableTitle'), detail: uiMessage('extension.runtime.messagingUnavailableDetail') },
   'initialization-failed': { title: uiMessage('extension.runtime.encryptionFailedTitle'), detail: uiMessage('extension.runtime.encryptionFailedDetail') },

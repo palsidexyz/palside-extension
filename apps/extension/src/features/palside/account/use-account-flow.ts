@@ -39,7 +39,15 @@ async function previewInvite(url: string) {
   // The quiz is keyed by the phrase, so the words are dropped only once the runtime has moved on to the password step.
   useLayoutEffect(() => { if (screen === 'password' && flow === 'create' && phrase.length) setPhrase([]); }, [screen, flow, phrase, setPhrase]);
 const restoreAccount = (words: string[]) => { activeGeneration.current = undefined; setFlow('restore'); return identityStep(() => live!.command('account-login', { words: words.map(word => word.trim().toLowerCase()) })); };
-// A finished registration stays on screen as a drawn check for a beat; failures return to the password step at once.
-const setPassword = (password: string) => identityStep(async () => { setWorking(true); try { await live!.command('password-set', { password }); setWorking('done'); await new Promise(resolve => setTimeout(resolve, DONE_HOLD_MS)); } finally { setWorking(false); } if (data.pendingInvite) getActions().openInvitation(); else getActions().go('chat'); });
+// A finished registration stays on screen as a drawn check for a beat; a failure stays on the wait screen at the part that
+// failed, with its reason, a retry with the same PIN, and a way back to the PIN step (which kept its digits underneath).
+const setPassword = (password: string): Promise<void> => identityStep(async () => {
+  setWorking(true);
+  try { await live!.command('password-set', { password }); }
+  catch (error) { if (mounted.current) setWorking({ error: failureText(error), retry: () => void setPassword(password), back: () => setWorking(false) }); return; }
+  setWorking('done');
+  try { await new Promise(resolve => setTimeout(resolve, DONE_HOLD_MS)); } finally { setWorking(false); }
+  if (data.pendingInvite) getActions().openInvitation(); else getActions().go('chat');
+});
   return { startCreate, previewInvite, createAccount, restoreAccount, setPassword };
 }

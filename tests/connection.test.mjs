@@ -39,7 +39,7 @@ test('lost acknowledgement stays uncertain; definite rejection is failed', () =>
 test('upload, permissions, rate limiting and session failures have actionable text', () => {
   assert.match(renderMessage('zh-CN', sendFailure({ code: 'UPLOAD_FAILED' }, false, false).detail), /图片上传失败/);
   assert.match(renderMessage('zh-CN', sendFailure({ httpStatus: 401 }, true, false).detail), /登录已失效/);
-  assert.match(renderMessage('zh-CN', sendFailure({ httpStatus: 403 }, true, false).detail), /发送权限/);
+  assert.match(renderMessage('zh-CN', sendFailure({ httpStatus: 403 }, true, false).detail), /发送被拒绝/);
   assert.match(renderMessage('zh-CN', sendFailure({ httpStatus: 429 }, true, false).detail), /过于频繁/);
 });
 test('unreachable service is not labelled device offline and write uncertainty is preserved', async t => {

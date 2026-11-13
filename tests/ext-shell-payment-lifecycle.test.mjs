@@ -49,6 +49,7 @@ function production() {
     '@palside/ui/switch': { Switch: ({ help }) => help.content },
     '../settings/setting-rows': { SettingGroup: pass, SettingControl: pass, SettingItem: () => null, settingRows: {} },
     '@palside/ui/counter': { Counter: ({ value }) => value },
+    '@palside/ui/spinner': { Spinner: () => h('span', { 'data-spinner': true }) },
     '@palside/ui/field': { PinInput: ({ onValueChange, ...props }) => h('input', { ...omit(props, ['outlined']), onInput: event => onValueChange(event.target.value) }) },
     '@palside/ui/sheet': { Sheet: ({ open, children, onOpenChange, ...props }) => open ? h('section', { 'data-sheet': true, 'aria-labelledby': props['aria-labelledby'] }, children, h('button', { 'data-dismiss': true, onClick: () => onOpenChange(false) }, 'Dismiss')) : null },
     '@palside/ui/visually-hidden': { VisuallyHidden: pass },
@@ -58,7 +59,8 @@ function production() {
     '../rooms/rooms': { roomPerson: (_c, author) => author },
     '../ui/primitives': { PersonAvatar: () => null, Token: () => null },
     '../ui/text': { useText: () => value => value },
-    '../ui/motion-details': { Count: ({ value }) => value, CountText: ({ text }) => text, Dots: () => 'pending', DrawnCheck: () => 'confirmed', Fit: pass, Rise: pass, Step: pass, Swap: pass },
+    '../ui/motion-details': { Count: ({ value }) => value, CountText: ({ text }) => text, Dots: () => 'pending', Pending: () => 'pending', DrawnCheck: () => 'confirmed', Fit: pass, Rise: pass, Step: pass, Swap: pass },
+    '../ui/wait': { Band: () => null, MarkLogo: () => null, WaitNote: () => null, useSlow: () => false },
     // Coin flight is DOM animation; the lifecycle under test only needs a hook with nothing in flight.
     './packet-coins': { usePacketCoins: () => coinsStub },
     './amount': { AnimatedAmount: ({ value }) => value, PalsAmount: ({ value }) => value, formatPals: value => String(Number(value) / 1e18) },
@@ -382,4 +384,14 @@ test('wallet copy has matching language keys and describes the actual packet ref
     assert.match(locale.extension.wallet.sponsorLimit, /\{reset\}/);
     assert.match(locale.extension.wallet.smallDailyLimit, /\{reset\}/);
   }
+});
+
+test('payment sheet waits for a state patch that arrives after openPayment', async t => {
+  const f = await fixture(t);
+  f.c.live.state.wallet.payment = undefined;
+  await act(async () => f.components.openPayment('late'));
+  await f.render();
+  assert.equal(f.calls.some(([name]) => name === 'wallet-dismiss'), false);
+  f.c.live.state.wallet.payment = quoted('late'); await f.render();
+  assert.equal(f.container.textContent.includes('extension.wallet.confirmTransfer'), true);
 });

@@ -7,7 +7,7 @@ export const walletHandlers = {
   'wallet-person': async function (command) { return this.runtime.wallet.person(command.payload.accountId); },
   // A grab is assigned by the service and settled by its automation: no password, no payment order.
   'wallet-claim': async function (command) {
-    const claim = await this.runtime.api.request('chain.claim', { params: { id: command.payload.packetId }, key: `claim:${command.payload.packetId}` });
+    const claim = await this.runtime.api.request('chain.claim', { params: { id: command.payload.packetId }, key: `claim_${command.payload.packetId}` });
     (await this.runtime.wallet.start()).noteGrab(command.payload.packetId);
     return claim;
   },

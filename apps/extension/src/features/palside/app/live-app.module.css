@@ -3,4 +3,6 @@
 .state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; max-width: 280px; margin: 0 auto; padding-bottom: 48px; text-align: center; }
 .title { margin: 0; font-size:var(--ui-type-title); line-height: 24px; font-weight: 600; }
 .detail { margin: 0; font-size:var(--ui-type-callout); line-height: 20px; color: var(--ui-text-secondary); }
-.loadingIcon[data-slot="spinner"] { color: var(--ui-text-secondary); animation-duration: 1s; }
+/* Opening: the same mark and band of light as registration, so the brand is the first thing on screen. */
+.mark { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 4px; border-radius: var(--ui-radius-l); corner-shape: var(--ui-corner-shape); background: var(--ui-control-surface); }
+.mark > svg { width: 24px; height: 24px; }

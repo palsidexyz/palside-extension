@@ -114,10 +114,14 @@ const invites = scene === 'invites' ? [
   { id: 'i2', team: { id: 'meme', name: 'Meme 研究所', avatarId: null, memberCount: 48 }, from: roomPeople[1]!, createdAt: now - 2 * DAY_MS, expiresAt: now + DAY_MS },
 ] : [];
 const rooms = {
+  // The tab shows CASHCAT on gmgn.ai, an added site, so 弹幕 follows it.
+  tab: roomKey, leased: roomKey, current: roomFor(roomKey),
   summaries: { [roomKey]: { key: roomKey, site: 'gmgn', count: 23, faces: roomFaces, at: now } },
   blocked: scene === 'blocked' ? [stranger('toshi-0x52aa', 'Toshi'), stranger('ivy-0xa8f0', 'Ivy')] : [], invites, acceptInvites: params.get('accept') !== '0', avatars: {},
 } satisfies RuntimeState['rooms'];
-const defaultClicks: Record<string, string> = { room: '弹幕', 'room-slow': '弹幕', 'room-empty': '弹幕', hot: '团队菜单,热门', interaction: '小队菜单,个人设置,网页互动', invite: '弹幕,Kenji,邀请进小队' };
+// 弹幕 is reached the way a person does: 弹 opens the line in the composer, ⌃ the sheet, ↗ the full view.
+const openDanmaku = '发弹幕,查看弹幕,打开弹幕页';
+const defaultClicks: Record<string, string> = { room: openDanmaku, 'room-slow': openDanmaku, 'room-empty': openDanmaku, hot: '团队菜单,热门', interaction: '小队菜单,个人设置,网页互动', invite: `${openDanmaku},Kenji,邀请进小队` };
 /** Clicks through the UI by visible text or aria-label: `clicks=设置,隐私与权限`. */
 const clicks = (params.get('clicks') ?? defaultClicks[scene] ?? '').split(',').filter(Boolean);
 async function clickThrough() {

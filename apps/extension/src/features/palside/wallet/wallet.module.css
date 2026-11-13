@@ -39,7 +39,6 @@
 .roomPayments { flex:none; display:flex; flex-direction:column; gap:6px; padding:0 12px; }
 .roomPayments:empty { display:none; }
 .transferCard { display:block; width:240px; max-width:100%; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; text-align:left; transition:opacity .3s; }
-.transferCard[data-state=failed] { opacity:.6; }
 .transferTop { display:flex; align-items:center; gap:10px; padding:12px 12px 10px; }
 .transferTop > span:last-child { min-width:0; display:flex; flex-direction:column; }
 .transferTop strong { font-size:var(--ui-type-title); line-height:22px; font-weight:600; font-variant-numeric:tabular-nums; }
@@ -49,8 +48,23 @@
 .transferFoot [data-state=done] { color:var(--ui-ink-success); }
 .transferFoot [data-state=failed] { color:var(--ui-ink-error); }
 .settled { width:13px; height:13px; }
+/* A failed transfer or share: a small red cross, the mirror of the green check. */
+.failGlyph { display:inline-grid; place-items:center; flex:none; width:14px; height:14px; border-radius:50%; background:var(--ui-ink-error); color:var(--ui-canvas); }
+.failGlyph svg { width:9px; height:9px; stroke-width:3.4; }
+.offline { display:flex; align-items:center; gap:8px; min-height:44px; padding:0 6px 0 14px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-callout); }
+.offline > span { flex:1; min-width:0; color:var(--ui-text-primary); }
+/* Loading skeleton: the shapes of the balance block and the tiles, with one slow band of light across them. */
+.skeleton { display:block; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:linear-gradient(90deg, var(--ui-control-surface) 0 40%, var(--ui-control-recess) 50%, var(--ui-control-surface) 60% 100%); background-size:300% 100%; animation:skeleton 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+.skeleton[data-shape=token] { width:54px; height:54px; border-radius:50%; }
+.skeleton[data-shape=label] { width:40px; height:12px; margin-top:6px; }
+.skeleton[data-shape=amount] { width:136px; height:32px; margin-block:4px; }
+.skeleton[data-shape=chip] { width:112px; height:24px; border-radius:var(--ui-radius-pill); }
+.skeleton[data-shape=tile] { height:64px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); }
+@keyframes skeleton { from { background-position:100% 0; } to { background-position:0 0; } }
+@media (prefers-reduced-motion:reduce) { .skeleton { animation:none; } }
 .levelEvent { padding:8px; margin:0; text-align:center; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
-.claimEvent { display:flex; align-items:center; justify-content:center; gap:6px; padding:4px 8px; }
+/* The small envelope takes a signal mark's 18px slot, so claim notes and signal hints line up the same way. */
+.claimArt { display:inline-flex; justify-content:center; flex:none; width:18px; }
 .roomPayments > details { max-height:180px; overflow:auto; font-size:var(--ui-type-callout); }
 .roomPayments > details summary { cursor:pointer; padding:6px 0; color:var(--ui-text-secondary); }
 @media(prefers-reduced-motion:reduce) { .segment button { transition:none; } }

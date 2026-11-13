@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'use-intl';
 import { localeOrEnglish, shortDateTime } from '@palside/i18n';
 import { motion, useReducedMotion } from 'motion/react';
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, ChevronRight, Copy, Eye, EyeOff, History, Settings, Wallet, X } from 'lucide-react';
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, ChevronRight, Copy, Eye, EyeOff, History, Settings, Wallet, WifiOff, X } from 'lucide-react';
 import { Button, IconButton } from '@palside/ui/button';
 import { Input, PinInput } from '@palside/ui/field';
 import { InlineFeedback } from '@palside/ui/inline-feedback';
@@ -12,7 +12,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { SettingGroup, SettingItem } from '../settings/setting-rows';
 import type { PalsideController } from '../app/use-palside';
 import { Token } from '../ui/primitives';
-import { Dots, Swap } from '../ui/motion-details';
+import { Pending, Swap } from '../ui/motion-details';
 import { PalsAmount } from './amount';
 import type { ChainRecord } from '@palside/shared/contracts/chain';
 import { Sheet } from '@palside/ui/sheet';
@@ -48,10 +48,14 @@ export function WalletHome({ c }: { c: PalsideController }) {
   useEffect(() => { if (!loading) return; const timer = setTimeout(() => setStalled(true), 6000); return () => { clearTimeout(timer); setStalled(false); }; }, [loading, attempt]);
   if (!c.live) return <div className={s.empty}><Wallet /><p>{t('extension.wallet.soon')}</p></div>;
   if (loading && stalled) return <div className={s.empty}><Wallet /><p>{t('extension.wallet.unavailable')}</p><Button onClick={retry}>{t('common.retry')}</Button></div>;
-  if (!wallet || wallet.availability === 'loading') return <p className={s.empty}>{t('extension.copy.loading')}</p>;
+  // Loading draws the page it is about to show: the balance block and the two tiles, in place, so nothing jumps on arrival.
+  if (!wallet || wallet.availability === 'loading') return <div className={s.page} role="status" aria-busy="true" aria-label={t('extension.copy.loading')}>
+    <div className={s.balance} aria-hidden="true"><span className={s.skeleton} data-shape="token" /><span className={s.skeleton} data-shape="label" /><span className={s.skeleton} data-shape="amount" /><span className={s.skeleton} data-shape="chip" /></div>
+    <div className={s.tiles} aria-hidden="true"><span className={s.skeleton} data-shape="tile" /><span className={s.skeleton} data-shape="tile" /></div>
+  </div>;
   if (wallet.availability === 'locked') return <><WalletUnlock c={c} /><WalletRecoveryList c={c} /></>;
   const hidden = wallet.preferences.hideAmounts, ready = wallet.availability === 'ready';
-  const pending = wallet.payment && !['confirmed', 'expired', 'failed'].includes(wallet.payment.phase) && <button type="button" className={s.pendingRow} onClick={() => openPayment(wallet.payment!.id)}><Dots /><span>{t('extension.wallet.pending')}</span><ChevronRight size={16} /></button>;
+  const pending = wallet.payment && !['confirmed', 'expired', 'failed'].includes(wallet.payment.phase) && <button type="button" className={s.pendingRow} onClick={() => openPayment(wallet.payment!.id)}><Pending /><span>{t('extension.wallet.pending')}</span><ChevronRight size={16} /></button>;
   // Closed, the page holds only what is still settling; once that resolves there is nothing left to show.
   if (wallet.availability === 'closed') return pending || wallet.recovery?.items.length ? <div className={s.page}>{pending}<WalletRecoveryList c={c} /></div> : <div className={s.empty}><Wallet /><p>{t('extension.wallet.closed')}</p></div>;
   return <div className={s.page}>
@@ -62,7 +66,8 @@ export function WalletHome({ c }: { c: PalsideController }) {
       <strong><Swap k={String(hidden)}><PalsAmount value={wallet.balance?.balance} hidden={hidden} price={wallet.price} /></Swap></strong>
       <AddressChip c={c} address={wallet.address} />
     </div>
-    {wallet.availability === 'offline' && <div className={s.error} role="status">{t('extension.wallet.offline')}<Button size="sm" onClick={retry}>{t('common.retry')}</Button></div>}
+    {/* Offline is not the person's fault: a neutral row, the last balance stays, transfer waits. */}
+    {wallet.availability === 'offline' && <div className={s.offline} role="status"><WifiOff size={16} /><span>{t('extension.wallet.offline')}</span><Button size="sm" variant="quiet" onClick={retry}>{t('common.retry')}</Button></div>}
     {wallet.openedNotice && <Button className={s.opened} onClick={() => void c.run('wallet-opened-ack', {})}>{t('extension.wallet.opened')}</Button>}
     <div className={s.tiles}>
       <button type="button" className={s.tile} onClick={() => c.go('wallet-receive')}><ArrowDownLeft /><span>{t('extension.wallet.receive')}</span></button>

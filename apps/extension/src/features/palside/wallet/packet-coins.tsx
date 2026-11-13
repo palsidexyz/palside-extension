@@ -42,15 +42,15 @@ export function usePacketCoins() {
     const host = layer.current;
     if (!host) return;
     if (!host.matches(':popover-open')) host.showPopover();
-    const { x, y } = centre(from), width = host.clientWidth;
+    // Every coin stays over the envelope the seal sits in, so none drifts out past the card that replaces it.
+    const { x, y } = centre(from), box = (from.parentElement ?? host).getBoundingClientRect();
     coins.current = Array.from({ length: COUNT }, (_, i) => {
       const angle = -Math.PI / 2 + (i - (COUNT - 1) / 2) * (2.5 / COUNT), distance = 110 + (i % 3) * 34;
       const el = document.createElement('span');
       el.className = p.coin ?? '';
       el.innerHTML = '<img src="/brand/palside.svg" alt="" draggable="false">';
       host.append(el);
-      // Every coin stays inside the panel.
-      const px = Math.max(26, Math.min(width - 26, x + Math.cos(angle) * distance)), py = Math.max(70, y + Math.sin(angle) * distance);
+      const px = Math.max(box.left + 24, Math.min(box.right - 24, x + Math.cos(angle) * distance)), py = Math.max(box.top + 24, y + Math.sin(angle) * distance);
       const coin: Coin = { el, dx: px - x, dy: py - y, r: (i % 2 ? 1 : -1) * (90 + i * 23), s: .7 + (i % 3) * .15, d: Math.hypot(px - x, py - y) };
       el.animate([
         { opacity: 0, offset: 0, transform: at(x, y, .4, 0), easing: 'cubic-bezier(.2, .8, .3, 1)' },

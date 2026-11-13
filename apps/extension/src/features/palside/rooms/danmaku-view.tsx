@@ -5,7 +5,7 @@ import { tagLabel, tagKey } from '../../../domain/account/profile-tags';
 import { chatTime, errorMessage, localeOrEnglish, message as uiMessage } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
 import { Count, CountText, Swap } from '../ui/motion-details';
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type RefObject } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { motionPresets } from '@palside/design/motion';
 import { ArrowUp, ArrowUpRight, Ban, Check, ChevronDown, Copy, Flag, Gift, HandCoins, MessageCircle, MoreHorizontal, Undo2, UserPlus, X } from 'lucide-react';
@@ -198,7 +198,7 @@ function Frost({ c, reason }: { c: PalsideController; reason: 'idle' | 'unusable
   </motion.div>;
 }
 
-function RoomList({ c, room }: { c: PalsideController; room: RoomView }) {
+export function RoomList({ c, room }: { c: PalsideController; room: RoomView }) {
   const t = useTranslations();
   const list = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -324,7 +324,8 @@ function LineMenu({ c, message, name, self }: { c: PalsideController; message: R
   </Menu>{tipping && <TipPayment c={c} messageId={message.id} onClose={() => setTipping(false)} />}</>;
 }
 
-function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; drafts: ReturnType<typeof useRoomDrafts> }) {
+/** One 弹幕 draft and its send rules — length, the slow-mode countdown, one send at a time — shared by the 弹幕 page's box and the composer's 弹幕 line. */
+export function useRoomSend(c: PalsideController, room: RoomView, drafts: ReturnType<typeof useRoomDrafts>, input: RefObject<HTMLInputElement | null>) {
   const t = useTranslations();
   const text = useSyncExternalStore(listener => { drafts.listeners.add(listener); return () => { drafts.listeners.delete(listener); }; }, () => drafts.values.get(room.key) ?? '', () => '');
   function setText(value: string) {
@@ -337,7 +338,6 @@ function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; dr
     for (const listener of drafts.listeners) listener();
   }
   const [now, setNow] = useState(() => Date.now());
-  const input = useRef<HTMLInputElement>(null);
   const waiting = room.slowUntil > now;
   useEffect(() => { if (!waiting) return; const timer = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(timer); }, [waiting]);
   const length = characterLength(text.trim());
@@ -355,9 +355,17 @@ function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; dr
     if (event.key === 'Enter') { event.preventDefault(); void send(); }
   }
   const sendLabel = slow > 0 ? t('extension.room.slow', { seconds: slow }) : c.disconnected ? t('extension.copy.sendWhenConnected') : t('extension.copy.sendMessage');
+  return { text, setText, length, slow, ready, send, key, sendLabel };
+}
+
+/** The 弹幕 bar under a list (full view and the composer's sheet): 打赏 / 红包, the field, 发送. */
+export function RoomBar({ c, room, drafts, autoFocus }: { c: PalsideController; room: RoomView; drafts: ReturnType<typeof useRoomDrafts>; autoFocus?: boolean }) {
+  const t = useTranslations();
+  const input = useRef<HTMLInputElement>(null);
+  const { text, setText, length, slow, ready, send, key, sendLabel } = useRoomSend(c, room, drafts, input);
   return <div className={d.bar}>
     <Tooltip content={t('extension.wallet.createPacket')}><IconButton size="sm" variant="quiet" label={t('extension.wallet.createPacket')} onClick={() => whenWalletOpen(c, () => c.go('wallet-packet'))}><Gift size={16} /></IconButton></Tooltip>
-    <input ref={input} className={d.input} value={text} aria-label={t('extension.room.placeholder')} placeholder={t('extension.room.placeholder')} onChange={event => setText(event.target.value)} onKeyDown={key} />
+    <input ref={input} className={d.input} value={text} data-autofocus={autoFocus || undefined} aria-label={t('extension.room.placeholder')} placeholder={t('extension.room.placeholder')} onChange={event => setText(event.target.value)} onKeyDown={key} />
     {length > ROOM_TEXT_MAX - 10 && <small className={d.counter} data-over={length > ROOM_TEXT_MAX || undefined}><Count value={length} />/{ROOM_TEXT_MAX}</small>}
     <Tooltip content={sendLabel}><IconButton size="sm" variant="solid" className={d.send} label={sendLabel} disabled={!ready} onClick={() => void send()}>{slow > 0 ? <span role="timer"><Count value={slow} /></span> : <ArrowUp size={16} aria-hidden="true" />}</IconButton></Tooltip>
   </div>;

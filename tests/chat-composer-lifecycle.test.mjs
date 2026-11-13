@@ -215,7 +215,7 @@ test('keep-local conflict resolution submits explicit empty values for every opt
 
 function composerFixture(c, extras = {}) {
   const h = host();
-  const tags = ['Spinner', 'VisuallyHidden', 'ArrowUp', 'Check', 'Gift', 'ImageIcon', 'Plus', 'Pencil', 'X', 'IconButton', 'ImageEditor', 'DraftConflict', 'AssetCard', 'ComposerRows', 'EditLine', 'ReplyLine', 'ReactionPicker', 'StateGlyph', 'CaptureTool', 'PageStrip', 'InteractToggle', 'ShareToggle', 'Action', 'PersonAvatar'];
+  const tags = ['Spinner', 'VisuallyHidden', 'ArrowUp', 'Check', 'Gift', 'ImageIcon', 'Plus', 'Pencil', 'X', 'IconButton', 'ImageEditor', 'DraftConflict', 'AssetCard', 'ComposerRows', 'EditLine', 'ReplyLine', 'ReactionPicker', 'StateGlyph', 'CaptureTool', 'PageStrip', 'InteractToggle', 'ShareToggle', 'Action', 'PersonAvatar', 'DanmakuKey', 'DanmakuLine'];
   const globals = { ...h.globals, ...Object.fromEntries(tags.map(tag => [tag, tag])),
     h: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }), Fragment: 'fragment',
     useTranslations: () => key => key, useMention: () => ({ close() {}, detect() {}, keyDown() {} }), useLinkCard() {}, useAddressCard: () => ({ pasted() {}, candidates: [], pick() {} }),

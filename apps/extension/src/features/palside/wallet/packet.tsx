@@ -17,8 +17,8 @@ import { nearestEqualPacketTotal, parsePals } from '../../../domain/wallet/model
 import { personFor } from '../../../domain/account/model';
 import type { PalsideController } from '../app/use-palside';
 import { PersonAvatar } from '../ui/primitives';
-import { Count, CountText, Dots, DrawnCheck, Rise, Swap } from '../ui/motion-details';
-import { AnimatedAmount, formatPals } from './amount';
+import { Count, CountText, Pending, DrawnCheck, Rise, Swap } from '../ui/motion-details';
+import { AnimatedAmount, formatPals, groupPals } from './amount';
 import { openPayment, usePaymentRequest } from './payment-sheet';
 import { usePacketCoins, type PacketCoins } from './packet-coins';
 import { useText } from '../ui/text';
@@ -41,9 +41,16 @@ const ended = (packet: Packet, now: number) => packet.status === 'exhausted' || 
 const openable = (detail: Detail, now: number) => detail.eligibility === 'eligible' && detail.packet.status === 'active' && detail.packet.expiresAt > now;
 
 /** The packet's state for me right now, in the fewest words. */
-function useStateLine(c: PalsideController, detail: Detail) {
+function useStateLine(c: PalsideController, detail: Detail): { key: string; dim: boolean; line: ReactNode } {
   const t = useTranslations(), { packet } = detail;
-  if (detail.myClaim && detail.myClaim.status !== 'failed') return { dim: true, line: t('extension.wallet.claimedAmount', { amount: formatPals(detail.myClaim.amount) }) };
+  // Only the sender sees a packet before it is on chain: on its way like a sent message, or failed where it stands.
+  if (packet.status === 'pending') return { key: 'sending', dim: false, line: <span className={p.sending}><Pending />{t('extension.copy.sending')}</span> };
+  if (packet.status === 'failed') return { key: 'failed', dim: true, line: t('extension.wallet.recoveryFailed') };
+  return { key: 'ready', ...readyLine(c, detail, t) };
+}
+function readyLine(c: PalsideController, detail: Detail, t: ReturnType<typeof useTranslations>): { dim: boolean; line: ReactNode } {
+  const { packet } = detail;
+  if (detail.myClaim && detail.myClaim.status !== 'failed') return { dim: true, line: t('extension.wallet.claimedAmount', { amount: groupPals(formatPals(detail.myClaim.amount)) }) };
   if (packet.accountId === c.data.self && !ended(packet, c.now)) return { dim: false, line: <CountText text={t('extension.wallet.claimedOf', { claimed: packet.claimedCount, count: packet.count })} value={packet.claimedCount} /> };
   if (packet.status === 'exhausted') return { dim: true, line: t('extension.wallet.gone') };
   if (packet.status === 'refunded') return { dim: true, line: t('extension.wallet.refunded') };
@@ -52,14 +59,18 @@ function useStateLine(c: PalsideController, detail: Detail) {
 }
 
 /** 红包卡片 in chat: red top with the wish and what it means for me now, a quiet foot with the kind; spent packets fade. */
-export function PacketCard({ c, detail }: { c: PalsideController; detail: Detail }) {
+/** `onOpen` lets the timeline own the detail sheet, so the claim notes under the card open the same packet. */
+export function PacketCard({ c, detail, onOpen }: { c: PalsideController; detail: Detail; onOpen?: () => void }) {
   const t = useTranslations(), reduced = useReducedMotion(), [open, setOpen] = useState(false);
   const [arriving] = useState(() => Date.now() - detail.packet.createdAt < 5_000);
-  const { dim, line } = useStateLine(c, detail);
+  const { key, dim, line } = useStateLine(c, detail);
+  // Until it is on chain there is nothing to grab or look back on; the card opens the payment still settling, if this panel holds it.
+  const settling = key !== 'ready', payment = c.live?.state.wallet?.payment;
+  const tap = () => settling ? payment?.id === detail.packet.id && openPayment(payment.id) : onOpen ? onOpen() : setOpen(true);
   return <>
-    <motion.button type="button" className={p.card} data-self={detail.packet.accountId === c.data.self || undefined} data-dim={dim || undefined} onClick={() => setOpen(true)}
+    <motion.button type="button" className={p.card} data-self={detail.packet.accountId === c.data.self || undefined} data-dim={dim || undefined} data-settling={settling || undefined} onClick={tap}
       initial={arriving && !reduced ? { opacity: 0, y: 14, scale: .96 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 360, damping: 30 }}>
-      <span className={p.cardTop}><Envelope /><span><strong>{detail.blessing || t('extension.wallet.blessingPlaceholder')}</strong><small><Swap k={String(dim)}><span>{line}</span></Swap></small></span></span>
+      <span className={p.cardTop}><Envelope /><span><strong>{detail.blessing || t('extension.wallet.blessingPlaceholder')}</strong><small><Swap k={`${key}:${dim}`}><span>{line}</span></Swap></small></span></span>
       <span className={p.cardFoot}><span>PALS {t('extension.wallet.packet')}</span><span>{kindLabel(t, detail)}</span></span>
     </motion.button>
     {open && <PacketDetail c={c} id={detail.packet.id} initial={detail} onClose={() => setOpen(false)} />}
@@ -73,19 +84,21 @@ type EnvelopeState = 'idle' | 'spinning' | 'opened' | 'lost' | 'leaving';
  * flap lifts away and the result rises. When the last share went first, the seal stops, the envelope shakes and says so.
  * Opened from a banner before its detail arrived, it shows the sender at once and the seal breathes until the wish lands.
  */
-function PacketEnvelope({ c, packet, detail, onClose, onOpened, onBurst, feedback }: { c: PalsideController; packet: Packet; detail?: Detail; onClose: () => void; onOpened: () => void; onBurst: (seal: Element) => void; feedback?: ReactNode }) {
+function PacketEnvelope({ c, packet, detail, onClose, onClaim, onOpened, onBurst, feedback }: { c: PalsideController; packet: Packet; detail?: Detail; onClose: () => void; onClaim: () => void; onOpened: () => void; onBurst: (seal: Element) => void; feedback?: ReactNode }) {
   const t = useTranslations(), text = useText(), reduced = useReducedMotion();
   const dialogRef = useRef<HTMLDialogElement>(null), sealRef = useRef<HTMLButtonElement>(null);
-  const [state, setState] = useState<EnvelopeState>('idle'), [note, setNote] = useState<string>();
+  const [state, setState] = useState<EnvelopeState>('idle'), [note, setNote] = useState<string>(), [claiming, setClaiming] = useState(false);
   const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
-  const canOpen = detail ? openable(detail, c.now) : undefined;
-  const closed = !detail || canOpen ? undefined : detail.packet.status === 'exhausted' ? t('extension.wallet.lost') : detail.packet.expiresAt <= c.now ? t('extension.wallet.packetExpired') : t(`extension.wallet.eligibility.${detail.eligibility}`);
+  // From the tap on 开 the envelope plays its own story: the claim's live update already reads 已领取, which must not swap the
+  // spinning seal for the spent one or the wish for that word before the flap has lifted.
+  const canOpen = claiming || (detail ? openable(detail, c.now) : undefined);
+  const closed = claiming || !detail || canOpen ? undefined : detail.packet.status === 'exhausted' ? t('extension.wallet.lost') : detail.packet.expiresAt <= c.now ? t('extension.wallet.packetExpired') : t(`extension.wallet.eligibility.${detail.eligibility}`);
   useEffect(() => { const dialog = dialogRef.current; if (dialog && !dialog.open) dialog.showModal(); }, []);
   // With reduced motion the flap does not travel, so nothing would report the end of its lift.
   useEffect(() => { if (state === 'opened' && reduced) onOpened(); }, [state, reduced, onOpened]);
   async function open() {
     if (state !== 'idle' || !c.live) return;
-    setState('spinning');
+    setState('spinning'); setClaiming(true); onClaim();
     const started = Date.now(), turn = () => new Promise(resolve => setTimeout(resolve, reduced ? 0 : Math.max(0, started + 700 - Date.now())));
     try {
       await c.live.command('wallet-claim', { packetId: packet.id }); await turn();
@@ -96,7 +109,7 @@ function PacketEnvelope({ c, packet, detail, onClose, onOpened, onBurst, feedbac
     catch (error) {
       await turn();
       const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-      setNote(code === 'CHAIN_PACKET_UNAVAILABLE' ? t('extension.wallet.lost') : text(errorMessage(error))); setState('lost');
+      setNote(code === 'CHAIN_PACKET_UNAVAILABLE' ? t('extension.wallet.lost') : text(errorMessage(error))); setClaiming(false); setState('lost');
     }
   }
   const leave = () => { if (state !== 'spinning') setState('leaving'); };
@@ -124,11 +137,11 @@ function PacketEnvelope({ c, packet, detail, onClose, onOpened, onBurst, feedbac
   </dialog>;
 }
 
-/** Where my share is: assigned and settling (dots), in 零钱 (drawn check), or the escrow closed before it settled. */
+/** Where my share is: assigned and settling (pending arc), in 零钱 (drawn check), or the escrow closed before it settled. */
 function ShareState({ claim, delay }: { claim: NonNullable<Detail['myClaim']>; delay: number }) {
   const t = useTranslations(), state = claim.status;
   return <Rise delay={delay} className={p.saved} data-state={state}>
-    {state === 'confirmed' ? <DrawnCheck size="sm" /> : state === 'issued' ? <Dots /> : null}
+    {state === 'confirmed' ? <DrawnCheck size="sm" /> : state === 'issued' ? <Pending /> : <span className={s.failGlyph}><X /></span>}
     <Swap k={state}>{t(state === 'confirmed' ? 'extension.wallet.saved' : state === 'issued' ? 'extension.wallet.settling' : 'extension.wallet.settleFailed')}</Swap>
   </Rise>;
 }
@@ -170,12 +183,12 @@ function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; det
       </> : <p className={s.note}>{detail.myClaim?.status === 'failed' ? t('extension.wallet.settleFailed') : status}</p>}
     </div>
     <section className={p.claims}>
-      <header><span><CountText text={t('extension.wallet.claimedOf', { claimed: packet.claimedCount, count: packet.count })} value={packet.claimedCount} /></span><span>{formatPals(packet.claimedAmount)}/{formatPals(packet.amount)} PALS</span></header>
+      <header><span><CountText text={t('extension.wallet.claimedOf', { claimed: packet.claimedCount, count: packet.count })} value={packet.claimedCount} /></span><span>{groupPals(formatPals(packet.claimedAmount))}/{groupPals(formatPals(packet.amount))} PALS</span></header>
       {detail.claims.map((item, index) => <motion.div key={item.accountId ?? `deleted:${index}`} className={p.claim} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...motionPresets.feedback, delay: .05 * index + .2 }}>
         <PersonAvatar person={personFor(c.people, item.accountId, t('common.member'), t('common.deletedMember'))} size="sm" />
         <span className={p.claimWho}><strong>{item.accountId === c.data.self ? t('common.self') : personFor(c.people, item.accountId, t('common.member'), t('common.deletedMember')).name}</strong>
           <small>{clockTime(item.claimedAt, localeOrEnglish(locale))}{item.status === 'issued' && <> · {t('extension.wallet.settling')}</>}</small></span>
-        <span><b>{formatPals(item.amount)}</b>{item.best && <small className={p.best}><Crown />{t('extension.wallet.best')}</small>}</span>
+        <span><b>{groupPals(formatPals(item.amount))}</b>{item.best && <small className={p.best}><Crown />{t('extension.wallet.best')}</small>}</span>
       </motion.div>)}
     </section>
     {claim && (packet.status !== 'active' || packet.expiresAt <= c.now) && <p className={`${s.note} ${p.centered}`}>{status}</p>}
@@ -188,7 +201,7 @@ function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; det
  */
 export function PacketDetail({ c, id, initial, summary, onClose }: { c: PalsideController; id: string; initial?: Detail; summary?: Packet; onClose: () => void }) {
   const t = useTranslations(), command = c.live?.command;
-  const [detail, setDetail] = useState<Detail | undefined>(initial), [failed, setFailed] = useState(false), [revision, setRevision] = useState(0), [opened, setOpened] = useState(false);
+  const [detail, setDetail] = useState<Detail | undefined>(initial), [failed, setFailed] = useState(false), [revision, setRevision] = useState(0), [opened, setOpened] = useState(false), [claiming, setClaiming] = useState(false);
   const chainRevision = c.live?.state.chainRevision, coins = usePacketCoins();
   const feedback = failed && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => { setFailed(false); setRevision(value => value + 1); } }}>{t('extension.wallet.unavailable')}</InlineFeedback>;
   useEffect(() => { let current = true; void command?.('wallet-packet', { id }).then(value => { if (current) { setFailed(false); setDetail(value); } }, () => { if (current) setFailed(true); }); return () => { current = false; }; }, [command, id, chainRevision, revision]);
@@ -201,13 +214,16 @@ export function PacketDetail({ c, id, initial, summary, onClose }: { c: PalsideC
   }, [detail?.packet.expiresAt, detail?.packet.status]);
   // The envelope while it can still be opened (or to say why not); the sender and anyone holding a share see the result.
   const packet = detail?.packet ?? summary;
-  const envelope = packet && !opened && (detail ? !detail.myClaim && (openable(detail, c.now) || detail.packet.accountId !== c.data.self) : !failed);
+  const fresh = detail ? !detail.myClaim && (openable(detail, c.now) || detail.packet.accountId !== c.data.self) : !failed;
+  // From the tap on 开 the envelope stays until its flap has lifted, though the claim's own live update already marks it claimed;
+  // then it closes and the result sheet rises. One already opened shows its result sheet at once.
+  const envelope = packet && !opened && (claiming || fresh);
   // The result sheet opens in the top layer after the coins did; lift them back above it.
   const { raise } = coins;
   useEffect(() => { if (opened) raise(); }, [opened, raise]);
   return <>
     {coins.node}
-    {envelope ? <PacketEnvelope c={c} packet={packet} detail={detail} feedback={feedback} onClose={onClose} onBurst={coins.burst} onOpened={() => { setOpened(true); setRevision(value => value + 1); }} />
+    {envelope ? <PacketEnvelope c={c} packet={packet} detail={detail} feedback={feedback} onClose={onClose} onBurst={coins.burst} onClaim={() => setClaiming(true)} onOpened={() => { setOpened(true); setRevision(value => value + 1); }} />
       : <Sheet open onOpenChange={open => { if (!open) onClose(); }} boundarySelector="[data-palside-app]" aria-labelledby="packet-detail-title">
         {detail ? <><PacketResult c={c} detail={detail} coins={coins} onClose={onClose} />{feedback}</>
           : <div className={`${s.page} ${s.sheetContent}`}><VisuallyHidden asChild><h2 id="packet-detail-title">{t('extension.wallet.packet')}</h2></VisuallyHidden><p className={s.empty}>{t(failed ? 'extension.wallet.unavailable' : 'extension.copy.loading')}</p>{failed && <Button onClick={() => setRevision(value => value + 1)}>{t('common.retry')}</Button>}</div>}
@@ -245,7 +261,7 @@ export function PacketPage({ c }: { c: PalsideController }) {
   let total: bigint | undefined; try { total = amount ? parsePals(amount, decimals) * (each ? BigInt(count) : 1n) : undefined; } catch { total = undefined; }
   const nearest = total !== undefined && count > 0 && each ? nearestEqualPacketTotal(total, count, decimals) : total;
   const balance = wallet?.balance?.balance;
-  const error = noMates ? t('extension.wallet.noTeammates') : amount && total === undefined || invalid ? t('extension.wallet.invalidAmount') : nearest !== total && nearest !== undefined ? t('extension.wallet.equalAmount', { amount: formatPals(each ? (nearest / BigInt(count)).toString() : nearest.toString(), decimals) }) : total !== undefined && balance !== undefined && total > BigInt(balance) ? t('extension.wallet.insufficient') : undefined;
+  const error = noMates ? t('extension.wallet.noTeammates') : amount && total === undefined || invalid ? t('extension.wallet.invalidAmount') : nearest !== total && nearest !== undefined ? t('extension.wallet.equalAmount', { amount: groupPals(formatPals(each ? (nearest / BigInt(count)).toString() : nearest.toString(), decimals)) }) : total !== undefined && balance !== undefined && total > BigInt(balance) ? t('extension.wallet.insufficient') : undefined;
   const usd = wallet?.price && total !== undefined && BigInt(wallet.price.denominator) > 0n ? (total * BigInt(wallet.price.numerator) * 100n / (10n ** BigInt(decimals) * BigInt(wallet.price.denominator))).toString() : undefined;
   async function review() {
     if (busy || !total || error) return;
@@ -272,7 +288,7 @@ export function PacketPage({ c }: { c: PalsideController }) {
     <div className={p.totalArea}>
       <span className={p.totalBig}><AnimatedAmount value={(total ?? 0n).toString()} decimals={decimals} /><small>PALS</small></span>
       <span className={p.totalSub}><Swap k={error ?? 'ok'}>{error ? <span data-error>{error}</span>
-        : <>{usd !== undefined && <><AnimatedAmount value={usd} decimals={2} prefix="≈ $" minimumFractionDigits={2} maximumFractionDigits={2} /><span className={p.dot}>·</span></>}{balance !== undefined && t('extension.wallet.available', { amount: formatPals(balance) })}</>}</Swap></span>
+        : <>{usd !== undefined && <><AnimatedAmount value={usd} decimals={2} prefix="≈ $" minimumFractionDigits={2} maximumFractionDigits={2} /><span className={p.dot}>·</span></>}{balance !== undefined && t('extension.wallet.available', { amount: groupPals(formatPals(balance)) })}</>}</Swap></span>
     </div>
     <div className={`${s.bottom} ${p.submit}`}><Button variant="primary" size="lg" loading={busy} disabled={!wallet?.config?.enabled || !total || Boolean(error)} onClick={() => void review()}>{t('extension.wallet.createPacket')}</Button></div>
   </div>;
@@ -285,7 +301,8 @@ export function PacketPage({ c }: { c: PalsideController }) {
 export function RoomPacketBanner({ c, packets }: { c: PalsideController; packets: Packet[] }) {
   const t = useTranslations(), reduced = useReducedMotion();
   const [index, setIndex] = useState(0), [selected, setSelected] = useState<string>(), [details, setDetails] = useState<Record<string, Detail>>({});
-  const live = packets.filter(packet => packet.status === 'active' && packet.expiresAt > c.now);
+  // My own packet still on its way stands with the live ones: it says so, and offers nothing to grab yet.
+  const live = packets.filter(packet => packet.status === 'active' && packet.expiresAt > c.now || packet.status === 'pending' && packet.accountId === c.data.self);
   // Fetched while the banner is on screen, so tapping 抢 opens the envelope with its wish and seal ready.
   const command = c.live?.command, liveKey = live.map(packet => `${packet.id}:${packet.claimedCount}`).join();
   useEffect(() => {
@@ -297,7 +314,7 @@ export function RoomPacketBanner({ c, packets }: { c: PalsideController; packets
   const list = live.length ? live : packets;
   const current = list[Math.min(index, list.length - 1)];
   if (!current) return null;
-  const mine = current.accountId === c.data.self, left = current.count - current.claimedCount;
+  const mine = current.accountId === c.data.self, left = current.count - current.claimedCount, sending = current.status === 'pending';
   const picked = list.find(packet => packet.id === selected);
   const sender = personFor(c.people, current.accountId, t('common.member'), t('common.deletedMember'));
   return <>
@@ -307,11 +324,11 @@ export function RoomPacketBanner({ c, packets }: { c: PalsideController; packets
         <AnimatePresence initial={false} mode="popLayout">
           <motion.span key={current.id} className={p.bannerText} initial={{ opacity: 0, x: reduced ? 0 : 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: reduced ? 0 : -24 }} transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
             <strong>{mine ? t('extension.wallet.packetMine') : t('extension.wallet.packetFrom', { name: sender.name })}</strong>
-            <small><Swap k={left === 0 ? 'gone' : 'left'}><span>{left === 0 ? t('extension.wallet.gone') : <CountText text={t('extension.wallet.leftOf', { left, count: current.count })} value={left} />}</span></Swap></small>
+            <small><Swap k={sending ? 'sending' : left === 0 ? 'gone' : 'left'}><span>{sending ? <span className={p.sending}><Pending />{t('extension.copy.sending')}</span> : left === 0 ? t('extension.wallet.gone') : <CountText text={t('extension.wallet.leftOf', { left, count: current.count })} value={left} />}</span></Swap></small>
           </motion.span>
         </AnimatePresence>
         {list.length > 1 && <button type="button" className={p.pager} onClick={() => setIndex((index + 1) % list.length)}><Count value={index + 1} />/{list.length}</button>}
-        {left > 0 && !mine
+        {sending ? null : left > 0 && !mine
           ? <motion.button type="button" className={p.grab} whileTap={reduced ? undefined : { scale: .92 }} onClick={() => setSelected(current.id)}>{t('extension.wallet.grab')}</motion.button>
           : <button type="button" className={p.luck} onClick={() => setSelected(current.id)}>{t('extension.wallet.luckShort')}</button>}
       </div>

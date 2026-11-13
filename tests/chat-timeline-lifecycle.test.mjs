@@ -58,7 +58,7 @@ function chat(messages, payments = [], overrides = {}) {
     useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}],
     useMemo: fn => fn(), useCallback: fn => fn, useLayoutEffect() {}, useEffect() {},
     useChatTimeline: () => ({ sendIntent: () => () => false }), unreadMentions: () => [],
-    useTopCard: () => undefined, usePageHints: () => [], useAway: () => ({}), showsNewTeam: () => false, panelTabsShown: () => false, NewTeam: 'NewTeam', SendFlights: function () { return flights; },
+    useTopCard: () => undefined, usePageHints: () => [], useAway: () => ({}), showsNewTeam: () => false, NewTeam: 'NewTeam', SendFlights: function () { return flights; },
     captureComposer: () => ({}), interleaveTimed, mergeSignalRuns, MINUTE_MS: 60 * 1000,
     s: new Proxy({}, { get: (_, key) => key }), navigation: {},
     ...Object.fromEntries(['MessageItem', 'TeamPaymentCard', 'PageHintRow', 'SendFlightContext', 'ReactionStage', 'ChatHeader', 'FollowBar', 'WatchStrip', 'MoreTeamPayments', 'AnimatePresence', 'FloatingDate', 'Composer', 'ReadonlyDraft'].map(name => [name, name])),

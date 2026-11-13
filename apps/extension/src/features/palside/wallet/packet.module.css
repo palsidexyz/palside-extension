@@ -20,6 +20,9 @@
 .cardTop > span:last-child { display:flex; flex-direction:column; min-width:0; }
 .cardTop strong { font-size:var(--ui-type-body); line-height:20px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cardTop small { font-size:var(--ui-type-footnote); line-height:17px; opacity:.86; font-variant-numeric:tabular-nums; }
+.sending { display:inline-flex; align-items:center; gap:5px; }
+.sending > span:first-child { width:12px; height:12px; }
+.cardTop .sending > span:first-child { box-shadow:inset 0 0 0 1.5px rgb(255 246 234 / 30%); }
 .cardFoot { display:flex; justify-content:space-between; align-items:center; height:26px; padding:0 12px; background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-caption); }
 
 /* 拆红包: the envelope dialog, centred over a light scrim. */

@@ -18,8 +18,8 @@
 .teamActions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; padding:0 2px 2px; }
 .teamActions > button { min-width:0; padding-inline:8px; font-size:var(--ui-type-callout); }
 @media (prefers-reduced-motion:reduce) { .teamOption { transition:none; } }
-/* The chat header, with or without 弹幕: one 52px row on one line — the title on the left (32px avatar, the name, then who is here),
-   then 36px controls on one top edge: search or 聊天 | 弹幕, the page capsule and ⋯. The two grey groups stand 8px apart so they never
+/* The chat header: one 52px row on one line — the title on the left (32px avatar, the name, then who is here), then 36px controls on one
+   top edge: search (← back on the 弹幕 page), the page capsule and ⋯. The two grey groups stand 8px apart so they never
    read as one strip; the bare ⋯ sits 4px closer, its own 36px box already holding air. */
 header.bar { height:52px; padding-block:0; padding-inline:16px 8px; gap:6px; container:chatHeader / inline-size; }
 header.bar > :last-child { gap:8px; }
@@ -33,11 +33,12 @@ header.bar > :last-child { gap:8px; }
    unread dot, the chevron or the faces after it stay attached to the last character. */
 .bar.bar [data-header-name] { text-overflow:clip; }
 .bar.bar [data-header-name][data-cut] { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 16px), transparent); }
-/* Narrow panels (Chrome's side panel can be 320px) tighten the tabs so the name keeps at least three characters. */
+/* Narrow panels (Chrome's side panel can be 320px): the name keeps at least three characters. */
 @container chatHeader (max-width:360px) {
-  .bar [role=tablist] > button { padding-inline:7px; }
   .identity.identity { min-width:calc(42px + 3.4em); }
 }
+/* ← on the 弹幕 page: pulled into the 16px gutter so the token keeps the squad avatar's left edge… minus the arrow, one step left. */
+.bar.bar .back { flex:none; margin:0 2px 0 -8px; }
 
 /* The title: the switcher (avatar, name, chevron or @N) and, as its own button beside it, who is here. The two never nest.
    The avatar's left edge sits on the 16px gutter. */

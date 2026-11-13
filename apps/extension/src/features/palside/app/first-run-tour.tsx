@@ -9,11 +9,12 @@ import type { PalsideController } from './use-palside';
 import { defaultSignalSettings } from '../../../runtime/annotations/signals';
 import { shortcutKeys } from '../../../runtime/browser/shortcuts';
 import { KeyCaps } from '../settings/signal-settings';
+import { DanmakuGlyph } from '../rooms/composer-danmaku';
 import { useCaptureShortcut } from '../settings/use-shortcut';
 import s from './first-run-tour.module.css';
 
 /** Controls the tour points at carry `data-tour`; a step whose control is not on screen is left out. */
-type Anchor = 'tabs' | 'share' | 'site' | 'tools' | 'invite';
+type Anchor = 'share' | 'site' | 'tools' | 'invite';
 type Box = { left: number; top: number; width: number; height: number };
 const GAP = 10, EDGE = 12, WIDTH = 288, PAD = 4, START_DELAY = 700;
 
@@ -64,10 +65,6 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
   const [height, setHeight] = useState(140);
   const shotKeys = shortcutKeys(useCaptureShortcut(c) ?? '');
   const steps: Record<Anchor, { title: string; body: ReactNode }> = {
-    tabs: { title: t('extension.tour.tabsTitle'), body: <dl className={s.pairs}>
-      <dt>{t('extension.discussion.chat')}</dt><dd>{t('extension.tour.chat')}</dd>
-      <dt>{t('extension.room.name')}</dt><dd>{t('extension.tour.room')}</dd>
-    </dl> },
     share: { title: t('extension.web.share'), body: <p>{t('extension.tour.share')}</p> },
     site: { title: t('extension.settings.interaction'), body: <><p>{t('extension.tour.site')}</p><Suspense fallback={null}><TourDemo settings={c.live?.page?.signalSettings ?? defaultSignalSettings} /></Suspense></> },
     tools: { title: t('extension.tour.toolsTitle'), body: <ul className={s.tools}>
@@ -75,6 +72,7 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
       <li><ImageIcon aria-hidden="true" /><b>{t('extension.copy.image')}</b><p><span>{t('extension.tour.image')}</span></p></li>
       <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><p><span>{t('extension.tour.shot')}</span>{shotKeys.length > 0 && <KeyCaps keys={shotKeys} />}</p></li>
       <li><Gift aria-hidden="true" /><b>{t('extension.wallet.packet')}</b><p><span>{t('extension.tour.packet')}</span></p></li>
+      <li><DanmakuGlyph /><b>{t('extension.room.name')}</b><p><span>{t('extension.tour.room')}</span></p></li>
     </ul> },
     invite: { title: t('extension.tour.inviteTitle'), body: <p>{t('extension.tour.invite')}</p> },
   };
@@ -88,7 +86,7 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
   useEffect(() => {
     const root = layer.current?.closest('[data-palside-app]') ?? null;
     const timer = setTimeout(() => {
-      const found = (['tabs', 'share', 'site', 'tools', 'invite'] as const).filter(anchor => anchorOf(root, anchor));
+      const found = (['share', 'site', 'tools', 'invite'] as const).filter(anchor => anchorOf(root, anchor));
       setApp(root);
       setAnchors(found);
       // Nothing on screen to point at: the tour has nothing to say and counts as seen.

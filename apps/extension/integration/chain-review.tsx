@@ -31,17 +31,23 @@ const deployment = { chainId: 4663 as const, token: '0x3333333333333333333333333
 const teamPacket = { ...packet, id: '0x' + 'e'.repeat(64), accountId: palsideFixtures.self, kind: 'team' as const, scope: palsideFixtures.teams[0]!.id };
 const teamDetail = { packet: teamPacket, distribution: 'equal', blessing: '小队测试红包', eligibility: 'eligible', eligibleAt: null, myClaim: null, claims: [] };
 // 小队里的付款，按聊天时间线的样子排：我发出的、转给我的（还在确认）、两位队友之间的、一个红包。
-const transfer = (id: string, accountId: string, recipientId: string, amount: bigint, status: 'confirmed' | 'submitted') => ({ id, accountId, recipientId, amount: String(amount * unit), status, createdAt: now, confirmedAt: status === 'confirmed' ? now : null });
+const transfer = (id: string, accountId: string, recipientId: string, amount: bigint, status: 'confirmed' | 'submitted') => ({ id, accountId, recipientId, amount: String(amount * unit), status, createdAt: now, submittedAt: now, confirmedAt: status === 'confirmed' ? now : null });
 const feedItems = [
   { id: 'feed-mine', timestamp: now, transfer: transfer('feed-mine', palsideFixtures.self, 'mia', 20n, 'confirmed') },
   { id: 'feed-incoming', timestamp: now + MINUTE_MS, transfer: transfer('feed-incoming', 'mia', palsideFixtures.self, 5n, 'submitted') },
   { id: 'feed-between', timestamp: now + 120_000, transfer: transfer('feed-between', 'robin', 'leo', 12n, 'confirmed') },
   { id: 'feed-packet', timestamp: now + 180_000, packet: { ...teamDetail, packet: { ...teamPacket, id: '0x' + 'f'.repeat(64), accountId: 'kai', kind: 'team' as const, createdAt: now }, distribution: 'random', blessing: '周五收盘红包', eligibility: 'eligible' } },
+  // 我发的、已领完的红包：卡片下面是我自己那条，加上队友合成的一条。
+  { id: 'feed-claimed', timestamp: now + 240_000, packet: { ...teamDetail, packet: { ...teamPacket, id: '0x' + 'e'.repeat(64), accountId: palsideFixtures.self, kind: 'team' as const, count: 4, claimedCount: 4, status: 'exhausted' as const, createdAt: now }, distribution: 'random', blessing: '恭喜发财，大吉大利', eligibility: 'claimed',
+    claims: [palsideFixtures.self, 'mia', 'robin', 'leo'].map((accountId, index) => ({ accountId, amount: String(BigInt(index + 1) * unit), claimedAt: now + 250_000 + index * 1_000, status: 'issued' as const, best: index === 3 })) } },
+  // 我刚付款、还没上链的红包，和一个付款失败的：只有我看得到。
+  { id: 'feed-sending', timestamp: now + 300_000, packet: { ...teamDetail, packet: { ...teamPacket, id: '0x' + 'd'.repeat(64), status: 'pending' as const, claimedCount: 0, createdAt: now + 300_000 }, blessing: '刚发的红包', eligibility: 'unavailable' } },
+  { id: 'feed-failed', timestamp: now + 320_000, packet: { ...teamDetail, packet: { ...teamPacket, id: '0x' + 'a'.repeat(64), status: 'failed' as const, claimedCount: 0, createdAt: now + 320_000 }, blessing: '没发出去的红包', eligibility: 'unavailable' } },
 ];
 function initial(): WalletState {
-  const phase = (scene === 'done' ? 'confirmed' : ['review', 'password', 'pending', 'failed'].includes(scene) ? scene : 'review') as PaymentPhase;
+  const phase = (scene === 'done' ? 'confirmed' : scene === 'flow' ? 'password' : ['review', 'password', 'pending', 'failed'].includes(scene) ? scene : 'review') as PaymentPhase;
   const input = { kind: 'transfer' as const, recipient, amount: String(50n * unit) };
-  return { address, availability: scene === 'closed' ? 'closed' : scene === 'locked' ? 'locked' : scene === 'offline' ? 'offline' : 'ready', preferences: { smallPayments: false, hideAmounts: false }, openedNotice: false,
+  return { address, availability: scene === 'closed' ? 'closed' : scene === 'locked' ? 'locked' : scene === 'offline' ? 'offline' : scene === 'loading' ? 'loading' : 'ready', preferences: { smallPayments: false, hideAmounts: false }, openedNotice: false,
     config: { enabled: scene !== 'closed', version: 1, deployment, dailySponsoredLimit: 50, quickPay: { single: String(20n * unit), daily: String(100n * unit) }, minimumLiquidity: String(BigInt(SECOND_MS) * unit), updatedAt: now },
     balance: { address, token: deployment.token, chainId: 4663, balance: String(4200n * unit), blockNumber: '1200' },
     records: { items: [], nextCursor: null },
@@ -50,7 +56,7 @@ function initial(): WalletState {
 }
 function Fixture() {
   usePaymentSession(palsideFixtures.self);
-  const [wallet, setWallet] = useState(initial), [page, setPage] = useState(scene);
+  const [wallet, setWallet] = useState(initial), [page, setPage] = useState(scene), [chainRevision, setChainRevision] = useState(0);
   const walletRef = useRef(wallet), eligibleAt = useRef<number | undefined>(undefined), grabbed = useRef<ApiResult<'chain.claim'> | undefined>(undefined);
   useLayoutEffect(() => { walletRef.current = wallet; }, [wallet]);
   const command = useCallback(async (name: string, payload?: Record<string, unknown>) => {
@@ -77,6 +83,8 @@ function Fixture() {
       if (payload?.packetId !== packet.id || !eligibleAt.current || Date.now() < eligibleAt.current) throw Error('Premature or wrong packet claim');
       // The service assigns the share at once and settles it later: the grab returns it as 入账中.
       grabbed.current = { packetId: packet.id, accountId: palsideFixtures.self, recipient: address, index: 4, amount: String(5n * unit), claimedAt: Date.now(), nonce: '1', deadline: now + HOUR_MS, status: 'issued' as const, transactionHash: null };
+      // As in production, the claim's chain event arrives at once and refreshes open packets while the seal is still spinning.
+      setChainRevision(value => value + 1);
       return grabbed.current;
     }
     if (name === 'wallet-packet') {
@@ -107,6 +115,19 @@ function Fixture() {
     if (name === 'wallet-refresh') return wallet;
     if (name === 'wallet-confirm' || name === 'wallet-dismiss') {
       if (payload?.accountId !== palsideFixtures.self || payload.paymentId !== wallet.payment?.id || wallet.payment?.order.accountId !== palsideFixtures.self) throw Error('Wrong fixture payment owner');
+      // scene=flow plays the whole wait after the PIN: a held confirm, then 签名 → 发送 → 等待确认 → 已到账 on fixture timers.
+      if (scene === 'flow' && name === 'wallet-confirm' && payload.password) {
+        const at = (phase: PaymentPhase) => { walletRef.current = { ...walletRef.current, payment: { ...walletRef.current.payment!, phase } }; setWallet(walletRef.current); };
+        await new Promise(resolve => setTimeout(resolve, 900));
+        at('signing');
+        // ?end=failed ends on a reverted payment instead, to show the failure in place on the stage it reached.
+        const end = query.get('end') === 'failed' ? 'failed' as const : 'confirmed' as const;
+        (['submitting', 'pending', end] as const).forEach((phase, index) => setTimeout(() => {
+          if (phase === 'failed') { walletRef.current = { ...walletRef.current, payment: { ...walletRef.current.payment!, phase, error: 'CHAIN_REVERTED' } }; setWallet(walletRef.current); }
+          else at(phase);
+        }, 1600 * (index + 1)));
+        return walletRef.current.payment;
+      }
       const payment = name === 'wallet-confirm' ? { ...wallet.payment, phase: payload.password ? 'pending' as const : 'password' as const } : undefined;
       walletRef.current = { ...wallet, payment };
       setWallet(walletRef.current);
@@ -116,10 +137,10 @@ function Fixture() {
     if (name === 'wallet-unlock') setWallet(value => ({ ...value, availability: 'ready' }));
     return wallet.payment;
   }, []);
-  const controller = { live: { state: { account: { id: palsideFixtures.self }, authenticated: true, wallet, chainRoom, chainTeam: { teamId: teamPacket.scope, packets: [teamDetail] }, rooms: { pinned: scene === 'packet' ? undefined : roomKey, avatars: {}, current: { messages: [{ id: 'fixture-tip-message', author: { wallet: null, id: 'fixture-tip-author', nickname: 'Mia', avatarId: null }, text: '这条测试弹幕值得打赏' }] } } }, command: command as CommandFunction }, now, run: command, people: palsideFixtures.people, teams: palsideFixtures.teams, me: palsideFixtures.people.find(person => person.id === palsideFixtures.self), data: palsideFixtures, team: { ...palsideFixtures.teams[0], activitySummary: { level: 2, rank: 12, isNew: false, points: 196, nextLevel: 3, pointsToNextLevel: 254, downgrade: null, averageDailyActive: 6.5, averageDailyMessages: 86, sharedViewingHours: 41, activeMembers7d: 7, rankingStatus: 'ranked', calculatedAt: now } }, current: palsideFixtures.teams[0]!.id, go: (next: string) => setPage(next.replace('wallet-', '')), copy: async () => true } as unknown as PalsideController;
+  const controller = { live: { state: { account: { id: palsideFixtures.self }, authenticated: true, chainRevision, connection: { networkOnline: !query.has('offline'), service: 'ready', messaging: 'ready', retrying: false }, wallet, chainRoom, chainTeam: { teamId: teamPacket.scope, packets: [teamDetail] }, rooms: { pinned: scene === 'packet' ? undefined : roomKey, avatars: {}, current: { messages: [{ id: 'fixture-tip-message', author: { wallet: null, id: 'fixture-tip-author', nickname: 'Mia', avatarId: null }, text: '这条测试弹幕值得打赏' }] } } }, command: command as CommandFunction }, now, run: command, people: palsideFixtures.people, teams: palsideFixtures.teams, me: palsideFixtures.people.find(person => person.id === palsideFixtures.self), data: palsideFixtures, team: { ...palsideFixtures.teams[0], activitySummary: { level: 2, rank: 12, isNew: false, points: 196, nextLevel: 3, pointsToNextLevel: 254, downgrade: null, averageDailyActive: 6.5, averageDailyMessages: 86, sharedViewingHours: 41, activeMembers7d: 7, rankingStatus: 'ranked', calculatedAt: now } }, current: palsideFixtures.teams[0]!.id, go: (next: string) => setPage(next.replace('wallet-', '')), copy: async () => true } as unknown as PalsideController;
   useEffect(() => {
     // Payment scenes open the production sheet over the wallet home, exactly as an entry point would.
-    if (['review', 'password', 'pending', 'done', 'failed'].includes(scene)) openPayment(initial().payment!.id);
+    if (['review', 'password', 'pending', 'done', 'failed', 'flow'].includes(scene)) openPayment(initial().payment!.id);
     if (scene === 'transfer') openTransfer();
     reviewStatus('ready');
   }, []);

@@ -60,7 +60,7 @@ export type RuntimeState = {
   leadTabs?: LeadTabs[];
   /** Teammates who asked you to look at their page during the last minute. */
   pokes?: Poke[];
-  history?: Record<string, { missingKeys: number; loaded: boolean; loading: boolean }>; /** Signup proof of work has run past a minute. */ signupWaiting?: boolean; /** Which part of password-set is running, so the panel can name it. */ signupPhase?: SignupPhase; notice?: TextValue; pendingShareTeamId?: string; jumpMessageId?: string; jumpWindowId?: number; pendingShare?: string; revision: number; ready: boolean; authenticated: boolean; account?: Account; connection: Connection; error?: TextValue; data: Dataset;
+  history?: Record<string, { missingKeys: number; loaded: boolean; loading: boolean }>; /** Signup proof of work has run past a minute. */ signupWaiting?: boolean; /** An unanswered registration request is being confirmed by retrying with the same identity. */ signupChecking?: boolean; /** Which part of password-set is running, so the panel can name it. */ signupPhase?: SignupPhase; notice?: TextValue; pendingShareTeamId?: string; jumpMessageId?: string; jumpWindowId?: number; pendingShare?: string; revision: number; ready: boolean; authenticated: boolean; account?: Account; connection: Connection; error?: TextValue; data: Dataset;
   drafts: Record<string, RevisionedDraft<Draft>>; preferences: Preferences; viewingId?: string; remoteTeams: TeamSnapshot[]; lobbyTeams?: Team[];
   config: ApiResult<'system.config'>; setup?: 'password'; invitations: Record<string, Invitation>;
 };

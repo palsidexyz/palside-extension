@@ -1,4 +1,3 @@
-import { Spinner } from '@palside/ui/spinner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { IntlProvider, useTranslations } from 'use-intl';
 import { browser } from 'wxt/browser';
@@ -18,6 +17,7 @@ import { readLanguage, type LanguageState } from '../../../runtime/transport/lan
 import type { RuntimeState } from '../../../runtime/composition/runtime-state';
 import type { DanmakuSettings, PageStatus } from '../../../runtime/browser/page-protocol';
 import type { SiteIcon } from '../../../domain/assets/site-icon';
+import { Band, MarkLogo } from '../ui/wait';
 import type { UpdateStatus } from '../../../runtime/browser/extension-update';
 function Banned({ expiresAt }: { expiresAt: number | null }) {
   const t = useTranslations(), appearance = useAppearance();
@@ -30,8 +30,8 @@ function Loading({ error }: { error: TextValue }) {
     <header className={s.header}>{error ? <Brand /> : <span />}<LanguageSetting compact /></header>
     {error ? <PageState title={t('connectionLostTitle')} action={<Button variant="surface" leadingIcon={<RotateCcw size={16} />} onClick={() => { void command('snapshot').catch(() => {}).finally(() => location.reload()); }}>{t('retry')}</Button>} />
       : <section className={s.state} role="status">
-        <Spinner className={s.loadingIcon} size={22} />
-        <p className={s.detail}>{t('opening')}</p>
+        <span className={s.mark} aria-hidden="true"><MarkLogo blink /></span>
+        <p className={s.detail}><Band>{t('opening')}</Band></p>
       </section>}
   </main>;
 }

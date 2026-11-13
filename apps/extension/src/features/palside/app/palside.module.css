@@ -56,6 +56,7 @@
 .readonlyActions { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:8px; }
 .readonlyActions > * { width:100%; }
 .composerWrap { padding:8px 12px 12px; flex-shrink:0; max-height:40%; overflow:auto; scrollbar-width:thin; }
+/* With the 弹幕 lines unfolded the box may grow taller; the lines scroll on their own, never the whole box. */
 .composer { position:relative; background:var(--ui-control-surface); padding:10px 8px 8px; border:0; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); }
 .composerInput { display:flex; align-items:flex-start; padding:0 6px; }
 .composerInput textarea { field-sizing:content; resize:none; min-height:28px; max-height:136px; width:100%; background:none; border:0; outline:none; color:var(--ui-text-primary); padding:3px 0; font-size:var(--ui-type-body); line-height:22px; }
@@ -162,7 +163,7 @@
 .messageStack { display:flex; flex-direction:column; align-items:flex-start; gap:4px; flex:0 1 auto; min-width:0; max-width:100%; transition:opacity .24s var(--ui-ease-feedback); }
 .selfMessage .messageStack { align-items:flex-end; }
 .messageStack > .assetCard { width:272px; max-width:100%; margin:0; padding:10px 12px; background:var(--ui-control-surface); border:0; box-shadow:none; }
-.messageStack > :not(.messageBubble, .assetCard) { max-width:min(100%, 272px); }
+.messageStack > :not(.messageBubble, .assetCard, dialog) { max-width:min(100%, 272px); }
 .assetGone { display:flex; align-items:center; gap:8px; width:272px; min-height:44px; padding:10px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-secondary); font-size:var(--ui-type-callout); }
 .messageBubble { position:relative; isolation:isolate; overflow:hidden; flex:0 1 auto; min-width:36px; max-width:100%; padding:8px 12px; border-radius:var(--ui-radius-s) var(--ui-radius-xl) var(--ui-radius-xl) var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); text-align:left; color:var(--ui-text-primary); }
 /* A lone token address and its card share one bubble: the address as one muted line, the card on the canvas under it. */

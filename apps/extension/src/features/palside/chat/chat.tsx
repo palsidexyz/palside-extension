@@ -18,7 +18,6 @@ import { Composer } from './composer';
 import { ReadonlyDraft } from '../feedback/readonly-draft';
 import { ChatHeader } from './chat-header';
 import { FollowBar } from '../annotations/follow-bar';
-import { panelTabsShown } from '../app/panel-tabs';
 import { MessageItem } from './message-item';
 import { NewTeam, showsNewTeam } from '../teams/new-team';
 import { ReactionStage } from '../annotations/reaction-picker';
@@ -190,7 +189,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     if (!message.recalled || leaving.has(message.id)) previous = message;
   });
   return <div className={s.chat} hidden={c.screen !== 'chat'}><SendFlightContext value={flight}><ReactionStage c={c}>
-    {!panelTabsShown(c) && <><ChatHeader c={c} onTeam={changeTeam} /><FollowBar c={c} /></>}
+    <ChatHeader c={c} onTeam={changeTeam} /><FollowBar c={c} />
     <WatchStrip key={c.current} c={c} top={top} />
     <div className={navigation.viewport}>
     <div ref={list} className={`${s.timeline} ${navigation.list}`} aria-label={t('extension.copy.chatMessages')} tabIndex={0}>
