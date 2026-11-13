@@ -38,6 +38,7 @@ function fixture() {
   value.state={account:{}, preferences:{current:'team',share:true,siteInteraction:{'x.com':{on:true}},notifications:'off'}, remoteTeams:[{id:'team',joined:true,people:[{id:'self',matrixId:'@self'}],memberIds:['self']}],data:{teams:[]}};
   value.requireConnection=()=>{}; value.preloadHistory=async()=>{}; value.signals={ serviceNow: () => Date.now(), toLocal: time => time };
   value.initialise=async()=>{};value.preferencesQueue=Promise.resolve();
+  value.rooms={preferencesChanged:async()=>{}};
   value.pageObservation=0;value.viewingSequence=0;value.viewingOrder=1;
   value.session={account:{id:'self'},matrix:{}}; value.emit=()=>snapshots.push(structuredClone(value.state));
   value.expireViewing=()=>value.emit();value.mayObserve=()=>Boolean(value.state.preferences.share);value.foreground=async()=>true;value.clearRemoteViewing=async()=>{};

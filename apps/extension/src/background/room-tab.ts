@@ -1,12 +1,14 @@
 import { siteByDomain } from '@palside/shared/sites';
-import { pageAsset, pageLookup } from '../runtime/browser/page-layer-host.ts';
+import { pageAsset, pageLookup, pageUrlHost } from '../runtime/browser/page-layer-host.ts';
+import { siteAllows } from '../domain/annotations/interaction.ts';
 import { accessStatus } from '../runtime/browser/permissions.ts';
 import { roomKeyForAsset } from '@palside/shared/contracts/rules';
 import type { RuntimeState } from '../runtime/composition/runtime-state.ts';
 import type { Background } from './index.ts';
 
-/** 弹幕 follows the token in the panel window the user last worked in (`panelWindows`). Only an added site (网站授权) follows its token:
- *  an address seen through 共享在看's tabs or a toolbar activeTab is never reported. */
+/** 弹幕 follows the token in the panel window the user last worked in (`panelWindows`). Only an added site (网站授权) with 弹幕 on there
+ *  (网页互动 › 弹幕, by the master switch and the site's own) follows its token: an address seen through 共享在看's tabs or a toolbar
+ *  activeTab is never reported, nor a token on a site where 弹幕 is off. */
 export function roomTab(bg: Background) {
   let version = 0, epoch = 0, sent = '', sending = 0, pending = Promise.resolve();
   async function refresh() {
@@ -14,7 +16,7 @@ export function roomTab(bg: Background) {
     try {
       const windowId = bg.panelWindows.current();
       const tab = windowId === undefined ? undefined : await bg.activeTab(windowId);
-      const granted = Boolean(tab?.url && !tab.incognito && (await accessStatus(tab.url, bg.browser)).site);
+      const granted = Boolean(tab?.url && !tab.incognito && siteAllows(bg.state?.preferences.siteInteraction, pageUrlHost(tab.url), 'danmaku') && (await accessStatus(tab.url, bg.browser)).site);
       if (request !== version) return;
       const asset = granted && tab?.url ? pageAsset(tab.url, bg.state) : undefined;
       // The registry site the token is open on is this device's vote for the room's usual site; names come from the token directory.

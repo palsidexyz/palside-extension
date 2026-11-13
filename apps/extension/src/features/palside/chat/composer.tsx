@@ -1,7 +1,7 @@
 'use client';
 import { Spinner } from '@palside/ui/spinner';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
-import { errorMessage,message as uiMessage,MessageError,failureText } from '@palside/i18n';
+import { errorMessage,message as uiMessage,failureText } from '@palside/i18n';
 import { useTranslations } from 'use-intl';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type RefObject } from 'react';
 import { ArrowUp, Check, Gift, ImageIcon, Plus, Pencil, X } from 'lucide-react';
@@ -19,6 +19,7 @@ import { type Person } from '../../../domain/account/model';
 import { insertMention, mentionQuery } from '../../../domain/chat/mentions';
 import { insertPastedText, pastedImage } from './clipboard';
 import { ReactionPicker } from '../annotations/reaction-picker';
+import { CallKey } from '../annotations/call-key';
 import { StateGlyph } from '../ui/motion-details';
 import { CaptureTool } from '../media/capture-tool';
 import { Action, PersonAvatar } from '../ui/primitives';
@@ -26,6 +27,7 @@ import { IMAGE_LIMIT } from '../../../domain/images/image-policy';
 import { readImage } from '../account/read-image';
 import type { PalsideController } from '../app/use-palside';
 import { whenWalletOpen } from '../wallet/closed';
+import { openPacketForm } from '../wallet/packet';
 import s from '../app/palside.module.css';
 import { liveView } from '../assets/token-data';
 import { ChainPicker } from '../assets/chain-picker';
@@ -36,7 +38,7 @@ const TEXT_MAX = 4000;
 
 type Mention = ReturnType<typeof mentionQuery>;
 
-/** The message box: the 本页条 while 互动 runs here, draft rows, the text field, outgoing tools (emoji, image, 截图) on the left and 共享 + 互动 + send on the right. Images come in by paste or drop.
+/** The message box: the 本页条 while 互动 runs here, draft rows, the text field, outgoing tools (emoji, image, 截图, 红包, 喊大家来看) on the left and 共享 + 互动 + send on the right. Images come in by paste or drop.
  * Editing a sent message happens here too, like a reply: its text takes the field, the draft waits untouched, and send becomes save. */
 export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputRef: RefObject<HTMLTextAreaElement | null>; onSend: () => Promise<void> }) {
   const t = useTranslations();
@@ -145,23 +147,18 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
 
   const live = c.live;
   // Queued messages show in the list itself; this only tells assistive technology that they go out on their own.
-  const queue = live?.state.sendQueue?.[c.current];
+  const queue = live.state.sendQueue?.[c.current];
   const attach = c.attach;
   useEffect(() => {
-    if (!live?.onCaptured) return;
+    if (!live.onCaptured) return;
     // A screenshot belongs to the team it was taken for, even if another team is open when it arrives.
     return live.onCaptured(({ src, teamId }) => attach({ kind: 'image', src, name: t('extension.copy.screenshotName') }, teamId));
   }, [live, attach, t]);
   const danmakuLine = useRef<HTMLInputElement>(null);
-  const pendingShare = live?.state.pendingShare && (!live.state.pendingShareTeamId || live.state.pendingShareTeamId === c.current) ? live.state.pendingShare : undefined;
+  const pendingShare = live.state.pendingShare && (!live.state.pendingShareTeamId || live.state.pendingShareTeamId === c.current) ? live.state.pendingShare : undefined;
   return <>
-    {editingImage && <ImageEditor src={editingImage.src} name={editingImage.name} teamId={editingImage.teamId} command={c.live?.command} onClose={() => setEditingImage(undefined)} onSave={async src => {
-      if (c.live) await c.live.command('image-draft-save', { accountId: editingImage.accountId, teamId: editingImage.teamId, source: editingImage.src, draftRevision: editingImage.revision, src });
-      else {
-        const original = c.drafts[editingImage.teamId]?.attachment;
-        if (original?.kind !== 'image' || original.src !== editingImage.src) throw new MessageError(uiMessage('extension.runtime.draftChanged'));
-        c.updateDraft({ attachment: { kind: 'image', src, name: editingImage.name } }, editingImage.teamId);
-      }
+    {editingImage && <ImageEditor src={editingImage.src} name={editingImage.name} teamId={editingImage.teamId} command={c.live.command} onClose={() => setEditingImage(undefined)} onSave={async src => {
+      await c.live.command('image-draft-save', { accountId: editingImage.accountId, teamId: editingImage.teamId, source: editingImage.src, draftRevision: editingImage.revision, src });
     }} />}
     {pendingShare && <div className={s.replyDraft}>
       <span>{t('extension.copy.addSelectionTo')}{c.team.name}</span>
@@ -209,8 +206,9 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
             <ReactionPicker c={c} />
             <Action label={t('extension.copy.image')} disabled={preparing} onClick={() => imageInput.current?.click()}><ImageIcon /></Action>
             <input ref={imageInput} type="file" accept="image/*" hidden onChange={event => { takeImage([...event.target.files ?? []]); event.target.value = ''; }} />
-            {live && <CaptureTool c={c} />}
-            <Action label={t('extension.wallet.createPacket')} onClick={() => whenWalletOpen(c, () => c.go('wallet-packet'))}><Gift /></Action>
+            <CaptureTool c={c} />
+            <Action label={t('extension.wallet.createPacket')} onClick={() => whenWalletOpen(c, () => openPacketForm(c, { kind: 'team', teamId: c.current }))}><Gift /></Action>
+            <CallKey c={c} />
           </div>}
           {edited ? <div className={s.tools}>
             {characterLength(c.editText) > TEXT_MAX - 200 && <small className={characterLength(c.editText) > TEXT_MAX ? s.danger : s.muted}>{characterLength(c.editText)}/{TEXT_MAX}</small>}
@@ -219,7 +217,7 @@ export function Composer({ c, inputRef, onSend }: { c: PalsideController; inputR
             </IconButton>
           </div> : <div className={s.tools}>
             {characterLength(c.draft.text) > TEXT_MAX - 200 && <small className={characterLength(c.draft.text) > TEXT_MAX ? s.danger : s.muted}>{characterLength(c.draft.text)}/{TEXT_MAX}</small>}
-            {live && <DanmakuKey c={c} lineRef={danmakuLine} />}
+            <DanmakuKey c={c} lineRef={danmakuLine} />
             <IconButton data-film-action="send" size="sm" className={s.sendButton}
               label={c.disconnected ? t('extension.copy.sendWhenConnected') : t('extension.copy.sendMessage')}
               variant={ready ? 'primary' : 'surface'} disabled={c.disconnected || !ready || preparing || c.draftConflict} onClick={() => void send()}>
@@ -245,7 +243,7 @@ function useLinkCard(c: PalsideController) {
   const dismissed = c.draft.dismissedUrls;
   const latest = useRef(c);
   useEffect(() => { latest.current = c; });
-  const command = c.live?.command;
+  const command = c.live.command;
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const quick = useRef(false);
@@ -253,7 +251,7 @@ function useLinkCard(c: PalsideController) {
   const lookup = useRef<{ url: string; teamId: string; accountId: string; done: Promise<void> }>(undefined);
   const wanted = (now: PalsideController, link: string) => LINK.exec(now.draft.text)?.[0] === link && !now.draft.attachment && !now.draft.dismissedUrls?.includes(link);
   const request = useRef((link: string, team: string, account: string) => {
-    const now = latest.current, run = now.live?.command;
+    const now = latest.current, run = now.live.command;
     if (!run || !mounted.current || now.current !== team || now.data.self !== account || !wanted(now, link)) return;
     const open = lookup.current;
     if (open && open.url === link && open.teamId === team && open.accountId === account) return open.done;
@@ -271,7 +269,7 @@ function useLinkCard(c: PalsideController) {
       if (!owned) { latest.current.updateDraft({ automaticCard: undefined, dismissedUrls: [...new Set([...(dismissed ?? []), auto.url])] }); return; }
       if (LINK.test(auto.url) ? auto.url !== url : !c.draft.text.includes(auto.url)) { latest.current.updateDraft({ attachment: undefined, automaticCard: undefined }); return; }
     }
-    if (!url || !command || attachment || dismissed?.includes(url)) return;
+    if (!url || attachment || dismissed?.includes(url)) return;
     const delay = quick.current ? 0 : 350;
     quick.current = false;
     const timer = setTimeout(() => { void request.current(url, teamId, accountId); }, delay);
@@ -280,7 +278,7 @@ function useLinkCard(c: PalsideController) {
   return {
     pasted() { quick.current = true; },
     /** The field's first address has no card yet but would get one. */
-    pending() { const now = latest.current, link = LINK.exec(now.draft.text)?.[0]; return Boolean(link && now.live?.command && wanted(now, link)); },
+    pending() { const now = latest.current, link = LINK.exec(now.draft.text)?.[0]; return Boolean(link && wanted(now, link)); },
     /** Starts or joins the lookup and waits for it, at most 600 ms. */
     async settle() {
       const now = latest.current, link = LINK.exec(now.draft.text)?.[0];
@@ -304,8 +302,8 @@ function useAddressCard(c: PalsideController) {
   useEffect(() => { latest.current = c; });
   const [found, setFound] = useState<{ address: string; candidates: string[] }>();
   const run = useRef(async (address: string, asset?: string) => {
-    const before = latest.current, team = before.current, account = before.data.self, command = before.live?.command;
-    if (!command) return;
+    const before = latest.current, team = before.current, account = before.data.self, command = before.live.command;
+
     const result = await command('token-card', { address, asset }).catch(() => undefined);
     const now = latest.current, auto = now.draft.automaticCard, attached = now.draft.attachment;
     if (!result?.attachment || now.current !== team || now.data.self !== account || !now.draft.text.includes(address) || now.draft.dismissedUrls?.includes(address)) return;

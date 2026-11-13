@@ -23,7 +23,7 @@
 .card[data-open] .inner { opacity:1; }
 .inner [data-dim] { opacity:.45; transition:opacity .2s var(--ui-ease-feedback); }
 
-/* 弹幕: 在网页上显示 and its look, then the rows of 参与弹幕 and strangers. */
+/* 弹幕: 在网页上显示 and its look, then the rows for strangers (已屏蔽, invites). */
 .section { padding-top:12px; }
 .label { display:block; margin:0 14px; font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); }
 .rows { box-shadow:inset 0 1px 0 var(--ui-border-soft); }

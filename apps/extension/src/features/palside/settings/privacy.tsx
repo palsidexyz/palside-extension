@@ -69,8 +69,8 @@ function useRevoke(c: PalsideController, grants: Grants) {
     const scope = all ? t('extension.sites.allSites') : t('extension.web.siteCount', { count: hosts.length });
     const take = {
       // Chrome taking 读取您的浏览记录 back switches 共享在看 off in the background, with its notice.
-      tabs: () => c.live ? void revokeTabs().then(done => { if (!done) c.setNotice(uiMessage('common.error')); }, () => c.setNotice(uiMessage('common.error'))) : void c.toggle('share', false),
-      sites: () => { if (c.live) void revokeAllSites().catch(() => c.setNotice(uiMessage('common.error'))); },
+      tabs: () => void revokeTabs().then(done => { if (!done) c.setNotice(uiMessage('common.error')); }, () => c.setNotice(uiMessage('common.error'))),
+      sites: () => { void revokeAllSites().catch(() => c.setNotice(uiMessage('common.error'))); },
       notifications: () => {
         if (!intent?.current()) return;
         const failed = () => { if (intent.current()) c.setNotice(uiMessage('extension.settings.notifyDenied')); };
@@ -175,20 +175,18 @@ function Cache({ c }: { c: PalsideController }) {
   const [reload, setReload] = useState(0);
   const live = c.live;
   useEffect(() => {
-    if (!live) return;
     let current = true;
     void live.command('cache-usage').then(value => { if (current) { setBytes(value?.bytes); setError(''); } }, () => { if (current) setError(uiMessage('extension.center.cacheUnavailable')); });
     return () => { current = false; };
   }, [live, reload, setError]);
   function clear() {
-    if (!live) return;
     c.setConfirmation({ title: uiMessage('extension.center.clearTitle'), description: uiMessage('extension.center.clearDescription'), action: uiMessage('extension.center.clear'), confirm: async () => {
       setBusy(true);
       try { setBytes((await live.command('clear-cache'))?.bytes); } finally { setBusy(false); }
     } });
   }
   return <div className={pages.row}><span className={pages.icon} aria-hidden="true"><HardDrive size={16} /></span>
-    <span className={pages.text}><strong>{t('extension.center.cache')}</strong><small>{error ? <span role="alert">{error}</span> : bytes === undefined ? live ? t('extension.copy.loading') : '—' : formatBytes(bytes, c.locale)}</small></span>
-    {live && <Button size="sm" disabled={busy || (!error && !bytes)} onClick={error ? () => { setError(''); setBytes(undefined); setReload(value => value + 1); } : clear}>{t(error ? 'common.retry' : 'extension.center.clear')}</Button>}
+    <span className={pages.text}><strong>{t('extension.center.cache')}</strong><small>{error ? <span role="alert">{error}</span> : bytes === undefined ? t('extension.copy.loading') : formatBytes(bytes, c.locale)}</small></span>
+    <Button size="sm" disabled={busy || (!error && !bytes)} onClick={error ? () => { setError(''); setBytes(undefined); setReload(value => value + 1); } : clear}>{t(error ? 'common.retry' : 'extension.center.clear')}</Button>
   </div>;
 }

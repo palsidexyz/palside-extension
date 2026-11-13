@@ -130,12 +130,6 @@ export async function roomBlocksCommand(this: RuntimeCommands) {
 return runtime.rooms.blocks();
 }
 
-export async function roomSettingsCommand(this: RuntimeCommands, command: Extract<Command, { name: "room-settings" }>) {
- const p = command.payload ?? {};
-    const runtime = this.runtime;
-return runtime.rooms.settings(p);
-}
-
 export const roomsHandlers = {
   'room-watch': roomWatchCommand,
   'room-panels': roomPanelsCommand,
@@ -160,5 +154,4 @@ export const roomsHandlers = {
   'room-report': roomReportCommand,
   'room-block': roomBlockCommand,
   'room-blocks': roomBlocksCommand,
-  'room-settings': roomSettingsCommand,
 } satisfies HandlerRegistry;

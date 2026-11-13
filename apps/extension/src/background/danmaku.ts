@@ -14,11 +14,11 @@ export function danmaku(bg: Background) {
   let settings: DanmakuSettings = { ...defaultDanmakuSettings };
   const loaded = bg.browser.storage.local.get([STORAGE_KEY]).then(value => { settings = normalizeDanmakuSettings(value[STORAGE_KEY]); }).catch(() => {});
   let changes = loaded;
-  type Projection = { key: string; seen: Set<string>; sent: Set<string>; queue: { id: string; replay?: true }[]; timer?: ReturnType<typeof setTimeout>; paymentsTimer?: ReturnType<typeof setTimeout> };
+  type Projection = { key: string; seen: Set<string>; sent: Set<string>; queue: { id: string; replay?: true }[]; timer?: ReturnType<typeof setTimeout>; packets: Set<string> };
   const projections = new Map<Port, Projection>();
   const replayed = new Map<number, Map<string, number>>();
-  /** 弹幕 runs at all: signed in with 参与弹幕 on. Where it crosses a page is each site's 弹幕 switch under 网页互动. */
-  function enabled() { return Boolean(bg.state?.authenticated && bg.state.preferences.rooms?.off !== true); }
+  /** Signed in; whether 弹幕 is on at all, and on this site, is 网页互动 › 弹幕 (`siteOn`). */
+  function enabled() { return Boolean(bg.state?.authenticated); }
   function siteOn(url: string | undefined) { return siteAllows(bg.state?.preferences.siteInteraction, pageUrlHost(url), 'danmaku'); }
   function allows(info: { url?: string; windowId?: number }) {
     const asset = info.url && pageAsset(info.url, bg.state);
@@ -28,9 +28,8 @@ export function danmaku(bg: Background) {
   function forget(port: Port) {
     const projection = projections.get(port);
     if (!projection) return;
-    bg.clearTimeout(projection.timer); bg.clearTimeout(projection.paymentsTimer); projections.delete(port);
-    try { port.postMessage({ type: 'danmaku-remove', ids: [...projection.sent] } satisfies PageDown); } catch { /* page gone */ }
-    try { port.postMessage({ type: 'room-payments', roomKey: null, packets: [] } satisfies PageDown); } catch { /* page gone */ }
+    bg.clearTimeout(projection.timer); projections.delete(port);
+    try { port.postMessage({ type: 'danmaku-remove', ids: [...projection.sent, ...projection.packets] } satisfies PageDown); } catch { /* page gone */ }
   }
   function messages() {
     const blocked = new Set(bg.state?.rooms?.blocked.map(person => person.id));
@@ -52,35 +51,41 @@ export function danmaku(bg: Background) {
     }
     if (projection.queue.length && projections.get(port) === projection) projection.timer = bg.setTimeout(() => release(port, info, projection), ROOM_REPLAY_GAP_MS);
   }
-  function syncPayments(port: Port, info: PageConnection, projection: Projection) {
-    bg.clearTimeout(projection.paymentsTimer); projection.paymentsTimer = undefined;
+  /**
+   * 红包 fly over the page like a line, once per packet per page: those still to grab when the page joins the room, then each new one as
+   * the room lists it. Only the packet id, its room and the sender's public face go out; amounts, claims and account ids stay here.
+   */
+  function syncPackets(port: Port, info: PageConnection, projection: Projection) {
     if (projections.get(port) !== projection) return;
-    if (bg.pages.pagePorts.get(port) !== info || !info.siteGranted || !allows(info) || bg.state?.rooms.current?.key !== projection.key) { forget(port); return; }
-    const now = Date.now(), room = bg.state.rooms.current;
-    const source = !room.loading && bg.state.chainRoom?.key === projection.key ? bg.state.chainRoom : undefined;
-    const blocked = new Set(bg.state.rooms.blocked.map(person => person.id));
-    const packets = (source?.packets ?? []).filter(item => item.kind === 'room' && item.scope === projection.key && item.status === 'active' && !(item.accountId && blocked.has(item.accountId)) && item.claimedCount < item.count && item.expiresAt > now);
-    post(port, {
-      type: 'room-payments', roomKey: projection.key,
-      packets: packets.length ? [{ roomKey: projection.key }] : [],
-    });
-    if (projections.get(port) !== projection) return;
-    const deadlines = packets.map(item => item.expiresAt).filter(at => at > now);
-    if (deadlines.length) projection.paymentsTimer = bg.setTimeout(() => syncPayments(port, info, projection), Math.min(Math.min(...deadlines) - now, 2_147_483_647));
+    const room = bg.state?.rooms.current;
+    const source = room && !room.loading && room.key === projection.key && bg.state?.chainRoom?.key === projection.key ? bg.state.chainRoom : undefined;
+    if (!source || !room) return;
+    const now = Date.now(), blocked = new Set(bg.state!.rooms.blocked.map(person => person.id));
+    const known = [...room.faces ?? [], ...bg.state!.rooms.people?.key === room.key ? bg.state!.rooms.people.people : [], ...room.messages.map(item => item.author)];
+    for (const item of source.packets) {
+      if (projection.packets.has(item.id) || item.kind !== 'room' || item.scope !== projection.key || item.status !== 'active' || !item.accountId || blocked.has(item.accountId) || item.claimedCount >= item.count || item.expiresAt <= now) continue;
+      projection.packets.add(item.id);
+      const sender = known.find(person => person.id === item.accountId) ?? { id: item.accountId, nickname: '' };
+      void bg.roomPagePerson(sender).then(({ mate, ...author }) => {
+        if (projections.get(port) !== projection || bg.pages.pagePorts.get(port) !== info) return;
+        const self = item.accountId === bg.state?.account?.id;
+        post(port, { type: 'danmaku', items: [{ id: item.id, key: projection.key, text: '', packet: true, timestamp: item.createdAt, author, self, mate }] });
+      });
+    }
   }
   function syncPage(port: Port, info: PageConnection) {
     if (bg.pages.pagePorts.get(port) !== info || !info.siteGranted || !allows(info)) { forget(port); return; }
     const room = bg.state!.rooms.current!;
     let projection = projections.get(port);
     if (projection?.key !== room.key) { forget(port); projection = undefined; }
-    if (room.loading) { if (projection) syncPayments(port, info, projection); return; }
+    if (room.loading) return;
     const visible = messages(), ids = new Set(visible.map(item => item.id));
     if (!projection) {
       const now = Date.now(), history = replayed.get(info.tabId) ?? new Map<string, number>();
       for (const [key, at] of history) if (now - at >= REPLAY_COOLDOWN_MS) history.delete(key);
       const replay = !history.has(room.key);
       history.set(room.key, history.get(room.key) ?? now); replayed.set(info.tabId, history);
-      projection = { key: room.key, seen: new Set(room.messages.map(item => item.id)), sent: new Set(), queue: replay ? visible.filter(item => item.createdAt > now - ROOM_REPLAY_WINDOW_MS && item.createdAt <= now).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)).slice(-ROOM_REPLAY_COUNT).map(item => ({ id: item.id, replay: true as const })) : [] };
+      projection = { key: room.key, seen: new Set(room.messages.map(item => item.id)), sent: new Set(), packets: new Set(), queue: replay ? visible.filter(item => item.createdAt > now - ROOM_REPLAY_WINDOW_MS && item.createdAt <= now).sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)).slice(-ROOM_REPLAY_COUNT).map(item => ({ id: item.id, replay: true as const })) : [] };
       projections.set(port, projection);
     } else {
       const removed = [...projection.sent].filter(id => !ids.has(id));
@@ -91,7 +96,7 @@ export function danmaku(bg: Background) {
       projection.queue.push(...visible.filter(item => !projection!.seen.has(item.id) && item.createdAt >= newest).map(item => ({ id: item.id })));
       projection.seen = new Set(room.messages.map(item => item.id));
     }
-    syncPayments(port, info, projection);
+    syncPackets(port, info, projection);
     if (projections.get(port) === projection && projection.queue.length && projection.timer === undefined) release(port, info, projection);
   }
   async function pageConfig(info: { url?: string }): Promise<PageDown> { await loaded; return { type: 'config', labels: await bg.pageLabels(), danmaku: { ...settings, enabled: enabled() && siteOn(info.url) } }; }
@@ -113,11 +118,13 @@ export function danmaku(bg: Background) {
       });
       changes = saved.catch(() => {}); return saved;
     },
-    openRoom(port: Port, info: PageConnection, key: string) {
+    /** A line or a 红包 clicked on the page: the room in the side panel, and that packet's envelope when it was one this page was sent. */
+    openRoom(port: Port, info: PageConnection, key: string, packet?: string) {
       if (!info.siteGranted || !allows(info) || projections.get(port)?.key !== key) return;
+      if (packet !== undefined && !projections.get(port)!.packets.has(packet)) packet = undefined;
       void bg.browser.sidePanel.open({ windowId: info.windowId }).then(() => {
         if (bg.pages.pagePorts.get(port) !== info || !info.siteGranted || !allows(info) || bg.state?.rooms.current?.key !== key) return;
-        for (const [panel, windowId] of bg.panels) if (windowId === info.windowId) bg.post(panel, { type: 'open-room', key });
+        for (const [panel, windowId] of bg.panels) if (windowId === info.windowId) bg.post(panel, { type: 'open-room', key, ...(packet ? { packet } : {}) });
       }).catch(() => {});
     },
   };

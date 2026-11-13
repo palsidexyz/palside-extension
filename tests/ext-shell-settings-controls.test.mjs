@@ -10,6 +10,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as platform from '../apps/extension/src/runtime/browser/platform.ts';
 import * as signalModel from '../apps/extension/src/runtime/annotations/signals.ts';
+import * as chatSearch from '../apps/extension/src/domain/chat/search.ts';
 
 const require = createRequire(import.meta.url), h = React.createElement;
 const sourceRoot = new URL('../apps/extension/src/features/palside/', import.meta.url);
@@ -44,6 +45,7 @@ async function fixture(t, { shared = false, read } = {}) {
     '../../../runtime/browser/platform': platform,
     '../../../domain/assets/model': { assetView: () => undefined },
     '../../../domain/assets/shared-tokens': { sharedTokens: () => [] },
+    '../../../domain/chat/search': chatSearch,
     '../media/message-image': { MessageImage: () => null },
     './asset-card': { AssetCard: () => null },
     './token-name': { tokenLabel: view => view.name },

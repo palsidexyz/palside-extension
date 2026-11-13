@@ -1,12 +1,9 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { type Screen } from './panel-model';
+import { signedOutScreens, type Screen } from './panel-model';
 import { type Viewing } from '../../../domain/assets/model';
 import type { PanelState } from './use-panel-state';
 import type { PanelActions } from './panel-actions';
 
-
-
-const signedOutScreens: Screen[] = ['welcome', 'new-account', 'confirm-phrase', 'restore'];
 
 /** Where 返回 leads when a screen was opened directly, not from another panel screen. */
 /** 招募大厅 and the recruitment details opened from it. */
@@ -16,12 +13,14 @@ const parents: Partial<Record<Screen, Screen>> = { wallet: 'settings', 'wallet-r
 export function usePanelNavigation(state: PanelState, getActions: () => PanelActions): Pick<PanelActions, 'go' | 'back' | 'openNotification' | 'openInvitation' | 'openSite' | 'selectAsset'> {
   const { view: { setSelectingOwner, screen, live, data, current, ownsScreen, setNotice }, returnFocus: returnFocusRef, localScreen, setPhrase, origins: originsRef, setScreen, setSiteHost, setSelectedAsset, setSelectedView } = state;
   const pendingFocus = useRef<{ accountId: string; teamId: string; element: HTMLElement | null } | undefined>(undefined);
-  // Leaving 招募大厅 by any route (a link, creating or joining a squad, 返回) stops its background reloads.
+  // Leaving 招募大厅 by any route (a link, creating or joining a squad, 返回) stops its background reloads. A token opened on purpose
+  // (热门, details, the 弹幕 sheet's 红包) stays pinned while you are with it; back in the chat 弹幕 follows the tab again.
   const lastScreen = useRef(screen);
   useEffect(() => {
     const was = lastScreen.current;
     lastScreen.current = screen;
-    if (live && lobbyScreens.has(was) && !lobbyScreens.has(screen)) void getActions().run('lobby-close');
+    if (lobbyScreens.has(was) && !lobbyScreens.has(screen)) void getActions().run('lobby-close');
+    if (live.state.rooms.pinned && screen === 'chat' && was !== 'chat') void getActions().run('room-close');
   }, [screen, live, getActions]);
   useLayoutEffect(() => {
     const request = pendingFocus.current;
@@ -38,12 +37,12 @@ function go(to: Screen) {
     const { run, refreshLobby } = getActions();
     if (to !== 'members') setSelectingOwner(false);
     if (screen === 'chat' && to !== 'chat') returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (live && !live.state.authenticated && !signedOutScreens.includes(to)) return;
+    if (!live.state.authenticated && !signedOutScreens.includes(to)) return;
     pendingFocus.current = undefined;
-    if (live && localScreen === 'new-account' && to === 'welcome') { setPhrase([]); void run('account-discard'); }
+    if (localScreen === 'new-account' && to === 'welcome') { setPhrase([]); void run('account-discard'); }
     // Leaving 通过邀请加入 without joining declines the link that opened it.
-    if (live && screen === 'join' && to !== 'join' && data.pendingInvite) void run('dismiss-invite', { url: data.pendingInvite });
-    if (live && to === 'lobby') void refreshLobby();
+    if (screen === 'join' && to !== 'join' && data.pendingInvite) void run('dismiss-invite', { url: data.pendingInvite });
+    if (to === 'lobby') void refreshLobby();
     if (to === 'chat') originsRef.current = {};
     else if (screen === 'chat') originsRef.current = { [to]: 'chat' };
     else if (screen !== to) {

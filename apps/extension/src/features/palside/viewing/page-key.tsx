@@ -42,7 +42,6 @@ export function askSiteAccess(host: string) {
 }
 
 export function siteState(c: PalsideController, waiting?: string): SiteState {
-  if (!c.live) return !c.pageHost ? 'none' : c.localSites.includes(c.pageHost) && siteAllows(c.siteInteraction, c.pageHost) ? 'on' : 'off';
   const { state } = capability(c, 'interact');
   if (state === 'blocked') return 'none';
   if (state === 'pending') return waiting === '' ? 'asking' : 'loading';
@@ -57,13 +56,13 @@ export function siteState(c: PalsideController, waiting?: string): SiteState {
 export function pageSite(c: PalsideController): Site | undefined {
   const host = c.pageHost;
   if (!host) return;
-  const page = c.live?.page;
+  const page = c.live.page;
   return siteOf(c, host, iconDataUrl(page?.favicon) ?? iconDataUrl(page?.icon));
 }
 
 /** Chrome names the tab, and it is no website Palside can work on: a browser page, a local file, or a local, private or ported address. */
 export function pageUnusable(c: PalsideController) {
-  const page = c.live?.page;
+  const page = c.live.page;
   if (!page) return false;
   return capability(c, 'interact').state === 'blocked' || Boolean(page.url && !c.pageHost);
 }
@@ -74,7 +73,7 @@ export function pageUnusable(c: PalsideController) {
  */
 export function openSiteSheet(c: PalsideController, tabs: boolean) {
   const session = captureSocialUi();
-  if (!c.live || c.pageHost || tabs || pageUnusable(c)) { session.set({ grant: true }); return; }
+  if (c.pageHost || tabs || pageUnusable(c)) { session.set({ grant: true }); return; }
   void wait('', requestTabs()).then(allowed => {
     if (!session.current() || !c.ownsAccess()) return;
     if (allowed) session.set({ grant: true });

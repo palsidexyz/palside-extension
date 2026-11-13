@@ -216,15 +216,15 @@ export function startBackground(env: BackgroundEnv) {
     void bg.sharing.observer.refresh();
   });
 
-  // 活跃 lasts five minutes after the last input; onStateChanged follows the same interval.
+  // 活跃 lasts five minutes after the last input; onStateChanged follows the same interval and reports a locked screen as 离开.
   browser.idle.onStateChanged.addListener(value => {
     // Idle keeps the shared page (quietly reading a chart is still watching); a locked screen ends it.
-    bg.sharing.updateDeviceState(value === 'active' ? 'active' : 'away'); void bg.sharing.observer.refresh(value === 'active');
+    bg.sharing.updateDeviceState(value); void bg.sharing.observer.refresh(value === 'active');
     // A locked screen forgets the wallet's unlocked signing key; the next payment asks for the password.
     if (value === 'locked' && bg.state?.authenticated) void bg.run({ name: 'wallet-lock', payload: {} }).catch(() => {});
   });
   browser.idle.setDetectionInterval(DEVICE_IDLE_SECONDS);
-  void browser.idle.queryState(DEVICE_IDLE_SECONDS).then(value => bg.sharing.updateDeviceState(value === 'active' ? 'active' : 'away')).catch(() => {});
+  void browser.idle.queryState(DEVICE_IDLE_SECONDS).then(value => bg.sharing.updateDeviceState(value)).catch(() => {});
   void bg.pages.registerPageLayer().catch(() => {});
   // A site revoked while the worker slept leaves its icon behind.
   void bg.siteIcons.prune().catch(() => {});

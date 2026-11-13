@@ -1,3 +1,4 @@
+import { MINUTE_MS, SECOND_MS } from '@palside/shared/units';
 import type { RuntimeDevice } from './device';
 import type { SessionRuntime } from './session-lifecycle';
 import { refreshLobbyApplications } from '../teams/command-handlers';
@@ -41,13 +42,14 @@ export function requestRefresh(this: SessionRuntime, domains: readonly RefreshDo
     void this.refresh(domains).catch(() => {});
   }
 
+/** The first report of a connection goes at once, so teammates never see a guess; later changes settle for 2 seconds. */
 export function scheduleDeviceStateReport(this: SessionRuntime, force = false) {
-    if (!this.session || !force && this.reportedDeviceState === this.deviceState) return;
+    if (!this.session || !this.deviceState || !force && this.reportedDeviceState === this.deviceState) return;
     clearTimeout(this.deviceStateTimer);
     this.deviceStateTimer = setTimeout(() => {
       this.deviceStateTimer = undefined;
       void this.reportDeviceState(force).catch(() => {});
-    }, force ? 0 : 2_000);
+    }, force || this.reportedDeviceState === undefined ? 0 : 2_000);
   }
 
 export async function reportDeviceState(this: SessionRuntime, force = false) {
@@ -55,14 +57,18 @@ export async function reportDeviceState(this: SessionRuntime, force = false) {
     const scope = this.scope();
     const session = this.session;
     const state = this.deviceState;
-    if (!session || !force && this.reportedDeviceState === state) return;
+    if (!session || !state || !force && this.reportedDeviceState === state) return;
     try {
       await scope.wait(runtime.api.request('presence.update', { body: { state } }));
       if (this.session !== session) return;
-      this.reportedDeviceState = state;
+      this.reportedDeviceState = state; this.deviceStateFailures = 0;
       if (this.deviceState !== state) this.scheduleDeviceStateReport();
     } catch { scope.check();
-      // The next state change or live reconnect retries the presence report.
+      // Retry with backoff while connected; a reconnect reports again on its own.
+      if (this.session !== session || !this.liveOpen) return;
+      const delay = Math.min(MINUTE_MS, 5 * SECOND_MS * 2 ** this.deviceStateFailures++);
+      clearTimeout(this.deviceStateTimer);
+      this.deviceStateTimer = setTimeout(() => { this.deviceStateTimer = undefined; void this.reportDeviceState(true).catch(() => {}); }, delay);
     }
   }
 
@@ -89,7 +95,9 @@ export function startLiveSync(auth: SessionRuntime, session: RuntimeDevice, curr
           if (status.initialIssued && reconnected) auth.requestRefresh(refreshDomains);
           if (status.initialIssued) void runtime.wallet.refresh().catch(() => {});
           runtime.directory.resume();
-          if (status.roomsStarted) { auth.scheduleDeviceStateReport(true); runtime.rooms.reconnected(); }
+          // Presence does not wait for encrypted chat: a new lease shows nothing until this report lands.
+          auth.scheduleDeviceStateReport(true);
+          if (status.roomsStarted) runtime.rooms.reconnected();
           else status.roomCatchUp = true;
         } else {
           runtime.state.data.people = runtime.state.data.people.map(person => ({ ...person, presence: undefined }));
@@ -108,7 +116,7 @@ export function startLiveSync(auth: SessionRuntime, session: RuntimeDevice, curr
       onPresence: (account, presence) => {
         if (!current()) return;
         auth.snapshotPresence?.set(account, presence);
-        runtime.state.data.people = runtime.state.data.people.map(person => person.id === account ? { ...person, presence: presence === 'offline' ? undefined : presence } : person);
+        runtime.state.data.people = runtime.state.data.people.map(person => person.id === account ? { ...person, presence } : person);
         runtime.emit();
       },
     });

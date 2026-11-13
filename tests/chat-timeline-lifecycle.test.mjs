@@ -65,7 +65,7 @@ function chat(messages, payments = [], overrides = {}) {
     ...overrides,
   };
   const Chat = execute(declarations('chat.tsx', ['groupWindow', 'continues', 'dayKey', 'dayLabel', 'Chat']), 'Chat', context);
-  const c = { currentMessages: messages, data: { self: 'self' }, current: 'team', screen: 'chat', canWrite: true, ...overrides.c };
+  const c = { currentMessages: messages, data: { self: 'self' }, current: 'team', screen: 'chat', canWrite: true, live: { command: async () => {}, state: { remoteTeams: [] } }, ...overrides.c };
   const tree = Chat({ c, clearJump() {} });
   return { tree, flights, send: nodes(tree, n => n.type === 'Composer')[0].props.onSend };
 }

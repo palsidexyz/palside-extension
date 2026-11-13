@@ -22,7 +22,7 @@ import s from '../app/palside.module.css';
  */
 export function CaptureTool({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const shortcut = useCaptureShortcut(c);
+  const shortcut = useCaptureShortcut();
   const [busy, setBusy] = useState(false);
   const version = useRef(0);
   const teamId = c.current;
@@ -31,7 +31,6 @@ export function CaptureTool({ c }: { c: PalsideController }) {
   const reason = unavailableReason(c, 'capture');
   const label = shortcut ? t('extension.shot.labelKey', { key: shortcutText(shortcut) }) : t('extension.copy.captureAnnotate');
   async function run() {
-    if (!c.live) return;
     const current = ++version.current;
     setBusy(true);
     try { await c.live.command('capture', { teamId: c.current, accountId: c.data.self }); }

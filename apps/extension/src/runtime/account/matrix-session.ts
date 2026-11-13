@@ -136,7 +136,6 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
     }
     if (!scope.current() || this.session !== session || this.client !== client) { client.stopClient(); guard(); throw new MessageError(uiMessage('extension.runtime.connectionChanged')); }
     status.roomsStarted = true;
-    if (this.liveOpen) this.scheduleDeviceStateReport(true);
     if (status.roomCatchUp) runtime.rooms.reconnected();
     void runtime.rooms.start().catch(() => {});
     void this.preloadHistory().catch(() => {});

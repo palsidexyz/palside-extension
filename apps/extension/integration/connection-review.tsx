@@ -11,9 +11,9 @@ import { connectionStatus, type Connection } from '../src/runtime/transport/conn
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { TeamSnapshot } from '@palside/shared/contracts/team-model';
 import type { RuntimeDevice } from '../src/runtime/account/device';
-import { PalsideApp } from './preview-app';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import { emptyDraft, type Draft, type Message } from '../src/domain/chat/model';
-import { palsideFixtures, demoSites } from './fixtures';
+import { palsideFixtures } from './fixtures';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
 
@@ -119,7 +119,7 @@ function Review() {
     }
     return undefined as never;
   };
-  return <div style={{ height: '100dvh' }}><PalsideApp data={state.data} sites={demoSites} live={{ state, command, openPage: async () => {} }} deliver={async () => {}} /><script type="application/json" id="connection-result">{JSON.stringify({ passed: true, checks })}</script></div>;
+  return <div style={{ height: '100dvh' }}><PalsideApp live={{ state, command, openPage: async () => {} }} /><script type="application/json" id="connection-result">{JSON.stringify({ passed: true, checks })}</script></div>;
 }
 const root = createRoot(document.getElementById('root')!);
 void verify().then(() => { root.render(<IntegrationIntl><Review /></IntegrationIntl>); reviewStatus('passed'); }).catch(error => { reviewStatus('failed'); root.render(<IntegrationIntl><pre role="alert">{JSON.stringify({ passed: false, checks, error: String(error) }, null, 2)}</pre></IntegrationIntl>); });

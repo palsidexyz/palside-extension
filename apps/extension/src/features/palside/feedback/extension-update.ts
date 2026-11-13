@@ -8,7 +8,7 @@ import type { PalsideController } from '../app/use-palside';
  * panel once the draft is saved; with none downloaded it asks the store and stays busy until the version arrives.
  */
 export function useExtensionUpdate(c: PalsideController) {
-  const status = c.live?.update;
+  const status = c.live.update;
   const ready = status?.ready;
   const [running, setRunning] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -20,7 +20,7 @@ export function useExtensionUpdate(c: PalsideController) {
     return () => clearTimeout(timer);
   }, [downloading, ready]);
   async function run() {
-    if (!c.live || pending.current) return;
+    if (pending.current) return;
     pending.current = true; setRunning(true);
     try {
       await c.flushDraft().catch(() => 0);

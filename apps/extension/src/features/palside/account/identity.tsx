@@ -52,7 +52,7 @@ function PasswordForm({ submitLabel, danger = false, onSubmit, onCancel }: { sub
 export function Security({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const text = useText();
-  const live = c.live!;
+  const live = c.live;
   const address = c.me.walletAddress;
   const [phrase, setPhrase] = useState<string[]>();
   const [revealing, setRevealing] = useState(false);
@@ -100,6 +100,7 @@ export function DeleteAccountForm({ c }: { c: PalsideController }) {
   const t = useTranslations();
   return <div className={s.form}>
     <p>{t('extension.copy.deleteAccountDescription')}</p>
-    <PasswordForm danger submitLabel={t('extension.copy.deleteAccount')} onSubmit={async password => c.setConfirmation({ title: uiMessage('extension.copy.permanentDeleteTitle'), description: uiMessage('extension.copy.permanentDeleteDescription'), action: uiMessage('extension.copy.deleteAccount'), danger: true, confirm: async () => { await c.live!.command('delete-account', { password }); } })} />
+    {/* The page is the confirmation: it states the consequences, and the PIN submits. A wrong PIN stays here. */}
+    <PasswordForm danger submitLabel={t('extension.copy.deleteAccount')} onSubmit={async password => { await c.live.command('delete-account', { password }); c.setNotice(uiMessage('extension.copy.accountDeleted')); }} />
   </div>;
 }

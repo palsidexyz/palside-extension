@@ -74,7 +74,7 @@ test('once per tab and token survives reconnect and token switching, expires aft
 
 test('all public-room display conditions apply independently of interaction features and team membership', async t => {
   const cases = [
-    f => f.update({ preferences: { ...f.state().preferences, rooms: { off: true } } }),
+    f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { '*': { on: true, danmaku: false, signal: true, chart: true } } } }),
     f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['https://gmgn.ai/*'] }); },
     f => f.primary.port.onDisconnect.emit(),
@@ -160,108 +160,67 @@ test('another tab gets its own replay and a missing grant or capture-only admiss
   assert.equal(p.flights().length, 1); assert.ok(p.removed().includes('a'));
 });
 
-const packet = (patch = {}) => ({ id: 'packet', accountId: 'bob', kind: 'room', scope: key(address), status: 'active', count: 5, claimedCount: 1, expiresAt: Date.now() + MINUTE_MS, ...patch });
-const payments = p => p.messages.filter(item => item.type === 'room-payments');
-const lastPayment = p => payments(p).at(-1);
-const emptyPayments = { type: 'room-payments', roomKey: null, packets: [] };
-const shown = { type: 'room-payments', roomKey: key(address), packets: [{ roomKey: key(address) }] };
+const packet = (patch = {}) => ({ id: 'packet', accountId: 'bob', kind: 'room', scope: key(address), status: 'active', count: 5, claimedCount: 1, amount: '5', expiresAt: Date.now() + MINUTE_MS, ...patch });
+const packetFlights = p => p.flights().filter(item => item.packet);
 
 function paymentFixture(options = {}) {
   return fixture({ ...options, state: { chainRoom: { key: key(address), packets: [packet()] }, ...options.state } });
 }
 
-test('room payments project only safe display fields and a single room packet entry', async t => {
-  const f = paymentFixture({ state: { chainRoom: { key: key(address), packets: [packet({ privateKey: 'never-project' }), packet({ id: 'other-packet' })] } } });
+test('room packets fly once each with public display fields only, and a click names only a packet this page was sent', async t => {
+  const f = paymentFixture({ messages: [message('a')], state: { chainRoom: { key: key(address), packets: [packet({ privateKey: 'never-project' }), packet({ id: 'other-packet' })] } } });
   t.after(f.close); await flush(); const p = f.page(); await flush();
-  assert.deepEqual(lastPayment(p), shown);
-  for (const field of ['accountId', 'privateKey', 'amount', 'claims', 'other-packet']) assert.equal(JSON.stringify(payments(p)).includes(field), false);
+  assert.deepEqual(packetFlights(p).map(item => item.id), ['packet', 'other-packet']);
+  assert.deepEqual(Object.keys(packetFlights(p)[0]).sort(), ['author', 'id', 'key', 'mate', 'packet', 'self', 'text', 'timestamp']);
+  assert.equal(packetFlights(p)[0].author.name, 'Bob');
+  for (const field of ['accountId', 'privateKey', 'amount', 'claimedCount']) assert.equal(JSON.stringify(packetFlights(p)).includes(field), false);
   const labels = p.messages.find(item => item.type === 'config').labels;
-  assert.equal(labels.packet, 'Red packet'); assert.equal(labels.member, 'Member');
-  p.port.onMessage.emit({ type: 'open-room', key: key(address) }); await flush();
+  assert.equal(labels.packetFrom, '{name}’s red packet'); assert.equal(labels.member, 'Member');
+  f.update({ chainRoom: { ...f.state().chainRoom } }); await flush();
+  assert.equal(packetFlights(p).length, 2, 'a packet already flown never flies again');
+  p.port.onMessage.emit({ type: 'open-room', key: key(address), packet: 'packet' }); await flush();
+  assert.deepEqual(f.primary.messages.filter(item => item.type === 'open-room').at(-1), { type: 'open-room', key: key(address), packet: 'packet' });
+  p.port.onMessage.emit({ type: 'open-room', key: key(address), packet: 'forged' }); await flush();
   assert.deepEqual(f.primary.messages.filter(item => item.type === 'open-room').at(-1), { type: 'open-room', key: key(address) });
 });
 
-test('room payments filter wrong rooms, blocked senders and unavailable packets', async t => {
+test('room packets skip wrong rooms, blocked senders and packets that cannot be grabbed, and fly when one arrives', async t => {
   const now = Date.now();
-  const unavailable = [packet({ scope: key(other) }), packet({ kind: 'team' }), packet({ status: 'refunded' }), packet({ claimedCount: 5 }), packet({ expiresAt: now }), packet({ accountId: 'blocked' })];
+  const unavailable = [packet({ id: 'a', scope: key(other) }), packet({ id: 'b', kind: 'team' }), packet({ id: 'c', status: 'refunded' }), packet({ id: 'd', status: 'pending' }), packet({ id: 'e', claimedCount: 5 }), packet({ id: 'f', expiresAt: now }), packet({ id: 'g', accountId: 'blocked' })];
   const f = paymentFixture({ state: { chainRoom: { key: key(address), packets: unavailable } } });
   t.after(f.close); f.update({ rooms: { ...f.state().rooms, blocked: [{ id: 'blocked' }] } });
   await flush(); const p = f.page(); await flush();
-  assert.deepEqual(lastPayment(p).packets, []);
-  f.update({ chainRoom: { key: key(address), packets: [packet()] } }); await flush();
-  assert.deepEqual(lastPayment(p), shown);
-  f.update({ chainRoom: { ...f.state().chainRoom, key: key(other) } }); await flush();
-  assert.deepEqual(lastPayment(p), { type: 'room-payments', roomKey: key(address), packets: [] });
+  assert.deepEqual(packetFlights(p), []);
+  f.update({ chainRoom: { key: key(other), packets: [packet()] } }); await flush();
+  assert.deepEqual(packetFlights(p), []);
+  f.update({ rooms: { ...f.state().rooms, current: { ...f.state().rooms.current, loading: true } }, chainRoom: { key: key(address), packets: [packet()] } }); await flush();
+  assert.deepEqual(packetFlights(p), [], 'nothing flies while the room reloads');
+  f.update({ rooms: { ...f.state().rooms, current: { ...f.state().rooms.current, loading: false } } }); await flush();
+  assert.deepEqual(packetFlights(p).map(item => item.id), ['packet']);
 });
 
-test('room payment snapshots remove records immediately and clear while the room reloads', async t => {
-  const f = paymentFixture(); t.after(f.close); await flush(); const p = f.page(); await flush();
-  assert.equal(lastPayment(p).packets.length, 1);
-  f.update({ chainRoom: { ...f.state().chainRoom, packets: [] } }); await flush();
-  assert.deepEqual(lastPayment(p), { type: 'room-payments', roomKey: key(address), packets: [] });
-  f.update({ chainRoom: { key: key(address), packets: [packet()] } }); await flush();
-  assert.equal(lastPayment(p).packets.length, 1);
-  f.update({ rooms: { ...f.state().rooms, current: { ...f.state().rooms.current, loading: true } } }); await flush();
-  assert.deepEqual(lastPayment(p).packets, []);
-  f.update({ chainRoom: undefined }); await flush();
-  assert.deepEqual(lastPayment(p).packets, []);
-});
-
-test('room payment timers expire packets without state events', async t => {
-  t.mock.timers.enable({ apis: ['Date'], now: 5_000_000 });
-  const now = Date.now();
-  const f = paymentFixture({ state: { chainRoom: { key: key(address), packets: [packet({ expiresAt: now + 1000 }), packet({ id: 'later', expiresAt: now + 3000 })] } } });
-  t.after(f.close); await flush(); const p = f.page(); await flush();
-  const advance = delay => {
-    const entry = [...f.timers].find(([id]) => id.delay === delay); assert.ok(entry);
-    f.timers.delete(entry[0]); t.mock.timers.tick(delay); entry[1]();
-  };
-  assert.equal(lastPayment(p).packets.length, 1);
-  advance(1000); assert.equal(lastPayment(p).packets.length, 1);
-  advance(2000); assert.deepEqual(lastPayment(p).packets, []);
-});
-
-test('room payment projections clear for permission, tab, account, team and display lifecycle changes', async t => {
+test('room packet flights are taken back when the page leaves the room or loses 弹幕', async t => {
   const cases = [
-    f => f.update({ preferences: { ...f.state().preferences, rooms: { off: true } } }),
     f => f.update({ preferences: { ...f.state().preferences, siteInteraction: { 'gmgn.ai': { on: true, danmaku: false, signal: true } } } }),
     f => { f.host.grantedOrigins.clear(); f.browser.permissions.onRemoved.emit({ origins: ['https://gmgn.ai/*'] }); },
-    f => f.primary.port.onDisconnect.emit(),
     f => f.update({ authenticated: false }),
-    f => f.update({ account: { id: 'other-account' } }),
-    f => f.update({ preferences: { ...f.state().preferences, current: 'other-team' } }),
     f => f.update({ rooms: { ...f.state().rooms, current: { key: key(other), messages: [], loading: true } } }),
-    f => { f.controls.tabs[0].url = url(other); f.browser.tabs.onUpdated.emit(1, { url: url(other) }, f.controls.tabs[0]); },
-    (f, p) => { p.port.onDisconnect.emit(); f.browser.tabs.onUpdated.emit(1, { status: 'loading' }, f.controls.tabs[0]); },
-    f => f.browser.tabs.onRemoved.emit(1, { windowId: 10 }),
-    (f, p) => p.port.onDisconnect.emit(),
   ];
   for (const disable of cases) {
     const f = paymentFixture(); t.after(f.close); await flush(); const p = f.page(); await flush();
-    assert.equal(lastPayment(p).packets.length, 1);
-    const callbacks = [...f.timers.values()];
+    assert.equal(packetFlights(p).length, 1);
     await disable(f, p); await flush();
-    assert.deepEqual(lastPayment(p), emptyPayments);
-    const count = payments(p).length;
-    for (const fn of callbacks) fn();
-    assert.equal(payments(p).length, count, 'old timer callbacks never resurrect a disposed projection');
+    assert.ok(p.removed().includes('packet'));
   }
 });
 
-test('room payments require a site grant and matching page and cannot reuse a replaced port binding', async t => {
+test('room packets require a site grant and a matching page', async t => {
   const denied = paymentFixture({ site: false }); t.after(denied.close); await flush();
-  const refused = denied.page(); await flush(); assert.equal(payments(refused).length, 0);
+  const refused = denied.page(); await flush(); assert.equal(packetFlights(refused).length, 0);
   const f = paymentFixture(); t.after(f.close); await flush();
   f.controls.tabs.push({ ...f.controls.tabs[0], id: 2, url: url(other) });
-  const wrong = f.page(f.controls.tabs[1]); await flush(); assert.equal(payments(wrong).length, 0);
-  const p = f.page(); await flush(); const info = f.bg.pages.pagePorts.get(p.port);
-  f.bg.pages.pagePorts.set(p.port, { ...info });
-  f.bg.danmaku.syncPage(p.port, info);
-  assert.deepEqual(lastPayment(p), emptyPayments);
-  f.bg.pages.pagePorts.set(p.port, info); f.bg.danmaku.syncPage(p.port, info);
-  assert.equal(lastPayment(p).packets.length, 1);
-  info.siteGranted = false; f.bg.danmaku.syncPage(p.port, info);
-  assert.deepEqual(lastPayment(p), emptyPayments);
+  const wrong = f.page(f.controls.tabs[1]); await flush(); assert.equal(packetFlights(wrong).length, 0);
+  const p = f.page(); await flush(); assert.equal(packetFlights(p).length, 1);
 });
 
 test('a pool page names its URL until the server finds its token, then follows the token and enables webpage danmaku', async t => {

@@ -14,14 +14,16 @@ export const overlayStyles = `
     .danmaku-area{position:fixed;pointer-events:none;overflow:hidden}
     .danmaku-area>div,.danmaku-area>div>div{pointer-events:none!important}
     .danmaku-area>div>div{display:flow-root}
-    .room-payments{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;width:min(360px,calc(100% - 24px));pointer-events:none}
-    .room-payments button{pointer-events:auto;max-width:100%;border:0;border-radius:var(--ui-radius-m);corner-shape:var(--ui-corner-shape);padding:10px 14px;background:var(--pl-light-surface);color:var(--pl-light-text);font:500 13px/20px Geist,system-ui,sans-serif;text-align:left;cursor:pointer}
-    .stage[data-theme=dark] .room-payments button{background:var(--pl-dark-surface);color:var(--pl-on-dark)}
     .dm{position:relative;margin:2px 24px 2px 0;pointer-events:auto;display:block;padding:0 6px;border-radius:var(--ui-radius-xs);corner-shape:var(--ui-corner-shape);white-space:nowrap;color:var(--pl-on-dark);opacity:var(--dm-opacity,1);font:bold 24px/30px SimHei,"Microsoft JhengHei",Arial,Helvetica,sans-serif;text-shadow:1px 0 1px var(--pl-outline),0 1px 1px var(--pl-outline),0 -1px 1px var(--pl-outline),-1px 0 1px var(--pl-outline);cursor:pointer;transition:background-color .12s}
     .dm[data-size=sm]{font-size:20px;line-height:26px}
     .dm[data-size=lg]{font-size:28px;line-height:34px}
     .dm[data-mate]{color:var(--pl-dm-mate)}
     .dm-likes{margin-left:.36em}
+    /* 红包 lines: the plain line in gold after a small red envelope. */
+    .dm[data-packet]{display:flex;align-items:center;gap:.32em;color:var(--pl-dm-packet-gold)}
+    .dm-envelope{position:relative;flex:none;width:.72em;height:.92em;border-radius:.12em;background:var(--pl-dm-packet);box-shadow:0 0 0 1px var(--pl-outline);overflow:hidden}
+    .dm-envelope::before{content:"";position:absolute;left:-25%;right:-25%;top:-38%;height:72%;border-radius:0 0 50% 50%;background:var(--pl-dm-packet-flap)}
+    .dm-envelope::after{content:"";position:absolute;left:50%;top:34%;width:.3em;height:.3em;margin-left:-.15em;border-radius:50%;background:var(--pl-dm-packet-gold)}
     .dm-likes svg{display:inline-block;width:.86em;height:.86em;margin-right:.12em;vertical-align:-.08em;overflow:visible}.dm-likes path{stroke:var(--pl-outline);stroke-width:2.4px;paint-order:stroke}
     .dm[data-replay]{opacity:calc(var(--dm-opacity,1) * .6)}
     .dm[data-self]{background:var(--pl-dm-self-fill);box-shadow:inset 0 0 0 1px var(--pl-dm-self)}

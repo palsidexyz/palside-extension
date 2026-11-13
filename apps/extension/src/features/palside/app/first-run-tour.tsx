@@ -9,14 +9,15 @@ import type { PalsideController } from './use-palside';
 import { defaultSignalSettings } from '../../../runtime/annotations/signals';
 import { shortcutKeys } from '../../../runtime/browser/shortcuts';
 import { KeyCaps } from '../settings/signal-settings';
-import { DanmakuGlyph } from '../rooms/composer-danmaku';
+import { DanmakuIcon } from '../ui/icons';
 import { useCaptureShortcut } from '../settings/use-shortcut';
 import s from './first-run-tour.module.css';
 
 /** Controls the tour points at carry `data-tour`; a step whose control is not on screen is left out. */
 type Anchor = 'share' | 'site' | 'tools' | 'invite';
 type Box = { left: number; top: number; width: number; height: number };
-const GAP = 10, EDGE = 12, WIDTH = 288, PAD = 4, START_DELAY = 700;
+// 输入框工具 is a table of one-line rows, so its bubble is wider than the prose steps'.
+const GAP = 10, EDGE = 12, WIDTH = 288, TOOLS_WIDTH = 336, PAD = 4, START_DELAY = 700;
 
 /** The first visible control for an anchor inside the panel; 邀请 falls back from the header seat to the new team card's button. */
 function anchorOf(app: Element | null, anchor: Anchor) {
@@ -63,23 +64,23 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
   const [index, setIndex] = useState(0);
   const [closed, setClosed] = useState(false);
   const [height, setHeight] = useState(140);
-  const shotKeys = shortcutKeys(useCaptureShortcut(c) ?? '');
+  // The keys close 截图's name line, so macOS caps keep only their symbol (⌥ ⇧ S); other systems' names are already short.
+  const shotKeys = shortcutKeys(useCaptureShortcut() ?? '').map(key => key.split(' ')[0] ?? key);
   const steps: Record<Anchor, { title: string; body: ReactNode }> = {
     share: { title: t('extension.web.share'), body: <p>{t('extension.tour.share')}</p> },
-    site: { title: t('extension.settings.interaction'), body: <><p>{t('extension.tour.site')}</p><Suspense fallback={null}><TourDemo settings={c.live?.page?.signalSettings ?? defaultSignalSettings} /></Suspense></> },
+    site: { title: t('extension.settings.interaction'), body: <><p>{t('extension.tour.site')}</p><Suspense fallback={null}><TourDemo settings={c.live.page?.signalSettings ?? defaultSignalSettings} /></Suspense></> },
     tools: { title: t('extension.tour.toolsTitle'), body: <ul className={s.tools}>
-      <li><SmilePlus aria-hidden="true" /><b>{t('extension.copy.reactionPicker')}</b><p><span>{t('extension.tour.reactions')}</span></p></li>
-      <li><ImageIcon aria-hidden="true" /><b>{t('extension.copy.image')}</b><p><span>{t('extension.tour.image')}</span></p></li>
-      <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><p><span>{t('extension.tour.shot')}</span>{shotKeys.length > 0 && <KeyCaps keys={shotKeys} />}</p></li>
-      <li><Gift aria-hidden="true" /><b>{t('extension.wallet.packet')}</b><p><span>{t('extension.tour.packet')}</span></p></li>
-      <li><DanmakuGlyph /><b>{t('extension.room.name')}</b><p><span>{t('extension.tour.room')}</span></p></li>
+      <li><SmilePlus aria-hidden="true" /><b>{t('extension.copy.reactionPicker')}</b><p>{t('extension.tour.reactions')}</p></li>
+      <li><ImageIcon aria-hidden="true" /><b>{t('extension.copy.image')}</b><p>{t('extension.tour.image')}</p></li>
+      <li><Scissors aria-hidden="true" /><b>{t('extension.privacy.feature_shot')}</b><p>{t('extension.tour.shot')}{shotKeys.length > 0 && <KeyCaps keys={shotKeys} />}</p></li>
+      <li><Gift aria-hidden="true" /><b>{t('extension.wallet.packet')}</b><p>{t('extension.tour.packet')}</p></li>
+      <li><DanmakuIcon /><b>{t('extension.room.name')}</b><p>{t('extension.tour.room')}</p></li>
     </ul> },
     invite: { title: t('extension.tour.inviteTitle'), body: <p>{t('extension.tour.invite')}</p> },
   };
 
   function save() {
-    const live = c.live;
-    if (live) void live.command('preferences', { accountId: c.data.self, toured: true }).catch(() => {});
+    void c.live.command('preferences', { accountId: c.data.self, toured: true }).catch(() => {});
   }
   const saveNow = useEffectEvent(save);
   // The panel settles first (capsule, presence, composer); the steps are the controls on screen at that moment.
@@ -135,7 +136,7 @@ export function FirstRunTour({ c, onRun }: { c: PalsideController; onRun: (team:
   };
 
   const bounds = app?.getBoundingClientRect() ?? { left: 0, top: 0, width: innerWidth, height: innerHeight };
-  const width = Math.min(WIDTH, bounds.width - EDGE * 2);
+  const width = Math.min(anchor === 'tools' ? TOOLS_WIDTH : WIDTH, bounds.width - EDGE * 2);
   // Below the control when it fits, otherwise above; the arrow follows the control's centre.
   const below = target ? target.top + target.height + GAP + height + EDGE <= bounds.top + bounds.height : true;
   const centre = target ? target.left + target.width / 2 : 0;

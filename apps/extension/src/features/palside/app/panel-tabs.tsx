@@ -23,5 +23,5 @@ export function RoomTitle({ c }: { c: PalsideController }) {
     <h1 data-header-name><TokenName c={c} view={view} /></h1><ChevronRight className={s.chevron} size={14} strokeWidth={2.2} aria-hidden="true" />
   </button></Tooltip>;
   if (choices.length < 2) return title;
-  return <span className={s.titleRow}>{title}<ChainPicker c={c} assets={choices} current={asset} onPick={pick => { void c.live?.command('page-chain', { asset: pick }).catch(() => {}); }} /></span>;
+  return <span className={s.titleRow}>{title}<ChainPicker c={c} assets={choices} current={asset} onPick={pick => { void c.live.command('page-chain', { asset: pick }).catch(() => {}); }} /></span>;
 }

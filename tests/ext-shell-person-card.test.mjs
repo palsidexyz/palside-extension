@@ -96,6 +96,7 @@ async function fixture(t) {
   const c = {
     people: [{ id: 'friend', name: 'Friend' }], personId: 'friend', data: { self: 'self', views: [] },
     team: { memberIds: ['self', 'friend'], owner: 'self' }, current: 'team', requests: [], canWrite: true,
+    live: { command: async () => ({}), state: { wallet: null, account: null, publishedViewing: null } },
     setPersonId(id) { closes.push(id); c.personId = id; root.render(panel(id ? h(PersonCard, { c }) : null)); },
   };
   const renderCard = async (patch = {}) => { Object.assign(c, patch); await render(h(PersonCard, { c })); };

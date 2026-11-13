@@ -27,8 +27,8 @@ export function tokenWaiting(c: Pick<PalsideController, 'live'>, view: Viewing):
   if (view.kind !== 'asset') return;
   view = liveView(c, view);
   const asset = viewAsset(view);
-  if (!tokenNamed(view)) return asset && c.live && !c.live.state.tokenUnknown?.includes(asset) ? 'name' : undefined;
-  return !view.logo && asset && c.live?.state.tokens?.[asset]?.logoPending ? 'logo' : undefined;
+  if (!tokenNamed(view)) return asset && !c.live.state.tokenUnknown?.includes(asset) ? 'name' : undefined;
+  return !view.logo && asset && c.live.state.tokens?.[asset]?.logoPending ? 'logo' : undefined;
 }
 
 /** The placeholder a name's line keeps while the name is on its way. */

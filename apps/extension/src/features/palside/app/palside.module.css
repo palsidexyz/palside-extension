@@ -59,7 +59,7 @@
 /* With the 弹幕 lines unfolded the box may grow taller; the lines scroll on their own, never the whole box. */
 .composer { position:relative; background:var(--ui-control-surface); padding:10px 8px 8px; border:0; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); }
 .composerInput { display:flex; align-items:flex-start; padding:0 6px; }
-.composerInput textarea { field-sizing:content; resize:none; min-height:28px; max-height:136px; width:100%; background:none; border:0; outline:none; color:var(--ui-text-primary); padding:3px 0; font-size:var(--ui-type-body); line-height:22px; }
+.composerInput textarea { field-sizing:content; resize:none; min-height:50px; max-height:136px; width:100%; background:none; border:0; outline:none; color:var(--ui-text-primary); padding:3px 0; font-size:var(--ui-type-body); line-height:22px; }
 .composerInput textarea::placeholder { color:var(--ui-ink-muted); }
 .composerToolbar { display:flex; align-items:center; justify-content:space-between; margin-top:6px; gap:8px; }
 /* One 32px row on one centre line: every tool, toggle and send is a 32px circle 4px apart; a hairline parts the page toggles from send. */

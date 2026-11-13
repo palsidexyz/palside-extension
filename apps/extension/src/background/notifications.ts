@@ -1,13 +1,13 @@
 import { parseCommand } from '../runtime/transport/command-map.ts';
 import { translator } from '@palside/i18n';
-import { notificationTarget,type NotificationIdentity } from '../runtime/chat/notification-policy.ts';
+import { notificationTarget,notificationValid,pokeNotificationTarget,type NotificationIdentity } from '../runtime/chat/notification-policy.ts';
 import type { RuntimeState } from '../runtime/composition/runtime-state';
 import type { Background } from './index.ts';
 
 const PREFIX = 'palside:';
 
 /**
- * Desktop notifications for chat messages, when 通知 is granted. Each one keeps a small local record (account, message, team,
+ * Desktop notifications for chat messages and 喊你来看, when 通知 is granted. Each one keeps a small local record (account, message, team,
  * preview) so a click can open the right place; records go when the notification closes or stops being valid.
  */
 export function notifications(bg: Background) {
@@ -53,6 +53,13 @@ export function notifications(bg: Background) {
             if (window.id === undefined || window.incognito) return;
             opened = true;
             await browser.sidePanel.open({ windowId: window.id });
+            // 喊你来看 opens the squad and then the page it called to; a message opens the squad at the message.
+            if (stored?.pokeId !== undefined) {
+              const result = await bg.run(parseCommand({ name: 'poke-open', payload: { accountId: stored.accountId, pokeId: stored.pokeId } }));
+              if (result.ok && result.value && typeof (result.value as { url?: unknown }).url === 'string') await bg.openPage((result.value as { url: string }).url);
+              else bg.notifyWindow(window.id, result);
+              return;
+            }
             const result = await bg.run(parseCommand({ name: 'notification-open', payload: { ...stored, windowId: window.id } }));
             bg.notifyWindow(window.id, result);
           } finally {
@@ -64,6 +71,7 @@ export function notifications(bg: Background) {
     },
     /** The offscreen document asks to notify a message: rechecked against the current state before and after creation. */
     async notify(identity: NotificationIdentity) {
+      if (identity.pokeId !== undefined) return this.notifyPoke(identity);
       const started = epoch;
       const current = () => started === epoch && notificationTarget(bg.state, identity);
       if (!current() || !await granted() || !current()) return;
@@ -84,16 +92,35 @@ export function notifications(bg: Background) {
       } catch { await forget(id); return; }
       if (!current()) await forget(id, true);
     },
-    /** The state changed: withdraw notifications that are no longer valid (read, recalled, muted, another account). */
+    /** 喊你来看: “Robin 喊你来看 CHUMP”, or without the page while 显示内容 is off. Rechecked before and after creation. */
+    async notifyPoke(identity: NotificationIdentity) {
+      const started = epoch;
+      const current = () => started === epoch ? pokeNotificationTarget(bg.state, identity) : undefined;
+      if (!current() || !await granted() || !current()) return;
+      const { accountId, teamId, pokeId, preview } = identity;
+      const id = `${PREFIX}${accountId}:poke:${pokeId}`;
+      await browser.storage.local.set({ [id]: { accountId, teamId, pokeId, preview } });
+      try {
+        const t = translator((await bg.language.get()).locale);
+        const target = current();
+        if (!target) { await forget(id); return; }
+        const person = bg.state?.data.people.find(person => person.id === target.poke.from);
+        const name = person?.deleted ? t('common.deletedMember') : person?.name || t('common.member');
+        const content = preview ? t('extension.runtime.notificationPokePage', { name, page: target.poke.view.name }) : t('extension.runtime.notificationPoke', { name });
+        await browser.notifications.create(id, { type: 'basic', iconUrl: browser.runtime.getURL('/icon-128.png'), title: target.team.name, message: content });
+      } catch { await forget(id); return; }
+      if (!current()) await forget(id, true);
+    },
+    /** The state changed: withdraw notifications that are no longer valid (read, recalled, answered, muted, another account). */
     notificationState(previous: RuntimeState | undefined, next: RuntimeState) {
       const who = (state: RuntimeState | undefined) => [state?.account?.id, state?.authenticated, state?.preferences.notifications, state?.preferences.notificationPreview];
       if (JSON.stringify(who(previous)) !== JSON.stringify(who(next))) epoch++;
-      if (previous?.authenticated === next.authenticated && previous?.account?.id === next.account?.id && previous?.remoteTeams === next.remoteTeams && previous?.data.messages === next.data.messages && previous?.preferences.notifications === next.preferences.notifications && previous?.preferences.notificationPreview === next.preferences.notificationPreview) return;
+      if (previous?.authenticated === next.authenticated && previous?.account?.id === next.account?.id && previous?.remoteTeams === next.remoteTeams && previous?.data.messages === next.data.messages && previous?.pokes === next.pokes && previous?.preferences.notifications === next.preferences.notifications && previous?.preferences.notificationPreview === next.preferences.notificationPreview) return;
       void (async () => {
         if (!await granted()) return;
         for (const id of Object.keys(await browser.notifications.getAll())) if (id.startsWith(PREFIX)) {
           const stored = (await browser.storage.local.get(id))[id];
-          if (!notificationTarget(bg.state, stored ?? {})) await forget(id, true);
+          if (!notificationValid(bg.state, stored ?? {})) await forget(id, true);
         }
       })().catch(() => {});
     },

@@ -19,7 +19,7 @@ import { Tabs } from '../ui/sub-rows';
 import type { PalsideController } from '../app/use-palside';
 import { characterLength } from '../../../domain/chat/model';
 import { type Team } from '../../../domain/teams/model';
-import { isRecruiting, publicTeams } from '../../../domain/teams/lobby-values';
+import { isRecruiting } from '../../../domain/teams/lobby-values';
 import { TeamAvatar } from './team-avatar';
 import { ReceivedInvites } from './invites';
 import type { DiscoveryActions } from './use-discovery';
@@ -35,10 +35,8 @@ export function Lobby({ c }: { c: PalsideController & DiscoveryActions }) {
   const setTab = (tab: 'recruiting' | 'applications') => c.updateLobbyFilters({ tab });
   const pendingIds = new Set(c.requests.filter(request => request.personId === c.data.self).map(request => request.teamId));
   const pendingFor = (team: Team) => pendingIds.has(team.id) || Boolean(team.requested);
-  const applications = c.live
-    ? c.discoveryTeams.filter(team => team.appliedOrder !== undefined && Boolean(team.applicationStatus && (team.applicationExpiresAt ?? 0) > c.now)).sort((a, b) => a.appliedOrder! - b.appliedOrder!)
-    : c.discoveryTeams.filter(pendingFor);
-  const teams = tab === 'applications' ? applications : c.live ? c.discoveryTeams.filter(team => team.listed && isRecruiting(team, c.now)) : publicTeams(c.discoveryTeams, query, c.now).sort((a, b) => sort === 'heat' ? (a.activity?.rank ?? Number.MAX_SAFE_INTEGER) - (b.activity?.rank ?? Number.MAX_SAFE_INTEGER) || (b.publishedAt ?? 0) - (a.publishedAt ?? 0) : (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
+  const applications = c.discoveryTeams.filter(team => team.appliedOrder !== undefined && Boolean(team.applicationStatus && (team.applicationExpiresAt ?? 0) > c.now)).sort((a, b) => a.appliedOrder! - b.appliedOrder!);
+  const teams = tab === 'applications' ? applications : c.discoveryTeams.filter(team => team.listed && isRecruiting(team, c.now));
   const open = (team: Team) => { c.setRecruitmentId(team.id); c.go('recruitment'); };
   const state = (team: Team) => pendingFor(team) ? 'pending' : team.joined ? 'joined' : team.applicationStatus === 'rejected' ? 'rejected' : undefined;
   const stateLabel = { pending: t('extension.copy.pendingApproval'), joined: t('extension.copy.joined'), rejected: t('extension.copy.applicationRejected') };
@@ -101,7 +99,7 @@ export function Recruitment({ c }: { c: PalsideController }) {
     <section className={s.hero} aria-labelledby="recruitment-name">
       <div className={s.heroTop}>
         <TeamAvatar team={team} size="lg" />
-        {c.live && <Tooltip content={t('extension.copy.reportTeam')}><IconButton label={t('extension.copy.reportTeam')} size="sm" variant="quiet" className={s.heroReport} onClick={() => { c.setReportTarget({ kind: 'team', targetId: team.id, team, preview: `${team.name}\n${team.description}` }); c.go('report'); }}><Flag size={15} /></IconButton></Tooltip>}
+        <Tooltip content={t('extension.copy.reportTeam')}><IconButton label={t('extension.copy.reportTeam')} size="sm" variant="quiet" className={s.heroReport} onClick={() => { c.setReportTarget({ kind: 'team', targetId: team.id, team, preview: `${team.name}\n${team.description}` }); c.go('report'); }}><Flag size={15} /></IconButton></Tooltip>
       </div>
       <h2 id="recruitment-name">{team.name}</h2>
       <p className={s.heroMeta}><span className={s.memberCount} role="img" aria-label={t('extension.dynamic.memberCapacity', { count })}><Users size={14} /><Count value={count} /><span>/{TEAM_MEMBER_LIMIT}</span></span>{isRecruiting(team, c.now) && team.recruitmentExpiresAt && <span>{t('extension.dynamic.recruitmentUntil', { date: deadlineTime(team.recruitmentExpiresAt, localeOrEnglish(locale), c.now) })}</span>}</p>

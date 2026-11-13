@@ -2,7 +2,6 @@
 import type { CSSProperties } from 'react';
 import { useTranslations } from 'use-intl';
 import { ALL_SITES, allSites, siteFeatures, siteInteraction, type SiteFeature } from '../../../domain/annotations/interaction';
-import { roomsOn } from '../rooms/rooms';
 import { DanmakuIcon, featureIcons } from '../ui/icons';
 import type { PalsideController } from '../app/use-palside';
 import s from './site-feature-tiles.module.css';
@@ -16,7 +15,7 @@ export function SiteFeatureTiles({ c, host, live, className }: { c: PalsideContr
   const t = useTranslations();
   const setting = siteInteraction(c.siteInteraction, host);
   const all = allSites(c.siteInteraction);
-  const features = siteFeatures.filter(feature => (feature !== 'danmaku' || roomsOn(c)) && (host === ALL_SITES || all[feature]));
+  const features = siteFeatures.filter(feature => host === ALL_SITES || all[feature]);
   if (!features.length) return null;
   const label = (feature: SiteFeature) => t(feature === 'danmaku' ? 'extension.room.name' : `extension.web.${feature}`);
   return <div className={`${s.tiles}${className ? ` ${className}` : ''}`} style={{ '--count': features.length } as CSSProperties} data-dim={!live || undefined}>

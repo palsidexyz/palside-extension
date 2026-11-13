@@ -52,7 +52,7 @@ function AvatarPicker({ c, team, onClose }: { c: PalsideController; team: boolea
   const current = team ? c.team.avatar : 'avatar' in c.me ? c.me.avatar : undefined;
   const portraits = use(TeamPortraits);
   const fallback = (team ? defaultTeamAvatar(c.current) : portraits?.get(accountId) ?? defaultAvatar(accountId))!;
-  const avatarId = team ? c.live?.state.remoteTeams.find(item => item.id === teamId)?.avatarId : c.live?.state.account?.avatarId;
+  const avatarId = team ? c.live.state.remoteTeams.find(item => item.id === teamId)?.avatarId : c.live.state.account?.avatarId;
   const options = team ? defaultTeamAvatarOptions : defaultAvatarOptions;
   const shown = choice?.src ?? current ?? fallback;
   const canSave = Boolean(choice) && !busy && !c.disconnected;
@@ -76,27 +76,21 @@ function AvatarPicker({ c, team, onClose }: { c: PalsideController; team: boolea
     const selected = choice;
     const live = c.live;
     try {
-      if (live) {
-        if (selected.reset) {
-          if (avatarId) await live.command('remove-avatar', { id: avatarId, accountId });
-        } else {
-          let data = selected.data;
-          if (!data) {
-            const response = await fetch(selected.src);
-            if (!response.ok) throw new MessageError(uiMessage('extension.copy.avatarLoadFailed'));
-            const blob = await response.blob();
-            if (blob.type !== 'image/webp' || !blob.size || blob.size > 20_000) throw new MessageError(uiMessage('extension.copy.avatarInvalid'));
-            data = await readImage(blob);
-          }
-          if (!alive.current) return;
-          await live.command('avatar', { accountId, data, ...(teamId ? { teamId } : {}) });
-        }
+      if (selected.reset) {
+        if (avatarId) await live.command('remove-avatar', { id: avatarId, accountId });
       } else {
-        const avatar = selected.reset ? undefined : selected.src;
-        if (teamId) c.setTeams(old => old.map(item => item.id === teamId ? { ...item, avatar } : item));
-        else c.setPeople(old => old.map(item => item.id === accountId ? { ...item, avatar } : item));
+        let data = selected.data;
+        if (!data) {
+          const response = await fetch(selected.src);
+          if (!response.ok) throw new MessageError(uiMessage('extension.copy.avatarLoadFailed'));
+          const blob = await response.blob();
+          if (blob.type !== 'image/webp' || !blob.size || blob.size > 20_000) throw new MessageError(uiMessage('extension.copy.avatarInvalid'));
+          data = await readImage(blob);
+        }
+        if (!alive.current) return;
+        await live.command('avatar', { accountId, data, ...(teamId ? { teamId } : {}) });
       }
-      if (alive.current) { c.setNotice(live ? uiMessage('extension.copy.avatarUpdated') : uiMessage('extension.copy.avatarDemoUpdated')); onClose(); }
+      if (alive.current) { c.setNotice(uiMessage('extension.copy.avatarUpdated')); onClose(); }
     } catch (failure) {
       if (alive.current) setError(failureText(failure, 'extension.copy.avatarSaveFailed'));
     } finally { lock.current = false; if (alive.current) setBusy(false); }

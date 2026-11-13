@@ -2,15 +2,15 @@ import { DAY_MS, HOUR_MS, MINUTE_MS } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
 import React, { useCallback, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PalsideApp } from './preview-app';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import { setSocialUi, type ReadKey } from '../src/features/palside/annotations/social-state';
-import { palsideFixtures, demoSites } from './fixtures';
+import { palsideFixtures } from './fixtures';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import { pageCapabilities } from '../src/runtime/browser/page-capabilities';
 import { defaultDanmakuSettings, normalizeDanmakuSettings, type DanmakuSettings, type PageStatus } from '../src/runtime/browser/page-protocol';
 import { defaultSignalSettings, normalizeSignalSettings } from '../src/runtime/annotations/signals';
-import { defaultSiteInteraction, siteAllows, type SiteInteractions } from '../src/domain/annotations/interaction';
+import { ALL_SITES, danmakuOn, defaultSiteInteraction, siteAllows, type SiteInteractions } from '../src/domain/annotations/interaction';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
 
@@ -42,7 +42,7 @@ const scene = params.get('scene') ?? 'chat';
 // 设置 › 网页: share=0 / interact=0 禁用 the feature. Composer switch: on=share turns it on; active=1 shows the tab's
 // address as activeTab would without the site; notify=off|denied.
 /** `interact=0`: 网页互动 is off on gmgn.ai; `share=0` keeps the share key up. */
-const siteInteraction: SiteInteractions = params.get('interact') === '0' ? { 'gmgn.ai': { ...defaultSiteInteraction, on: false } } : {};
+const siteInteraction: SiteInteractions = { ...(params.get('interact') === '0' ? { 'gmgn.ai': { ...defaultSiteInteraction, on: false } } : {}), ...(params.get('rooms') === 'off' ? { [ALL_SITES]: { ...defaultSiteInteraction, danmaku: false } } : {}) };
 const on = (params.get('on') ?? '').split(',');
 const data = structuredClone(palsideFixtures);
 // Security views require a public-key-shaped ID; this synthetic key never authenticates.
@@ -114,8 +114,8 @@ const invites = scene === 'invites' ? [
   { id: 'i2', team: { id: 'meme', name: 'Meme 研究所', avatarId: null, memberCount: 48 }, from: roomPeople[1]!, createdAt: now - 2 * DAY_MS, expiresAt: now + DAY_MS },
 ] : [];
 const rooms = {
-  // The tab shows CASHCAT on gmgn.ai, an added site, so 弹幕 follows it.
-  tab: roomKey, leased: roomKey, current: roomFor(roomKey),
+  // The tab shows CASHCAT on gmgn.ai, an added site, so 弹幕 follows it — unless 弹幕 is off there (`interact=0`) or everywhere (`rooms=off`).
+  ...(siteAllows(siteInteraction, 'gmgn.ai', 'danmaku') ? { tab: roomKey, leased: roomKey, current: roomFor(roomKey) } : {}),
   summaries: { [roomKey]: { key: roomKey, site: 'gmgn', count: 23, faces: roomFaces, at: now } },
   blocked: scene === 'blocked' ? [stranger('toshi-0x52aa', 'Toshi'), stranger('ivy-0xa8f0', 'Ivy')] : [], invites, acceptInvites: params.get('accept') !== '0', avatars: {},
 } satisfies RuntimeState['rooms'];
@@ -141,7 +141,7 @@ function Review() {
     account: { wallet: null, id: data.self, nickname: '测试成员', bio: '', tags: data.people.find(person => person.id === data.self)?.tags ?? [], avatarId: null, matrixId: '@review:example.test', revision: 0, acceptTeamInvites: params.get('accept') !== '0' }, data,
     drafts: scene === 'ref' ? { night: { value: { text: '这里量很大', ref: { target: { kind: 'quote', exact: '24h 成交额 $1.2M，持有人 3,412', prefix: '', suffix: '' }, caption: '24h 成交额 $1.2M，持有人 3,412', view: data.views[0]! } }, revision: 1 } } as never : scene === 'draft' ? { night: { value: { text: '看这个', attachment: { kind: 'asset', assetId: 'page-github', view: data.views.at(-1)! } }, revision: 1 } } as never : {},
     rooms, tokens: hotNames,
-    preferences: { toured: params.get('tour') !== '1', rooms: { off: params.get('rooms') === 'off' }, share: params.get('share') !== '0' && on.includes('share'), siteInteraction, current: 'night', notifications: params.get('notify') === 'off' ? 'off' : 'all', notificationPreview: true, hiddenStickies: scene === 'stickies' ? ['k5'] : [] },
+    preferences: { toured: params.get('tour') !== '1', rooms: {}, share: params.get('share') !== '0' && on.includes('share'), siteInteraction, current: 'night', notifications: params.get('notify') === 'off' ? 'off' : 'all', notificationPreview: true, hiddenStickies: scene === 'stickies' ? ['k5'] : [] },
     remoteTeams: [], lobbyTeams, config: { websiteUrl: 'https://example.test', signupDifficulty: 0 },
     invitations: {},
     // scene=signals: chat hints for pages this window is not showing — signals and 喊你来看 (the panel is on gmgn's token page).
@@ -149,6 +149,8 @@ function Review() {
       { id: '$sig-kai', teamId: 'night', personId: 'kai', kind: 'question', url: 'https://x.com/robinhoodapp/status/1', timestamp: now - 40_000, expiresAt: now + DAY_MS, target: { kind: 'page' } },
       { id: '$sig-mia', teamId: 'night', personId: 'mia', kind: 'danger', url: 'https://dexscreener.com/solana/So11111111111111111111111111111111111111112', timestamp: now - 4000, expiresAt: now + DAY_MS, target: { kind: 'page' } },
     ] as RuntimeState['signalRecords'] : [],
+    // pokes: this device shares CASHCAT, so the composer's 喊大家来看 key is live.
+    ...(scene === 'pokes' ? { viewingId: data.views[0]!.id, publishedViewing: { viewId: data.views[0]!.id, teamId: 'night', expiresAt: now + 30_000 } } : {}),
     pokes: scene === 'chat' || scene === 'pokes' || scene === 'signals' ? [{ id: 'p1', teamId: 'night', from: 'mia', view: data.views[0]!, at: now, count: 2 }, { id: 'p2', teamId: 'night', from: 'kai', view: data.views[1]!, at: now - 5000, count: 1 }] : [],
   } as RuntimeState);
   // scene=chat follows Robin; a moment later Robin moves to PONS, so the chip's follow mark moves and the chat shows 去了.
@@ -184,7 +186,8 @@ function Review() {
     if (name === 'preferences') setState(old => ({ ...old, preferences: { ...old.preferences, ...payload } }));
     const key = String(payload?.key ?? '');
     const setRooms = (update: (rooms: RuntimeState['rooms']) => Partial<RuntimeState['rooms']>) => setState(old => ({ ...old, rooms: { ...old.rooms, ...update(old.rooms) } }));
-    if (name === 'room-settings') { setState(old => ({ ...old, preferences: { ...old.preferences, rooms: { off: payload?.off === true } } })); setRooms(rooms => payload?.off ? { pinned: undefined, leased: undefined, current: undefined } : rooms); }
+    // 弹幕 switched off in 网页互动 drops the room, as the runtime does.
+    if (name === 'preferences' && payload?.siteInteraction && !danmakuOn(payload.siteInteraction as SiteInteractions)) setRooms(() => ({ pinned: undefined, leased: undefined, current: undefined }));
     if (name === 'room-open') setRooms(rooms => ({ pinned: key, leased: key, current: rooms.current?.key === key ? rooms.current : roomFor(key) }));
     if (name === 'room-close') setRooms(() => ({ pinned: undefined }));
     if (name === 'room-send') { const message = roomLine(`r${Date.now()}`, roomPeople[4]!, String(payload?.text), 0); setRooms(rooms => rooms.current ? { current: { ...rooms.current, messages: [...rooms.current.messages, message], slowUntil: Date.now() + 5_000 } } : {}); return { message } as T; }
@@ -222,6 +225,6 @@ function Review() {
     if (scene === 'grant') setSocialUi({ grant: true });
     if (scene === 'read') setSocialUi({ read: (params.get('read') ?? 'share') as ReadKey });
   }, []);
-  return <div style={{ height: '100dvh', width: `${params.get('w') ?? 380}px`, boxShadow: '1px 0 0 #ddd', transform: 'translateZ(0)', overflow: 'hidden' }}><PalsideApp data={state.data} sites={demoSites} live={{ state, command, openPage: async () => {}, page, danmaku: danmakuSettings, update: params.get('update') ? { ready: params.get('update')! } : undefined } as LivePort} deliver={async () => {}} /></div>;
+  return <div style={{ height: '100dvh', width: `${params.get('w') ?? 380}px`, boxShadow: '1px 0 0 #ddd', transform: 'translateZ(0)', overflow: 'hidden' }}><PalsideApp live={{ state, command, openPage: async () => {}, page, danmaku: danmakuSettings, update: params.get('update') ? { ready: params.get('update')! } : undefined } as LivePort} /></div>;
 }
 createRoot(document.getElementById('root')!).render(<IntegrationIntl><Review /></IntegrationIntl>);

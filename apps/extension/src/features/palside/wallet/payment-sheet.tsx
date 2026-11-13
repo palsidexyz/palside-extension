@@ -62,7 +62,7 @@ function own(paymentId: string | undefined, sheet: SheetState) { if (current.ope
 /** Async reviews may update only their initiating account, view and sheet opening. */
 export function usePaymentRequest(c: PalsideController, context: string) {
   const lifetime = useRef<object | undefined>(undefined);
-  const accountId = c.live?.state.account?.id;
+  const accountId = c.live.state.account?.id;
   useLayoutEffect(() => { lifetime.current = {}; return () => { lifetime.current = undefined; }; }, [accountId, context]);
   return {
     cancel: () => { lifetime.current = undefined; },
@@ -72,7 +72,7 @@ export function usePaymentRequest(c: PalsideController, context: string) {
       return {
         isMounted,
         isCurrent: () => isMounted() && current.session === session,
-        discard: (paymentId: string) => { if (accountId) void c.live?.command('wallet-dismiss', { accountId, paymentId }).catch(() => {}); },
+        discard: (paymentId: string) => { if (accountId) void c.live.command('wallet-dismiss', { accountId, paymentId }).catch(() => {}); },
       };
     },
   };
@@ -83,9 +83,9 @@ const stepOf = (phase: PaymentPhase): FlowStep => phase === 'review' || phase ==
 const ORDER: Record<FlowStep, number> = { compose: 0, confirm: 1, busy: 2, done: 3, failed: 3 };
 
 export function PaymentSheet({ c }: { c: PalsideController }) {
-  const sheet = useSheetState(), payment = c.live?.state.wallet?.payment, command = c.live?.command;
-  const visible = sheet.open && sheet.accountId === c.live?.state.account?.id && c.live.state.authenticated;
-  useEffect(() => { if (visible) void command?.('wallet-reconcile', {}).catch(() => {}); }, [command, visible, sheet.session]);
+  const sheet = useSheetState(), payment = c.live.state.wallet?.payment, command = c.live.command;
+  const visible = sheet.open && sheet.accountId === c.live.state.account?.id && c.live.state.authenticated;
+  useEffect(() => { if (visible) void command('wallet-reconcile', {}).catch(() => {}); }, [command, visible, sheet.session]);
   const owned = visible && sheet.owned && payment?.id === sheet.owned ? payment : undefined;
   // A review's reply can land before the state patch that carries its payment, so the sheet waits for that payment.
   const arrived = useRef<number | undefined>(undefined);
@@ -149,10 +149,10 @@ type Draft = { to: 'mate' | 'address'; recipient: string; address: string; amoun
 
 /** 转账: who (a teammate, or any address), then the amount, large. The balance is fetched again as the sheet opens. */
 function Compose({ c, sheet, draft, setDraft, fixed }: { c: PalsideController; sheet: SheetState; draft: Draft; setDraft: (update: (value: Draft) => Draft) => void; fixed: boolean }) {
-  const t = useTranslations(), text = useText(), wallet = c.live?.state.wallet, command = c.live?.command;
+  const t = useTranslations(), text = useText(), wallet = c.live.state.wallet, command = c.live.command;
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const requests = usePaymentRequest(c, String(sheet.session));
-  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); }, [command]);
+  useEffect(() => { void command('wallet-refresh', {}).catch(() => {}); }, [command]);
   const mates = c.people.filter(person => person.id !== c.data.self && c.team.memberIds.includes(person.id));
   const decimals = wallet?.config?.deployment?.decimals ?? 18, balance = wallet?.balance?.balance;
   let value: bigint | undefined; try { value = draft.amount ? parsePals(draft.amount, decimals) : undefined; } catch { value = undefined; }
@@ -166,7 +166,7 @@ function Compose({ c, sheet, draft, setDraft, fixed }: { c: PalsideController; s
     setBusy(true); setError('');
     try {
       const input = draft.to === 'address' ? { kind: 'transfer' as const, recipient: draft.address, amount: value.toString() } : { kind: 'transfer' as const, teamId: c.current, recipientId: draft.recipient, amount: value.toString() };
-      const quoted = await command?.('wallet-review', { input });
+      const quoted = await command('wallet-review', { input });
       if (quoted) { if (request.isCurrent()) own(quoted.id, sheet); else request.discard(quoted.id); }
     } catch (failure) { if (request.isCurrent()) setError(text(errorMessage(failure))); }
     finally { if (request.isCurrent()) setBusy(false); }
@@ -192,7 +192,7 @@ function Segment({ value, onChange }: { value: Draft['to']; onChange: (value: Dr
 
 /** The amount, large, with the token beside it; below, what it is worth and what is available. It shakes on an error. */
 function AmountBox({ c, value, onChange, error, autoFocus }: { c: PalsideController; value: string; onChange: (value: string) => void; error?: string; autoFocus?: boolean }) {
-  const t = useTranslations(), reduced = useReducedMotion(), wallet = c.live?.state.wallet, balance = wallet?.balance?.balance;
+  const t = useTranslations(), reduced = useReducedMotion(), wallet = c.live.state.wallet, balance = wallet?.balance?.balance;
   return <motion.div className={s.amountBox} data-error={error ? true : undefined} animate={error && !reduced ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }} transition={{ duration: .36 }}>
     <label className={s.amountTop}>
       <input className={s.amountField} inputMode="decimal" placeholder="0" aria-label={t('extension.wallet.amount')} value={value} onChange={event => onChange(event.target.value.replace(/[^\d.]/g, ''))} autoFocus={autoFocus} data-autofocus={autoFocus || undefined} />
@@ -205,7 +205,7 @@ function AmountBox({ c, value, onChange, error, autoFocus }: { c: PalsideControl
   </motion.div>;
 }
 function UsdValue({ c, value }: { c: PalsideController; value: string }) {
-  const price = c.live?.state.wallet?.price, decimals = c.live?.state.wallet?.config?.deployment?.decimals ?? 18;
+  const price = c.live.state.wallet?.price, decimals = c.live.state.wallet?.config?.deployment?.decimals ?? 18;
   let amount: bigint; try { amount = parsePals(value, decimals); } catch { return <>{' '}</>; }
   if (!price || BigInt(price.denominator) <= 0n) return <>{' '}</>;
   const cents = amount * BigInt(price.numerator) * 100n / (10n ** BigInt(decimals) * BigInt(price.denominator));
@@ -215,7 +215,7 @@ function UsdValue({ c, value }: { c: PalsideController; value: string }) {
 /** Who a payment goes to, as the hero shows it: a person, or an address behind a wallet glyph. */
 function usePayee(c: PalsideController, payment: WalletPayment): { person?: Person; line: string; done: string } {
   const t = useTranslations(), input = payment.input;
-  const tipLine = input.kind === 'tip' ? c.live?.state.rooms.current?.messages.find(item => item.id === input.messageId) : undefined;
+  const tipLine = input.kind === 'tip' ? c.live.state.rooms.current?.messages.find(item => item.id === input.messageId) : undefined;
   if (tipLine) { const person = roomPerson(c, tipLine.author, t('common.member')); return { person, line: t('extension.wallet.tipTo', { name: person.name }), done: t('extension.wallet.tippedTo', { name: person.name }) }; }
   if (input.kind === 'transfer' && 'recipientId' in input) { const person = personFor(c.people, input.recipientId, t('common.member')); return { person, line: t('extension.wallet.transferTo', { name: person.name }), done: t('extension.wallet.sentTo', { name: person.name }) }; }
   if (input.kind === 'transfer') return { line: t('extension.wallet.transferToAddress', { address: shortAddress(input.recipient) }), done: t('extension.wallet.sentToAddress', { address: shortAddress(input.recipient) }) };
@@ -232,12 +232,12 @@ function Settle({ c, payment, step, failedAt, onClose, onRestart }: { c: Palside
   const submitted = useRef('');
   // While it runs: offline is what the browser reports; checking is a submitted payment whose reply was lost and is being
   // reconciled; slow is the same stage still running after 8 s, measured here.
-  const busyStep = step === 'busy', offline = busyStep && c.live?.state?.connection?.networkOnline === false;
+  const busyStep = step === 'busy', offline = busyStep && c.live.state?.connection?.networkOnline === false;
   const checking = busyStep && payment.phase === 'pending' && Boolean(payment.error);
   const slow = useSlow(busyStep && !offline ? `${payment.id}:${payment.phase}` : undefined);
   async function pay(pin?: string) {
     if (busy) return; setBusy(true);
-    try { await c.live?.command('wallet-confirm', { accountId: c.data.self, paymentId: payment.id, password: pin || undefined }); } catch { /* The payment carries its own error and shakes the cells. */ }
+    try { await c.live.command('wallet-confirm', { accountId: c.data.self, paymentId: payment.id, password: pin || undefined }); } catch { /* The payment carries its own error and shakes the cells. */ }
     finally { setPassword(''); setBusy(false); }
   }
   // Six digits pay at once, as a payment pad does; with a PIN there is no 付款 button to press as well.

@@ -73,6 +73,7 @@
 .warning>svg { flex-shrink:0; margin-top:2px; }
 .warning p { flex:1; font-size:var(--ui-type-footnote); line-height:18px; color:var(--ui-text-primary); }
 .warning .help { margin-top:-3px; }
+.warning[role="status"] { animation:stepEnter .35s var(--ui-ease-feedback) both; }
 
 /* Phrase cells: mono word with an inline grey completion, no native suggestion list. */
 .sheet { display:flex; flex-direction:column; gap:10px; }
@@ -158,6 +159,7 @@
 @container onboarding (max-width:340px) { .phrase,.wordGrid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @container onboarding (max-width:280px) { .progress,.body { padding-inline:16px; } .welcomeHero { margin-inline:-16px; padding:16px; } }
 @media(prefers-reduced-motion:reduce) {
+  .warning[role="status"],
   .body,.quiz,.choice,.choice[data-state="wrong"],.sky,.sky::before,.watchCard,.arriving span,.shell[data-screen="welcome"] .lead,.shell[data-screen="welcome"] .footer,.working,.phraseCard[data-revealed] .phrase li { animation:none; }
   .track i::before { animation:none; }
   .track i::after { transition:none; }

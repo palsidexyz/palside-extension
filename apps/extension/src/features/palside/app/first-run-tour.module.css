@@ -15,16 +15,16 @@
 
 .body h2 { margin:0 0 6px; font-size:var(--ui-type-headline); font-weight:600; line-height:1.35; }
 .body p { margin:0; font-size:var(--ui-type-callout); line-height:1.55; color:var(--ui-text-secondary); }
-.tools { display:grid; gap:7px; margin:2px 0 0; padding:0; list-style:none; font-size:var(--ui-type-callout); line-height:1.4; }
-/* Icon, name, then one text column: the description never breaks; keycaps sit beside it when they fit and drop under it, on the same edge, when they don't. */
-.tools li { display:grid; grid-template-columns:18px auto minmax(0, 1fr); align-items:start; column-gap:8px; }
-.tools svg { width:17px; height:17px; margin-top:2px; stroke-width:1.8; }
-/* 弹: the composer's own glyph, still, scaled to the 17px icon line. */
-.tools li > span[aria-hidden] { width:18px; height:18px; margin-top:1px; transform:scale(.82); }
-.tools b { font-weight:600; white-space:nowrap; }
-.tools p { display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; margin:0; min-width:0; color:inherit; line-height:inherit; }
-.tools p > span:first-child { color:var(--ui-text-secondary); white-space:nowrap; }
-.tools p > span:last-child:not(:first-child) { justify-content:flex-start; }
+/* One line per tool, three shared columns (icon, name, description), so every name and every description starts on one edge.
+   A description longer than its column wraps inside it; 截图's keys follow its description and drop under it, on the same edge. */
+.tools { display:grid; grid-template-columns:18px auto minmax(0, 1fr); column-gap:10px; row-gap:9px; margin:4px 0 0; padding:0; list-style:none;
+  font-size:var(--ui-type-callout); line-height:20px; }
+.tools li { display:grid; grid-column:1 / -1; grid-template-columns:subgrid; align-items:start; }
+.tools li > svg { width:18px; height:18px; margin-top:1px; stroke-width:1.75; color:var(--ui-text-primary); }
+.tools li > b { padding-right:2px; font-weight:600; white-space:nowrap; }
+.tools li > p { display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; min-width:0; margin:0; font-size:inherit; line-height:inherit; color:var(--ui-text-secondary); }
+.tools li > p > span { flex-wrap:nowrap; gap:3px; }
+.tools li > p kbd { min-width:20px; height:20px; padding:0 4px; box-sizing:border-box; text-align:center; font:500 var(--ui-type-footnote)/20px system-ui, sans-serif; color:var(--ui-text-secondary); }
 
 .footer { display:flex; align-items:center; gap:4px; margin-top:12px; }
 .dots { display:flex; gap:4px; margin-right:auto; }

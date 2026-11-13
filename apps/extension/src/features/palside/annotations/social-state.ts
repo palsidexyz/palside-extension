@@ -24,6 +24,8 @@ type SocialUi = {
   roomPerson?: string;
   roomPersonMessage?: string;
   invite?: string;
+  /** A 红包 clicked on the page: its envelope opens over that token's 弹幕 view. */
+  roomPacket?: { key: string; id: string };
 };
 /** A feature as 隐私与数据 lists it under the Chrome permission it runs on; each opens its own drawer. */
 export type ReadKey = 'share' | 'token' | 'signal' | 'chart' | 'room' | 'shot' | 'presence' | 'notify' | 'follow';

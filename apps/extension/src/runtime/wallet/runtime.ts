@@ -23,8 +23,10 @@ export class WalletRuntime {
   private roomRequest = 0;
   private messageRequest = 0;
   private personRequests = new Map<string, object>();
+  /** The binding signup or sign-in just made, so the start that follows does not ask again. */
+  private bound?: { accountId: string; binding: NonNullable<ApiResult<'chain.wallet'>> };
   constructor(runtime: PalsideService) { this.runtime = runtime; }
-  reset() { this.hide(); this.generation++; this.roomRequest++; this.messageRequest++; this.personRequests.clear(); this.roomReads.clear(); this.teamFeed = undefined; this.recipients.clear(); this.controller?.dispose(); this.keys?.dispose(); this.controller = undefined; this.keys = undefined; this.starting = undefined; this.accountId = undefined; this.runtime.state.wallet = undefined; }
+  reset() { this.bound = undefined; this.hide(); this.generation++; this.roomRequest++; this.messageRequest++; this.personRequests.clear(); this.roomReads.clear(); this.teamFeed = undefined; this.recipients.clear(); this.controller?.dispose(); this.keys?.dispose(); this.controller = undefined; this.keys = undefined; this.starting = undefined; this.accountId = undefined; this.runtime.state.wallet = undefined; }
   async start(mnemonic?: string): Promise<WalletController> {
     const runtime = this.runtime, session = runtime.auth.session;
     if (!session) throw new Error('AUTH_REQUIRED');
@@ -47,7 +49,7 @@ export class WalletRuntime {
       // With the mnemonic in hand (login, unlock) the address is bound first, whatever the chain switch says: it is the
       // account ID everyone sees. The binding read here also answers the check after start, so one start asks for it once.
       let fetched: ApiResult<'chain.wallet'> | undefined;
-      if (mnemonic) fetched = await this.bind(mnemonic, accountId, address, check);
+      if (mnemonic) fetched = this.bound?.accountId === accountId ? this.bound.binding : await this.bind(mnemonic, accountId, address, check);
       else if (!address) {
         try {
           fetched = await runtime.api.request('chain.wallet'); check();
@@ -86,6 +88,14 @@ export class WalletRuntime {
   async refresh() {
     if (!this.controller || this.starting || this.accountId !== this.runtime.auth.session?.account.id) return (await this.start()).snapshot();
     return this.controller.refresh();
+  }
+  /** Signup and sign-in finish only once the address is bound: it is the account ID everyone sees. */
+  async bindAccount(mnemonic: string) {
+    const session = this.runtime.auth.session;
+    if (!session) throw new Error('AUTH_REQUIRED');
+    const scope = this.runtime.auth.scope(), accountId = session.account.id;
+    const binding = await this.bind(mnemonic, accountId, deriveWalletAccount(mnemonic).address, scope.check);
+    this.bound = { accountId, binding };
   }
   /** Binds once and re-reads after: the address the service returns must be this mnemonic's, signed by this identity. */
   private async bind(mnemonic: string, accountId: string, address: string, check: () => void) {

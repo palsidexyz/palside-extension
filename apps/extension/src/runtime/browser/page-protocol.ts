@@ -71,10 +71,8 @@ export function normalizeDanmakuSettings(value: unknown): DanmakuSettings {
 }
 /** replay: sent before the page opened, replayed once and drawn lighter than live lines. */
 /** `likes`: the line's 点赞 when it leaves, drawn after the text once someone has liked it. */
-export type PageDanmaku = { id: string; key: string; text: string; author: PagePerson; self?: boolean; mate?: boolean; replay?: true; timestamp?: number; likes?: number };
-/** Public display fields only; account IDs, wallet addresses and payment credentials stay in the extension. */
-/** Opens the room in the side panel; claims and payment actions never run in the page. */
-export type PageRoomPacket = { roomKey: string };
+/** A line, or with `packet` a 红包 (`id` is the packet's; the page words it from `labels.packet` and the author). */
+export type PageDanmaku = { id: string; key: string; text: string; author: PagePerson; self?: boolean; mate?: boolean; replay?: true; timestamp?: number; likes?: number; packet?: true };
 /**
  * Where a locate ended: `shown`; `missing` (the signal's record is gone); `loading` (the page did not finish loading); `blocked` (Palside cannot run on this page);
  * `moved` (the tab went to another page); `timeout` (the page did not answer); `unavailable` (the account, squad or tab changed meanwhile).
@@ -99,6 +97,8 @@ export type CaptureLabels = {
 export type PageLabels = {
   you: string;
   packet?: string;
+  /** “{name} 的红包”: a 红包 line, `{name}` left for the page to fill. */
+  packetFrom?: string;
   member?: string;
   /** The tag on a teammate's 弹幕 card. */
   mate?: string;
@@ -130,7 +130,8 @@ export type PageUp =
   | { type: 'lead-scroll'; y: number }
   | { type: 'url'; url: string }
   | { type: 'open-panel' }
-  | { type: 'open-room'; key: string }
+  /** Opens the room in the side panel, and with `packet` that 红包's envelope; claims and payments never run in the page. */
+  | { type: 'open-room'; key: string; packet?: string }
   | { type: 'captured'; src: string }
   | { type: 'capture-cancel' }
   | { type: 'located'; requestId: string; result: LocateResult };
@@ -157,8 +158,6 @@ export type PageDown =
   | { type: 'config'; labels: PageLabels; danmaku: DanmakuSettings }
   | { type: 'danmaku'; items: PageDanmaku[] }
   | { type: 'danmaku-remove'; ids: string[] }
-  /** Replaces the entire room payment projection. A null room and empty arrays clear it on disable/disposal. */
-  | { type: 'room-payments'; roomKey: string | null; packets: PageRoomPacket[] }
   /** 信号 again, from its line in the chat; answers `located`. */
   | { type: 'signal-replay'; kind: SignalKind; target: SignalTarget; author: PagePerson; requestId: string }
   /** 共享画线: scroll the chart to one drawing, from its line in the chat; answers `located`. */

@@ -17,11 +17,11 @@ import { groupPals } from './amount';
 import s from './wallet.module.css';
 
 export function WalletSettings({ c }: { c: PalsideController }) {
-  const t = useTranslations(), wallet = c.live?.state.wallet, command = c.live?.command;
+  const t = useTranslations(), wallet = c.live.state.wallet, command = c.live.command;
   const [mode, setMode] = useState<'small' | 'export'>(), [password, setPassword] = useState(''), [secret, setSecret] = useState<{ privateKey: string; expiresAt: number }>(), [busy, setBusy] = useState(false);
   const limits = wallet?.config && quickPayLimits(wallet.config.quickPay), token = wallet?.config?.deployment?.token;
   const generation = useRef(0);
-  const hideSecret = useCallback(() => { generation.current++; void command?.('wallet-hide-private-key', {}).catch(() => {}); }, [command]);
+  const hideSecret = useCallback(() => { generation.current++; void command('wallet-hide-private-key', {}).catch(() => {}); }, [command]);
   useEffect(() => {
     const clear = () => { hideSecret(); setSecret(undefined); setPassword(''); };
     const visibility = () => { if (document.hidden) clear(); };
@@ -30,7 +30,7 @@ export function WalletSettings({ c }: { c: PalsideController }) {
   }, [hideSecret]);
   useEffect(() => { if (!secret) return; const timer = setTimeout(() => { hideSecret(); setSecret(undefined); }, Math.max(0, secret.expiresAt - Date.now())); return () => clearTimeout(timer); }, [secret, hideSecret]);
   async function confirm() {
-    if (!command || busy || password.length !== PIN_LENGTH) return; setBusy(true); const current = generation.current;
+    if (busy || password.length !== PIN_LENGTH) return; setBusy(true); const current = generation.current;
     try {
       if (mode === 'small') { if (await c.run('wallet-preferences', { smallPayments: true, password }) !== undefined) setMode(undefined); }
       else { const value = await c.run('wallet-export-private-key', { password }); if (value && current === generation.current && !document.hidden) setSecret(value); }

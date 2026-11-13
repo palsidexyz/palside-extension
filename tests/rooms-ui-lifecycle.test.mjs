@@ -52,7 +52,7 @@ function fixture() {
     message: key => key, errorMessage: error => error.message, characterLength: text => [...text].length,
     HOT_CHAIN_ORDER: [null, 'Robinhood', 'Solana', 'BNB Chain', 'Base', 'Ethereum'], ...units, ROOM_TEXT_MAX: 200, TEAM_MEMBER_LIMIT: 30, viewAsset: view => view?.id,
     tokenNamed, withProfile, shortAddress, tokenPageUrl, siteById, tokenLabel: view => view.name, tokenWaiting: () => undefined, TokenName: 'TokenName',
-    capability: () => ({ state: 'on' }), AccountId: 'AccountId', AccountIdText: 'AccountIdText', accountHandle: person => person?.walletAddress, pageUnusable: () => false, pageIssue: () => undefined, ConnectionState: 'ConnectionState',
+    capability: () => ({ state: 'on' }), AccountId: 'AccountId', AccountIdText: 'AccountIdText', accountHandle: person => person?.walletAddress, pageUnusable: () => false, pageIssue: () => undefined, danmakuOn: sites => { const all = sites?.['*'] ?? { on: true, danmaku: true }; return all.on && all.danmaku; }, ConnectionState: 'ConnectionState',
   };
   function load(file) {
     if (modules.has(file)) return modules.get(file);
@@ -223,14 +223,6 @@ test('a public-room teammate opens the room card with invitation, block and repo
   for (const key of ['extension.invite.action', 'extension.room.block', 'extension.copy.report']) assert.ok(button(tree, key));
 });
 
-
-test('closed invitation sheets and invitation inboxes remain empty without a live account', () => {
-  const f = fixture(), { c } = controller(); c.live = undefined;
-  const sheet = f.mount(f.load('rooms/danmaku-view.tsx').InviteChoices);
-  assert.equal(sheet.render({ c }).props.open, false); sheet.unmount();
-  const inbox = f.mount(f.load('teams/invites.tsx').ReceivedInvites);
-  assert.equal(inbox.render({ c }), null); inbox.unmount();
-});
 
 test('unknown viewer counts stay absent until a verified room, summary or hot row exists', () => {
   const f = fixture(), { c, rooms } = controller(), { roomCount } = f.load('rooms/rooms.ts');

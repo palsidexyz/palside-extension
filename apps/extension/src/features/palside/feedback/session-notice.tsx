@@ -22,11 +22,11 @@ export function useReconnect(c: PalsideController) {
   async function reconnect() {
     if (pending.current) return;
     pending.current = true; setBusy(true);
-    try { if (c.live) await c.live.command('reconnect'); else c.setOffline(false); }
+    try { await c.live.command('reconnect'); }
     catch { /* The shared connection notice owns failure feedback. */ }
     finally { pending.current = false; setBusy(false); }
   }
-  return { reconnect, busy: busy || Boolean(c.live?.state.connection.retrying) };
+  return { reconnect, busy: busy || Boolean(c.live.state.connection.retrying) };
 }
 
 /** The one action a connection state offers: 更新 when the service refuses this version (it updates, nothing reconnects), else 重新连接. */
@@ -45,7 +45,7 @@ function useIssueAction(c: PalsideController, status: ConnectionStatus | undefin
  */
 export type ConnectionScope = 'chat' | 'service';
 export function pageIssue(c: PalsideController, scope: ConnectionScope): ConnectionStatus | undefined {
-  if (scope === 'chat' || !c.live || c.connection === 'update-required') return c.connection === 'connected' ? undefined : c.connection;
+  if (scope === 'chat' || c.connection === 'update-required') return c.connection === 'connected' ? undefined : c.connection;
   const { networkOnline, service } = c.live.state.connection;
   return !networkOnline ? 'network-offline' : service === 'unavailable' ? 'service-unavailable' : service === 'connecting' ? 'connecting' : undefined;
 }

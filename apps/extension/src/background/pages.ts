@@ -302,7 +302,7 @@ export function pages(bg: Background) {
         case 'follow-touch': bg.follow.touched(port, info); break;
         case 'lead-scroll': void bg.follow.leadScrolled(port, info, message.y).catch(() => {}); break;
         case 'captured': case 'capture-cancel': bg.capture.captureDone(port, info, message); break;
-        case 'open-room': bg.danmaku.openRoom(port, info, message.key); break;
+        case 'open-room': bg.danmaku.openRoom(port, info, message.key, typeof message.packet === 'string' ? message.packet : undefined); break;
         case 'open-panel': void browser.sidePanel.open({ windowId: info.windowId }).catch(() => {}); break;
       }
     });

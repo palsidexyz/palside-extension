@@ -18,7 +18,7 @@ export type ShareState = 'off' | 'on' | 'blocked';
 
 export function shareState(c: PalsideController): ShareState {
   if (!c.share) return 'off';
-  return c.live?.page?.capabilities.share.state === 'blocked' ? 'blocked' : 'on';
+  return c.live.page?.capabilities.share.state === 'blocked' ? 'blocked' : 'on';
 }
 
 /**
@@ -32,16 +32,15 @@ export function ShareToggle({ c }: { c: PalsideController }) {
   const operation = useRef({ version: 0 });
   const [asking, setAsking] = useState(false);
   const squad = c.current;
-  const live = Boolean(c.live);
   useLayoutEffect(() => {
     const pending = operation.current;
     return () => { pending.version++; };
-  }, [c.data.self, c.live?.state.account?.id, squad, live, c.canWrite]);
+  }, [c.data.self, c.live.state.account?.id, squad, c.canWrite]);
   if (!shareShown(c)) return null;
   const state = shareState(c);
   const on = state !== 'off';
-  const published = c.live?.state.publishedViewing;
-  const sharing = state === 'on' && (!c.live || (published?.teamId === c.current && published.expiresAt > c.now));
+  const published = c.live.state.publishedViewing;
+  const sharing = state === 'on' && published?.teamId === c.current && published.expiresAt > c.now;
   const label = t(state === 'off' ? 'extension.toggle.shareOff' : state === 'blocked' ? 'extension.toggle.shareBlocked' : 'extension.toggle.shareOn');
   function press() {
     // While Chrome's prompt is open a second press changes nothing — unless 共享在看 came on elsewhere meanwhile: then it turns off,
@@ -50,7 +49,7 @@ export function ShareToggle({ c }: { c: PalsideController }) {
     const token = ++operation.current.version;
     if (asking) setAsking(false);
     if (on) { void c.toggle('share', false); return; }
-    if (!c.live || grants.tabs) { void c.toggle('share', true); return; }
+    if (grants.tabs) { void c.toggle('share', true); return; }
     // Chrome's prompt must open synchronously from this click.
     setAsking(true);
     void requestTabs().then(allowed => {

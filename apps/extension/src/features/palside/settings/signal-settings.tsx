@@ -38,7 +38,7 @@ export function ChartOptions({ c }: { c: PalsideController }) {
   return <AccountChartOptions key={accountKey(c)} c={c} />;
 }
 
-const accountKey = (c: PalsideController) => c.live ? c.live.state.account?.id : c.data.self;
+const accountKey = (c: PalsideController) => c.live.state.account?.id;
 
 function AccountSignalOptions({ c }: { c: PalsideController }) {
   const t = useTranslations();
@@ -71,26 +71,26 @@ function AccountChartOptions({ c }: { c: PalsideController }) {
  */
 function useSignalSettings(c: PalsideController) {
   const [settings, setSettings] = useState<SignalSettings>(defaultSignalSettings);
-  const [ready, setReady] = useState(!c.live);
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const changes = useRef<Promise<unknown>>(Promise.resolve());
   const revision = useRef(0);
   const generation = useRef(0);
-  const command = c.live?.command;
-  const accountId = c.live?.state.account?.id;
+  const command = c.live.command;
+  const accountId = c.live.state.account?.id;
   const notice = useRef(c.setNotice);
   useLayoutEffect(() => { notice.current = c.setNotice; }, [c.setNotice]);
   useLayoutEffect(() => {
     const scope = ++generation.current;
-    void command?.('signal-settings-get').then(value => { if (scope === generation.current) { setSettings(value); setReady(true); } }).catch(error => { if (scope === generation.current) notice.current(errorMessage(error)); });
+    void command('signal-settings-get').then(value => { if (scope === generation.current) { setSettings(value); setReady(true); } }).catch(error => { if (scope === generation.current) notice.current(errorMessage(error)); });
     return () => { generation.current = scope + 1; };
   }, [command]);
-  const actual = c.live?.page?.signalSettings;
+  const actual = c.live.page?.signalSettings;
   const [observed, setObserved] = useState(actual);
   if (actual !== observed) { setObserved(actual); if (actual && !busy) setSettings(actual); }
   function save(patch: Partial<SignalSettings>) {
     setSettings(old => ({ ...old, ...patch }));
-    if (!command || !accountId) return;
+    if (!accountId) return;
     setBusy(true);
     const request = ++revision.current;
     const scope = generation.current;

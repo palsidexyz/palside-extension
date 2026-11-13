@@ -62,6 +62,15 @@ export function siteAllows(sites: SiteInteractions | undefined, host: string | u
   return Boolean(normalizeSiteHost(host)) && all.on && value.on && (!feature || all[feature] && value[feature]);
 }
 
+/**
+ * 弹幕 itself is on: the master 网页互动 switch and its 弹幕 card. Off, there is no 弹幕 anywhere — no key in the composer, no 热门, no
+ * lease or count, nothing on pages. Each site's 弹幕 switch then decides whether its token pages join (`siteAllows(…, 'danmaku')`).
+ */
+export function danmakuOn(sites: SiteInteractions | undefined) {
+  const all = allSites(sites);
+  return all.on && all.danmaku;
+}
+
 /** The page layer runs for the squad while 网页互动 is on: 信号 and 共享画线 have their own switches (弹幕 joins by the open room). */
 export function siteDraws(sites: SiteInteractions | undefined, host: string | undefined) {
   return siteAllows(sites, host);

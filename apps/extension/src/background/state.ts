@@ -1,4 +1,3 @@
-import { DEVICE_IDLE_SECONDS } from '@palside/shared/rules/accounts';
 import { pageTeam } from '../runtime/browser/page-layer-host.ts';
 import { applyPatch,type StatePatch } from '../runtime/transport/state-patch.ts';
 import type { RuntimeState } from '../runtime/composition/runtime-state';
@@ -22,9 +21,8 @@ export function stateSync(bg: Background) {
       await bg.run({ name: 'room-panels', payload: { connected: false } });
       if (version !== replayVersion) return;
       await bg.roomTab.refresh();
-      const idle = await bg.browser.idle.queryState(DEVICE_IDLE_SECONDS);
       if (version !== replayVersion) return;
-      await bg.run({ name: 'device-state', payload: { state: bg.panels.size > 0 || idle === 'active' ? 'active' : 'away' } });
+      await bg.sharing.replayDeviceState();
       if (version !== replayVersion) return;
       await bg.sharing.observer.replay();
       if (version === replayVersion) await bg.panel.reportRoomPanels();
@@ -49,7 +47,7 @@ export function stateSync(bg: Background) {
 
     const contextChanged = pageTeam(previous) !== pageTeam(next) || previous?.authenticated !== next.authenticated || previous?.account?.id !== next.account?.id || previous?.preferences.current !== next.preferences.current;
     const interactionChanged = JSON.stringify(previous?.preferences.siteInteraction ?? null) !== JSON.stringify(next.preferences.siteInteraction ?? null);
-    const roomChanged = previous?.preferences.rooms?.off !== next.preferences.rooms?.off || previous?.rooms?.current?.key !== next.rooms?.current?.key;
+    const roomChanged = previous?.rooms?.current?.key !== next.rooms?.current?.key;
     const policyChanged = contextChanged || interactionChanged || roomChanged;
     if ((interactionChanged || roomChanged) && !contextChanged) {
       void bg.danmaku.broadcastDanmakuSettings().then(bg.signals.broadcastSignals).catch(() => {});
@@ -67,7 +65,7 @@ export function stateSync(bg: Background) {
     if (policyChanged || pageChanged) void bg.pages.pushPageStatus();
     bg.notifications.notificationState(previous, next);
     bg.updates.stateChanged(previous, next);
-    if (contextChanged || pageChanged || previous?.tokens !== next.tokens) void bg.roomTab.refresh();
+    if (contextChanged || pageChanged || interactionChanged || previous?.tokens !== next.tokens) void bg.roomTab.refresh();
     else if (previous?.rooms !== next.rooms) bg.roomTab.stateChanged(next);
   }
 

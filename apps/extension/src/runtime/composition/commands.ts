@@ -1,13 +1,15 @@
 import { message as uiMessage,MessageError,type TextMessage } from '@palside/i18n';
 
-export const AUTH_CANCEL_COMMANDS = new Set(['account-discard', 'logout']);
-export const AUTH_SETUP_COMMANDS = new Set(['account-generate', 'account-create', 'account-login']);
+export const AUTH_CANCEL_COMMANDS = new Set(['account-discard', 'signup-cancel', 'logout']);
+export const AUTH_SETUP_COMMANDS = new Set(['account-generate', 'account-create', 'account-login', 'account-import']);
 
 export const SERIAL_COMMANDS = new Set([
   'account-generate',
   'account-discard',
+  'signup-cancel',
   'account-create',
   'account-login',
+  'account-import',
   'password-set',
   'mnemonic-reveal',
   'device-remove',

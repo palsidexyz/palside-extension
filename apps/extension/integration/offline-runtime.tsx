@@ -9,8 +9,7 @@ import { ApiError } from '../src/runtime/transport/api';
 import { ClientStorage } from '../src/runtime/storage/storage';
 import type { RuntimeDevice } from '../src/runtime/account/device';
 import type { TeamSnapshot } from '@palside/shared/contracts/team-model';
-import { PalsideApp } from './preview-app';
-import { siteCatalog } from '../src/features/palside/settings/site-catalog';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
 import { reviewStatus } from './review-harness';
@@ -74,7 +73,7 @@ async function run() {
     const empty=structuredClone(third.state); empty.error=undefined;
     const state=new URLSearchParams(location.search).get('scene')==='cached'?cached:empty;
     if (new URLSearchParams(location.search).get('scene') === 'settings') state.preferences.notifications = 'all';
-    root.render(<IntegrationIntl><div style={{height:'100dvh'}}><PalsideApp data={state.data} sites={siteCatalog} live={{state,command:async(...[name])=>{if(name==='reconnect') throw new ApiError(0,{error:'SERVICE_UNAVAILABLE'}); return undefined as never;},openPage:async()=>{}}} deliver={async()=>{}}/><script type="application/json" id="offline-result">{JSON.stringify({checks,passed:true})}</script></div></IntegrationIntl>);
+    root.render(<IntegrationIntl><div style={{height:'100dvh'}}><PalsideApp live={{state,command:async(...[name])=>{if(name==='reconnect') throw new ApiError(0,{error:'SERVICE_UNAVAILABLE'}); return undefined as never;},openPage:async()=>{}}}/><script type="application/json" id="offline-result">{JSON.stringify({checks,passed:true})}</script></div></IntegrationIntl>);
   } finally {
     MatrixClient.prototype.initRustCrypto = initialiseCrypto;
     for(const service of services) clearInterval(service.auth.timer);

@@ -5,16 +5,14 @@ import type { PalsideController } from '../app/use-palside';
 
 /**
  * What Chrome has granted right now — exact sites, 所有网站 (asked for in 网站 or given in Chrome's menu), 读取您的浏览记录 and 通知 — kept live through
- * `permissions.onAdded/onRemoved`, so a change made in Chrome shows everywhere at once. The preview without a browser counts every site as allowed.
+ * `permissions.onAdded/onRemoved`, so a change made in Chrome shows everywhere at once.
  */
 export function useGrants(c: PalsideController) {
   const [value, setValue] = useState<{ origins: string[]; notifications: boolean; tabs: boolean; tabGroups: boolean; ready?: boolean; error?: boolean }>({ origins: [], notifications: false, tabs: false, tabGroups: false });
-  const live = Boolean(c.live);
   const account = c.data.self;
   const version = useRef(0);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (!live) return;
     let active = true;
     const refresh = () => {
       const request = ++version.current;
@@ -30,39 +28,38 @@ export function useGrants(c: PalsideController) {
     catch { subscriptionError = true; }
     refresh();
     return () => { active = false; stop?.(); };
-  }, [live, account, attempt]);
-  const broad = live && value.origins.some(broadOrigin);
+  }, [account, attempt]);
+  const broad = value.origins.some(broadOrigin);
   const hosts = [...new Set(value.origins.map(grantedHost).filter((host): host is string => Boolean(host)))];
   return {
-    error: live && Boolean(value.error),
+    error: Boolean(value.error),
     retry: () => setAttempt(value => value + 1),
     /** The latest completed read succeeded; failed refreshes retain the last verified grants. */
-    ready: !live || Boolean(value.ready),
-    notifications: !live || value.notifications,
+    ready: Boolean(value.ready),
+    notifications: value.notifications,
     /** 查看和管理您的标签页组, which names 跟看's group. */
-    tabGroups: !live || value.tabGroups,
+    tabGroups: value.tabGroups,
     /** 读取您的浏览记录, which 共享在看 runs on. */
-    tabs: !live || value.tabs,
+    tabs: value.tabs,
     /** 所有网站 is allowed. */
     broad,
     /** Sites granted one by one, as Chrome lists them. */
     hosts,
-    site: (host: string) => !live || broad || hosts.includes(host),
+    site: (host: string) => broad || hosts.includes(host),
   };
 }
 export type Grants = ReturnType<typeof useGrants>;
 
 /**
- * 已授权网站: the sites Chrome allows (the preview keeps its own list), in catalog order, then other hosts by name. `all`:
+ * 已授权网站: the sites Chrome allows, in catalog order, then other hosts by name. `all`:
  * 所有网站 covers every site.
  */
 export function allowedSites(c: PalsideController, grants: Grants) {
   const order = (host: string) => { const index = c.sites.findIndex(site => site.domain === host); return index < 0 ? Infinity : index; };
-  const hosts = c.live ? grants.hosts : c.localSites;
-  return { all: grants.broad, hosts: [...hosts].sort((a, b) => order(a) - order(b) || a.localeCompare(b)) };
+  return { all: grants.broad, hosts: [...grants.hosts].sort((a, b) => order(a) - order(b) || a.localeCompare(b)) };
 }
 
 /** Chrome allows reading and changing this site. */
 export function siteAllowed(c: PalsideController, grants: Grants, host: string) {
-  return c.live ? grants.site(host) : c.localSites.includes(host);
+  return grants.site(host);
 }

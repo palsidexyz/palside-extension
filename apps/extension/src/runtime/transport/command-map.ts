@@ -51,7 +51,7 @@ const message = Type.Decode(object, (input): Message => {
   if (input.attachment !== undefined) decodeContract(attachment, input.attachment, [...path, 'attachment']);
   return input as Message;
 });
-const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), siteInteraction: Type.Optional(validated(readSiteInteractions)), favorites: Type.Optional(validated(readFavorites)), toured: optionalBool, rooms: Type.Optional(strictObject({ off: optionalBool, site: optionalText, noticed: optionalBool })) });
+const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), siteInteraction: Type.Optional(validated(readSiteInteractions)), favorites: Type.Optional(validated(readFavorites)), toured: optionalBool, rooms: Type.Optional(strictObject({ site: optionalText, noticed: optionalBool, used: optionalBool })) });
 const windowTarget = { windowId: optionalInt, teamId: optionalText, accountId: optionalText };
 
 /** The same payload schemas guard panel, worker and offscreen messages. */
@@ -76,8 +76,8 @@ export const commandPayloads = {
   'image-session-read': strictObject({ id: text }), 'image-session-return': strictObject({ id: text }),
   'image-session-update': strictObject({ id: text, expectedRevision: integer, document: imageDocument }),
   'image-session-save': strictObject({ id: text, expectedRevision: integer, src: text }), 'image-session-cancel': strictObject({ id: text, expectedRevision: integer }),
-  snapshot: empty, 'account-generate': empty, 'account-discard': empty, 'account-create': empty,
-  'account-login': strictObject({ words: denseArray(text) }), 'password-set': strictObject({ password: text }),
+  snapshot: empty, 'account-generate': empty, 'account-discard': empty, 'signup-cancel': empty, 'account-create': empty,
+  'account-login': strictObject({ words: denseArray(text) }), 'account-import': strictObject({ words: denseArray(text) }), 'password-set': strictObject({ password: text }),
   'mnemonic-reveal': strictObject({ password: text }), 'device-remove': strictObject({ id: text, password: text }),
   'delete-account': strictObject({ password: text }), 'identity-approve': strictObject(team), devices: empty, logout: empty, reconnect: empty,
   profile: strictObject({ name: optionalText, bio: optionalText, tags: Type.Optional(profileTags) }),
@@ -100,7 +100,7 @@ export const commandPayloads = {
   'room-send': strictObject({ text }), 'room-more': empty, 'room-retract': strictObject({ id: text }), 'room-report': strictObject({ id: text }),
   'room-like': strictObject({ key: roomKey, id: text, liked: Type.Boolean() }), 'room-summary': roomQuery,
   'room-people': roomQuery, 'room-hot': strictObject({ sourceId: optionalText, open: Type.Boolean() }), 'room-blocks': empty,
-  'room-block': strictObject({ accountId: text, blocked: bool }), 'room-settings': strictObject({ off: bool }),
+  'room-block': strictObject({ accountId: text, blocked: bool }),
   preferences, toggle: strictObject({ share: optionalBool, revoked: optionalBool }),
   'device-state': activity,
   'host-notice': strictObject({ message: strictObject({ key: text, values: Type.Optional(plainRecord(Type.Union([text, safeInteger()]))) }) }),
@@ -111,10 +111,11 @@ export const commandPayloads = {
   page: strictObject({ failed: optionalBool, clear: optionalBool, activity: optionalBool, identity: Type.Optional(object), host: optionalText, preview: optionalBool, stable: optionalBool, title: optionalText, favicon: optionalText }),
   history: strictObject(team), visible: strictObject({ teamId: optionalText, sourceId: text, ids: denseArray(text) }), 'visible-drop': strictObject({ panel: text }),
   'notification-open': strictObject({ accountId: text, teamId: optionalText, messageId: text, windowId: integer, preview: optionalBool }),
+  'poke-open': strictObject({ accountId: text, pokeId: text }),
   'image-draft-save': strictObject({ ...accountTeam, source: text, draftRevision: integer, src: text }),
   attach: strictObject({ ...accountTeam, attachment, replace: optionalBool, revision: optionalInt }),
   draft: strictObject({ ...accountTeam, patch: draft, revision: integer }), 'clear-share': empty,
-  poke: strictObject({ ...team, accountId: text }), 'prepare-retry': strictObject({ accountId: text, id: text }),
+  poke: strictObject({ ...team, accountId: optionalText }), 'prepare-retry': strictObject({ accountId: text, id: text }),
   send: strictObject({ message, revision: safeInteger({ minimum: -1 }) }), react: strictObject({ ...team, emoji: text, count: integer }),
   'cancel-send': strictObject({ id: text }), edit: strictObject({ ...team, id: text, text, baseEditedAt: optionalInt }), recall: strictObject({ ...team, id: text }),
   avatar: strictObject({ accountId: text, teamId: optionalText, data: text }), 'remove-avatar': strictObject({ accountId: text, teamId: optionalText, id: text }), 'reload-image': strictObject({ id: text }),
@@ -151,9 +152,9 @@ type Results = {
   'image-session-cancel': ImageSessionSnapshot & { windowOpen: boolean }; 'image-session-save': ImageSessionSnapshot & { windowOpen: boolean };
   send: { eventId: string }; 'signal-send': { queued: number }; 'mark-send': { queued: number }; 'drawing-send': { eventId: string }; 'follow-watch': ApiResult<'viewing.react'> | { delivered: number }; 'follow-scroll': ApiResult<'viewing.react'> | { delivered: number }; 'follow-tabs': ApiResult<'viewing.react'> | { delivered: number };
   'password-set': { nicknameRequired: boolean };
-  'room-panels': { connected: boolean }; 'room-settings': { off?: boolean }; 'invite-settings': { accept: boolean };
+  'room-panels': { connected: boolean }; 'invite-settings': { accept: boolean };
   'team-invite-permission': ApiResult<'teams.invitePermission'>;
-  react: ApiResult<'viewing.react'>; poke: ApiResult<'viewing.react'>;
+  react: ApiResult<'viewing.react'>; poke: { people: number }; 'poke-open': { url: string };
   team: { done: true }; retention: { done: true }; dissolve: { done: true }; leave: { done: true }; remove: { done: true }; unban: { done: true }; recruitment: { done: true }; apply: { done: true }; 'cancel-application': { done: true }; decide: { done: true }; transfer: { done: true }; 'team-preferences': { done: true };
   edit: { done: true }; avatar: { done: true }; 'remove-avatar': { done: true }; recall: { done: true };
   lobby: LobbyPaging | undefined; 'lobby-more': LobbyPaging | undefined; 'lobby-close': void;

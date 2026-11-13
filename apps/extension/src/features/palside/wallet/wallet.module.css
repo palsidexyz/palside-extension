@@ -36,8 +36,6 @@
 .segment button { flex:1; min-width:0; min-height:34px; padding:6px; border:0; border-radius:calc(var(--ui-radius-m) - 3px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); cursor:pointer; transition:background-color .18s,color .18s; }
 .segment button:is([aria-pressed=true],[aria-checked=true]) { background:var(--ui-canvas); color:var(--ui-text-primary); }
 .secret { padding:16px; border:0; background:var(--ui-control-surface); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); overflow-wrap:anywhere; font:400 var(--ui-type-callout)/22px var(--font-geist-mono),monospace; }
-.roomPayments { flex:none; display:flex; flex-direction:column; gap:6px; padding:0 12px; }
-.roomPayments:empty { display:none; }
 .transferCard { display:block; width:240px; max-width:100%; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; text-align:left; transition:opacity .3s; }
 .transferTop { display:flex; align-items:center; gap:10px; padding:12px 12px 10px; }
 .transferTop > span:last-child { min-width:0; display:flex; flex-direction:column; }
@@ -65,8 +63,6 @@
 .levelEvent { padding:8px; margin:0; text-align:center; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
 /* The small envelope takes a signal mark's 18px slot, so claim notes and signal hints line up the same way. */
 .claimArt { display:inline-flex; justify-content:center; flex:none; width:18px; }
-.roomPayments > details { max-height:180px; overflow:auto; font-size:var(--ui-type-callout); }
-.roomPayments > details summary { cursor:pointer; padding:6px 0; color:var(--ui-text-secondary); }
 @media(prefers-reduced-motion:reduce) { .segment button { transition:none; } }
 
 /* Wallet home: the balance with its address, two equal tiles. */

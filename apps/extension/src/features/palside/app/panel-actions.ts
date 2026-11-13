@@ -17,8 +17,6 @@ export type PanelActions = {
   setFavorites: (update: (old: Favorites) => Favorites) => Promise<void>;
   /** 共享在看's key, kept until pressed again. */
   toggle: (feature: 'share', on: boolean) => Promise<void>;
-  enableSites: (hosts: string[]) => Promise<boolean>;
-  addedNotice: (hosts: string[]) => TextMessage;
   removeSite: (host: string | "all") => void;
   siteName: (host: string) => string;
   openSite: (host: string) => void;
@@ -41,7 +39,6 @@ export type PanelActions = {
   setRecruitment: (active: boolean) => Promise<boolean>;
   requestTeam: (id: string, text: string) => void;
   cancelApplication: (id: string) => void;
-  joinTeam: (id: string) => void;
   leave: () => void;
   /** After this account leaves or dissolves a team: open the next joined team, else the 首页, and say what ended. */
   exitTeam: (teamId: string, notice: TextMessage) => void;
@@ -55,5 +52,8 @@ export type PanelActions = {
   copy: (value: string) => Promise<boolean>;
   createAccount: () => Promise<void>;
   restoreAccount: (words: string[]) => Promise<void>;
+  importAccount: (words: string[]) => Promise<void>;
   setPassword: (password: string) => Promise<void>;
+  /** 取消 while signup is still preparing: back to the PIN step with the same phrase. */
+  cancelSignup: () => void;
 };

@@ -14,12 +14,12 @@ type Live = Pick<PalsideController, 'live'>;
  * Cards, 详情, 弹幕, 热门, 在看 and titles therefore always agree.
  */
 export function liveView<T extends Viewing>(c: Live, view: T): T {
-  return view.kind === 'asset' ? withProfile(view, c.live?.state.tokens?.[viewAsset(view) ?? '']) : view;
+  return view.kind === 'asset' ? withProfile(view, c.live.state.tokens?.[viewAsset(view) ?? '']) : view;
 }
 
 /** A token by asset (`chain:address`), with `base` supplying the page identity when one is known. */
 export function tokenView(c: Live & Pick<PalsideController, 'data'>, asset: string, base?: Viewing): Viewing {
-  const record = c.live?.state.tokens?.[asset];
+  const record = c.live.state.tokens?.[asset];
   const known = base ?? c.data.views.find(view => viewAsset(view) === asset && tokenNamed(view)) ?? c.data.views.find(view => viewAsset(view) === asset);
   if (known) return liveView(c, known);
   const [chain = '', address = ''] = [asset.slice(0, asset.indexOf(':')), asset.slice(asset.indexOf(':') + 1)];
@@ -32,7 +32,7 @@ export function tokenView(c: Live & Pick<PalsideController, 'data'>, asset: stri
 export type TokenStats = { count: number; faces: RoomPerson[] };
 /** A token's public 弹幕 numbers: the open room once loaded, else its latest summary, else its 热门 row; undefined when unknown. */
 export function tokenStats(c: Live, key: RoomKey): TokenStats | undefined {
-  const rooms = c.live?.state.rooms;
+  const rooms = c.live.state.rooms;
   if (rooms?.current?.key === key && !rooms.current.loading) return rooms.current;
   const summary = rooms?.summaries[key]; if (summary) return summary;
   const row = rooms?.hot?.rows.find(item => item.key === key);

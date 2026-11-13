@@ -1,10 +1,10 @@
 import { IntegrationIntl } from './intl';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PalsideApp } from './preview-app';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import { PalsideService } from '../src/runtime/composition/core';
 import { reactionEmojis, type ReactionEmoji } from '../src/domain/annotations/reactions';
-import { palsideFixtures, demoSites } from './fixtures';
+import { palsideFixtures } from './fixtures';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import '@palside/design/fonts.css';
@@ -53,7 +53,7 @@ function Review() {
       <output style={{ whiteSpace: 'pre', width: '100%' }}>{sent.join('\n') || '尚未发送'}</output>
     </nav>
     <div id="product" style={{ width, maxWidth: '100%', height, margin: '8px auto', border: '1px solid #a6acb2' }}>
-      <PalsideApp data={state.data} sites={demoSites} live={{ state, command, openPage: async () => {} }} deliver={async () => {}} />
+      <PalsideApp live={{ state, command, openPage: async () => {} }} />
     </div>
   </>;
 }

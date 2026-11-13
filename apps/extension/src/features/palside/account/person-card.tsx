@@ -30,8 +30,8 @@ export function PersonCard({ c }: { c: PalsideController }) {
   // Focus starts on 关闭, not on the first control (the account ID), so opening never draws a ring around the ID.
   const closeRef = useRef<HTMLButtonElement>(null);
   const { dialogRef, dialogProps } = useDialogBehavior({ open: Boolean(person), onOpenChange: open => { if (!open) close(); }, initialFocusRef: closeRef });
-  const command = c.live?.command, personId = person?.id, chainEnabled = c.live?.state.wallet?.config?.enabled;
-  useEffect(() => { if (personId && chainEnabled) void command?.('wallet-person', { accountId: personId }).catch(() => {}); }, [command, personId, chainEnabled]);
+  const command = c.live.command, personId = person?.id, chainEnabled = c.live.state.wallet?.config?.enabled;
+  useEffect(() => { if (personId && chainEnabled) void command('wallet-person', { accountId: personId }).catch(() => {}); }, [command, personId, chainEnabled]);
   if (!person) return null;
   const self = person.id === c.data.self;
   const member = c.team.memberIds.includes(person.id);
@@ -39,20 +39,19 @@ export function PersonCard({ c }: { c: PalsideController }) {
   const found = member ? c.data.views.find(v => v.id === person.viewing) : undefined;
   const view = found && liveView(c, found);
   const role = member ? person.id === c.team.owner ? t('extension.copy.owner') : t('common.member') : applicant ? t('extension.copy.applyTeam') : t('extension.copy.notMember');
-  const presence = member && !self && person.presence ? person.presence === 'active' ? t('extension.copy.presenceActive') : t('extension.copy.presenceAway') : undefined;
-  const bio = self ? c.live?.state.account?.bio ?? person.bio : person.bio;
-  const tags = (self ? c.live?.state.account?.tags ?? person.tags : person.tags) ?? [];
-  // 喊来看 needs my token page shared with this team and the teammate to be here.
-  const ownView = c.data.views.find(item => item.id === c.viewingId);
-  const sharing = c.live ? c.live.state.publishedViewing?.teamId === c.current && ownView?.kind === 'asset' : Boolean(ownView);
-  const reason = !sharing ? t('extension.member.needSharing') : person.presence !== 'active' ? t('extension.member.offline') : undefined;
+  const presence = member ? person.presence === 'active' ? t('extension.copy.presenceActive') : person.presence === 'away' ? t('extension.copy.presenceAway') : undefined : undefined;
+  const bio = self ? c.live.state.account?.bio ?? person.bio : person.bio;
+  const tags = (self ? c.live.state.account?.tags ?? person.tags : person.tags) ?? [];
+  // 喊来看 needs a page this device shares with the squad, and the teammate online (active or away).
+  const sharing = c.live.state.publishedViewing?.teamId === c.current;
+  const reason = !sharing ? t('extension.member.needSharing') : person.presence !== 'active' && person.presence !== 'away' ? t('extension.member.offline') : undefined;
   const following = follow?.teamId === c.current && follow.personId === person.id;
   const teammate = member && !self && c.canWrite;
   const transferReason = person.walletVerified === false ? t('extension.wallet.noWallet') : undefined;
   async function poke() {
-    if (!c.live || reason || busy || !person) return;
+    if (reason || busy || !person) return;
     setBusy(true);
-    try { await c.live.command('poke', { teamId: c.current, accountId: person.id }); c.setNotice(uiMessage('extension.member.poked')); close(); }
+    try { await c.live.command('poke', { teamId: c.current, accountId: person.id }); c.setNotice(uiMessage('extension.member.poked', { name: person.name ?? '' })); close(); }
     catch (error) { c.setNotice(errorMessage(error)); }
     finally { setBusy(false); }
   }
@@ -79,12 +78,12 @@ export function PersonCard({ c }: { c: PalsideController }) {
       <Tooltip content={t('extension.dynamic.mentionPerson', { name: person.name })}>
         <button type="button" className={card.action} onClick={() => { close(); c.mention(person.id); c.go('chat'); requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[data-message-input]')?.focus()); }}><AtSign size={18} /><span>{t('extension.web.mention')}</span></button>
       </Tooltip>
-      {c.live && <Tooltip content={reason ?? t('extension.member.poke')}>
+      <Tooltip content={reason ?? t('extension.member.poke')}>
         <button type="button" className={card.action} aria-disabled={reason ? true : undefined} disabled={busy} onClick={() => void poke()}><UserRoundPlus size={18} /><span>{t('extension.web.bringOver')}</span></button>
-      </Tooltip>}
-      {c.live && <Tooltip content={following ? t('extension.member.stopFollowing') : t('extension.member.follow')}>
+      </Tooltip>
+      <Tooltip content={following ? t('extension.member.stopFollowing') : t('extension.member.follow')}>
         <button type="button" className={card.action} aria-pressed={following} onClick={() => { const follow = () => { setSocialUi({ follow: following ? undefined : { teamId: c.current, personId: person.id, startedAt: Date.now() } }); close(); }; if (following) follow(); else void askFollowGroup().finally(follow); }}><Footprints size={18} /><span>{following ? follow?.paused ? t('extension.web.followPausedShort') : t('extension.web.followingShort') : t('extension.web.followShort')}</span></button>
-      </Tooltip>}
+      </Tooltip>
       {/* 转账 sits with the other teammate actions while the chain is open; it needs the teammate's verified wallet. */}
       {chainEnabled && <Tooltip content={transferReason ?? t('extension.wallet.transferTo', { name: person.name })}>
         <button type="button" className={card.action} aria-disabled={transferReason ? true : undefined} onClick={() => { if (transferReason) return; close(); openTransfer(person.id); }}><ArrowLeftRight size={18} /><span>{t('extension.wallet.transfer')}</span></button>

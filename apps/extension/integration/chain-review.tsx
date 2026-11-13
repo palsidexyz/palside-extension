@@ -8,7 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { IntegrationIntl } from './intl';
 import { reviewStatus } from './review-harness';
 import { WalletSettings } from '../src/features/palside/wallet/security';
-import { RoomPayments, TipPayment } from '../src/features/palside/wallet/room-payments';
+import { RoomPacketCard, TipPayment } from '../src/features/palside/wallet/room-payments';
 import { WalletHome, WalletReceive, WalletRecords } from '../src/features/palside/wallet/wallet';
 import { PaymentSheet, openPayment, openTransfer, usePaymentSession } from '../src/features/palside/wallet/payment-sheet';
 import { TeamPaymentCard } from '../src/features/palside/wallet/team-feed';
@@ -145,7 +145,7 @@ function Fixture() {
     reviewStatus('ready');
   }, []);
   return <main data-palside-app data-appearance={query.get('theme') ?? 'light'} data-chain-scene={scene} style={{ height: '100%', overflowY: 'auto', padding: 16, boxSizing: 'border-box', background: 'var(--ui-canvas)', color: 'var(--ui-text-primary)' }}>
-    {page === 'level' ? <TeamLevel c={controller} /> : page === 'tip' ? <TipPayment c={controller} messageId="fixture-tip-message" onClose={() => setPage('home')} /> : page === 'packet' ? <PacketPage c={controller} /> : page === 'export' ? <WalletSettings c={controller} /> : page === 'room' ? <RoomPayments c={controller} roomKey={roomKey} /> : page === 'feed' ? <div data-feed style={{ display: 'flex', flexDirection: 'column' }}>{feedItems.map(item => <TeamPaymentCard key={item.id} c={controller} item={item as never} />)}</div> : page === 'receive' ? <WalletReceive c={controller} /> : page === 'records' ? <WalletRecords c={controller} /> : <WalletHome c={controller} />}
+    {page === 'level' ? <TeamLevel c={controller} /> : page === 'tip' ? <TipPayment c={controller} messageId="fixture-tip-message" onClose={() => setPage('home')} /> : page === 'packet' ? <PacketPage c={controller} /> : page === 'export' ? <WalletSettings c={controller} /> : page === 'room' ? <div data-room-packet><RoomPacketCard c={controller} packet={packet} /></div> : page === 'feed' ? <div data-feed style={{ display: 'flex', flexDirection: 'column' }}>{feedItems.map(item => <TeamPaymentCard key={item.id} c={controller} item={item as never} />)}</div> : page === 'receive' ? <WalletReceive c={controller} /> : page === 'records' ? <WalletRecords c={controller} /> : <WalletHome c={controller} />}
     <PaymentSheet c={controller} />
   </main>;
 }

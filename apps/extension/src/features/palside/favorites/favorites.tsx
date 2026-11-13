@@ -41,11 +41,11 @@ function toggleFavoriteSite(c: PalsideController, host: string) {
 export function Favorites({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const view = currentPage(c);
-  const host = normalizeSiteHost(c.live?.page?.host);
+  const host = normalizeSiteHost(c.live.page?.host);
   const site: Site | undefined = host ? siteOf(c, host) : undefined;
   const pageSaved = Boolean(view && isFavoritePage(c, view.url));
   const siteSaved = Boolean(host && c.favorites.sites.includes(host));
-  const open = (url: string) => { const session = captureSocialUi(); if (c.live) void c.live.openPage(url).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); else window.open(url, '_blank', 'noopener'); };
+  const open = (url: string) => { const session = captureSocialUi(); void c.live.openPage(url).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); };
   const sites = c.favorites.sites.map(domain => siteOf(c, domain));
   const star = (on: boolean) => <Star size={16} className={on ? s.starOn : s.star} aria-hidden="true" />;
   return <div className={s.page} data-fill>

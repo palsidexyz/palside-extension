@@ -16,7 +16,7 @@ import type { WheelEntry } from '../../../runtime/annotations/signals';
 import { createdAt } from '../../../runtime/annotations/chart-drawings';
 import { WheelArt } from '../settings/signal-settings';
 import { Count } from '../ui/motion-details';
-import { Token } from '../ui/primitives';
+import { PersonAvatar, Token } from '../ui/primitives';
 import { tokenLabel } from '../assets/token-name';
 import { openPage } from './reminders';
 import { captureSocialUi } from './social-state';
@@ -27,7 +27,7 @@ import type { PalsideController } from '../app/use-palside';
 import s from './page-hint.module.css';
 
 /** A line in the chat about a page: a signal the chat keeps, a 共享画线 drawing, or 喊你来看. */
-export type PageHint = { id: string; timestamp: number; hint: { kind: 'signal' | 'drawing' | 'poke'; noteId: string; personId: string; view?: Viewing; signal?: SignalKind; emote?: string; url?: string; at?: number; pending?: boolean } };
+export type PageHint = { id: string; timestamp: number; hint: { kind: 'signal' | 'drawing' | 'poke'; noteId: string; personId: string; view?: Viewing; count?: number; signal?: SignalKind; emote?: string; url?: string; at?: number; pending?: boolean } };
 
 /** The page a signal or drawing was made on, drawn like any shared page: a token page as its token, another page as its site. */
 function recordView(record: Pick<SignalRecord, 'url' | 'asset'>) {
@@ -41,10 +41,12 @@ function recordView(record: Pick<SignalRecord, 'url' | 'asset'>) {
 /** Signals stay in the chat as long as the squad's messages, at the time they were made, wherever you are.
  *  喊你来看 is a request for now: it goes when opened, ignored, reached or expired. */
 export function usePageHints(c: PalsideController): PageHint[] {
-  const page = c.live?.page, command = c.live?.command, state = c.live?.state, team = c.current;
-  const here = (url: string, view?: Viewing) => Boolean(page?.url && (samePage(page.url, url, page.asset) || view?.kind === 'asset' && page.asset && viewAsset(view) === page.asset));
-  const pokes = (state?.pokes ?? []).filter(poke => poke.teamId === team).map(poke => ({ id: `poke-${poke.id}`, timestamp: poke.at, hint: { kind: 'poke' as const, noteId: poke.id, personId: poke.from, view: poke.view } }));
-  const reached = pokes.filter(item => here(item.hint.view.url, item.hint.view));
+  const page = c.live.page, command = c.live.command, state = c.live.state, team = c.current;
+  // The tab in front answers a call even while sharing is off, so the panel checks it too; the runtime drops calls to a page it shares.
+  const here = (view: Viewing) => Boolean(page?.url && (samePage(page.url, view.url, page.asset) || view.kind === 'asset' && page.asset && viewAsset(view) === page.asset));
+  // One row per caller and page: calling again moves it to the newest place and raises its count.
+  const pokes = (state?.pokes ?? []).filter(poke => poke.teamId === team).map(poke => ({ id: `poke-${poke.from}-${poke.view.url}`, timestamp: poke.at, hint: { kind: 'poke' as const, noteId: poke.id, personId: poke.from, view: poke.view, count: poke.count } }));
+  const reached = pokes.filter(item => here(item.hint.view));
   const seen = reached.map(item => item.hint.noteId).join();
   useEffect(() => {
     if (!seen || !command) return;
@@ -85,15 +87,15 @@ export function PageHintRow({ c, item, counts }: { c: PalsideController; item: P
   const [arriving] = useState(() => item.at === undefined || Date.now() - item.at < ARRIVING_MS);
   const person = personFor(c.people, item.personId, t('common.member'));
   const view = item.view && liveView(c, item.view);
-  const dismiss = () => { if (item.kind === 'poke') void c.live?.command('dismiss-poke', { id: item.noteId }).catch(() => {}); };
+  const dismiss = () => { if (item.kind === 'poke') void c.live.command('dismiss-poke', { id: item.noteId }).catch(() => {}); };
   // The newest in the line: a signal plays again, a drawing brings the chart to it.
   const replay = () => {
     const session = captureSocialUi();
     withTargetAccess(c, item.url!, () => {
       if (!session.current() || !c.ownsScreen()) return;
       setBusy(true);
-      const request = item.kind === 'drawing' ? c.live!.command('drawing-show', { teamId: c.current, personId: item.personId, recordId: item.noteId })
-        : c.live!.command('signal-replay', { teamId: c.current, recordId: item.noteId });
+      const request = item.kind === 'drawing' ? c.live.command('drawing-show', { teamId: c.current, personId: item.personId, recordId: item.noteId })
+        : c.live.command('signal-replay', { teamId: c.current, recordId: item.noteId });
       void request
         .then(({ result }) => { const key = locateFeedback[result]; if (session.current() && key) c.setNotice(uiMessage(key)); }, error => { if (session.current()) c.setNotice(errorMessage(error)); })
         .finally(() => setBusy(false));
@@ -116,14 +118,15 @@ export function PageHintRow({ c, item, counts }: { c: PalsideController; item: P
     <span key="emotes">{t('extension.top.verbEmote')}{names(emotes)}</span>,
     <span key="marks">{' · '}{marks.some(entry => entry.kind !== DRAWING_RUN) && t('extension.top.verbSignal')}{names(marks)}</span>,
   ];
-  const text = item.kind === 'poke' ? t.rich('extension.top.pokeAt', { name: person.name, place, page })
+  const text = item.kind === 'poke' ? t.rich('extension.top.pokeAt', { name: person.name, place, page, times: () => times(item.count ?? 1) })
     : drawingsOnly ? self ? t.rich('extension.top.drewAtSelf', { place, page, times: () => times(list[0]!.count) }) : t.rich('extension.top.drewAt', { name: person.name, place, page, times: () => times(list[0]!.count) })
     : !marks.length ? self ? t.rich('extension.top.emoteAtSelf', { kind: () => names(emotes), place, page }) : t.rich('extension.top.emoteAt', { name: person.name, kind: () => names(emotes), place, page })
     : emotes.length ? self ? t.rich('extension.top.actedAtSelf', { kind: acted, place, page }) : t.rich('extension.top.actedAt', { name: person.name, kind: acted, place, page })
     : self ? t.rich('extension.top.signalAtSelf', { kind: () => names(marks), place, page }) : t.rich('extension.top.signalAt', { name: person.name, kind: () => names(marks), place, page });
   // The row's picture is its first entry: an emote's own image, a signal's mark, or the drawing mark.
   const first = list[0]?.kind, firstEmote = first && runEmote(first);
-  const art = item.kind === 'poke' ? <WheelArt entry="together" style={{ width: 18, height: 18, flex: 'none' }} />
+  // 喊你来看 leads with the caller's face (no presence dot: the line is about the call); signals and drawings lead with their mark.
+  const art = item.kind === 'poke' ? <PersonAvatar person={{ ...person, presence: undefined }} size="xs" />
     : drawingsOnly ? <DrawingArt />
     : <WheelArt entry={(firstEmote ?? (first !== DRAWING_RUN ? first : undefined) ?? item.signal ?? 'attention') as WheelEntry} style={firstEmote ? { width: 20, height: 20, flex: 'none', objectFit: 'contain' } : { width: 18, height: 18, flex: 'none' }} />;
   return <motion.div className={s.row} layout={!reduced && item.kind === 'poke'}

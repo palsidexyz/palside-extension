@@ -41,8 +41,10 @@ export class SessionRuntime {
   timer?: ReturnType<typeof setInterval>;
   receiveSince = Date.now();
   snapshotAt = 0;
-  deviceState: DeviceState = 'away';
+  /** Unknown until the worker reports Chrome's idle state; nothing is reported before that. */
+  deviceState?: DeviceState;
   reportedDeviceState?: DeviceState;
+  deviceStateFailures = 0;
   deviceStateTimer?: ReturnType<typeof setTimeout>;
   directoryExpiresAt = 0;
   authQueue: Promise<unknown> = Promise.resolve();
@@ -223,7 +225,7 @@ export class SessionRuntime {
     const scope = this.scope();
     runtime.dispatch.inviteRequest++; runtime.dispatch.inviteExpiresAt = 0; runtime.sharing.invalidatePage();
     this.liveDispose?.(); this.liveDispose = undefined; this.liveOpen = false; this.refreshQueued.clear();
-    clearTimeout(this.deviceStateTimer); this.deviceStateTimer = undefined; this.reportedDeviceState = undefined;
+    clearTimeout(this.deviceStateTimer); this.deviceStateTimer = undefined; this.reportedDeviceState = undefined; this.deviceStateFailures = 0;
     const old = this.session ?? this.pendingDevice; this.session = undefined; runtime.api.token = undefined;
     const client = this.client; this.client = undefined; client?.stopClient();
     this.scheduleCleanup(old, preservePreferences, client);

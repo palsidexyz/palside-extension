@@ -62,19 +62,19 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
   const [leaving, setLeaving] = useState<ReadonlySet<string>>(() => new Set());
   const onLeave = useCallback((id: string, on: boolean) => setLeaving(old => { if (old.has(id) === on) return old; const next = new Set(old); if (on) next.add(id); else next.delete(id); return next; }), []);
   const flight = useMemo(() => ({ flights, layer: () => layer.current, list: () => list.current }), [flights]);
-  const timeline = useChatTimeline({ self: c.data.self, teamId: c.current, messages: c.currentMessages, active: c.screen === 'chat', command: c.live?.command, jumpId, listRef: list, contentRef: content });
-  const readIds = c.live?.state.remoteTeams.find(team => team.id === c.current)?.preferences.readIds ?? [];
+  const timeline = useChatTimeline({ self: c.data.self, teamId: c.current, messages: c.currentMessages, active: c.screen === 'chat', command: c.live.command, jumpId, listRef: list, contentRef: content });
+  const readIds = c.live.state.remoteTeams.find(team => team.id === c.current)?.preferences.readIds ?? [];
   const mentions = unreadMentions(c.currentMessages, c.data.self, readIds, c.now);
   const newestId = c.currentMessages.at(-1)?.id;
   const scrollToLatest = timeline.latest;
   useLayoutEffect(() => { if (followLatest) scrollToLatest(); }, [followLatest, newestId, scrollToLatest]);
   const currentTeamId = c.current;
   const live = c.live;
-  const historyLoading = live?.state.history?.[currentTeamId]?.loading;
-  const historyLoaded = live?.state.history?.[currentTeamId]?.loaded;
+  const historyLoading = live.state.history?.[currentTeamId]?.loading;
+  const historyLoaded = live.state.history?.[currentTeamId]?.loaded;
   useEffect(() => {
     const root = list.current;
-    if (!root || !live) return;
+    if (!root) return;
     let requested = false;
     const onScroll = () => {
       if (root.scrollTop > 24) return;
@@ -144,7 +144,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     if (sent && follow()) clearJump();
     if (input.current?.checkVisibility()) input.current.focus();
   }
-  const queue = live?.state.sendQueue?.[c.current];
+  const queue = live.state.sendQueue?.[c.current];
   const queued = new Map(queue?.items.map((item, index) => [item.id, { at: item.at, head: index === 0 }]));
   const stops = timeline.canReturn ? timeline.trail.split('\n') : [];
   const nameOf = (id: string) => personFor(c.people, c.currentMessages.find(message => message.id === id)?.author ?? '', t('common.member')).name;
@@ -180,7 +180,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     const { message } = entry;
     const label = day.label ?? days.findLast(item => item.label)?.label;
     if (label) dayOf.set(message.id, label);
-    if (c.live && message.id === away.first) day.items.push(<AwayDivider key="away" c={c} views={away.views} />);
+    if (message.id === away.first) day.items.push(<AwayDivider key="away" c={c} views={away.views} />);
     day.items.push(<MessageItem key={`message-${message.clientId ?? message.id}`} c={c} message={message} grouped={continues(previous, message)} onLeave={onLeave}
       landing={target === message.id ? timeline.landing : undefined} queued={queued.get(message.clientId ?? message.id)}
       landingRange={target === message.id && quoted?.id === message.id ? quoted.range : undefined}
@@ -195,9 +195,9 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     <div ref={list} className={`${s.timeline} ${navigation.list}`} aria-label={t('extension.copy.chatMessages')} tabIndex={0}>
     <div ref={content} className={`${navigation.content} ${!c.currentMessages.length ? navigation.emptyContent : ''}`}>
 
-      {c.currentMessages.length > 0 && c.live?.state.history?.[c.current]?.loading && <div className={s.historyStatus} role="status" aria-live="polite">{t('extension.copy.loading')}</div>}
+      {c.currentMessages.length > 0 && c.live.state.history?.[c.current]?.loading && <div className={s.historyStatus} role="status" aria-live="polite">{t('extension.copy.loading')}</div>}
       {/* Without key backup a device reads only what arrived after it signed in: say so once, where the readable history begins. */}
-      {(c.scenario === 'history' || (c.live?.state.history?.[c.current]?.missingKeys ?? 0) > 0) && <div className={s.dateLabel}><span>{t('extension.copy.historyBefore')}</span></div>}
+      {(c.live.state.history?.[c.current]?.missingKeys ?? 0) > 0 && <div className={s.dateLabel}><span>{t('extension.copy.historyBefore')}</span></div>}
       {!c.currentMessages.length && !payments.length && <div className={s.empty}>{showsNewTeam(c)
         ? <NewTeam c={c} />
         : c.canWrite ? <NewTeam c={c} invite={false} /> : <><MessageCircle size={24} strokeWidth={1.3} /><h2>{t('extension.copy.noViewableMessages')}</h2></>}</div>}

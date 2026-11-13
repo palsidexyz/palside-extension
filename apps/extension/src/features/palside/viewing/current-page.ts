@@ -7,7 +7,7 @@ import { liveView } from '../assets/token-data';
 
 /** The active tab owns page identity; shared views supply asset metadata only. */
 export function currentPage(c: PalsideController): Viewing | undefined {
-  const page = c.live?.page;
+  const page = c.live.page;
   const url = pageScopeUrl(page?.url);
   if (!url) return;
   const view = tabView(page);

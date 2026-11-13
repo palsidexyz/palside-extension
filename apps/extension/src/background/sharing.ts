@@ -18,9 +18,12 @@ import type { Tab } from './context.ts';
  * window the user last worked in is published as this device's 正在看. It ends on a page switch, the switch turned off, the last panel closing or a locked screen. Chrome's 读取您的浏览记录 gives the address of every tab. Also device activity
  * (活跃) and link cards.
  */
+/** 活跃 is keyboard or mouse input on this computer within five minutes; idle or a locked screen is 离开. An open panel alone proves nobody is there. */
+export function deviceStateOf(value: string): DeviceState { return value === 'active' ? 'active' : 'away'; }
+
 export function sharing(bg: Background) {
   const { browser } = bg;
-  let idle: DeviceState = 'away';
+  /** The state the offscreen runtime last accepted; a failed report is retried on the next change or replay. */
   let reported: DeviceState | undefined;
   /** When a resume, enable or preference change replied before its state arrived: the sharing policy that follows within 10 s claims this device. */
   let claimAt = 0;
@@ -57,13 +60,19 @@ export function sharing(bg: Background) {
 
   return {
     observer, observationPolicy,
-    /** 活跃: an open panel or recent input on this device; reported once per change. */
-    updateDeviceState(value?: DeviceState) {
-      if (value) idle = value;
-      const next = bg.panels.size > 0 || idle === 'active' ? 'active' : 'away';
+    /** Chrome's idle state changed: report it once per change. */
+    updateDeviceState(value: string) {
+      const next = deviceStateOf(value);
       if (next === reported) return;
       reported = next;
       void bg.run({ name: 'device-state', payload: { state: next } }).catch(() => { reported = undefined; });
+    },
+    /** A new offscreen runtime starts without a state: give it the current one. */
+    async replayDeviceState() {
+      const next = deviceStateOf(await browser.idle.queryState(DEVICE_IDLE_SECONDS));
+      reported = undefined;
+      await bg.run({ name: 'device-state', payload: { state: next } });
+      reported = next;
     },
     /** The sharing policy changed: refresh, claiming this device if a panel action asked for it within the last 10 seconds. */
     sharingPolicyChanged() {

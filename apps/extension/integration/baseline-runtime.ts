@@ -52,15 +52,17 @@ export async function verifyRuntimeBoundaries(initial: RuntimeState, check: (val
     const event = (age: number) => ({ isEncrypted: () => true, getSender: () => '@mia:example.test', getContent: () => ({ id: `poke${age}`, teamId: 'night', sentAt: at - age, view: { ...initial.data.views[0]!, version: 1 } }) }) as unknown as MatrixEvent;
     try {
       Date.now = () => at;
-      await runtime.interactions.consumePoke(event(10_001), session);
-      check(!runtime.state.pokes?.length, 'A viewing invitation older than ten seconds is not replayed on receipt');
-      await runtime.interactions.consumePoke(event(10_000), session);
-      check(runtime.state.pokes?.length === 1, 'A viewing invitation exactly ten seconds old can still arrive');
+      await runtime.interactions.consumePoke(event(15_001), session);
+      check(!runtime.state.pokes?.length, 'A viewing invitation older than the relay lifetime plus clock tolerance is not replayed on receipt');
+      await runtime.interactions.consumePoke(event(15_000), session);
+      check(runtime.state.pokes?.length === 1, 'A viewing invitation at the edge of the relay lifetime plus clock tolerance can still arrive');
+      await runtime.interactions.consumePoke(event(15_000), session);
+      check(runtime.state.pokes?.length === 1 && runtime.state.pokes[0]!.count === 1, 'The same invitation delivered twice counts once');
       await show(runtime.state);
-      Date.now = () => at + 59_999;
+      Date.now = () => at + 5 * MINUTE_MS - 1;
       await runtime.cache.expireLocalContent();
-      check(runtime.state.pokes?.length === 1, 'A received viewing invitation remains before its sixty second display deadline');
-      Date.now = () => at + MINUTE_MS;
+      check(runtime.state.pokes?.length === 1, 'A received viewing invitation remains before its five minute display deadline');
+      Date.now = () => at + 5 * MINUTE_MS;
       await runtime.cache.expireLocalContent();
       check(runtime.state.pokes?.length === 0 && runtime.state.data.messages.length === 0, 'The display deadline removes viewing invitations without adding chat history');
       await show(runtime.state);

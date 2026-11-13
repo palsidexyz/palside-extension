@@ -20,7 +20,7 @@ function FollowingRow({ c, personId, paused }: { c: PalsideController; personId:
   const person = personFor(c.people, personId, t('common.member'));
   const found = c.data.views.find(view => view.id === person.viewing);
   const view = found && liveView(c, found);
-  const request = (op: { op: 'pause' } | { op: 'resume'; url?: string }) => { void c.live?.follow?.(op).catch(error => c.setNotice(errorMessage(error))); };
+  const request = (op: { op: 'pause' } | { op: 'resume'; url?: string }) => { void c.live.follow?.(op).catch(error => c.setNotice(errorMessage(error))); };
   return <div className={s.row} data-follow-bar={paused ? 'paused' : 'on'} role="status">
     <Footprints size={15} strokeWidth={2} className={s.mark} aria-hidden="true" />
     <span className={s.text}><Swap k={paused ? 'paused' : 'on'}><b>{t(paused ? 'extension.top.followPausedHere' : 'extension.top.followOn', { name: person.name })}</b></Swap></span>
@@ -48,7 +48,7 @@ export function FollowBar({ c }: { c: PalsideController }) {
   const { follow } = useSocialUi();
   const mine = follow?.teamId === c.current ? follow : undefined;
   // The runtime removes a follower who stopped renewing and pushes the new state.
-  const followers = (c.live?.state.followers ?? []).filter(item => item.teamId === c.current).map(item => item.personId);
+  const followers = (c.live.state.followers ?? []).filter(item => item.teamId === c.current).map(item => item.personId);
   const motionProps = reduced
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
     : { initial: { height: 0, opacity: 0 }, animate: { height: 'auto', opacity: 1 }, exit: { height: 0, opacity: 0 } };

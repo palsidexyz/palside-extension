@@ -5,10 +5,10 @@ import { createRoot } from 'react-dom/client';
 import { createTranslator } from 'use-intl';
 import { messagesFor } from '@palside/i18n';
 import { IntegrationIntl } from './intl';
-import { palsideFixtures, demoSites, remoteTeam } from './fixtures';
+import { palsideFixtures, remoteTeam } from './fixtures';
 import { autoRun, reviewStatus } from './review-harness';
 import { verifyRuntimeBoundaries } from './baseline-runtime';
-import { PalsideApp } from './preview-app';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import { usePalside, type PalsideController } from '../src/features/palside/app/use-palside';
 import { ChatHeader } from '../src/features/palside/chat/chat-header';
 import { Chat } from '../src/features/palside/chat/chat';
@@ -56,6 +56,8 @@ let state: RuntimeState;
 let page: LivePort['page'];
 let openPending: (() => void) | undefined;
 let delayOpen = false;
+/** Sign-in finds no account for the typed phrase, as for one never registered or since deleted. */
+let missingAccount = false;
 let phrase = 'abandon ability able about above absent absorb abstract absurd abuse access accident'.split(' ');
 const grants = { origins: ['https://gmgn.ai/*', 'https://axiom.trade/*'], permissions: ['tabs', 'notifications'] };
 const permissionListeners = new Set<() => void>();
@@ -104,7 +106,8 @@ const command: LivePort['command'] = async <T,>(name: string, payload?: Record<s
   if (name === 'draft') { const teamId = String(payload?.teamId); state = { ...state, drafts: { ...state.drafts, [teamId]: { revision: Number(payload?.revision) + 1, updatedAt: Date.now(), value: { text: '', ...state.drafts[teamId]?.value, ...payload?.patch as object } } } }; render(); }
   if (name === 'room-open') { state = { ...state, rooms: { ...state.rooms, pinned: String(payload?.key) } }; render(); }
   if (name === 'account-generate') result = { words: phrase };
-  if (name === 'account-create' || name === 'account-login') { state = { ...state, setup: 'password' }; render(); }
+  if (name === 'account-login' && missingAccount) throw Object.assign(new Error(t('extension.runtime.notPalsideAccount')), { code: 'ACCOUNT_NOT_FOUND' });
+  if (name === 'account-create' || name === 'account-login' || name === 'account-import') { state = { ...state, setup: 'password' }; render(); }
   if (name === 'password-set') { state = { ...state, setup: undefined, authenticated: true }; render(); }
   if (name === 'profile') { state = { ...state, account: { ...state.account!, nickname: String(payload?.name) } }; render(); }
   if (name === 'dismiss-poke') { state = { ...state, pokes: state.pokes?.filter(poke => poke.id !== payload?.id) }; render(); }
@@ -127,7 +130,7 @@ function Top({ controller }: { controller: PalsideController }) { const top = us
 function Theme() { const value = useAppearance(); return <div data-theme={value}><AppearanceSetting /></div>; }
 function observe(controller: PalsideController, shared: ReturnType<typeof useSocialUi>) { c = controller; social = shared; }
 function Surface() {
-  const c = usePalside({ data: state.data, sites: demoSites, live: { state, page, command, openPage, follow, onFollowStatus }, deliver: async () => {} });
+  const c = usePalside({ live: { state, page, command, openPage, follow, onFollowStatus } });
   const shared = useSocialUi();
   useLayoutEffect(() => { observe(c, shared); });
   let content: ReactNode;
@@ -154,7 +157,7 @@ function Surface() {
   }
   return <div data-palside-app style={{ height: '100%', containerType: 'inline-size' }}>{content}{c.personId && <PersonCard key={c.personId} c={c} />}<RoomPersonSheet c={c} /><Toaster label="Notices" closeLabel="Dismiss notice" /></div>;
 }
-function render() { root.render(<IntegrationIntl>{mode === 'app' ? <PalsideApp key={generation} data={state.data} sites={demoSites} live={{ state, page, command, openPage, follow, onFollowStatus }} deliver={async () => {}} /> : <SocialSession key={`${generation}:${state.data.self}`} accountId={state.data.self}><Surface /></SocialSession>}</IntegrationIntl>); }
+function render() { root.render(<IntegrationIntl>{mode === 'app' ? <PalsideApp key={generation} live={{ state, page, command, openPage, follow, onFollowStatus }} /> : <SocialSession key={`${generation}:${state.data.self}`} accountId={state.data.self}><Surface /></SocialSession>}</IntegrationIntl>); }
 async function reset(next: string, configure?: () => void) {
   // Sonner keeps toasts in module state; each check starts without the previous check's notices.
   toast.dismiss(); root.render(null); await wait(20);
@@ -287,6 +290,14 @@ async function onboardingChecks() {
   assert(c.screen === 'nickname' && host.querySelectorAll('ol li[data-state]').length === 3, 'Recovery adds a third name step only when the account has no nickname');
   state = { ...state, account: { ...state.account!, nickname: 'Restored name' } }; c.go('chat'); await refresh();
   assert(c.screen === 'chat', 'A restored account with a nickname skips nickname setup');
+  missingAccount = true;
+  await reset('onboarding', () => { state.authenticated = false; });
+  await clickKey('extension.copy.haveAccount');
+  const unclaimed = new DataTransfer(); unclaimed.setData('text/plain', `${'abandon '.repeat(11)}about`);
+  query('input').dispatchEvent(new ClipboardEvent('paste', { clipboardData: unclaimed, bubbles: true, cancelable: true })); await wait(); await clickKey('extension.copy.signIn'); await wait(400);
+  assert(c.screen === 'restore' && text().includes(t('extension.copy.phraseNoAccount')) && query<HTMLInputElement>('input').value === 'abandon' && !host.querySelector('[role="alert"]') && button(t('extension.copy.createWithPhrase')), 'A phrase with no account keeps its words and offers to create an account with it');
+  await clickKey('extension.copy.createWithPhrase'); missingAccount = false;
+  assert(recorded('account-import').length === 1 && c.screen === 'password' && host.querySelectorAll('ol li[data-state]').length === 3 && button(t('extension.copy.createAccount')), 'Creating from a typed phrase reaches the PIN step of a three-step creation');
 }
 
 async function profileChecks() {
@@ -316,9 +327,9 @@ async function memberChecks() {
   assert(dialog.textContent?.includes('Robin') && dialog.textContent?.includes(shortAccountAddress('0xf5c5cbb0c3dd22f9459e6a3bf1c6ebc105870eeb')) && dialog.textContent?.includes('只看 Base 新币') && dialog.querySelector('[data-presence="away"]'), 'A member name opens a card with name, short ID, biography, tags and presence');
   for (const label of ['extension.web.mention', 'extension.web.bringOver', 'extension.web.followShort']) assert(button(t(label), dialog), `A teammate card exposes ${t(label)}`);
   await clickKey('extension.web.mention'); assert(c.draft.text.includes('@Robin') && c.screen === 'chat', 'Mentioning a member returns to chat and inserts the mention');
-  state.viewingId = 'cashcat'; state.publishedViewing = { viewId: 'cashcat', teamId: 'night', expiresAt: Date.now() + 30000 }; state.data.people.find(person => person.id === 'robin')!.presence = 'active'; await refresh();
+  state.viewingId = 'cashcat'; state.publishedViewing = { viewId: 'cashcat', teamId: 'night', expiresAt: Date.now() + 30000 }; state.data.people.find(person => person.id === 'robin')!.presence = 'away'; await refresh();
   await click('Robin'); await clickKey('extension.web.bringOver');
-  assert(recorded('poke')[0]?.payload?.teamId === 'night' && recorded('poke')[0]?.payload?.accountId === 'robin', 'Inviting an active teammate to a shared token targets that teammate in the current team');
+  assert(recorded('poke')[0]?.payload?.teamId === 'night' && recorded('poke')[0]?.payload?.accountId === 'robin', 'Inviting an away teammate to a shared page targets that teammate in the current team');
   c.setMemberFilter(undefined); await wait(); await click(t('extension.dynamic.viewProfile', { name: '你' }));
   assert(text().includes(t('extension.copy.owner')) && button(t('extension.copy.editProfile')), 'The current user card identifies the captain and offers profile editing');
   await clickKey('extension.copy.editProfile'); assert(c.screen === 'profile', 'Editing the current user card opens the profile form');
@@ -381,10 +392,10 @@ async function readingChecks() {
     state.data.messages = state.data.views.map((view, i) => ({ id: `unread${i}`, teamId: 'night', author: 'mia', text: `Coin ${i}`, status: 'sent', time: '12:00', attachment: { kind: 'asset', assetId: view.id, view } }));
     state.remoteTeams = [remoteTeam({ id: 'night', roomId: '!night:example.test', preferences: { muted: false, readIds: ["unread0"], revision: 0 } })];
   });
-  assert(query('[data-first]').getAttribute('data-first') === 'unread1' && host.querySelectorAll('[role="separator"] button').length === 3 && text().includes('+1'), 'The unread divider starts at the first unread message and caps token icons at three plus the remainder');
+  assert(query('[data-first]').getAttribute('data-first') === 'unread1' && host.querySelectorAll(`[data-first] [role="group"] button`).length === 3 && text().includes('+1'), 'The unread divider starts at the first unread message and caps token icons at three plus the remainder');
   state.data.messages = [...state.data.messages, { ...state.data.messages[0]!, id: 'arrival' }]; state.data.teams[0]!.unread = 6; await refresh();
   assert(query('[data-first]').getAttribute('data-first') === 'unread1' && text().includes('+1'), 'Arriving messages do not move or recompute the unread snapshot');
-  state.preferences.current = 'weekend'; await refresh(); assert(!host.querySelector('[role="separator"]'), 'Switching teams establishes that team’s unread divider');
+  state.preferences.current = 'weekend'; await refresh(); assert(!host.querySelector(`[data-first] [role="group"]`), 'Switching teams establishes that team’s unread divider');
   state.preferences.current = 'night'; state.remoteTeams[0] = { ...state.remoteTeams[0]!, preferences: { ...state.remoteTeams[0]!.preferences, readIds: ['unread0', 'unread1'] } }; await refresh();
   assert(query('[data-first]').getAttribute('data-first') === 'unread2', 'Returning to a team computes its first unread message again');
   await reset('history', () => { state.history!.night = { loaded: false, loading: false, missingKeys: 0 }; });

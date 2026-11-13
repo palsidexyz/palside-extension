@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { assetView } from '../apps/extension/src/domain/assets/model.ts';
 import { canSend } from '../apps/extension/src/domain/chat/model.ts';
+import { searchableMessages, searchNeedle } from '../apps/extension/src/domain/chat/search.ts';
 import { sharedTokens } from '../apps/extension/src/domain/assets/shared-tokens.ts';
 import { publicShareUrl } from '../packages/shared/src/navigation.ts';
 
@@ -26,45 +27,37 @@ function execute(source, name, context) {
 }
 const sharedSource = declaration('assets/shared-content.tsx', 'SharedContent');
 const plain = value => JSON.parse(JSON.stringify(value));
-function sender(live = true) {
+function sender() {
   const calls = [];
   const context = {
     disconnected: false, draftConflict: false, canWrite: true, canSend,
     current: 'team', data: { self: 'self' }, team: { memberIds: ['member'] },
     draft: { automaticCard: { url: 'https://a.test', assetId: 'a' }, dismissedUrls: ['https://b.test'], text: '  hello @Member @Out  ', attachment: { kind: 'image', src: 'blob:image' }, replyTo: 'parent', mentions: [{ id: 'member', label: 'Member' }, { id: 'outsider', label: 'Out' }, { id: 'member', label: 'Absent' }] },
     crypto: { randomUUID: () => 'message-id' }, Date: { now: () => 1234 },
-    live: live ? { state: { drafts: { team: { revision: 7 } } } } : undefined,
+    live: { state: { drafts: { team: { revision: 7 } } } },
     draftRevisions: { current: { team: 5 } }, draftQueue: { current: Promise.resolve() }, blockedDrafts: { current: new Set() },
     uiMessage: key => key, setNotice: value => calls.push(['notice', value]),
     guarded: async (name, payload, retry) => { calls.push([name, payload, retry]); return { eventId: 'event' }; },
     setMessages: update => calls.push(['messages', update([{ id: 'existing' }])]),
     setDrafts: update => calls.push(['drafts', update({ team: { text: 'old' }, other: { text: 'keep' } })]),
-    emptyDraft: { text: '' }, pending: { current: new Set() }, mounted: { current: true }, deliver: async message => { calls.push(['deliver', message]); },
+    emptyDraft: { text: '' }, pending: { current: new Set() }, mounted: { current: true },
   };
   const load = productionModules({ crypto: context.crypto, Date: context.Date, message: key => key });
-  const createActions = live ? load('apps/extension/src/features/palside/chat/live-actions.ts').createLiveDraftActions : load('apps/extension/src/features/palside/chat/memory-actions.ts').createMemoryDraftActions;
+  const createActions = load('apps/extension/src/features/palside/chat/live-actions.ts').createLiveDraftActions;
   return { context, calls, send: (...args) => createActions({ ...context, view: context }, () => context).send(...args) };
 }
 const expectedMessage = { id: 'message-id', teamId: 'team', author: 'self', text: 'hello @Member @Out', time: '', timestamp: 1234, attachment: { kind: 'image', src: 'blob:image' }, replyTo: 'parent', mentionIds: ['member'], status: 'sending' };
 
-test('send uses the same message fields in live and preview and preserves preview drafts for other teams', async () => {
-  for (const live of [true, false]) {
-    const { send, calls } = sender(live);
-    // The chat measures the composer for the send flight before anything is written or the draft clears.
-    const prepared = [];
-    assert.equal(await send(message => prepared.push([plain(message), calls.length])), true);
-    assert.deepEqual(prepared, [[expectedMessage, 0]]);
-    if (live) {
-      assert.equal(calls.length, 1);
-      assert.equal(calls[0][0], 'send');
-      assert.deepEqual(plain(calls[0][1]), { message: expectedMessage, revision: 7 });
-      assert.equal(typeof calls[0][2], 'function');
-    } else {
-      assert.deepEqual(plain(calls.slice(0, 2)), [['messages', [{ id: 'existing' }, expectedMessage]], ['drafts', { team: { text: '' }, other: { text: 'keep' } }]]);
-      assert.deepEqual(plain(calls.find(call => call[0] === 'deliver')), ['deliver', expectedMessage]);
-      assert.deepEqual(calls.map(call => call[0]), ['messages', 'drafts', 'messages', 'deliver', 'messages']);
-    }
-  }
+test('send builds the message fields once and hands them to the runtime with the draft revision', async () => {
+  const { send, calls } = sender();
+  // The chat measures the composer for the send flight before anything is written or the draft clears.
+  const prepared = [];
+  assert.equal(await send(message => prepared.push([plain(message), calls.length])), true);
+  assert.deepEqual(prepared, [[expectedMessage, 0]]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'send');
+  assert.deepEqual(plain(calls[0][1]), { message: expectedMessage, revision: 7 });
+  assert.equal(typeof calls[0][2], 'function');
 });
 
 test('send snapshots content and revision before waiting and checks newly blocked drafts after the queue', async () => {
@@ -86,13 +79,11 @@ test('send snapshots content and revision before waiting and checks newly blocke
 });
 
 test('send guards, revision maximum, failure results and queue rejection retain their contracts', async () => {
-  for (const live of [true, false]) {
-    for (const patch of [{ disconnected: true }, { draftConflict: true }, { canWrite: false }, { draft: { text: '  ' } }, { draft: { text: 'x'.repeat(4001) } }]) {
-      const { context, calls, send } = sender(live);
-      Object.assign(context, patch);
-      assert.equal(await send(), false);
-      assert.deepEqual(calls, patch.draftConflict ? [['notice', 'extension.copy.chooseDraftFirst']] : []);
-    }
+  for (const patch of [{ disconnected: true }, { draftConflict: true }, { canWrite: false }, { draft: { text: '  ' } }, { draft: { text: 'x'.repeat(4001) } }]) {
+    const { context, calls, send } = sender();
+    Object.assign(context, patch);
+    assert.equal(await send(), false);
+    assert.deepEqual(calls, patch.draftConflict ? [['notice', 'extension.copy.chooseDraftFirst']] : []);
   }
   for (const result of [undefined, {}, { eventId: '' }, { eventId: 'ok' }]) {
     const { context, send } = sender();
@@ -100,9 +91,6 @@ test('send guards, revision maximum, failure results and queue rejection retain 
     context.guarded = async (_, payload) => { assert.equal(payload.revision, 10); return result; };
     assert.equal(await send(), Boolean(result?.eventId));
   }
-  const preview = sender(false);
-  preview.context.deliver = async () => { throw new Error('delivery failed'); };
-  assert.equal(await preview.send(), false);
   const rejected = sender();
   rejected.context.draftQueue.current = Promise.reject(new Error('queue failed'));
   await assert.rejects(rejected.send(), /queue failed/);
@@ -116,6 +104,7 @@ function renderer() {
   const component = execute(sharedSource, 'SharedContent', {
     h, Fragment: 'Fragment', tokenLabel: view => view.name, liveView: (_c, view) => view, useTranslations: () => key => key, useId: () => 'tabs', useState: () => [order, value => { order = value; }],
     s: new Proxy({}, { get: (_, key) => key }), Tabs: 'Tabs', HistoryMore: 'HistoryMore', EmptyState: 'EmptyState', Coins: 'Coins', ImageIcon: 'ImageIcon', Token: 'Token', Tooltip: 'Tooltip', IconButton: 'IconButton', Button: 'Button', MessageImage: 'MessageImage', ArrowUpRight: 'ArrowUpRight', Link2: 'Link2',
+    searchableMessages, searchNeedle,
     sharedTokens: input => { calls.tokens++; return sharedTokens(input); },
     publicShareUrl: value => { calls.urls++; return publicShareUrl(value); },
     assetView: value => { calls.views++; return assetView(value); },

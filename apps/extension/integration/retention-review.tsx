@@ -5,8 +5,8 @@ import { createRoot } from 'react-dom/client';
 import { MatrixEvent } from 'matrix-js-sdk';
 import { PalsideService } from '../src/runtime/composition/core';
 import { ClientStorage } from '../src/runtime/storage/storage';
-import { PalsideApp } from './preview-app';
-import { palsideFixtures, demoSites, remoteTeam } from './fixtures';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
+import { palsideFixtures, remoteTeam } from './fixtures';
 import { autoRun, reviewStatus } from './review-harness';
 import { emptyDraft } from '../src/domain/chat/model';
 import type { RuntimeDevice } from '../src/runtime/account/device';
@@ -38,7 +38,7 @@ async function prepare(){
   for(const message of data.messages){const time=message.id==='$qa-reply'?now:now-29*day;cache.eventTimes.set(message.id,time);await cache.cacheMessage(message,time);}
   service.state.drafts[teamId]=await storage.updateDraft('you',teamId,{text:'保留的未发送草稿'},0,emptyDraft);
   const command:LivePort['command']=async(...[name])=>{if(name==='visible'||name==='dismiss-notice'||name==='history')return undefined as never;throw Error(`This isolated fixture does not execute ${name}`);};
-  unsubscribe=service.subscribe(state=>root.render(<IntegrationIntl><PalsideApp data={state.data} sites={demoSites} live={{state,command,openPage:async()=>{}}} deliver={async()=>{}}/></IntegrationIntl>));
+  unsubscribe=service.subscribe(state=>root.render(<IntegrationIntl><PalsideApp live={{state,command,openPage:async()=>{}}}/></IntegrationIntl>));
   check((await rawKeys()).includes(imageKey),'Initial image Blob is persisted in the isolated database');report();
 }
 async function act(action:()=>Promise<void>){try{await action();}catch(error){result.error=String(error);}report();}

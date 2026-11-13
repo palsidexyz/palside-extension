@@ -20,7 +20,7 @@ const done = { hasMore: { teams: false, applications: false } };
 function fixture(request) {
   let emits = 0;
   const runtime = {
-    auth: { session: {}, scope() {
+    auth: { session: { account: { id: 'self' } }, scope() {
       const session = this.session;
       const current = () => this.session === session;
       const check = () => { if (!current()) throw Error('scope changed'); };
@@ -136,7 +136,7 @@ test('lobby requests are isolated per runtime and cannot publish across sessions
   assert.equal(first.runtime.state.lobbyTeams[0].id, 'first');
   assert.equal(second.runtime.state.lobbyTeams[0].id, 'second');
   const stale = deferred(); first.runtime.api.request = () => stale.promise;
-  const changed = first.run(); first.runtime.auth.session = {};
+  const changed = first.run(); first.runtime.auth.session = { account: { id: 'self' } };
   stale.resolve(result(team('stale')));
   await assert.rejects(changed, /scope changed/);
   assert.equal(first.runtime.state.lobbyTeams[0].id, 'first');

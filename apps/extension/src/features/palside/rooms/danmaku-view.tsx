@@ -23,14 +23,15 @@ import { SettingGroup } from '../settings/setting-rows';
 import { AccountId, AccountIdText, accountHandle } from '../account/account-id';
 import { capability } from '../settings/access';
 import { characterLength } from '../../../domain/chat/model';
-import { type Person } from '../../../domain/account/model';
+import { personFor, type Person } from '../../../domain/account/model';
 import { openRoom, roomElsewhere, roomPerson, roomView, roomsOn, tabRoomKey, teammateIds, useRoomRead, useRoomOpening, useRoomDrafts, tokenSiteChoice, openTokenSite, useShownRoomKey } from './rooms';
 import type { Viewing } from '../../../domain/assets/model';
 import { DanmakuIcon, HotIcon, LikeIcon } from '../ui/icons';
 import { SiteFace, SiteLogo } from '../assets/site-logo';
 import { openSiteSheet, pageSite, pageUnusable } from '../viewing/page-key';
 import { allSites, siteAllows } from '../../../domain/annotations/interaction';
-import { RoomPayments, TipPayment } from '../wallet/room-payments';
+import { RoomPacketCard, TipPayment, useRoomPackets, type RoomPacket } from '../wallet/room-payments';
+import { openPacketForm, PacketDetail } from '../wallet/packet';
 import { PalsAmount } from '../wallet/amount';
 import { setSocialUi, useSocialUi } from '../annotations/social-state';
 import type { PalsideController } from '../app/use-palside';
@@ -63,9 +64,9 @@ export function Faces({ c, people, count }: { c: PalsideController; people: Room
  */
 export function DanmakuView({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const rooms = c.live?.state.rooms;
+  const rooms = c.live.state.rooms;
   const opening = useRoomOpening(c);
-  const drafts = useRoomDrafts(c.live?.state.authenticated ? c.data.self : '');
+  const drafts = useRoomDrafts(c.live.state.authenticated ? c.data.self : '');
   const key = useShownRoomKey(c);
   const room = key && rooms?.current?.key === key ? rooms.current : undefined;
   const screen = c.screen, go = c.go, on = roomsOn(c);
@@ -73,20 +74,23 @@ export function DanmakuView({ c }: { c: PalsideController }) {
   // hides, or a token page it names. A page Chrome names but Palside cannot use (local, private, a browser page) says so instead.
   const unusable = pageUnusable(c);
   const blocked = siteBlocked(c);
-  const gate = Boolean(c.live) && !unusable && Boolean(blocked) && (!c.pageHost || Boolean(tabRoomKey(c)));
+  const gate = !unusable && Boolean(blocked) && (!c.pageHost || Boolean(tabRoomKey(c)));
   useEffect(() => { if (screen === 'room' && !on) go('chat'); }, [screen, on, go]);
   // 弹幕 is live server data only: without the service the token's view is the connection state, never a list that may be stale.
   const offline = Boolean(key) && Boolean(pageIssue(c, 'service'));
+  const social = useSocialUi();
+  // A 红包 opened from the page belongs to the room it was opened in: leaving the view forgets it.
+  useEffect(() => { if (screen !== 'room' && social.roomPacket) setSocialUi({ roomPacket: undefined }); }, [screen, social.roomPacket]);
   if (c.screen !== 'room') return null;
   return <div className={d.view} onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); c.go('chat'); } }}>
     {!offline && <RoomToolbar c={c} roomKey={key} room={room} />}
-    {key && !offline && <RoomPayments c={c} roomKey={key} />}
     <SwitchRow c={c} shown={key} />
     {!offline && opening?.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => openRoom(c, opening.key) }}>{t('common.error')}</InlineFeedback>}
-    {!offline && room?.failed && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => { void c.live?.command('room-retry').catch(() => {}); } }}>{t('extension.room.loadFailed')}</InlineFeedback>}
+    {!offline && room?.failed && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => { void c.live.command('room-retry').catch(() => {}); } }}>{t('extension.room.loadFailed')}</InlineFeedback>}
     {!key ? <Skeleton /> : offline ? <ConnectionState c={c} /> : room ? <RoomList key={room.key} c={c} room={room} /> : opening?.status !== 'error' ? <div className={d.empty}><p>{t('extension.copy.loading')}</p></div> : null}
     {room && !offline && !room.failed ? <RoomBar key={`bar-${room.key}`} c={c} room={room} drafts={drafts} /> : <IdleBar />}
     <AnimatePresence initial={false}>{!key && <Frost key="frost" c={c} reason={roomElsewhere(c) ? 'elsewhere' : gate ? 'gate' : unusable ? 'unusable' : 'idle'} />}</AnimatePresence>
+    {room && !offline && social.roomPacket?.key === room.key && <PacketDetail key={social.roomPacket.id} c={c} id={social.roomPacket.id} summary={c.live.state.chainRoom?.key === room.key ? c.live.state.chainRoom.packets.find(item => item.id === social.roomPacket!.id) : undefined} onClose={() => setSocialUi({ roomPacket: undefined })} />}
   </div>;
 }
 
@@ -124,13 +128,13 @@ function TokenSites({ c, view, sites, site }: { c: PalsideController; view: View
 }
 
 /** 开启 opens the site's sheet; 弹幕 switched off for every site in 设置 › 网页互动 has no tile there, so it opens that page instead. */
-function turnOnDanmaku(c: PalsideController) {
+export function turnOnDanmaku(c: PalsideController) {
   if (siteBlocked(c) === 'site' && !allSites(c.siteInteraction).danmaku) { setSocialUi({ settingsTab: 'danmaku' }); c.go('interaction'); return; }
   openSiteSheet(c, false);
 }
 
 /** Why 弹幕 cannot follow this tab's site: Chrome has not allowed it (or hides which it is), or 网页互动 or 弹幕 is off there. */
-function siteBlocked(c: PalsideController): 'chrome' | 'site' | undefined {
+export function siteBlocked(c: PalsideController): 'chrome' | 'site' | undefined {
   if (capability(c, 'interact').state === 'access') return 'chrome';
   if (c.pageHost && !siteAllows(c.siteInteraction, c.pageHost, 'danmaku')) return 'site';
 }
@@ -162,7 +166,7 @@ function SwitchRow({ c, shown }: { c: PalsideController; shown?: string }) {
     </div>;
   }
   // 切换 follows the tab, which 弹幕 can do only where Chrome allows the site.
-  if (!c.live?.page?.access.site) return null;
+  if (!c.live.page?.access.site) return null;
   const view = roomView(c, key);
   return <div className={d.switchRow}>
     <Token view={view} size="sm" waiting={tokenWaiting(c, view)} /><strong><TokenName c={c} view={view} /></strong>
@@ -205,10 +209,14 @@ export function RoomList({ c, room }: { c: PalsideController; room: RoomView }) 
   const paging = useRef(false);
   const height = useRef(0);
   const [shown, setShown] = useState<ReadonlySet<string>>(() => new Set());
-  const blocked = new Set((c.live?.state.rooms.blocked ?? []).map(person => person.id));
+  const blocked = new Set((c.live.state.rooms.blocked ?? []).map(person => person.id));
   const messages = room.messages.filter(message => !blocked.has(message.author.id));
+  // 红包 stand in the stream at the moment they were sent, like a squad's packet cards; older than the loaded lines they wait above.
+  const packets = useRoomPackets(c, room.key).filter(packet => !(packet.accountId && blocked.has(packet.accountId)) && (!room.hasMore || !messages[0] || packet.createdAt >= messages[0].createdAt));
+  const items: { at: number; id: string; message?: RoomMessage; packet?: RoomPacket }[] = [...messages.map(message => ({ at: message.createdAt, id: message.id, message })), ...packets.map(packet => ({ at: packet.createdAt, id: packet.id, packet }))]
+    .sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
   const mates = teammateIds(c);
-  const newest = messages.at(-1)?.id, oldest = messages[0]?.id;
+  const newest = items.at(-1)?.id, oldest = items[0]?.id;
   // Older pages keep the reading position; new messages follow only while the reader is at the bottom.
   useLayoutEffect(() => {
     const element = list.current; if (!element) return;
@@ -223,10 +231,29 @@ export function RoomList({ c, room }: { c: PalsideController; room: RoomView }) 
       void c.run('room-more').then(() => { if (paging.current && list.current?.scrollHeight === height.current) paging.current = false; });
     }
   }
-  if (!messages.length) return <div className={d.empty}><MessageCircle aria-hidden="true" /><p>{room.loading ? t('extension.copy.loading') : t('extension.room.empty')}</p></div>;
+  if (!items.length) return <div className={d.empty}><MessageCircle aria-hidden="true" /><p>{room.loading ? t('extension.copy.loading') : t('extension.room.empty')}</p></div>;
   return <div ref={list} className={d.list} role="log" aria-label={t('extension.room.name')} tabIndex={0} onScroll={scroll}>
     {room.hasMore && <span className={d.more}>{t('extension.copy.loading')}</span>}
-    {messages.map(message => <RoomLine key={message.id} c={c} message={message} mate={mates.has(message.author.id)} open={shown.has(message.id)} onShow={() => setShown(old => new Set(old).add(message.id))} />)}
+    {items.map(item => item.message
+      ? <RoomLine key={item.id} c={c} message={item.message} mate={mates.has(item.message.author.id)} open={shown.has(item.id)} onShow={() => setShown(old => new Set(old).add(item.id))} />
+      : <RoomPacketRow key={item.id} c={c} packet={item.packet!} mate={Boolean(item.packet!.accountId && mates.has(item.packet!.accountId))} />)}
+  </div>;
+}
+
+/** A 红包 in the stream: the sender's face and name like any line, the card under them; it opens the envelope in place. */
+function RoomPacketRow({ c, packet, mate }: { c: PalsideController; packet: RoomPacket; mate: boolean }) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const self = packet.accountId === c.data.self;
+  const rooms = c.live.state.rooms;
+  const known = [...rooms?.current?.faces ?? [], ...rooms?.people?.people ?? [], ...rooms?.current?.messages.map(message => message.author) ?? []].find(person => person.id === packet.accountId);
+  const person = known ? roomPerson(c, known, t('common.member')) : { ...personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember')), mate };
+  return <div className={d.row} data-room-packet={packet.id} data-mate={mate || undefined} data-self={self || undefined}>
+    <button type="button" data-mate={mate || undefined} aria-label={t('extension.copy.openProfile', { name: person.name })} disabled={!known && !self} onClick={() => showPerson(c, person)}><PersonAvatar person={person} size="room" /></button>
+    <div className={d.messageBody}>
+      <div className={d.messageHead}><b>{self ? t('extension.page.you') : person.name}</b><time dateTime={new Date(packet.createdAt).toISOString()}>{roomTime(packet.createdAt, c.now, locale)}</time></div>
+      <RoomPacketCard c={c} packet={packet} />
+    </div>
   </div>;
 }
 
@@ -254,7 +281,7 @@ function LineLike({ c, message, self }: { c: PalsideController; message: RoomMes
   const reduced = useReducedMotion();
   // Only a press of this button animates; a liked state that arrives from the server or on mount just shows.
   const [pressed, setPressed] = useState(false);
-  const like = c.live?.state.rooms.current?.likes?.[message.id];
+  const like = c.live.state.rooms.current?.likes?.[message.id];
   const count = like?.count ?? 0, liked = Boolean(like?.liked);
   const label = count ? t('extension.room.likes', { count }) : t('extension.room.like');
   const pop = liked && pressed && !reduced;
@@ -266,7 +293,7 @@ function LineLike({ c, message, self }: { c: PalsideController; message: RoomMes
     {count > 0 && <Count value={count} />}
   </>;
   if (self) return count ? <span className={d.like} data-count="" role="img" aria-label={label}>{body}</span> : null;
-  const toggle = () => { setPressed(true); void c.live?.command('room-like', { key: message.key, id: message.id, liked: !liked }).catch(error => c.setNotice(errorMessage(error))); };
+  const toggle = () => { setPressed(true); void c.live.command('room-like', { key: message.key, id: message.id, liked: !liked }).catch(error => c.setNotice(errorMessage(error))); };
   return <Tooltip content={liked ? t('extension.room.unlike') : label}>
     <button type="button" className={d.like} data-count={count ? '' : undefined} aria-pressed={liked} aria-label={liked ? t('extension.room.unlike') : t('extension.room.like')} onClick={toggle}>{body}</button>
   </Tooltip>;
@@ -286,7 +313,7 @@ function TipChip({ value }: { value: string }) {
 /** Tips to one line within 30 seconds: one public line where faces stack, names fold into “等 N 人”, and the total rolls. */
 function TipGroupLine({ c, accountIds, amount }: { c: PalsideController; accountIds: string[]; amount: string }) {
   const t = useTranslations();
-  const room = c.live?.state.rooms;
+  const room = c.live.state.rooms;
   const known = [...room?.current?.faces ?? [], ...room?.people?.people ?? [], ...room?.current?.messages.map(message => message.author) ?? []];
   const people = accountIds.map(id => known.find(person => person.id === id) ?? { id, nickname: '', avatarId: null, wallet: null });
   const names = people.map(person => person.id === c.data.self ? t('extension.page.you') : roomPerson(c, person, t('common.member')).name);
@@ -306,11 +333,11 @@ function LineMenu({ c, message, name, self }: { c: PalsideController; message: R
   const [tipping, setTipping] = useState(false);
   function report() {
     c.setConfirmation({ title: uiMessage('extension.room.reportTitle', { name }), description: uiMessage('extension.room.reportDescription'), action: uiMessage('extension.copy.report'), danger: true,
-      confirm: async () => { await c.live?.command('room-report', { id: message.id }); c.setNotice(uiMessage('extension.room.reported')); } });
+      confirm: async () => { await c.live.command('room-report', { id: message.id }); c.setNotice(uiMessage('extension.room.reported')); } });
   }
   function retract() {
     c.setConfirmation({ title: uiMessage('extension.room.retractTitle'), description: uiMessage('extension.room.retractDescription'), action: uiMessage('extension.copy.recall'), danger: true,
-      confirm: async () => { await c.live?.command('room-retract', { id: message.id }); } });
+      confirm: async () => { await c.live.command('room-retract', { id: message.id }); } });
   }
   const label = t('extension.dynamic.messageActions', { content: message.text.slice(0, 15) });
   return <><Menu boundarySelector="[data-palside-app]" align="end">
@@ -358,14 +385,14 @@ export function useRoomSend(c: PalsideController, room: RoomView, drafts: Return
   return { text, setText, length, slow, ready, send, key, sendLabel };
 }
 
-/** The 弹幕 bar under a list (full view and the composer's sheet): 打赏 / 红包, the field, 发送. */
-export function RoomBar({ c, room, drafts, autoFocus }: { c: PalsideController; room: RoomView; drafts: ReturnType<typeof useRoomDrafts>; autoFocus?: boolean }) {
+/** The 弹幕 bar under the list: 红包 (into this token's 弹幕), the field, 发送. */
+function RoomBar({ c, room, drafts }: { c: PalsideController; room: RoomView; drafts: ReturnType<typeof useRoomDrafts> }) {
   const t = useTranslations();
   const input = useRef<HTMLInputElement>(null);
   const { text, setText, length, slow, ready, send, key, sendLabel } = useRoomSend(c, room, drafts, input);
   return <div className={d.bar}>
-    <Tooltip content={t('extension.wallet.createPacket')}><IconButton size="sm" variant="quiet" label={t('extension.wallet.createPacket')} onClick={() => whenWalletOpen(c, () => c.go('wallet-packet'))}><Gift size={16} /></IconButton></Tooltip>
-    <input ref={input} className={d.input} value={text} data-autofocus={autoFocus || undefined} aria-label={t('extension.room.placeholder')} placeholder={t('extension.room.placeholder')} onChange={event => setText(event.target.value)} onKeyDown={key} />
+    <Tooltip content={t('extension.wallet.createPacket')}><IconButton size="sm" variant="quiet" label={t('extension.wallet.createPacket')} onClick={() => whenWalletOpen(c, () => openPacketForm(c, { kind: 'room', key: room.key }))}><Gift size={16} /></IconButton></Tooltip>
+    <input ref={input} className={d.input} value={text} aria-label={t('extension.room.placeholder')} placeholder={t('extension.room.placeholder')} onChange={event => setText(event.target.value)} onKeyDown={key} />
     {length > ROOM_TEXT_MAX - 10 && <small className={d.counter} data-over={length > ROOM_TEXT_MAX || undefined}><Count value={length} />/{ROOM_TEXT_MAX}</small>}
     <Tooltip content={sendLabel}><IconButton size="sm" variant="solid" className={d.send} label={sendLabel} disabled={!ready} onClick={() => void send()}>{slow > 0 ? <span role="timer"><Count value={slow} /></span> : <ArrowUp size={16} aria-hidden="true" />}</IconButton></Tooltip>
   </div>;
@@ -376,9 +403,9 @@ export function RoomPersonSheet({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const social = useSocialUi(), id = social.roomPerson;
   const [tipping, setTipping] = useState(false);
-  const tipMessage = c.live?.state.rooms.current?.messages.find(item => item.id === social.roomPersonMessage && item.author.id === id && !item.folded);
+  const tipMessage = c.live.state.rooms.current?.messages.find(item => item.id === social.roomPersonMessage && item.author.id === id && !item.folded);
   const close = () => setSocialUi({ roomPerson: undefined });
-  const rooms = c.live?.state.rooms;
+  const rooms = c.live.state.rooms;
   const found = id ? [...rooms?.current?.faces ?? [], ...rooms?.people?.people ?? [], ...rooms?.current?.messages.map(message => message.author) ?? []].find(person => person.id === id) : undefined;
   const person = found && roomPerson(c, found, t('common.member')), address = person?.walletAddress;
   const blocked = Boolean(person && rooms?.blocked.some(item => item.id === person.id));
@@ -420,14 +447,14 @@ export function InviteSheet({ c }: { c: PalsideController }) {
 function InviteChoices({ c, id }: { c: PalsideController; id?: string }) {
   const t = useTranslations();
   const close = () => setSocialUi({ invite: undefined });
-  const live = c.live, command = live?.command, accountId = live?.state.account?.id;
+  const live = c.live, command = live.command, accountId = live.state.account?.id;
   const [opening, setOpening] = useState({ id, accountId });
   if (opening.id !== id || opening.accountId !== accountId) setOpening({ id, accountId });
   const [options, setOptions] = useState<{ opening: typeof opening; value?: InviteOptions; status: 'error' | 'success'; eligibility: string; revision: number }>();
   const [revision, setRevision] = useState(0);
   const [pick, setPick] = useState<{ team: string; options: typeof options }>();
   const [sending, setSending] = useState<typeof opening>();
-  const eligibility = JSON.stringify(c.teams.map(team => [team.id, team.joined, team.memberIds, team.owner, team.readonly, live?.state.remoteTeams.find(item => item.id === team.id)?.membersCanInvite]));
+  const eligibility = JSON.stringify(c.teams.map(team => [team.id, team.joined, team.memberIds, team.owner, team.readonly, live.state.remoteTeams.find(item => item.id === team.id)?.membersCanInvite]));
   const active = useRef<typeof opening | undefined>(opening);
   useLayoutEffect(() => { active.current = opening; return () => { active.current = undefined; }; }, [opening]);
   useEffect(() => {
@@ -436,7 +463,7 @@ function InviteChoices({ c, id }: { c: PalsideController; id?: string }) {
     void command('invite-options', { accountId: id }).then(value => { if (current) setOptions({ opening, value, status: 'success', eligibility, revision }); }, () => { if (current) setOptions(old => ({ value: old?.opening.id === id && old.opening.accountId === accountId ? old.value : undefined, opening, status: 'error', eligibility, revision })); });
     return () => { current = false; };
   }, [id, command, accountId, opening, eligibility, revision]);
-  const rooms = live?.state.rooms;
+  const rooms = live.state.rooms;
   const found = id ? [...rooms?.current?.faces ?? [], ...rooms?.people?.people ?? [], ...rooms?.current?.messages.map(message => message.author) ?? []].find(person => person.id === id) : undefined;
   const person = found && roomPerson(c, found, t('common.member'));
   const value = options && options.opening.id === id && options.opening.accountId === accountId ? options.value : undefined;
@@ -486,7 +513,7 @@ function InviteChoices({ c, id }: { c: PalsideController; id?: string }) {
 /** 在看: the count, then who spoke in the last 24 hours; teammates first. */
 export function RoomPeople({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const rooms = c.live?.state.rooms;
+  const rooms = c.live.state.rooms;
   const key = useSocialUi().people ?? rooms?.pinned ?? rooms?.leased;
   const read = useRoomRead(c, 'people', key);
   if (!key) return <EmptyState title={t('extension.room.noSpeakers')} />;
@@ -509,7 +536,7 @@ export function RoomPeople({ c }: { c: PalsideController }) {
 export function BlockedPeople({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const read = useRoomRead(c, 'blocks');
-  const people = c.live?.state.rooms.blocked ?? [];
+  const people = c.live.state.rooms.blocked ?? [];
   const feedback = read.status === 'error' ? <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback> : null;
   if (!people.length) return feedback ?? <EmptyState icon={<Ban />} title={t(read.status === 'loading' ? 'extension.copy.loading' : 'extension.room.noBlocked')} />;
   return <>{feedback}<SettingGroup>{people.map(item => {

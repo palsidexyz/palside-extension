@@ -10,7 +10,7 @@ export type RoomState = {
   window?: number;
   /** Set for this panel only (`stateForPanel`): `tab` follows another window. */
   elsewhere?: boolean;
-  /** The token this device holds a lease on: `pinned`, else the active tab's token; none while 参与弹幕 is off or no panel is open. */
+  /** The token this device holds a lease on: `pinned`, else the active tab's token; none while 弹幕 is off or no panel is open. */
   leased?: RoomKey;
   current?: RoomView;
   /** `room-summary` results for 代币详情, by key. */

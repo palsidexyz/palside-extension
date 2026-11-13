@@ -13,13 +13,15 @@ import { tokenStats,tokenView } from '../assets/token-data';
 import type { Person } from '../../../domain/account/model';
 import type { Viewing } from '../../../domain/assets/model';
 import { viewAsset } from '../../../domain/annotations/social';
+import { danmakuOn } from '../../../domain/annotations/interaction';
 import type { PalsideController } from '../app/use-palside';
 import { errorMessage } from '@palside/i18n';
 import { defaultTokenSite, tokenSites } from '../../../runtime/rooms/token-sites';
 import { siteLogo } from '../settings/site-catalog';
+import { setSocialUi } from '../annotations/social-state';
 
-/** 参与弹幕 is on unless switched off in 设置 › 弹幕; it needs the live runtime. */
-export function roomsOn(c: PalsideController) { return Boolean(c.live && !c.live.state.preferences.rooms?.off); }
+/** 弹幕 is on (设置 › 网页互动 and its 弹幕 card); it needs the live runtime. Off, every way into it goes. */
+export function roomsOn(c: PalsideController) { return Boolean(danmakuOn(c.siteInteraction)); }
 
 /** The 弹幕 of a token the panel shows; pages that are not a confirmed token have none. */
 export function roomKeyFor(view: Viewing | undefined): RoomKey | undefined {
@@ -29,7 +31,7 @@ export function roomKeyFor(view: Viewing | undefined): RoomKey | undefined {
 
 /** The active tab's token, as the panel names it. */
 export function tabRoomKey(c: PalsideController) {
-  const asset = c.live?.page?.asset;
+  const asset = c.live.page?.asset;
   return asset ? roomKeyForAsset(asset) ?? undefined : undefined;
 }
 
@@ -50,7 +52,7 @@ export function tabView(page: PageStatus | undefined, asset?: string): Viewing |
 export function roomView(c: PalsideController, key: RoomKey): Viewing {
   const asset = key.slice('token:'.length);
   const views = c.data.views.filter(view => viewAsset(view) === asset);
-  const base = views.find(view => tokenNamed(view)) ?? (c.live?.page?.asset === asset ? tabView(c.live.page, asset) : undefined) ?? views[0];
+  const base = views.find(view => tokenNamed(view)) ?? (c.live.page?.asset === asset ? tabView(c.live.page, asset) : undefined) ?? views[0];
   return tokenView(c, asset, base);
 }
 
@@ -64,7 +66,7 @@ export function roomPerson(c: PalsideController, person: RoomPerson, fallback: s
   const known = c.people.find(item => item.id === person.id);
   const mate = mates.has(person.id);
   if (known) return { ...known, walletAddress: known.walletAddress ?? person.wallet ?? undefined, mate };
-  return { id: person.id, name: person.nickname || fallback, color: '#e5e6e9', avatar: c.live?.state.rooms.avatars[person.id], walletAddress: person.wallet ?? undefined, mate };
+  return { id: person.id, name: person.nickname || fallback, color: '#e5e6e9', avatar: c.live.state.rooms.avatars[person.id], walletAddress: person.wallet ?? undefined, mate };
 }
 
 type Opening = { key: RoomKey; status: 'opening' | 'error' };
@@ -83,7 +85,9 @@ function publishOpening(session: RoomSession, opening?: Opening) {
 
 /** Opens the requested token in the 弹幕 tab, pinned, while its snapshot travels to the panel. */
 export function openRoom(c: PalsideController, key: RoomKey) {
-  if (!c.live || !roomsOn(c)) return;
+  if (!roomsOn(c)) return;
+  // Every entry opens the room alone; a 红包 from the page names its envelope again right after.
+  setSocialUi({ roomPacket: undefined });
   const session = roomSession(c), opening: Opening = { key, status: 'opening' };
   session.navigation = {};
   publishOpening(session, opening);
@@ -101,7 +105,7 @@ function releaseRoomSession(session: RoomSession, identity: PalsideController['s
 export function useRoomOpening(c: PalsideController) {
   const session = roomSession(c);
   const opening = useSyncExternalStore(listener => { session.listeners.add(listener); return () => { session.listeners.delete(listener); }; }, () => session.opening, () => session.opening);
-  const pinned = c.live?.state.rooms.pinned, on = roomsOn(c);
+  const pinned = c.live.state.rooms.pinned, on = roomsOn(c);
   useLayoutEffect(() => { updateRoomController(session, c); });
   useLayoutEffect(() => {
     if (c.screen !== 'room' || !on || opening?.status === 'opening' && pinned === opening.key) publishOpening(session);
@@ -122,19 +126,19 @@ export function useOpeningKey(c: PalsideController) {
 /** The token 弹幕 follows, exactly as the runtime leases it: the active tab of the panel window the user last worked in, on an added site.
  *  Another window's panel gets none (`elsewhere`). */
 export function followedTabRoomKey(c: PalsideController) {
-  const rooms = c.live?.state.rooms;
+  const rooms = c.live.state.rooms;
   return rooms && !rooms.elsewhere ? rooms.tab : undefined;
 }
 
 /** This panel's own tab shows a token that 弹幕 cannot follow because it follows another window. */
 export function roomElsewhere(c: PalsideController) {
-  return Boolean(c.live?.state.rooms.elsewhere && c.live.page?.access.site && tabRoomKey(c) && !c.live.state.rooms.pinned);
+  return Boolean(c.live.state.rooms.elsewhere && c.live.page?.access.site && tabRoomKey(c) && !c.live.state.rooms.pinned);
 }
 
 /** The token the 弹幕 tab shows: the one being opened, else the pinned one, else the token it follows; none elsewhere. */
 export function useShownRoomKey(c: PalsideController) {
   const opening = useOpeningKey(c);
-  return opening ?? c.live?.state.rooms.pinned ?? followedTabRoomKey(c);
+  return opening ?? c.live.state.rooms.pinned ?? followedTabRoomKey(c);
 }
 
 /** Drafts belong to the mounted panel account, including visits to other screens. */
@@ -147,7 +151,7 @@ export function useRoomDrafts(account: string) {
 }
 
 export function useRoomRead(c: PalsideController, kind: 'summary' | 'people' | 'hot' | 'blocks' | 'invites', key?: string | null) {
-  const command = c.live?.command, account = c.data.self;
+  const command = c.live.command, account = c.data.self;
   const [revision, setRevision] = useState(0);
   const [result, setResult] = useState<{ command: typeof command; account: string; kind: typeof kind; key: typeof key; revision: number; status: 'loading' | 'error' | 'success' }>();
   useEffect(() => {
@@ -173,7 +177,7 @@ export function useRoomRead(c: PalsideController, kind: 'summary' | 'people' | '
   }, [command, account, kind, key, revision]);
   let status = result && result.command === command && result.account === account && result.kind === kind && result.key === key && result.revision === revision ? result.status : 'loading';
   // A hot subscription acknowledgement does not contain a verified ranking.
-  if (kind === 'hot' && status === 'success' && !c.live?.state.rooms.hot?.loaded) status = 'loading';
+  if (kind === 'hot' && status === 'success' && !c.live.state.rooms.hot?.loaded) status = 'loading';
   if (!command) status = 'success';
   return { status, retry: () => setRevision(value => value + 1) };
 }
@@ -183,14 +187,13 @@ export function tokenSiteChoice(c: PalsideController, view: Viewing, participant
   const token = view.kind === 'asset' && view.chain && view.address ? { chain: view.chain, address: view.address } : undefined;
   if (!token) return { sites: [], site: undefined };
   const withLogo = <Site extends { id: string }>(site: Site) => ({ ...site, logo: siteLogo(site.id) });
-  const site = defaultTokenSite(token, c.live?.state.preferences.rooms?.site, participantSite);
+  const site = defaultTokenSite(token, c.live.state.preferences.rooms?.site, participantSite);
   return { sites: tokenSites(token).map(withLogo), site: site && withLogo(site) };
 }
 
 /** Opens the token on a site the usual way (beside the panel, reusing an open tab) and makes that site the default. */
 export function openTokenSite(c: PalsideController, site: { id: string; url: string }) {
   const live = c.live;
-  if (!live) { window.open(site.url, '_blank', 'noopener'); return; }
   void live.openPage(site.url).catch(error => c.setNotice(errorMessage(error)));
   if (live.state.preferences.rooms?.site !== site.id) void live.command('preferences', { accountId: c.data.self, rooms: { site: site.id } }).catch(() => {});
 }

@@ -2,11 +2,12 @@ import { DAY_MS as day, MINUTE_MS } from '@palside/shared/units';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Button } from '@palside/ui/button';
-import { PalsideApp } from './preview-app';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import type { Message } from '../src/domain/chat/model';
 import type { Dataset } from '../src/runtime/composition/dataset';
 import { IntegrationIntl } from './intl';
-import { palsideFixtures, demoSites } from './fixtures';
+import { palsideFixtures } from './fixtures';
+import { fixtureState, useFixtureLive } from './fixture-live';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
 import './chat-motion.css';
@@ -40,16 +41,12 @@ function fixture(scene: Scene): Dataset {
 }
 
 function Stage({ scene, theme, fail }: { scene: Scene; theme: string; fail: boolean }) {
-  const [data] = useState(() => fixture(scene));
   const host = useRef<HTMLDivElement>(null);
   const failing = useRef(fail);
   useEffect(() => { failing.current = fail; }, [fail]);
   useEffect(() => { host.current?.querySelector('[data-palside-app]')?.setAttribute('data-appearance', theme); }, [theme]);
-  async function deliver() {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    if (failing.current) throw new Error('Preview delivery failure');
-  }
-  return <div ref={host} className="cm-product" data-scene={scene}><PalsideApp data={data} sites={demoSites} deliver={deliver} /></div>;
+  const live = useFixtureLive(() => fixtureState(fixture(scene)), { delay: 600, fail: () => failing.current });
+  return <div ref={host} className="cm-product" data-scene={scene}><PalsideApp live={live} /></div>;
 }
 
 function Preview() {

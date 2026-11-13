@@ -19,7 +19,7 @@ import l from './lobby.module.css';
 export function ReceivedInvites({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const read = useRoomRead(c, 'invites');
-  const invites = c.live?.state.rooms.invites ?? [];
+  const invites = c.live.state.rooms.invites ?? [];
   const feedback = read.status === 'error' ? <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback> : null;
   if (!invites.length) return feedback ?? (read.status === 'loading' ? <p role="status">{t('extension.copy.loading')}</p> : null);
   return <section className={l.received} aria-label={t('extension.invite.received')}>
@@ -33,7 +33,7 @@ function InviteCard({ c, invite }: { c: PalsideController; invite: TeamInvite })
   const t = useTranslations();
   const [busy, setBusy] = useState(false);
   const from = roomPerson(c, invite.from, t('common.member'));
-  const avatar = c.live?.state.rooms.avatars[`team:${invite.team.id}`];
+  const avatar = c.live.state.rooms.avatars[`team:${invite.team.id}`];
   async function run(name: 'invite-accept' | 'invite-ignore') {
     if (busy) return;
     setBusy(true);

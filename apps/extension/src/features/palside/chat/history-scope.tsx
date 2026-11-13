@@ -11,7 +11,6 @@ import s from '../app/palside.module.css';
  */
 export function HistoryMore({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  if (!c.live) return null;
   const history = c.live.state.history?.[c.current];
   if (history?.loaded && !history.missingKeys) return null;
   return <>

@@ -15,6 +15,10 @@ const colors = {
   dmSelf: 'rgb(255 255 255 / 85%)',
   dmSelfFill: 'rgb(0 0 0 / 22%)',
   dmSelfFillLight: 'rgb(0 0 0 / 40%)',
+  // 红包 lines: the side panel's packet red, flap and gold seal.
+  dmPacket: '#E2543F',
+  dmPacketFlap: '#EC6A53',
+  dmPacketGold: '#F5C55B',
   darkText: product.darkText,
   darkMuted: product.darkTextSecondary,
   lightMuted: product.textSecondary,

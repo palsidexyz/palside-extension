@@ -68,7 +68,7 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
   const [busy, setBusy] = useState(false);
   const [session] = useState(captureSocialUi);
   const active = useRef(false);
-  const accountId = c.data.self, teamId = c.current, tabId = c.live?.page?.tabId, url = c.live?.page?.url;
+  const accountId = c.data.self, teamId = c.current, tabId = c.live.page?.tabId, url = c.live.page?.url;
   const [context] = useState({ accountId, teamId, tabId, url });
   useLayoutEffect(() => {
     active.current = context.accountId === accountId && context.teamId === teamId && context.tabId === tabId && context.url === url;
@@ -77,7 +77,7 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
   }, [request, session, context, accountId, teamId, tabId, url]);
   const current = () => active.current && session.current() && session.snapshot()?.site === request && c.ownsAccess()
     && (!request.accountId || request.accountId === c.data.self) && (!request.teamId || request.teamId === c.current)
-    && (request.tabId === undefined || request.tabId === c.live?.page?.tabId);
+    && (request.tabId === undefined || request.tabId === c.live.page?.tabId);
 
   const all: Site[] = [...c.sites, ...typed.filter(host => !c.sites.some(site => site.domain === host)).map(host => siteOf(c, host))];
   const on = (host: string) => siteAllowed(c, grants, host);
@@ -107,11 +107,11 @@ function Picker({ c, request, onClose }: { c: PalsideController; request: Reques
     if (!hosts.length) { onClose(); return; }
     setBusy(true);
     // Chrome's prompt must open synchronously from this click; a refusal keeps the sheet and its selection.
-    const asking = c.live ? requestSitesAccess(hosts) : c.enableSites(hosts);
+    const asking = requestSitesAccess(hosts);
     void asking.then(added => {
       if (!current()) return;
       if (!added) { c.setNotice(uiMessage('extension.sites.denied')); return; }
-      if (c.live) c.setNotice(hosts.length === 1 ? uiMessage('extension.sites.added', { name: all.find(site => site.domain === hosts[0])?.name ?? hosts[0]! }) : uiMessage('extension.sites.addedMany', { count: hosts.length }));
+      c.setNotice(hosts.length === 1 ? uiMessage('extension.sites.added', { name: all.find(site => site.domain === hosts[0])?.name ?? hosts[0]! }) : uiMessage('extension.sites.addedMany', { count: hosts.length }));
       onClose();
       request.then?.();
     }, () => { if (current()) c.setNotice(uiMessage('extension.sites.denied')); }).finally(() => { if (current()) setBusy(false); });
@@ -203,7 +203,7 @@ export function SiteControls({ c, host }: { c: PalsideController; host: string }
     if (!next || allowed) { void turnSite(c, host, next); return; }
     const denied = () => { if (session.current()) c.setNotice(uiMessage('extension.sites.denied')); };
     // Chrome's prompt must open synchronously from this click.
-    const asking = c.live ? askSiteAccess(host) : c.enableSites([host]);
+    const asking = askSiteAccess(host);
     void asking.then(granted => { if (!session.current()) return; if (granted) void turnSite(c, host, true); else denied(); }, denied);
   }
   const label = t('extension.settings.interaction');

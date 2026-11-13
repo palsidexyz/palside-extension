@@ -12,7 +12,6 @@ import { addSite } from './access';
 import { setSocialUi } from '../annotations/social-state';
 import { SettingControl, SettingDanger, SettingGroup, settingRows } from './setting-rows';
 import { ALL_SITES, allSites, siteFeatures, siteInteraction, type SiteFeature } from '../../../domain/annotations/interaction';
-import { roomsOn } from '../rooms/rooms';
 import { SiteFeatureTiles } from './site-feature-tiles';
 import { allowedSites, siteAllowed, useGrants } from './use-grants';
 import type { PalsideController } from '../app/use-palside';
@@ -21,14 +20,14 @@ import motion from './settings.module.css';
 
 /**
  * The features that run on a site (`ALL_SITES`: anywhere), in the site sheet's order: 弹幕、信号、共享画线, or 关 — by the master switch and
- * the site's own. 弹幕 counts only while 弹幕 itself is on.
+ * the site's own. 弹幕 needs the live runtime.
  */
 export function useSiteSummary(c: PalsideController) {
   const t = useTranslations();
   return (host: string) => {
     const all = allSites(c.siteInteraction), setting = host === ALL_SITES ? all : siteInteraction(c.siteInteraction, host);
     if (!all.on || !setting.on) return t('extension.settings.off');
-    const names = siteFeatures.filter(feature => all[feature] && setting[feature] && (feature !== 'danmaku' || roomsOn(c))).map(feature => featureName(t, feature));
+    const names = siteFeatures.filter(feature => all[feature] && setting[feature]).map(feature => featureName(t, feature));
     return names.join(t('extension.access.separator')) || t('extension.access.none');
   };
 }
@@ -72,7 +71,7 @@ export function SitesSettings({ c }: { c: PalsideController }) {
       </button>)}
       {!all && !hosts.length && <p className={s.empty}>{t('extension.sites.empty')}</p>}
       {!all && <button type="button" className={s.addRow} onClick={() => addSite(c)}><span className={s.addMark} aria-hidden="true"><Plus size={14} /></span>{t('extension.sites.add')}</button>}
-      {c.live && !all && <button type="button" className={s.addRow} aria-haspopup="dialog" onClick={() => setSocialUi({ allSites: true })}><span className={s.addMark} aria-hidden="true"><Globe2 size={13} /></span>{t('extension.sites.allowAll')}</button>}
+      {!all && <button type="button" className={s.addRow} aria-haspopup="dialog" onClick={() => setSocialUi({ allSites: true })}><span className={s.addMark} aria-hidden="true"><Globe2 size={13} /></span>{t('extension.sites.allowAll')}</button>}
     </SettingGroup>
   </div>;
 }

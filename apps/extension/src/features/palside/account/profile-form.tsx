@@ -27,7 +27,7 @@ export function ProfileForm({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const self = c.people.find(person => person.id === c.data.self);
   // What the form opened with: 保存 is available only once something differs from it.
-  const [saved] = useState(() => ({ name: c.me.name, bio: c.live?.state.account?.bio ?? self?.bio ?? '', tags: c.live?.state.account?.tags ?? self?.tags ?? [] }));
+  const [saved] = useState(() => ({ name: c.me.name, bio: c.live.state.account?.bio ?? self?.bio ?? '', tags: c.live.state.account?.tags ?? self?.tags ?? [] }));
   const [name, setName] = useState(saved.name);
   const [bio, setBio] = useState(saved.bio);
   const [tags, setTags] = useState<ProfileTag[]>(saved.tags);
@@ -55,8 +55,7 @@ export function ProfileForm({ c }: { c: PalsideController }) {
     const nextTags = pending && !full && !hasTag(tags, { text: pending }) ? [...tags, { text: pending }] : tags;
     setBusy(true); setError('');
     try {
-      if (c.live) await c.live.command('profile', { name: name.trim(), bio: bio.trim(), tags: nextTags });
-      else c.setPeople(old => old.map(person => person.id === c.data.self ? { ...person, name: name.trim(), bio: bio.trim(), tags: nextTags } : person));
+      await c.live.command('profile', { name: name.trim(), bio: bio.trim(), tags: nextTags });
       c.go('settings');
     } catch (failure) { setError(failureText(failure, 'extension.copy.profileSaveFailed')); }
     finally { setBusy(false); }
@@ -97,8 +96,7 @@ export function TeamProfileForm({ c }: { c: PalsideController }) {
     event.preventDefault(); if (busy || !changed || nameError || descriptionError || !name.trim()) return;
     setBusy(true); setError('');
     try {
-      if (c.live) await c.live.command('team', { teamId: c.current, name: name.trim(), description: description.trim() });
-      else c.setTeams(old => old.map(team => team.id === c.current ? { ...team, name: name.trim(), description: description.trim() } : team));
+      await c.live.command('team', { teamId: c.current, name: name.trim(), description: description.trim() });
       c.go('team');
     } catch (failure) { setError(failureText(failure, 'extension.copy.teamSaveFailed')); }
     finally { setBusy(false); }

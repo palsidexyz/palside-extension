@@ -86,8 +86,7 @@ function WatchChipContent({ group, c, onMenu, onOpenPage, merges, pop, listed, f
     openingRequest.current = true; setOpening(url);
     try {
       if (onOpenPage) await onOpenPage(url);
-      else if (c.live) await c.live.openPage(url);
-      else window.open(url, '_blank', 'noopener,noreferrer');
+      else await c.live.openPage(url);
       if (session.current()) close();
     } catch (error) { if (session.current()) c.setNotice(failureText(error, 'extension.copy.openPageFailed')); }
     finally { openingRequest.current = false; setOpening(undefined); }

@@ -1,8 +1,8 @@
 import type { Person as PersonIdentity } from '@palside/shared/models/account';
 import type { ProfileTag } from '@palside/shared/contracts/profiles';
-import type { DeviceState } from '@palside/shared/contracts/presence';
+import type { PresenceState } from '@palside/shared/contracts/common';
 
-export type Person = PersonIdentity & { bio?: string; tags?: ProfileTag[]; presence?: DeviceState; walletAddress?: string; walletVerified?: boolean };
+export type Person = PersonIdentity & { bio?: string; tags?: ProfileTag[]; /** `undefined` is unknown (disconnected, not yet read or not a teammate); `offline` is known to have no live device. */ presence?: PresenceState; walletAddress?: string; walletVerified?: boolean };
 /** `null` identifies a deleted account: retained chain records have no account association. */
 export function personFor(people: Person[], id: string | null, fallback: string, deleted = fallback): Person {
   if (id === null) return { id: '', name: deleted, color: '#e9edf0', deleted: true };

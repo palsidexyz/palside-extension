@@ -2,7 +2,7 @@ import { siteById } from '@palside/shared/sites';
 import type { Preferences } from '../../domain/account/preferences';
 import type { RuntimeState } from './runtime-state';
 import { startedTeams } from '../teams/onboarding';
-import { readFavorites,readSiteInteractions } from '../../domain/annotations/interaction';
+import { ALL_SITES,allSites,readFavorites,readSiteInteractions,withSiteInteraction } from '../../domain/annotations/interaction';
 
 export const SNAPSHOT_INTERVAL = 15_000;
 export const READ_FLUSH_DELAY = 1_500;
@@ -39,8 +39,10 @@ export function readPreferencePatch(input: Record<string, unknown>): Partial<Pre
         if (value !== 'off' && value !== 'mentions' && value !== 'all') return;
         patch.notifications = value; break;
       case 'rooms': {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([key, item]) => key === 'off' || key === 'noticed' ? typeof item !== 'boolean' : key !== 'site' || typeof item !== 'string' || !siteById(item))) return;
-        patch.rooms = { ...value }; break;
+        // `off` is the stored 参与弹幕 switch: still accepted from storage, where `readPreferences` moves it to the 弹幕 card, never kept.
+        if (!value || typeof value !== 'object' || Array.isArray(value) || Object.entries(value).some(([key, item]) => key === 'off' || key === 'noticed' || key === 'used' ? typeof item !== 'boolean' : key !== 'site' || typeof item !== 'string' || !siteById(item))) return;
+        const { off: _off, ...rooms } = value as NonNullable<Preferences['rooms']> & { off?: boolean };
+        patch.rooms = rooms; break;
       }
       case 'siteInteraction': {
         const sites = readSiteInteractions(value);
@@ -67,6 +69,12 @@ export function readPreferences(input: unknown): Preferences {
     if (Object.hasOwn(record, field)) Object.assign(preferences, readPreferencePatch({ [field]: record[field] }));
   }
   preferences.startedTeams = startedTeams(record.startedTeams);
+  // 参与弹幕 off from before it merged into the 弹幕 card: the card starts off.
+  const rooms = record.rooms as { off?: unknown } | undefined;
+  if (rooms && typeof rooms === 'object' && rooms.off === true) {
+    const sites = preferences.siteInteraction ?? {};
+    preferences.siteInteraction = withSiteInteraction(sites, ALL_SITES, { ...allSites(sites), danmaku: false });
+  }
   return preferences;
 }
 

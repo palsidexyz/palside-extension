@@ -29,7 +29,7 @@ function useFollowTab(c: PalsideController) {
   const followed = follow && follow.teamId === c.current ? follow.personId : undefined;
   const viewingId = followed ? c.people.find(person => person.id === followed)?.viewing : undefined;
   const url = viewingId ? c.data.views.find(view => view.id === viewingId)?.url : undefined;
-  const request = c.live?.follow, listen = c.live?.onFollowStatus, setNotice = c.setNotice, current = c.current;
+  const request = c.live.follow, listen = c.live.onFollowStatus, setNotice = c.setNotice, current = c.current;
   const t = useTranslations();
   const followedName = followed ? c.people.find(person => person.id === followed)?.name : undefined;
   const groupTitle = followedName ? t('extension.top.followGroup', { name: followedName }) : undefined;
@@ -44,9 +44,9 @@ function useFollowTab(c: PalsideController) {
     void request({ op: 'go', url, start, teamId: current, personId: followed, ...(groupTitle ? { title: groupTitle } : {}) }).catch(error => setNotice(errorMessage(error)));
   }, [request, followed, url, paused, startedAt, setNotice, current, groupTitle]);
   // The teammate hears that you follow while it runs: now, then every minute; pausing or ending says so once.
-  const command = c.live?.command, teamId = c.current;
+  const command = c.live.command, teamId = c.current;
   useEffect(() => {
-    if (!command || !followed) return;
+    if (!followed) return;
     const watch = (on: boolean) => { void command('follow-watch', { teamId, leader: followed, on }).catch(() => {}); };
     if (paused) return;
     watch(true);
@@ -66,5 +66,5 @@ export function useTopCard(c: PalsideController): TopCard | undefined {
 
 export function openPage(c: PalsideController, view: Viewing, then?: () => void) {
   const session = captureSocialUi();
-  if (c.live) void c.live.openPage(view.url).then(() => { if (session.current()) then?.(); }, error => { if (session.current()) c.setNotice(errorMessage(error)); });
+  void c.live.openPage(view.url).then(() => { if (session.current()) then?.(); }, error => { if (session.current()) c.setNotice(errorMessage(error)); });
 }

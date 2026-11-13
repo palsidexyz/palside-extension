@@ -2,6 +2,19 @@
 
 Each version matches a Chrome Web Store release. The GitHub release attaches the exact store package with its build provenance.
 
+## v0.1.7
+
+- **Red packets in live comments**: a red packet sent to a token appears once on the page as a gold comment with a small envelope; click it to open the envelope in the side panel. When a packet is not yet claimable, the envelope shows the time left and the requirement. Slow mode limits text comments only, not red packets.
+- **Live comments key**: the Danmaku key next to the message box shows how many people are watching the token. One switch in page interaction settings turns live comments on or off.
+- **Call to look**: call a teammate who is active or away, or the whole squad, to the page you are sharing. The call arrives as a desktop notification, following your notification settings, and stays for 5 minutes.
+- **Presence**: your own avatar shows your account's real status. Only keyboard and mouse activity counts as active.
+- **Message search**: newest results first, with earlier history loaded automatically while you search.
+- **Accounts**: after deleting your account, the same recovery phrase can sign up again. Signing in with a phrase that has no account offers to create one with it.
+
+Requires desktop Chrome 130 or later.
+
+红包进入弹幕：发到代币的红包在网页上以金色弹幕加小红信封飘过一次，点击即在侧栏打开信封；暂不可领取时，信封显示剩余时间与领取条件；慢速只限制文字弹幕，不限制发红包。输入框旁的「弹幕」键显示在看人数，网页互动设置里一个开关统一开关弹幕。「喊来看」可以喊活跃或离开的队友，也可以喊全队，以桌面通知送达（遵循通知设置），保留 5 分钟。自己的头像显示账号真实状态，只有键鼠操作算活跃。搜索消息按最新排序，并自动加载更早的记录。注销后同一组助记词可以重新注册；用没有账号的助记词登录时，可直接用它创建账号。需要桌面版 Chrome 130 或更高版本。
+
 ## v0.1.6
 
 - **Live comments from the chat box**: the chat and live-comment tabs at the top are gone; a 弹 key next to the message box switches it to sending a live comment on the token you're viewing.

@@ -14,8 +14,9 @@ import { readSiteIcon, type SiteIcon } from '../../domain/assets/site-icon.ts';
 import { readUpdateStatus, type UpdateStatus } from '../browser/extension-update.ts';
 
 
-const openRoomListeners = new Set<(key: RoomKey) => void>();
-export function onOpenRoom(listener: (key: RoomKey) => void) { openRoomListeners.add(listener); return () => { openRoomListeners.delete(listener); }; }
+/** A 弹幕 line, or with `packet` a 红包, clicked on the page. */
+const openRoomListeners = new Set<(key: RoomKey, packet?: string) => void>();
+export function onOpenRoom(listener: (key: RoomKey, packet?: string) => void) { openRoomListeners.add(listener); return () => { openRoomListeners.delete(listener); }; }
 
 /** 跟看's tab, kept by the background for this panel's window. */
 export type FollowStatus = { paused: boolean; ended?: true };
@@ -159,7 +160,8 @@ export function observeState({ onState, onError, onLanguage, onDisconnect, onPag
         onError(message.message);
       }
       if (message.type === 'open-room' && isRoomKey(message.key)) {
-        for (const listener of openRoomListeners) listener(message.key);
+        const packet = typeof message.packet === 'string' && /^0x[0-9a-f]{64}$/i.test(message.packet) ? message.packet : undefined;
+        for (const listener of openRoomListeners) listener(message.key, packet);
       }
       if (message.type === 'follow' && message.status && typeof message.status.paused === 'boolean') {
         const status: FollowStatus = message.status.ended === true ? { paused: message.status.paused, ended: true } : { paused: message.status.paused };

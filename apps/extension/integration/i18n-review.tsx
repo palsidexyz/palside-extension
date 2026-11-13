@@ -5,8 +5,8 @@ import { IntlProvider } from 'use-intl';
 import { messagesFor, type LanguagePreference } from '@palside/i18n';
 import { createLanguageController, type LanguageState } from '../src/runtime/transport/language';
 import { LanguageContext } from '../src/features/palside/settings/language-setting';
-import { PalsideApp } from './preview-app';
-import { palsideFixtures, demoSites } from './fixtures';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
+import { palsideFixtures } from './fixtures';
 import type { Draft } from '../src/domain/chat/model';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
@@ -64,7 +64,7 @@ function Review() {
     <IntlProvider locale={lang.locale} messages={messagesFor(lang.locale)} timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone}>
       <LanguageContext.Provider value={{ state: lang, connected, save }}>
         <div style={{ display: 'grid', gridTemplateColumns: params.has('single') ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-          {(params.has('single') ? ['A'] : ['A', 'B']).map(id => <div key={id} data-testid={`panel-${id}`} style={{ height: params.has('single') ? '100dvh' : 640, minWidth: 0 }}><PalsideApp data={state.data} sites={demoSites} live={{ state, command, openPage: async () => {} }} deliver={async () => {}} /></div>)}
+          {(params.has('single') ? ['A'] : ['A', 'B']).map(id => <div key={id} data-testid={`panel-${id}`} style={{ height: params.has('single') ? '100dvh' : 640, minWidth: 0 }}><PalsideApp live={{ state, command, openPage: async () => {} }} /></div>)}
         </div>
       </LanguageContext.Provider>
     </IntlProvider>

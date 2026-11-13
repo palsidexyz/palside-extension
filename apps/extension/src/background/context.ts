@@ -158,7 +158,8 @@ export function createContext(env: BackgroundEnv) {
       const state = ctx.state, self = state?.account?.id;
       const mate = author.id !== self && Boolean(state?.remoteTeams.some(team => team.joined && team.memberIds.includes(author.id)));
       const member = state?.data.people.find(value => value.id === author.id);
-      const name = member?.name || author.nickname || 'Member';
+      // Someone the room has no name for goes out nameless; the page words them with its own 成员 label.
+      const name = member?.name || author.nickname || '';
       if (member?.avatar) return { ...await ctx.pagePerson(author.id), mate };
       const path = defaultAvatar(author.id);
       const url = state?.rooms.avatars[author.id] ?? (path && browser.runtime.getURL(path as '/'));
@@ -201,7 +202,7 @@ export function createContext(env: BackgroundEnv) {
         copy: t('extension.copy.copy'), copied: t('extension.copy.copied'),
       } as CaptureLabels;
       return {
-        packet: t('extension.wallet.packet'), member: t('common.member'),
+        packet: t('extension.wallet.packet'), packetFrom: t('extension.wallet.packetFrom', { name: '{name}' }), member: t('common.member'),
         you: t('extension.page.you'), mate: t('extension.room.mate'), capture, locale,
       };
     },

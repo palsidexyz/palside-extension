@@ -7,7 +7,7 @@ import { Button } from '@palside/ui/button';
 import type { PalsideController } from '../app/use-palside';
 import type { ApiResult } from '../../../runtime/transport/api';
 import { Sheet } from '@palside/ui/sheet';
-import { RoomPacketBanner } from './packet';
+import { PacketCard, PacketDetail } from './packet';
 import { formatPals, groupPals } from './amount';
 import { PersonAvatar } from '../ui/primitives';
 import { roomPerson } from '../rooms/rooms';
@@ -16,19 +16,48 @@ import { parsePals, type WalletPayment } from '../../../domain/wallet/model';
 import { openPayment, usePaymentRequest } from './payment-sheet';
 import s from './wallet.module.css';
 
-export function RoomPayments({ c, roomKey }: { c: PalsideController; roomKey: string }) {
-  const command = c.live?.command, enabled = c.live?.state.wallet?.config?.enabled;
-  const data = c.live?.state.chainRoom?.key === roomKey ? c.live.state.chainRoom : undefined;
-  useEffect(() => { if (enabled) void command?.('wallet-room', { key: roomKey }).catch(() => {}); }, [command, enabled, roomKey]);
+/**
+ * A room's packets as its 弹幕 stream carries them: the live ones and those just ended (they fade in place), plus my own from 付款 on,
+ * before the service lists it; the listed one replaces it in place. Read for the room on screen, refreshed by its chain events.
+ */
+export function useRoomPackets(c: PalsideController, roomKey: string): RoomPacket[] {
+  const command = c.live.command, enabled = c.live.state.wallet?.config?.enabled;
+  const data = c.live.state.chainRoom?.key === roomKey ? c.live.state.chainRoom : undefined;
+  useEffect(() => { if (enabled) void command('wallet-room', { key: roomKey }).catch(() => {}); }, [command, enabled, roomKey]);
+  if (!enabled) return [];
   const listed = data?.packets.filter(item => item.expiresAt + ROOM_PACKET_AFTER_EXPIRY_MS > c.now) ?? [];
-  // My packet shows from 付款 on, before the service lists it; the listed one replaces it in place.
-  const sending = roomSending(c.live?.state.wallet?.payment, roomKey, c.data.self);
-  const packets = sending && !listed.some(item => item.id === sending.id) ? [...listed, sending] : listed;
-  if (!enabled || !packets.length) return null;
-  return <div className={s.roomPayments}><RoomPacketBanner c={c} packets={packets} /></div>;
+  const sending = roomSending(c.live.state.wallet?.payment, roomKey, c.data.self);
+  return sending && !listed.some(item => item.id === sending.id) ? [...listed, sending] : listed;
 }
 
-type RoomPacket = ApiResult<'chain.room'>['packets'][number];
+/** Whether a room packet can still be grabbed by me: what the composer's 弹幕 line lets pass through. */
+export const roomPacketLive = (packet: RoomPacket, c: PalsideController) => packet.status === 'active' && packet.expiresAt > c.now && packet.claimedCount < packet.count && packet.accountId !== c.data.self;
+
+/**
+ * One room packet in the 弹幕 stream: the same card as in a squad, its detail read once it is on screen (and again when the room
+ * stay ends), so a tap opens the envelope with its wish and seal ready. My own still on its way reads 发送中 and opens its payment.
+ */
+export function RoomPacketCard({ c, packet }: { c: PalsideController; packet: RoomPacket }) {
+  const command = c.live.command, chainRevision = c.live.state.chainRevision;
+  const [detail, setDetail] = useState<PacketDetailData>(), [revision, setRevision] = useState(0), [open, setOpen] = useState(false);
+  const pending = packet.status === 'pending';
+  useEffect(() => {
+    if (pending) return;
+    let current = true;
+    void command('wallet-packet', { id: packet.id }).then(value => { if (current) setDetail(value); }, () => {});
+    return () => { current = false; };
+  }, [command, packet.id, pending, packet.claimedCount, packet.status, chainRevision, revision]);
+  useEffect(() => { const at = detail?.eligibleAt; if (!at || at <= Date.now()) return; const timer = setTimeout(() => setRevision(value => value + 1), Math.min(at - Date.now() + 100, 2_147_483_647)); return () => clearTimeout(timer); }, [detail?.eligibleAt]);
+  // Until the detail lands the card stands on the room's summary: the wish blank, the state line loading.
+  const shown: PacketDetailData = detail ?? { packet, distribution: 'random', blessing: '', eligibility: 'unavailable', eligibleAt: null, myClaim: null, claims: [] };
+  return <>
+    <PacketCard c={c} detail={shown} loading={!pending && !detail} onOpen={() => setOpen(true)} />
+    {open && <PacketDetail c={c} id={packet.id} initial={detail} summary={packet} onClose={() => setOpen(false)} />}
+  </>;
+}
+
+export type RoomPacket = ApiResult<'chain.room'>['packets'][number];
+type PacketDetailData = ApiResult<'chain.packet'>;
 /** The room packet this panel is sending right now, until the service lists it. */
 function roomSending(payment: WalletPayment | undefined, roomKey: string, self: string): RoomPacket | undefined {
   if (!payment || !['signing', 'submitting', 'pending'].includes(payment.phase)) return undefined;
@@ -40,13 +69,13 @@ function roomSending(payment: WalletPayment | undefined, roomKey: string, self: 
 /** 打赏: the line being thanked, then quick amounts or a custom one; the author receives all of it. */
 export function TipPayment({ c, messageId, onClose }: { c: PalsideController; messageId: string; onClose: () => void }) {
   const t = useTranslations(), [amount, setAmount] = useState<string>(TIP_AMOUNTS.initial), [custom, setCustom] = useState(false), [busy, setBusy] = useState(false), [invalid, setInvalid] = useState(0);
-  const reduced = useReducedMotion(), command = c.live?.command;
-  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); }, [command]);
-  const requests = usePaymentRequest(c, JSON.stringify([c.screen, c.current, c.live?.state.rooms.current?.key, messageId]));
+  const reduced = useReducedMotion(), command = c.live.command;
+  useEffect(() => { void command('wallet-refresh', {}).catch(() => {}); }, [command]);
+  const requests = usePaymentRequest(c, JSON.stringify([c.screen, c.current, c.live.state.rooms.current?.key, messageId]));
   const close = () => { requests.cancel(); onClose(); };
-  const target = c.live?.state.rooms.current?.messages.find(item => item.id === messageId);
+  const target = c.live.state.rooms.current?.messages.find(item => item.id === messageId);
   const author = target && roomPerson(c, target.author, t('common.member'));
-  const decimals = c.live?.state.wallet?.config?.deployment?.decimals ?? 18;
+  const decimals = c.live.state.wallet?.config?.deployment?.decimals ?? 18;
   let value: bigint | undefined; try { value = parsePals(amount, decimals); } catch { /* The amount is still being entered. */ }
   const overLimit = !!amount && /^\d+$/.test(amount) && BigInt(amount) > BigInt(CHAIN_RULES.maxTipPals);
   const valid = Boolean(value && value > 0n && !overLimit);

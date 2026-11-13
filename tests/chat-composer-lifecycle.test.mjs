@@ -16,7 +16,6 @@ const card = (id = 'a') => ({ kind: 'asset', assetId: id, view: { id, kind: 'web
 const message = id => ({ id, teamId: 'team', author: 'self', text: id, status: 'sent' });
 const load = productionModules({ message: key => key });
 const liveActions = load('apps/extension/src/features/palside/chat/live-actions.ts').createLiveDraftActions;
-const memoryActions = load('apps/extension/src/features/palside/chat/memory-actions.ts').createMemoryDraftActions;
 const draftActions = load('apps/extension/src/features/palside/chat/use-drafts.ts').useDrafts;
 
 // Execute the production declarations with deterministic React hooks and DOM boundaries.
@@ -120,7 +119,7 @@ test('late automatic lookups cannot replace a manual attachment or revive an unm
   }
 });
 
-function actionFixture(live = true) {
+function actionFixture() {
   const requests = [], navigation = [], notices = [];
   let active = true, confirmation;
   const state = {
@@ -135,11 +134,11 @@ function actionFixture(live = true) {
     setOptimisticDrafts() {}, setDraftConflicts() {}, setDrafts(update) { state.view.drafts = update(state.view.drafts); },
   };
   const command = (name, payload, retry) => { const pending = deferred(); requests.push({ name, payload, retry, ...pending }); return pending.promise; };
-  if (live) state.view.live = { command, state: { drafts: { team: { revision: 3 } } } };
+  state.view.live = { command, state: { drafts: { team: { revision: 3 } } } };
   const getActions = () => ({ guarded: command, go: to => navigation.push(to) });
   return { state, requests, navigation, notices, get confirmation() { return confirmation; },
     leave() { active = false; },
-    actions() { return (live ? liveActions : memoryActions)(state, getActions); },
+    actions() { return liveActions(state, getActions); },
     edit(id) { draftActions(state, getActions).edit(state.view.messages.find(row => row.id === id)); },
   };
 }
@@ -167,15 +166,6 @@ test('confirmed attachment replacement cannot navigate after its context changes
   assert.deepEqual(f.navigation, []);
 });
 
-test('memory attachments save to the initiating squad and respect screen ownership', () => {
-  const f = actionFixture(false), attach = f.actions().attach;
-  f.leave(); f.state.view.current = 'other';
-  attach({ kind: 'image', src: 'data:original', name: 'image' });
-  assert.equal(f.state.view.drafts.team.attachment.src, 'data:original');
-  assert.equal(f.state.view.drafts.other.text, 'other');
-  assert.deepEqual(f.navigation, []);
-});
-
 test('edit completion and retry belong to the submitted session and text version', async () => {
   for (const supersede of [f => f.edit('b'), f => f.edit('a'), f => f.state.view.setEditText('new text'), f => { f.state.mounted.current = false; }]) {
     const f = actionFixture(); f.edit('a'); f.actions().saveEdit(); supersede(f);
@@ -194,8 +184,8 @@ test('edit completion and retry belong to the submitted session and text version
 });
 
 test('edit actions reject recalled, missing and non-editable originals', () => {
-  for (const live of [true, false]) for (const patch of [{ recalled: true }, { status: 'sending' }, { author: 'someone' }, { teamId: 'other' }]) {
-    const f = actionFixture(live); f.edit('a'); Object.assign(f.state.view.messages[0], patch); f.actions().saveEdit();
+  for (const patch of [{ recalled: true }, { status: 'sending' }, { author: 'someone' }, { teamId: 'other' }]) {
+    const f = actionFixture(); f.edit('a'); Object.assign(f.state.view.messages[0], patch); f.actions().saveEdit();
     assert.equal(f.state.view.editing, undefined); assert.equal(f.requests.length, 0);
   }
   const f = actionFixture(); f.edit('a'); f.state.view.messages = []; f.actions().saveEdit();
@@ -215,7 +205,7 @@ test('keep-local conflict resolution submits explicit empty values for every opt
 
 function composerFixture(c, extras = {}) {
   const h = host();
-  const tags = ['Spinner', 'VisuallyHidden', 'ArrowUp', 'Check', 'Gift', 'ImageIcon', 'Plus', 'Pencil', 'X', 'IconButton', 'ImageEditor', 'DraftConflict', 'AssetCard', 'ComposerRows', 'EditLine', 'ReplyLine', 'ReactionPicker', 'StateGlyph', 'CaptureTool', 'PageStrip', 'InteractToggle', 'ShareToggle', 'Action', 'PersonAvatar', 'DanmakuKey', 'DanmakuLine'];
+  const tags = ['Spinner', 'VisuallyHidden', 'ArrowUp', 'Check', 'Gift', 'ImageIcon', 'Plus', 'Pencil', 'X', 'IconButton', 'ImageEditor', 'DraftConflict', 'AssetCard', 'ComposerRows', 'EditLine', 'ReplyLine', 'ReactionPicker', 'StateGlyph', 'CaptureTool', 'PageStrip', 'InteractToggle', 'ShareToggle', 'Action', 'PersonAvatar', 'DanmakuKey', 'DanmakuLine', 'CallKey'];
   const globals = { ...h.globals, ...Object.fromEntries(tags.map(tag => [tag, tag])),
     h: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }), Fragment: 'fragment',
     useTranslations: () => key => key, useMention: () => ({ close() {}, detect() {}, keyDown() {} }), useLinkCard() {}, useAddressCard: () => ({ pasted() {}, candidates: [], pick() {} }),
@@ -259,26 +249,26 @@ test('image preparation finishing after composer unmount saves through its origi
 function panelFixture() {
   const h = host();
   const data = { self: 'self', teams: [{ id: 'team', joined: true, memberIds: [], name: 'Team' }, { id: 'other', joined: true, memberIds: [], name: 'Other' }], people: [], messages: [], requests: [], views: [] };
-  const adapterData = load('apps/extension/src/features/palside/app/live-data.ts').livePanelData({ data, scenario: 'normal', initialTeam: data.teams[0] });
-  const source = declarations('apps/extension/src/features/palside/app/use-panel-state.ts', ['signedOutScreens', 'noTeam', 'usePanelState', 'useScreenOwnership', 'useAccessOwnership', 'activeHost']);
+  const live = { state: { data, account: { id: 'self' }, authenticated: true, connection: {}, drafts: {}, invitations: {}, remoteTeams: [], preferences: { current: 'team' } } };
+  const source = declarations('apps/extension/src/features/palside/app/use-panel-state.ts', ['noTeam', 'usePanelState', 'useScreenOwnership', 'useAccessOwnership', 'activeHost']);
   const usePanelState = compile(source, 'usePanelState', {
     ...h.globals, useTranslations: () => key => key, useLocale: () => 'en', localeOrEnglish: value => value,
     useText: () => value => value, useTextState: () => h.react.useState(''), usePreferences: () => ({ values: {} }),
     useFormattedTeams: teams => teams, useFormattedMessages: messages => messages, useCurrentMessages: messages => messages,
     lobbyWithMembership: () => [], requestIsActive: () => false, walletDeadlines: () => undefined,
-    defaultInteraction: {}, emptyFavorites: {}, uiMessage: key => key,
+    defaultInteraction: {}, emptyFavorites: {}, uiMessage: key => key, signedOutScreens: ['welcome', 'new-account', 'confirm-phrase', 'restore'], siteCatalog: [], connectionStatus: () => 'connected', readSiteInteractions: () => undefined, readFavorites: () => undefined, imageExpiry: () => undefined, normalizeSiteHost: host => host,
     document: { addEventListener() {}, removeEventListener() {} }, URL,
   });
   let state;
-  const render = () => state = h.render(() => usePanelState({ data, adapter: { data: adapterData } }));
+  const render = () => state = h.render(() => usePanelState({ live: { ...live, state: { ...live.state, data: { ...data }, preferences: { ...live.state.preferences } } } }));
   render();
-  return { data, adapterData, render, get state() { return state; }, unmount: () => h.unmount() };
+  return { data, live, render, get state() { return state; }, unmount: () => h.unmount() };
 }
 
 test('panel screen ownership cannot revive after navigation, squad changes, account changes or unmount', () => {
   for (const leave of [
     f => { f.state.setScreen('settings'); f.state.setScreen('chat'); },
-    f => { f.adapterData.localCurrent = 'other'; f.render(); f.adapterData.localCurrent = 'team'; },
+    f => { f.live.state.preferences.current = 'other'; f.render(); f.live.state.preferences.current = 'team'; },
     f => { f.data.self = 'someone'; f.render(); f.data.self = 'self'; },
   ]) {
     const f = panelFixture(), owns = f.state.view.ownsScreen;
@@ -305,8 +295,9 @@ test('runtime draft metadata survives persistence and manual attachment replacem
   indexedDb(t);
   const storage = new ClientStorage('composer-lifecycle');
   const runtime = { storage, auth: { session: { account: { id: 'self' } }, scope: () => ({ wait: promise => promise }) }, state: { drafts: {}, remoteTeams: [{ id: 'team', joined: true }], data: { views: [] } }, emit() {} };
-  const source = declarations('apps/extension/src/runtime/chat/command-handlers.ts', ['draftCommand', 'attachCommand']);
-  const handlers = compile(source, '({ draftCommand, attachCommand })', { ...model, MessageError, uiMessage: key => ({ key }), text: value => typeof value === 'string' ? value : '', validateView: view => view });
+  const source = declarations('apps/extension/src/runtime/chat/command-handlers.ts', ['joinedTeam', 'draftCommand', 'attachCommand']);
+  const signedIn = commands => ({ runtime: commands.runtime, session: commands.runtime.auth.session, accountId: commands.runtime.auth.session.account.id, scope: commands.runtime.auth.scope() });
+  const handlers = compile(source, '({ draftCommand, attachCommand })', { ...model, MessageError, signedIn, uiMessage: key => ({ key }), text: value => typeof value === 'string' ? value : '', validateView: view => view });
   const parseCommand = load('apps/extension/src/runtime/transport/command-map.ts').parseCommand;
   const draft = { text: 'https://a.test', attachment: card(), automaticCard: { url: 'https://a.test', assetId: 'a' }, dismissedUrls: ['https://b.test'] };
   await handlers.draftCommand.call({ runtime }, parseCommand({ name: 'draft', payload: { accountId: 'self', teamId: 'team', revision: 0, patch: draft } }));

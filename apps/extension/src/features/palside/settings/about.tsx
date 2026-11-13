@@ -30,10 +30,9 @@ export function About({ c }: { c: PalsideController }) {
   const [copied, setCopied] = useState(false);
   const live = c.live;
   const update = useExtensionUpdate(c);
-  const offerUpdate = Boolean(live && (update.ready || c.connection === 'update-required'));
-  const website = live?.state.config.websiteUrl;
+  const offerUpdate = Boolean((update.ready || c.connection === 'update-required'));
+  const website = live.state.config.websiteUrl;
   async function copyDiagnostics() {
-    if (!live) return;
     try {
       const { text } = await live.command('diagnostics');
       await navigator.clipboard.writeText(text);
@@ -45,7 +44,6 @@ export function About({ c }: { c: PalsideController }) {
   }
   // 重看引导 clears the saved flag and returns to the chat, where the tour starts again.
   async function replayTour() {
-    if (!live) return;
     try {
       await live.command('preferences', { accountId: c.data.self, toured: false });
       c.go('chat');
@@ -57,14 +55,14 @@ export function About({ c }: { c: PalsideController }) {
   return <>
     <div className={s.aboutHero}><Brand /><p>{t('extension.copy.exploreWithFriends')}</p></div>
     <SettingGroup>
-      <SettingItem icon={<Tag size={16} />} title={t('extension.copy.version')} end={!live ? t('extension.copy.interactiveDemo') : offerUpdate
+      <SettingItem icon={<Tag size={16} />} title={t('extension.copy.version')} end={offerUpdate
         ? <span className={s.versionEnd}>{version() ?? '—'}<Button size="sm" variant="primary" loading={update.busy} loadingLabel={t('extension.copy.updateChecking')} onClick={() => void update.run()}>{update.ready ? t('extension.copy.updateTo', { version: update.ready }) : t('extension.copy.update')}</Button></span>
         : version() ?? '—'} />
     </SettingGroup>
-    {live && <SettingGroup>
+    <SettingGroup>
       <SettingItem icon={copied ? <Check size={16} /> : <ClipboardCopy size={16} />} title={copied ? t('extension.copy.copied') : t('extension.center.diagnostics')} end={null} onClick={() => void copyDiagnostics()} />
       <SettingItem icon={<Signpost size={16} />} title={t('extension.tour.replay')} onClick={() => void replayTour()} />
-    </SettingGroup>}
+    </SettingGroup>
     <SettingGroup>
       {website && links.map(([path, label, icon]) => <SettingItem key={path} icon={icon} title={label} href={`${website}${path}`} />)}
       <SettingItem icon={<Code size={16} />} title={t('extension.copy.aboutSource')} href={PUBLIC_LINKS.repository} />

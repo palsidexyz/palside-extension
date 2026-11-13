@@ -41,7 +41,7 @@ const GROUP_ROWS = 2;
 /** The page a 详情 is about: a token known only from the service opens on the site most people use for it. */
 function detailView(c: PalsideController, asset: Viewing) {
   const roomKey = roomsOn(c) ? roomKeyFor(asset) : undefined;
-  const rooms = c.live?.state.rooms;
+  const rooms = c.live.state.rooms;
   const summary = roomKey ? tokenStats(c, roomKey) : undefined;
   // The site most participants use is the room's public vote, not part of the display record.
   const participantSite = roomKey ? (rooms?.current?.key === roomKey ? rooms.current : rooms?.summaries[roomKey])?.site : undefined;
@@ -68,7 +68,7 @@ export function AssetHeaderActions({ c, asset }: { c: PalsideController; asset: 
 export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; asset: Viewing; onJump: (id: string) => void }) {
   const t = useTranslations();
   const key = viewAsset(asset);
-  const live = c.live, page = live?.page;
+  const live = c.live, page = live.page;
   const { roomKey, summary, participantSite, sources, view } = detailView(c, asset);
   const read = useRoomRead(c, 'summary', roomKey);
   const current = Boolean(page?.url && (samePage(page.url, asset.url) || key && page.asset === key));
@@ -76,11 +76,11 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
   const [sharing, setSharing] = useState(false);
   const latest = useRef(c);
   useEffect(() => { latest.current = c; }, [c]);
-  const open = (target: Viewing) => { if (live) void live.openPage(target.url).catch(error => c.setNotice(errorMessage(error))); else window.open(target.url, '_blank', 'noopener'); };
+  const open = (target: Viewing) => { void live.openPage(target.url).catch(error => c.setNotice(errorMessage(error))); };
   const short = view.address ? `${view.address.slice(0, 6)}…${view.address.slice(-4)}` : undefined;
   async function share() {
     if (!c.canWrite || sharing) return;
-    if (view.kind === 'asset' || !live) { c.attach({ kind: 'asset', assetId: view.id, view }); return; }
+    if (view.kind === 'asset') { c.attach({ kind: 'asset', assetId: view.id, view }); return; }
     const account = c.data.self, team = c.current;
     setSharing(true);
     try {
@@ -115,7 +115,7 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
       <OpenAction targets={targets} />
     </div>}
     {reachable && roomKey && read.status === 'error' && <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: read.retry }}>{t('common.error')}</InlineFeedback>}
-    {live && c.team.joined && <TeamRecords c={c} asset={view} onJump={onJump} />}
+    {c.team.joined && <TeamRecords c={c} asset={view} onJump={onJump} />}
   </div>;
 }
 

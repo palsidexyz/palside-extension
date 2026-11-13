@@ -48,7 +48,7 @@ function fixture(t) {
 }
 
 test('pending invite avatars use the authenticated invitee endpoint even with rooms off', async t => {
-  const f = fixture(t), gate = deferred(); f.runtime.state.preferences.rooms = { off: true };
+  const f = fixture(t), gate = deferred(); f.runtime.state.preferences.siteInteraction = { '*': { on: true, danmaku: false, signal: true, chart: true } };
   f.response.handler = () => gate.promise;
   await f.invites([invite()]); f.runtime.emit(); f.runtime.emit();
   assert.equal(f.calls.length, 1, 'in-flight requests are deduplicated');

@@ -35,7 +35,7 @@ export function HotSearchResults({ c, query }: { c: PalsideController; query: st
   const q = query.trim();
   const [found, setFound] = useState<Found>();
   const [round, setRound] = useState(0);
-  const command = c.live?.command;
+  const command = c.live.command;
   useEffect(() => {
     if (!q || !command) return;
     let current = true;
@@ -45,7 +45,7 @@ export function HotSearchResults({ c, query }: { c: PalsideController; query: st
     return () => { current = false; clearTimeout(timer); };
   }, [q, command, round]);
   // Leaving the search drops its rows from panel state.
-  useEffect(() => () => { void command?.('token-search', { q: '' }).catch(() => {}); }, [command]);
+  useEffect(() => () => { void command('token-search', { q: '' }).catch(() => {}); }, [command]);
   const answer = found?.q === q ? found : undefined;
   if (answer?.failed) return <InlineFeedback tone="error" action={{ label: t('common.retry'), onClick: () => setRound(value => value + 1) }}>{t('common.error')}</InlineFeedback>;
   if (!answer?.assets) return <EmptyState title={t('extension.copy.loading')} />;

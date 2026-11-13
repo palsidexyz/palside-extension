@@ -43,7 +43,7 @@ export function Hot({ c, chain, onChain }: { c: PalsideController; chain: string
   const t = useTranslations();
   const board = useRef<HTMLDivElement>(null);
   const read = useRoomRead(c, 'hot');
-  const hot = c.live?.state.rooms.hot;
+  const hot = c.live.state.rooms.hot;
   const all = hot?.loaded ? hot.rows : undefined;
   const rows = useMemo(() => all?.filter(row => chain === null || row.key.split(':')[1] === chain), [all, chain]);
   const ranks = useRankChanges(rows);

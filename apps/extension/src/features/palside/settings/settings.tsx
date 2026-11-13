@@ -42,11 +42,11 @@ const modeKey = { off: 'extension.settings.notifyOff', mentions: 'extension.sett
 export function Settings({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const grants = useGrants(c);
-  const shortcut = useCaptureShortcut(c);
+  const shortcut = useCaptureShortcut();
   const notifications = notifyMode(c, grants.notifications);
   const sites = allowedSites(c, grants);
   const interaction = useSiteSummary(c);
-  const wallet = c.live?.state.wallet;
+  const wallet = c.live.state.wallet;
   const balance = wallet?.config?.enabled && wallet.availability === 'ready' ? wallet.balance?.balance : undefined;
   // With the chain off, a payment still settling or an order left to recover keeps the wallet reachable until it resolves.
   const pending = !wallet?.config?.enabled && Boolean((wallet?.payment && !['confirmed', 'expired', 'failed'].includes(wallet.payment.phase)) || wallet?.recovery?.items.length);
@@ -66,25 +66,25 @@ export function Settings({ c }: { c: PalsideController }) {
       <SettingItem icon={<Globe2 size={16} />} title={t('extension.settings.sites')} value={sites.all ? t('extension.sites.allSites') : <CountText text={t('extension.web.siteCount', { count: sites.hosts.length })} value={sites.hosts.length} />} onClick={() => c.go('sites')} />
     </SettingGroup>
     <SettingGroup title={t('extension.settings.groupGeneral')}>
-      {c.live && <SettingItem icon={<Bell size={16} />} title={t('extension.settings.notifications')} value={t(modeKey[notifications])} onClick={() => c.go('notifications')} />}
-      {c.live && <SettingItem icon={<Keyboard size={16} />} title={t('extension.shot.shortcut')} value={shortcut ? <KeyCaps keys={shortcutKeys(shortcut)} /> : t('extension.shot.unset')} end={<span className={settingRows.arrow} aria-hidden="true"><ArrowUpRight size={15} /></span>} onClick={() => void openShortcuts()} />}
+      <SettingItem icon={<Bell size={16} />} title={t('extension.settings.notifications')} value={t(modeKey[notifications])} onClick={() => c.go('notifications')} />
+      <SettingItem icon={<Keyboard size={16} />} title={t('extension.shot.shortcut')} value={shortcut ? <KeyCaps keys={shortcutKeys(shortcut)} /> : t('extension.shot.unset')} end={<span className={settingRows.arrow} aria-hidden="true"><ArrowUpRight size={15} /></span>} onClick={() => void openShortcuts()} />
       <SettingControl icon={<Monitor size={16} />}><label className={settingRows.label} htmlFor="appearance">{t('extension.copy.appearance')}</label><AppearanceSetting /></SettingControl>
-      {c.live && <SettingControl icon={<Languages size={16} />}><label className={settingRows.label} htmlFor="language">{t('common.language')}</label><LanguageSetting /></SettingControl>}
+      <SettingControl icon={<Languages size={16} />}><label className={settingRows.label} htmlFor="language">{t('common.language')}</label><LanguageSetting /></SettingControl>
     </SettingGroup>
     <SettingGroup title={t('extension.settings.groupAccount')}>
       <SettingItem icon={<ShieldCheck size={16} />} title={t('extension.settings.privacy')} onClick={() => c.go('privacy')} />
-      {c.live && <SettingItem icon={<KeyRound size={16} />} title={t('extension.copy.security')} onClick={() => c.go('security')} />}
+      <SettingItem icon={<KeyRound size={16} />} title={t('extension.copy.security')} onClick={() => c.go('security')} />
       <SettingItem icon={<Brand markOnly />} title={t('extension.copy.aboutPalside')} onClick={() => c.go('about')} />
     </SettingGroup>
     <SettingGroup>
-      <SettingItem tone="danger" icon={<LogOut size={16} />} title={t('extension.copy.signOut')} end={null} onClick={() => c.setConfirmation({ title: uiMessage('extension.copy.signOutTitle'), description: uiMessage('extension.wallet.logoutRecovery'), action: uiMessage('extension.copy.signOut'), danger: true, confirm: () => { if (c.live) return c.live.command('logout').then(() => {}); c.setNotice(uiMessage('extension.copy.previewNotConnected')); } })} />
+      <SettingItem tone="danger" icon={<LogOut size={16} />} title={t('extension.copy.signOut')} end={null} onClick={() => c.setConfirmation({ title: uiMessage('extension.copy.signOutTitle'), description: uiMessage('extension.copy.signOutDescription'), action: uiMessage('extension.copy.signOut'), danger: true, confirm: () => c.live.command('logout').then(() => {}) })} />
     </SettingGroup>
   </div>;
 }
 
 /** The 通知 choice as it works now: one Chrome does not allow is 关闭. */
 function notifyMode(c: PalsideController, granted: boolean): Mode {
-  const mode = c.live?.state.preferences.notifications ?? 'off';
+  const mode = c.live.state.preferences.notifications ?? 'off';
   return granted ? mode : 'off';
 }
 
@@ -97,7 +97,6 @@ export function NotificationSettings({ c }: { c: PalsideController }) {
   const grants = useGrants(c);
   const live = c.live;
   const preferences = usePreferences(live);
-  if (!live) return null;
   const mode = grants.notifications ? preferences.values.notifications ?? 'off' : 'off';
   function choose(next: Mode) {
     if (!preferences.current()) return;

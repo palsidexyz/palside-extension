@@ -3,8 +3,8 @@ import { IntegrationIntl } from './intl';
 import tokenMetadata from './fixtures/token-metadata.json';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PalsideApp } from './preview-app';
-import { palsideFixtures, demoSites } from './fixtures';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
+import { palsideFixtures } from './fixtures';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import { errorMessage, MessageError } from '@palside/i18n';
@@ -91,6 +91,6 @@ function Review() {
     if (name === 'preferences' || name === 'notification-settings') setState(old => ({ ...old, preferences: { ...old.preferences, ...payload } }));
     return { ok: true } as T;
   }, []);
-  return <div data-last-command={lastCommand} style={{ height: '100dvh' }}><PalsideApp data={data} sites={demoSites} live={{ state, command, openPage: async () => {} }} deliver={async () => {}} /></div>;
+  return <div data-last-command={lastCommand} style={{ height: '100dvh' }}><PalsideApp live={{ state, command, openPage: async () => {} }} /></div>;
 }
 createRoot(document.getElementById('root')!).render(<IntegrationIntl><Review /></IntegrationIntl>);

@@ -16,7 +16,7 @@ export function usePalside(props: PalsideProps) {
   const state = usePanelState(props);
   const { guarded, ...commands } = usePanelCommands(state);
   const pageActions = usePageActions(state);
-  const actions = {} as Omit<PanelActions, 'guarded' | 'addedNotice' | 'siteName'> & ReturnType<typeof useDiscovery>;
+  const actions = {} as Omit<PanelActions, 'guarded' | 'siteName'> & ReturnType<typeof useDiscovery>;
   const getActions = () => ({ ...actions, guarded, ...pageActions });
   Object.assign(actions, {
     ...commands,
@@ -25,7 +25,7 @@ export function usePalside(props: PalsideProps) {
     ...useTeamActions(state, getActions),
     ...useDiscovery(state),
     ...useAccountFlow(state, getActions),
-    ...(props.adapter?.actions ?? createLiveActions)(state, getActions),
+    ...createLiveActions(state, getActions),
   });
   usePanelEffects(state, getActions());
   const { preferences } = state;

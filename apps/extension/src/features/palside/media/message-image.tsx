@@ -23,7 +23,7 @@ function ImageContent({ c, id, image, compact }: { c: PalsideController; id: str
     if (state === 'ready') { c.setImage(image); return; }
     if (busy) return; setBusy(true);
     try {
-      if (c.live) await c.live.command('reload-image', { id });
+      await c.live.command('reload-image', { id });
       if (image.src) { setAttempt(n => n + 1); setState('loading'); }
     } catch { setState('failed'); }
     finally { setBusy(false); }

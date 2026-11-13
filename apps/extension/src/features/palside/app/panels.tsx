@@ -1,10 +1,8 @@
 'use client';
 import { useTranslations } from 'use-intl';
 import { FollowBar } from '../annotations/follow-bar';
-import { CountText } from '../ui/motion-details';
-import { hitSegments } from '../chat/text-highlights';
+import { MessageSearch } from '../chat/message-search';
 import { assetView } from '../../../domain/assets/model';
-import { personFor } from '../../../domain/account/model';
 import { NotificationSettings, Settings } from '../settings/settings';
 import { InteractionSettings } from '../settings/web-settings';
 import { SiteDetail, SitesSettings } from '../settings/sites';
@@ -17,13 +15,11 @@ import { WalletSettings } from '../wallet/security';
 import { PacketPage } from '../wallet/packet';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { ProfileForm, TeamProfileForm } from '../account/profile-form';
 import { TeamSettings } from '../teams/team-settings';
 import { TeamLevel } from '../teams/team-level';
 import { Members, Requests } from '../teams/member-list';
-import { SharedContent } from '../assets/shared-content';
-import { HistoryMore } from '../chat/history-scope';
 import { EmptyState } from '../ui/empty-state';
 import { Report } from '../feedback/report';
 import { DeleteAccountForm, Security } from '../account/identity';
@@ -32,8 +28,7 @@ import { FormerTeams, JoinPage, TeamStartForm } from '../teams/team-start';
 import { AssetDiscussion, AssetHeaderActions } from '../assets/asset-discussion';
 import { BlockedPeople, RoomPeople } from '../rooms/danmaku-view';
 import { Hot, hotStartChain } from '../rooms/hot';
-import { Input } from '@palside/ui/field';
-import { Action, PersonAvatar } from '../ui/primitives';
+import { Action } from '../ui/primitives';
 import { ConnectionCard, ConnectionState, NeedsService, pageIssue } from '../feedback/session-notice';
 
 import type { PalsideController } from './use-palside';
@@ -53,10 +48,6 @@ export function Panels({ c, onJump }: { c: PalsideController; onJump: (id: strin
   const [hotChain, setHotChain] = useState<string | null>(hotStartChain);
   const draftAsset = assetView(c.draft.attachment);
   const asset = draftAsset?.id === c.selectedAsset ? draftAsset : c.selectedView?.id === c.selectedAsset ? c.selectedView : c.data.views.find(v => v.id === c.selectedAsset) ?? c.selectedView;
-  const results = c.currentMessages.filter(m => !m.recalled && m.status === 'sent').filter(m => {
-    const view = assetView(m.attachment);
-    return `${m.text} ${view?.name ?? ''} ${view?.address ?? ''}`.toLocaleLowerCase().includes(c.query.toLocaleLowerCase());
-  });
   if (c.screen === 'chat' || c.screen === 'room') return null;
   function back() { if (c.screen === 'members' && c.selectingOwner) c.go('team'); else c.back(); }
   const title = titles[c.screen] ?? 'extension.copy.signIn';
@@ -79,7 +70,7 @@ export function Panels({ c, onJump }: { c: PalsideController; onJump: (id: strin
       {c.screen === 'members' && <Members c={c} />}
       {c.screen === 'requests' && <NeedsService c={c}><Requests c={c} /></NeedsService>}
       {c.screen === 'team-profile' && <>{c.team.owner === c.data.self && c.canWrite && <NeedsService c={c}><TeamProfileForm key={c.current} c={c} /></NeedsService>}<TeamLevel c={c} /></>}
-      {c.screen === 'search' && <><Input type="search" autoFocus aria-label={t('extension.copy.searchMessageContent')} leadingIcon={<Search size={16} />} placeholder={t('extension.copy.searchPlaceholder')} value={c.query} onChange={e => c.setQuery(e.target.value)} /><SharedContent c={c} onJump={onJump} messages={<>{results.length > 0 && <div className={s.listCaption}>{c.query.trim() ? t('extension.copy.searchResults') : t('extension.copy.recentMessages')}<small><CountText text={t('extension.dynamic.messageCount', { count: results.length })} value={results.length} /></small></div>}{results.length > 0 && <div className={s.group}>{results.map(m => <button className={s.searchResult} key={m.id} onClick={() => onJump(m.id)}><PersonAvatar person={personFor(c.people, m.author, t('common.member'))} /><span><strong>{personFor(c.people, m.author, t('common.member')).name}<small>{m.time}</small></strong><p>{m.text ? hitSegments(m.text, c.query).map((part, index) => part.hit ? <mark key={index}>{part.text}</mark> : part.text) : m.attachment?.kind === 'image' ? t('extension.copy.imageQuote') : t('extension.copy.tokenQuote')}</p></span></button>)}</div>}{results.length > 0 ? <HistoryMore c={c} /> : <EmptyState icon={<Search />} title={c.live && !c.live.state.history?.[c.current] ? t('extension.copy.historyNotLoaded') : c.query.trim() ? t('extension.copy.noSearchResults') : t('extension.copy.noSearchableMessages')}><HistoryMore c={c} /></EmptyState>}</>} /></>}
+      {c.screen === 'search' && <MessageSearch c={c} onJump={onJump} />}
       {c.screen === 'asset' && !asset && <EmptyState title={t('extension.copy.contentUnavailable')} />}
       {c.screen === 'asset' && asset && <AssetDiscussion key={asset.id} c={c} asset={asset} onJump={onJump} />}
       {c.screen === 'settings' && <Settings c={c} />}
@@ -89,8 +80,8 @@ export function Panels({ c, onJump }: { c: PalsideController; onJump: (id: strin
       {c.screen === 'wallet-settings' && <WalletSettings c={c} />}
       {c.screen === 'wallet-packet' && <PacketPage c={c} />}
       {c.screen === 'profile' && <NeedsService c={c}><ProfileForm c={c} /></NeedsService>}
-      {c.screen === 'delete-account' && c.live && <NeedsService c={c}><DeleteAccountForm c={c} /></NeedsService>}
-      {c.screen === 'security' && c.live && <Security c={c} />}
+      {c.screen === 'delete-account' && <NeedsService c={c}><DeleteAccountForm c={c} /></NeedsService>}
+      {c.screen === 'security' && <Security c={c} />}
       {c.screen === 'privacy' && <Privacy c={c} />}
       {c.screen === 'interaction' && <InteractionSettings c={c} />}
       {c.screen === 'sites' && <SitesSettings c={c} />}

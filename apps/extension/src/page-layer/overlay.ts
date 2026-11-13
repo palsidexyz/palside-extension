@@ -13,7 +13,7 @@ export function createOverlay(send: (message: PageUp) => void) {
     host, stage, isControl: context.isControl, onPageChange: context.onPageChange,
     setLabels(next: PageLabels) { context.labels = { ...context.labels, ...next }; },
     setDanmakuSettings: danmaku.setDanmakuSettings,
-    updateDanmaku: danmaku.update, removeDanmaku: danmaku.remove, updatePayments: danmaku.updatePayments,
+    updateDanmaku: danmaku.update, removeDanmaku: danmaku.remove,
     startCapture: capture.startCapture, stopCapture: capture.stopCapture,
     clear() {
       timers.forEach(timer => window.clearTimeout(timer)); timers.clear();

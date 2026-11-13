@@ -8,7 +8,7 @@ const noMore = { teams: false, applications: false };
 
 export function useDiscovery(state: PanelState) {
   const { view: { live }, setLobbyLoading, setLobbyError } = state;
-  const command = live?.command;
+  const command = live.command;
   const [lobbyFilters, setLobbyFilters] = useState<LobbyFilters>({ query: '', sort: 'heat', tab: 'recruiting' });
   const filters = useRef(lobbyFilters);
   const request = useRef({ version: 0 });
@@ -22,7 +22,7 @@ export function useDiscovery(state: PanelState) {
   const loadingMore = useRef(false);
   const refreshLobby = useCallback(async () => {
     clearTimeout(timer.current);
-    if (!command || !active.current) return;
+    if (!active.current) return;
     const version = ++request.current.version;
     const { query, sort, tab } = filters.current;
     setLobbyLoading(true); setLobbyError('');
@@ -44,13 +44,11 @@ export function useDiscovery(state: PanelState) {
     clearTimeout(timer.current);
     request.current.version++;
     setLobbyError('');
-    if (command) {
-      setLobbyLoading(true);
-      timer.current = setTimeout(() => { void refreshLobby(); }, filters.current.query ? 200 : 0);
-    }
+    setLobbyLoading(true);
+    timer.current = setTimeout(() => { void refreshLobby(); }, filters.current.query ? 200 : 0);
   }
   const loadMoreLobby = useCallback(async (list: LobbyList) => {
-    if (!command || loadingMore.current || !lobbyMore[list]) return;
+    if (loadingMore.current || !lobbyMore[list]) return;
     const version = request.current.version;
     loadingMore.current = true; setLobbyLoadingMore(true);
     try {

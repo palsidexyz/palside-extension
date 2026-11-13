@@ -64,7 +64,7 @@ export function TeamStartForm({ c }: { c: PalsideController }) {
   const joined = c.teams.filter(team => team.joined);
   const limit = joined.filter(team => team.owner === c.data.self).length >= TEAM_OWNED_LIMIT ? t('extension.start.ownedLimit', { count: TEAM_OWNED_LIMIT }) : joined.length >= TEAM_JOINED_LIMIT ? t('extension.start.joinedLimit', { count: TEAM_JOINED_LIMIT }) : '';
   const tooLong = characterLength(name.trim()) > TEAM_NAME_LENGTH;
-  const invites = c.live?.state.rooms.invites.length ?? 0;
+  const invites = c.live.state.rooms.invites.length;
   const former = formerTeams(c).length;
   const introLength = characterLength(description);
   const src = upload || defaultTeamAvatarOptions[preset]!.src;
@@ -150,7 +150,7 @@ function AvatarStage({ selected, upload, disabled, onSelect, onUpload }: { selec
 /** 通过邀请加入: one field for the link. A readable invitation opens the join sheet; an unreadable one is a field error and nothing else. */
 export function JoinPage({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const pending = c.data.pendingInvite ? c.live ? c.data.pendingInvite : `/invite/${c.data.pendingInvite}` : '';
+  const pending = c.data.pendingInvite ?? '';
   const [link, setLink] = useState(pending);
   const [error, setError] = useTextState();
   const [busy, setBusy] = useState(false);
@@ -167,14 +167,6 @@ export function JoinPage({ c }: { c: PalsideController }) {
     setBusy(true); setError('');
     const open = (prompt: EntryPrompt) => { const entry = { ...prompt, pendingInvite: url === pending ? c.data.pendingInvite : undefined }; c.setJoinPrompt(entry); };
     try {
-      if (!c.live) {
-        const code = url.split('?')[0]?.split('/').filter(Boolean).at(-1);
-        const team = c.teams.find(item => item.id === (code === 'night-owls' ? 'night' : code));
-        if (!team || (team.id === c.current && !c.inviteActive)) { setError(uiMessage('extension.copy.invalidInvitation')); return; }
-        if (team.joined) { c.chooseTeam(team.id); return; }
-        open({ invite: team.id, team: { id: team.id, name: team.name, description: team.description, memberCount: team.memberCount ?? team.memberIds.length } });
-        return;
-      }
       const result = await c.previewInvite(url);
       if (!isActive() || !result) return;
       if (result.alreadyMember) { const joined = await c.live.command('join', { invite: result.invite }); if (isActive()) c.chooseTeam(joined.teamId); return; }
@@ -213,7 +205,7 @@ export function JoinSheet({ c }: { c: PalsideController }) {
     if (!isActive()) return;
     active.current = undefined;
     c.setJoinPrompt(undefined);
-    if (prompt?.pendingInvite && c.live) void c.run('dismiss-invite', { url: prompt.pendingInvite });
+    if (prompt?.pendingInvite) void c.run('dismiss-invite', { url: prompt.pendingInvite });
   };
   return <Sheet open={Boolean(prompt)} onOpenChange={open => { if (!open) close(); }} boundarySelector="[data-palside-app]" aria-labelledby="join-sheet-title" className={s.sheet}>
     {prompt && <JoinPrompt key={prompt.invite} c={c} prompt={prompt} close={close} isActive={isActive} />}
@@ -253,7 +245,6 @@ function JoinPrompt({ c, prompt, close, isActive }: { c: PalsideController; prom
     if (busy || !ready || !isActive()) return;
     setBusy(true); setFieldError(''); setNotice('');
     try {
-      if (!c.live) { c.setJoinPrompt(undefined); c.joinTeam(team.id); c.setNotice(uiMessage('extension.invite.joined', { name: team.name })); return; }
       const joined = await c.live.command('join', { invite: prompt.invite, ...(needsPassword ? { password: value } : {}) });
       if (!isActive()) return;
       c.setJoinPrompt(undefined);
@@ -264,7 +255,7 @@ function JoinPrompt({ c, prompt, close, isActive }: { c: PalsideController; prom
       const message = failureText(failure);
       if (passwordErrors.has(code)) {
         setNeedsPassword(true); setValue(''); setFieldError(message);
-        if (code === 'INVITE_PASSWORD_REQUIRED' && c.live) {
+        if (code === 'INVITE_PASSWORD_REQUIRED') {
           try {
             const refreshed = await c.previewInvite(new URL(`/invite/${prompt.invite}`, c.live.state.config.websiteUrl).href);
             if (!isActive()) return;

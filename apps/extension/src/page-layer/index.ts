@@ -118,8 +118,6 @@ export function startPageLayer(port: {
       overlay.clear();
     } else if (message.type === 'danmaku') {
       overlay.updateDanmaku(message.items);
-    } else if (message.type === 'room-payments') {
-      overlay.updatePayments(message);
     } else if (message.type === 'danmaku-remove') {
       overlay.removeDanmaku(message.ids);
     } else if (message.type === 'capture') {

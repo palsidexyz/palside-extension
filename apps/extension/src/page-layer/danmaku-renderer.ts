@@ -1,7 +1,7 @@
 import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import { LIKE_THUMB_PATHS } from '@palside/shared/like-art';
 import Danmaku from 'danmaku/dist/esm/danmaku.dom.js';
-import type { PageDanmaku,PageDown,PageUp,DanmakuSettings } from '../runtime/browser/page-protocol';
+import type { PageDanmaku,PageUp,DanmakuSettings } from '../runtime/browser/page-protocol';
 import { defaultDanmakuSettings,normalizeDanmakuSettings,danmakuLimits } from '../runtime/browser/page-protocol';
 import { danmakuAreaRect,createMediaClock,pruneDanmaku,activeDanmaku,removeDanmaku } from './danmaku-helpers';
 import type { DanmakuAreaRect,Flight } from './danmaku-helpers';
@@ -31,15 +31,6 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
   card.className = 'dm-card';
   card.hidden = true;
   danmakuArea.append(card);
-  const paymentsArea = document.createElement('section');
-  paymentsArea.className = 'room-payments';
-  danmakuArea.append(paymentsArea);
-  function updatePayments(value: Extract<PageDown, { type: 'room-payments' }>) {
-    paymentsArea.replaceChildren();
-    if (!danmakuSettings.enabled || !value.roomKey) return;
-    const open = (event: Event) => { if (event.isTrusted) send({ type: 'open-room', key: value.roomKey! }); };
-    if (value.packets.length) { const button = document.createElement('button'); button.className = 'room-packet'; button.textContent = context.labels.packet || ''; button.addEventListener('click', open); paymentsArea.append(button); }
-  }
   const arrivals = new Map<string, number>();
   /** Replayed lines the screen has no room for yet; they fly as lines finish. A full screen simply skips live lines. */
   let waiting: PageDanmaku[] = [];
@@ -73,16 +64,28 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
     if (data.replay) element.dataset.replay = '';
     if (data.self) element.dataset.self = '';
     else if (data.mate) element.dataset.mate = '';
-    element.textContent = data.text;
-    if (data.likes) element.append(likesMark(data.likes));
-    element.addEventListener('click', event => { if (event.isTrusted === false) return; send({ type: 'open-room', key: data.key }); });
+    if (data.packet) {
+      // A 红包: the envelope, then “Kai 的红包”; a click opens its envelope in the side panel.
+      element.dataset.packet = '';
+      const envelope = document.createElement('span');
+      envelope.className = 'dm-envelope';
+      envelope.setAttribute('aria-hidden', 'true');
+      const name = data.self ? context.labels.you : data.author.name || context.labels.member || '';
+      const words = document.createElement('span');
+      words.textContent = (context.labels.packetFrom ?? '{name}').replace('{name}', name);
+      element.append(envelope, words);
+    } else {
+      element.textContent = data.text;
+      if (data.likes) element.append(likesMark(data.likes));
+    }
+    element.addEventListener('click', event => { if (event.isTrusted === false) return; send({ type: 'open-room', key: data.key, ...(data.packet ? { packet: data.id } : {}) }); });
     return element;
   }
 
   function showCard(element: HTMLElement, data: PageDanmaku) {
     const avatar = face(data.author);
     const name = document.createElement('b');
-    name.textContent = data.self ? context.labels.you : data.author.name;
+    name.textContent = data.self ? context.labels.you : data.author.name || context.labels.member || '';
     const parts: HTMLElement[] = [avatar, name];
     if (data.mate && !data.self && context.labels.mate) { const tag = document.createElement('span'); tag.className = 'dm-tag'; tag.textContent = context.labels.mate; parts.push(tag); }
     const when = relativeTime(data);
@@ -247,13 +250,12 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
         danmaku.hide();
         danmaku.comments.length = 0; danmaku._.position = 0;
         staticArea.replaceChildren();
-        paymentsArea.replaceChildren();
         renders.clear();
         waiting = [];
       }
       syncDanmakuArea();
     },
-    update: enqueue, remove: removeFlights, updatePayments,
+    update: enqueue, remove: removeFlights,
     clear() {
       renders.clear();
       arrivals.clear();
@@ -262,7 +264,6 @@ export function createDanmakuRenderer(context: OverlayHost, send: (message: Page
       danmaku.comments.length = 0;
       danmaku._.position = 0;
       staticArea.replaceChildren();
-      paymentsArea.replaceChildren();
       danmaku.clear();
       media.pause();
     },

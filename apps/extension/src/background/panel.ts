@@ -33,7 +33,6 @@ export function panel(bg: Background) {
       bg.danmaku.sendDanmakuSettings(port);
       bg.siteIcons.send(port);
       bg.updates.panelConnected(port);
-      bg.sharing.updateDeviceState();
       void bg.language.refresh().then(value => { if (bg.panels.has(port)) bg.post(port, { type: 'language', state: value }); });
 
       port.onMessage.addListener(message => {
@@ -45,8 +44,7 @@ export function panel(bg: Background) {
           if (opened) bg.panelWindows.focused(message.windowId);
           void bg.roomTab.refresh();
           if (opened) bg.pages.pagePolicyChanged(false);
-          bg.sharing.updateDeviceState();
-          bg.follow.sendStatus(port, message.windowId);
+              bg.follow.sendStatus(port, message.windowId);
           pendingActivity ||= !bg.state && message.activity === true;
           void bg.sharing.observer.refresh(message.activity === true);
           void bg.pages.pushPageStatus();
@@ -70,8 +68,7 @@ export function panel(bg: Background) {
         bg.updates.panelClosed();
         void bg.roomTab.refresh();
         reportRoomPanels();
-        bg.sharing.updateDeviceState();
-        if (windowId !== undefined) {
+          if (windowId !== undefined) {
           const lastForWindow = ![...bg.panels.values()].includes(windowId);
           if (bg.capture.captures.get(windowId)?.panel === port || lastForWindow) bg.capture.discardCapture(windowId);
           if (lastForWindow) { bg.pages.pagePolicyChanged(false); bg.follow.panelClosed(windowId); }

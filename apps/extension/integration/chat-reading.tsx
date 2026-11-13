@@ -2,8 +2,8 @@ import { SECOND_MS, MINUTE_MS } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { PalsideApp } from './preview-app';
-import { palsideFixtures, demoSites } from './fixtures';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
+import { palsideFixtures } from './fixtures';
 import type { Message } from '../src/domain/chat/model';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
@@ -54,7 +54,7 @@ const command: LivePort['command'] = async <T,>(name: string, payload?: Record<s
   }
   return {} as T;
 };
-function render() { root.render(<IntegrationIntl><PalsideApp data={state.data} sites={demoSites} live={{ state, command, openPage: async () => {} }} deliver={async () => {}} /></IntegrationIntl>); }
+function render() { root.render(<IntegrationIntl><PalsideApp live={{ state, command, openPage: async () => {} }} /></IntegrationIntl>); }
 function updateMessages(messages: Message[]) { state = { ...state, data: { ...state.data, messages } }; render(); }
 function incoming() { updateMessages([...state.data.messages, ...Array.from({ length: 3 }, () => message(`live${++serial}`, { text: `刚刚收到的消息 ${serial}`, timestamp: Date.now() + serial, liveArrival: true }))]); }
 function history() {

@@ -22,7 +22,7 @@ import w from './web-settings.module.css';
  * 网页互动: the master switch heads the page, for every site; under it 弹幕, 信号 and 共享画线 are one card each — its name and its
  * switch for every site, with its options opening in place under the name, one card at a time. Master off, nothing runs on any page and
  * the cards grey; a feature off here is off on every site and leaves the site sheets, while each site keeps its own choice for when it
- * comes back. 弹幕's card needs the service, so it waits while offline.
+ * comes back. 弹幕's switch turns 弹幕 itself off, in the panel too. Its card needs the service, so it waits while offline.
  */
 export function InteractionSettings({ c }: { c: PalsideController }) {
   const t = useTranslations();
@@ -67,33 +67,26 @@ function FeatureCard({ c, feature, open }: { c: PalsideController; feature: Site
 }
 
 /**
- * 弹幕's options: 在网页上显示 — how they cross the page, greyed while 弹幕 is off on pages or not joined at all — then 参与弹幕 (the rooms
- * themselves: reading and sending in the panel) and the strangers it brings: who is blocked and whether they may invite you into a squad.
+ * 弹幕's options. The card's switch is 弹幕 itself — off, it leaves the composer, 热门 and every page. Under it: 在网页上显示, how they
+ * cross the page, then the strangers it brings: who is blocked and whether they may invite you into a squad. All grey while it is off.
  */
 function DanmakuOptions({ c, on }: { c: PalsideController; on: boolean }) {
   const t = useTranslations();
-  const rooms = c.live?.state.rooms;
-  const off = Boolean(c.live?.state.preferences.rooms?.off);
-  const joined = useSavingSwitch(!off);
+  const rooms = c.live.state.rooms;
   const invites = useSavingSwitch(rooms?.acceptInvites ?? true);
   const blocked = rooms?.blocked.length ?? 0;
-  return <>
-    <div className={w.section} data-dim={!on || off || undefined} inert={!on || off}>
+  return <div data-dim={!on || undefined} inert={!on}>
+    <div className={w.section}>
       <span className={w.label}>{t('extension.settings.onPages')}</span>
       <DanmakuStyle c={c} />
     </div>
     <div className={w.rows}>
-      <SettingControl icon={<DanmakuIcon size={16} />}>
-        <Switch className={settingRows.switch} label={t('extension.settings.joinRooms')} checked={joined.checked} pending={joined.pending} refused={joined.refused} onChange={event => { const join = event.currentTarget.checked; void joined.save(join, async () => await c.run('room-settings', { off: !join }) !== undefined); }} />
+      <SettingItem icon={<Ban size={16} />} title={t('extension.room.blocked')} value={blocked ? <CountText text={t('extension.dynamic.peopleCount', { count: blocked })} value={blocked} /> : t('extension.room.blockedNone')} onClick={() => c.go('blocked')} />
+      <SettingControl icon={<UserPlus size={16} />}>
+        <Switch className={settingRows.switch} label={t('extension.settings.acceptInvites')} checked={invites.checked} pending={invites.pending} refused={invites.refused} onChange={event => { const accept = event.currentTarget.checked; void invites.save(accept, async () => await c.run('invite-settings', { accept }) !== undefined); }} />
       </SettingControl>
-      <div className={w.strangers} data-dim={off || undefined} inert={off}>
-        <SettingItem icon={<Ban size={16} />} title={t('extension.room.blocked')} value={blocked ? <CountText text={t('extension.dynamic.peopleCount', { count: blocked })} value={blocked} /> : t('extension.room.blockedNone')} onClick={() => c.go('blocked')} />
-        <SettingControl icon={<UserPlus size={16} />}>
-          <Switch className={settingRows.switch} label={t('extension.settings.acceptInvites')} checked={invites.checked} pending={invites.pending} refused={invites.refused} onChange={event => { const accept = event.currentTarget.checked; void invites.save(accept, async () => await c.run('invite-settings', { accept }) !== undefined); }} />
-        </SettingControl>
-      </div>
     </div>
-  </>;
+  </div>;
 }
 
 // The page's 20/24/28px, scaled to the preview's width.
@@ -109,8 +102,8 @@ const previewLeft = [20, 150, 80, 210] as const;
 function DanmakuStyle({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const live = c.live;
-  const danmaku = live?.danmaku ?? defaultDanmakuSettings;
-  const set = (settings: Partial<DanmakuSettings>) => live?.command('danmaku-settings', { settings }).catch(error => { c.setNotice(errorMessage(error)); return false; });
+  const danmaku = live.danmaku ?? defaultDanmakuSettings;
+  const set = (settings: Partial<DanmakuSettings>) => live.command('danmaku-settings', { settings }).catch(error => { c.setNotice(errorMessage(error)); return false; });
   return <div className={s.options}>
     <div className={d.preview} aria-hidden="true" style={{ '--dm-size': `${previewSize[danmaku.size]}px`, '--dm-alpha': danmaku.opacity / 100 } as CSSProperties}>
       <svg viewBox="0 0 300 120" preserveAspectRatio="none">{Array.from({ length: 20 }, (_, i) => { const y = 90 - i * 2.6 - Math.sin(i / 2) * 9; return <rect key={i} x={6 + i * 14.5} y={y - 14} width="7" height={14 + (i % 3) * 5} fill={i % 4 ? '#3FB27F' : '#E5566B'} />; })}</svg>

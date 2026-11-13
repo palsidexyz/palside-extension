@@ -41,7 +41,7 @@ export function withTargetAccess(c: PalsideController, url: string, action: () =
 
 /** What the active tab allows for a page action right now; before the first page status it counts as still loading. */
 export function capability(c: PalsideController, action: PageAction): PageCapability {
-  return c.live?.page?.capabilities?.[action] ?? { state: 'pending' };
+  return c.live.page?.capabilities?.[action] ?? { state: 'pending' };
 }
 
 /** The tooltip reason when an action cannot run on this tab, or nothing when it can (allowing the site counts as can). */

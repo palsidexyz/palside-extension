@@ -302,7 +302,7 @@ function MessageMenu({ ref, c, message, text, stack, onReply }: { ref: Ref<Messa
       <MenuItem className={menuStyles.item} icon={selected ? <Quote size={16} /> : <Reply size={16} />} onClick={() => { onReply(selected); getSelection()?.removeAllRanges(); }}>{selected ? t('extension.reading.quoteSelection') : t('extension.copy.reply')}</MenuItem>
       {copyText && <MenuItem className={menuStyles.item} icon={<Copy size={16} />} onClick={() => void c.copy(copyText)}>{selected ? t('extension.reading.copySelection') : t('extension.reading.copyText')}</MenuItem>}
       {link && <MenuItem className={menuStyles.item} icon={<Link size={16} />} onClick={() => void c.copy(link)}>{t('extension.copy.copyLink')}</MenuItem>}
-      {c.live && !self && <MenuItem className={menuStyles.item} icon={<Flag size={16} />} onClick={report}>{t('extension.copy.reportMessage')}</MenuItem>}
+      {!self && <MenuItem className={menuStyles.item} icon={<Flag size={16} />} onClick={report}>{t('extension.copy.reportMessage')}</MenuItem>}
       {self && <MenuItem className={menuStyles.item} icon={<Pencil size={16} />} onClick={() => { c.edit(message); }}>{t('extension.copy.edit')}</MenuItem>}
       {(self || c.team.owner === c.data.self) && <MenuItem className={menuStyles.item} icon={<Trash2 size={16} />} tone="danger" onClick={() => { c.recall(message); }}>{self ? t('extension.copy.recall') : t('extension.copy.remove')}</MenuItem>}
     </MenuContent>
@@ -318,7 +318,6 @@ function FailureActions({ c, message }: { c: PalsideController; message: Message
   const tip = status === 'uncertain' ? t('extension.copy.retryChecksMessage') : status === 'waiting' ? t('extension.copy.sendManuallyAfterReconnect') : t('extension.copy.notSent');
   const retryLabel = c.disconnected ? t('extension.copy.retryAfterReconnect') : status === 'uncertain' ? t('extension.copy.checkSendResult') : t('extension.copy.resend');
   function cancel() {
-    if (!c.live) { c.setMessages(old => old.filter(m => m.id !== message.id)); return; }
     const stop = () => { void c.run('cancel-send', { id: message.id }); };
     if (status === 'uncertain') c.setConfirmation({ title: uiMessage('extension.copy.stopCheckingTitle'), description: uiMessage('extension.copy.stopCheckingDescription'), confirm: stop });
     else stop();

@@ -1,11 +1,11 @@
 import { IntegrationIntl } from './intl';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PalsideApp } from './preview-app';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
 import { PalsideService } from '../src/runtime/composition/core';
 import { pageView } from '../src/runtime/viewing/view-snapshot';
 import { identifyPage, websiteIdentity } from '@palside/shared/navigation';
-import { palsideFixtures, demoSites } from './fixtures';
+import { palsideFixtures } from './fixtures';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import '@palside/design/fonts.css';
@@ -24,6 +24,6 @@ function Review(){
  const [state,setState]=useState<RuntimeState>(()=>({...new PalsideService().state,ready:true,authenticated:true,account:{ wallet: null, bio: '', tags: [], id:'you',nickname:'你',avatarId:null,matrixId:'@fixture:test',revision:0,acceptTeamInvites:true},data:data('mixed'),preferences:{web:{share:true,interact:true},current:'night',notifications:'off'}}));
  const [opened,setOpened]=useState('');
  const command:LivePort['command']=async<T,>(name:string,p:Record<string,unknown>={})=>{if(name==='preferences')setState(old=>({...old,preferences:{...old.preferences,...p}}));return undefined as T;};
- return <><nav style={{display:'flex',gap:4,flexWrap:'wrap',padding:6,fontSize:12}}>{[['mixed','混合来源'],['single','同页'],['rank','人数变化'],['gone','网站离开'],['late-token-rank','延迟人数变化'],['late-gone','延迟网站离开']].map(([scene,label])=><button key={scene} onClick={()=>{if(scene!.startsWith('late-'))setTimeout(()=>setState(old=>({...old,data:data(scene!.slice(5))})),1500);else setState(old=>({...old,data:data(scene!)}));}}>{label}</button>)}<output aria-label="跳转结果">{opened}</output></nav><div style={{height:'calc(100dvh - 64px)'}}><PalsideApp data={state.data} sites={demoSites} live={{state,command,openPage:async url=>{setOpened(url);}}} deliver={async()=>{}} /></div></>;
+ return <><nav style={{display:'flex',gap:4,flexWrap:'wrap',padding:6,fontSize:12}}>{[['mixed','混合来源'],['single','同页'],['rank','人数变化'],['gone','网站离开'],['late-token-rank','延迟人数变化'],['late-gone','延迟网站离开']].map(([scene,label])=><button key={scene} onClick={()=>{if(scene!.startsWith('late-'))setTimeout(()=>setState(old=>({...old,data:data(scene!.slice(5))})),1500);else setState(old=>({...old,data:data(scene!)}));}}>{label}</button>)}<output aria-label="跳转结果">{opened}</output></nav><div style={{height:'calc(100dvh - 64px)'}}><PalsideApp live={{state,command,openPage:async url=>{setOpened(url);}}} /></div></>;
 }
 createRoot(document.getElementById('root')!).render(<IntegrationIntl><Review/></IntegrationIntl>);

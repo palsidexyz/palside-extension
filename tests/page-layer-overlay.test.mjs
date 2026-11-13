@@ -125,6 +125,13 @@ test('density caps pending flights, lowering density takes down excess, and retr
     assert.equal(live.comments.includes(comment), false);
     overlay.updateDanmaku([{ id: line.dataset.id, key: 'token:Solana:test', text: 'duplicate', author: { name: 'A' } }]);
     assert.equal(live.comments.length, 3);
+    // A 红包 line names its packet, so the side panel opens that envelope.
+    overlay.setDanmakuSettings({ enabled: true, density: 'high' });
+    overlay.updateDanmaku([{ id: 'p1', key: 'token:Solana:test', text: '', packet: true, author: { name: 'Kai' } }]);
+    const packetLine = live.comments.at(-1).render();
+    assert.equal(packetLine.dataset.packet, '');
+    packetLine.listeners.get('click')({ isTrusted: true });
+    assert.deepEqual(sent.at(-1), { type: 'open-room', key: 'token:Solana:test', packet: 'p1' });
   } finally { overlay.stop(); env.restore(); }
 });
 

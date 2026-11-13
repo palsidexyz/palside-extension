@@ -92,7 +92,7 @@ export function ReactionStage({ c, children }: { c: PalsideController; children:
   const settle = useCallback((id: number) => setFlights(old => old.filter(item => item.id !== id)), []);
   const fallen = useCallback((key: string) => setDrops(old => old.filter(item => item.key !== key)), []);
 
-  const received = c.live?.state.reactions;
+  const received = c.live.state.reactions;
   const team = c.current; const visible = c.screen === 'chat';
   useEffect(() => {
     const clear = () => {
@@ -192,7 +192,7 @@ export function ReactionPicker({ c }: { c: PalsideController }) {
   const batcher = useRef<ReactionBatcher>(undefined);
   useEffect(() => {
     const created = new ReactionBatcher((teamId, emoji, count) => {
-      const live = controller.current.live; if (!live) return;
+      const live = controller.current.live;
       void live.command('react', { teamId, emoji, count }).catch(error => {
         // Reactions are momentary: one notice per burst of failures, never a retry queue.
         if (Date.now() - noticeAt.current < 5_000) return;

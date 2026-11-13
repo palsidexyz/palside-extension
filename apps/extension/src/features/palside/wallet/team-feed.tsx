@@ -52,20 +52,20 @@ function sendingItem(payment: WalletPayment, teamId: string, self: string): Team
   return undefined;
 }
 export function useTeamPayments(c: PalsideController): TeamPaymentItem[] {
-  const command = c.live?.command, enabled = c.live?.state.wallet?.config?.enabled, teamId = c.current, payment = c.live?.state.wallet?.payment;
-  useEffect(() => { if (enabled) void command?.('wallet-team', { teamId }).catch(() => {}); }, [command, enabled, teamId]);
-  const feed = c.live?.state.chainTeam?.teamId === teamId ? c.live.state.chainTeam : undefined;
+  const command = c.live.command, enabled = c.live.state.wallet?.config?.enabled, teamId = c.current, payment = c.live.state.wallet?.payment;
+  useEffect(() => { if (enabled) void command('wallet-team', { teamId }).catch(() => {}); }, [command, enabled, teamId]);
+  const feed = c.live.state.chainTeam?.teamId === teamId ? c.live.state.chainTeam : undefined;
   const recorded = (id: string) => !!feed && (feed.packets.some(item => item.packet.id === id) || feed.transfers.some(item => item.id === id));
   const local = payment && !recorded(payment.order.id) ? sendingItem(payment, teamId, c.data.self) : undefined;
   return [
     ...(feed?.packets.map(packet => ({ id: packet.packet.id, timestamp: packet.packet.createdAt, packet })) ?? []),
     ...(feed?.transfers.map(transfer => ({ id: transfer.id, timestamp: transfer.confirmedAt ?? transfer.submittedAt ?? transfer.createdAt, transfer })) ?? []),
     ...(local ? [local] : []),
-    ...(c.live?.state.teamLevelEvents?.filter(event => event.teamId === teamId).map(event => ({ id: event.id, timestamp: event.timestamp, level: event.to })) ?? []),
+    ...(c.live.state.teamLevelEvents?.filter(event => event.teamId === teamId).map(event => ({ id: event.id, timestamp: event.timestamp, level: event.to })) ?? []),
   ].sort((a, b) => a.timestamp - b.timestamp || a.id.localeCompare(b.id));
 }
 export function MoreTeamPayments({ c }: { c: PalsideController }) {
-  const t = useTranslations(), [busy, setBusy] = useState(false), feed = c.live?.state.chainTeam;
+  const t = useTranslations(), [busy, setBusy] = useState(false), feed = c.live.state.chainTeam;
   if (feed?.teamId !== c.current || !feed.nextCursor) return null;
   return <Button size="sm" loading={busy} onClick={() => { if (busy) return; setBusy(true); void c.run('wallet-team', { teamId: c.current, cursor: feed.nextCursor! }).finally(() => setBusy(false)); }}>{t('extension.wallet.more')}</Button>;
 }

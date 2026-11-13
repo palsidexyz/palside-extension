@@ -111,7 +111,7 @@ for (const change of ['none', 'navigation', 'account', 'team', 'unmount']) test(
   const { usePanelNavigation } = new Function('React', 'require', 'requestAnimationFrame', 'cancelAnimationFrame', `${production}; return Production;`)(React, require,
     callback => { frames.set(++frameId, callback); return frameId; }, id => frames.delete(id));
   const state = {
-    view: { screen: 'settings', data: { self: 'one' }, current: 'team', ownsScreen: () => true, setSelectingOwner() {}, setNotice() {} },
+    view: { screen: 'settings', data: { self: 'one' }, current: 'team', ownsScreen: () => true, setSelectingOwner() {}, setNotice() {}, live: { state: { authenticated: true, rooms: {} } } },
     returnFocus: { current: { checkVisibility: () => true, focus: () => { focused++; } } }, origins: { current: {} },
     setScreen: screen => { state.view.screen = screen; },
   };

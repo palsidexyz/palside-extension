@@ -66,7 +66,7 @@ function fixture() {
   const modules = new Map();
   const real = {
     './use-preferences': 'settings/use-preferences.ts', './use-grants': 'settings/use-grants.ts',
-    './access': 'settings/access.ts', '../annotations/social-state': 'annotations/social-state.ts',
+    './access': 'settings/access.ts', '../annotations/social-state': 'annotations/social-state.ts', '../composition/signed-in': '../../runtime/composition/signed-in.ts',
   };
   function load(file) {
     if (modules.has(file)) return modules.get(file);

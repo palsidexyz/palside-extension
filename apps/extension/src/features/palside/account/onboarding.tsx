@@ -27,13 +27,20 @@ import o from './onboarding.module.css';
 
 const words = new Set(ENGLISH_WORDS);
 export const onboardingScreens = ['welcome', 'new-account', 'confirm-phrase', 'restore', 'password', 'nickname'];
+/** Where 返回 and Escape lead from a sign-in step; the welcome, PIN and name steps have no way back. */
+export function onboardingBack(screen: string): 'welcome' | 'new-account' | undefined {
+  return screen === 'confirm-phrase' ? 'new-account' : screen === 'new-account' || screen === 'restore' ? 'welcome' : undefined;
+}
 
 type StepKey = 'stepPhrase' | 'stepVerify' | 'stepPassword' | 'stepName';
-/** Ordered steps of the current flow and the active index. Restore only grows a name step for accounts without one. */
+/**
+ * Ordered steps of the current flow and the active index. A typed phrase has no backup steps; a new account from it always
+ * ends with a name, while sign-in only grows a name step for accounts without one.
+ */
 function progress(c: PalsideController): { steps: StepKey[]; index: number } | undefined {
   const screen = c.working ? 'password' : c.screen;
-  if (c.flow === 'restore' || screen === 'restore') {
-    const steps: StepKey[] = c.screen === 'nickname' ? ['stepPhrase', 'stepPassword', 'stepName'] : ['stepPhrase', 'stepPassword'];
+  if (c.flow !== 'create' || screen === 'restore') {
+    const steps: StepKey[] = c.flow === 'import' || c.screen === 'nickname' ? ['stepPhrase', 'stepPassword', 'stepName'] : ['stepPhrase', 'stepPassword'];
     const index = { restore: 0, password: 1, nickname: 2 }[screen as string];
     return index === undefined ? undefined : { steps, index };
   }
@@ -86,7 +93,7 @@ function Working({ c }: { c: PalsideController }) {
   const t = useTranslations(), text = useText();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
-  const state = c.live?.state, done = c.working === 'done', failed = typeof c.working === 'object' ? c.working : undefined;
+  const state = c.live.state, done = c.working === 'done', failed = typeof c.working === 'object' ? c.working : undefined;
   // The runtime clears its phase when password-set fails; the screen keeps the last part it saw so the failure lands there.
   const reported = state?.signupPhase ? signupPhases.indexOf(state.signupPhase) : -1, [last, setLast] = useState(0);
   if (reported >= 0 && reported !== last) setLast(reported);
@@ -94,8 +101,8 @@ function Working({ c }: { c: PalsideController }) {
   const running = !done && !failed, offline = running && state?.connection?.networkOnline === false, checking = running && Boolean(state?.signupChecking);
   const slow = useSlow(running && !offline ? `${index}:${checking}` : undefined);
   const phase = signupPhases[index];
-  const title = done ? t(c.flow === 'create' ? 'extension.copy.createDone' : 'extension.copy.restoreDone')
-    : failed ? t(c.flow === 'create' ? 'extension.copy.createFailed' : 'extension.copy.restoreFailed')
+  const title = done ? t(c.flow === 'restore' ? 'extension.copy.restoreDone' : 'extension.copy.createDone')
+    : failed ? t(c.flow === 'restore' ? 'extension.copy.restoreFailed' : 'extension.copy.createFailed')
     : checking ? t('extension.copy.signupChecking')
     : phase === 'register' && c.flow === 'restore' ? t('extension.copy.phaseAddDevice') : t(`extension.copy.${phaseTitle[phase ?? 'seal']}`);
   return <>
@@ -106,11 +113,11 @@ function Working({ c }: { c: PalsideController }) {
         <X className={o.workingCross} strokeWidth={2.6} />
       </span>
       <h1 ref={heading} tabIndex={-1} className={o.workingTitle}><Roll k={title}><Band active={running && !offline}>{title}</Band></Roll></h1>
-      <span className={o.track} role="progressbar" aria-label={t(c.flow === 'create' ? 'extension.copy.createTitle' : 'extension.copy.restoreProgressTitle')} aria-valuemin={0} aria-valuemax={signupPhases.length} aria-valuenow={index}>
+      <span className={o.track} role="progressbar" aria-label={t(c.flow === 'restore' ? 'extension.copy.restoreProgressTitle' : 'extension.copy.createTitle')} aria-valuemin={0} aria-valuemax={signupPhases.length} aria-valuenow={index}>
         {signupPhases.map((item, at) => <i key={item} data-state={at < index ? 'done' : at === index ? failed ? 'failed' : offline ? 'paused' : 'current' : undefined} />)}
       </span>
       {failed ? <p className={o.workingError} role="alert">{text(failed.error)}</p>
-        : state?.signupWaiting ? <p className={o.waiting}>{t('extension.copy.signupStillPreparing')}<button type="button" onClick={() => { void c.run('account-discard'); c.go('welcome'); }}>{t('common.cancel')}</button></p>
+        : state?.signupWaiting ? <p className={o.waiting}>{t('extension.copy.signupStillPreparing')}<button type="button" onClick={c.cancelSignup}>{t('common.cancel')}</button></p>
         : offline ? <WaitNote icon={<WifiOff />}>{t('common.networkOffline')}</WaitNote>
         : slow ? <WaitNote>{t('common.slowNetwork')}</WaitNote> : null}
     </div>
@@ -343,32 +350,46 @@ function ConfirmPhrase({ c }: { c: PalsideController }) {
   </Step>;
 }
 
+/**
+ * 用助记词登录. A valid phrase with no account (never registered, or deleted) keeps its words and turns the same button into
+ * 用这组助记词创建账号, with one line on what that phrase becomes; changing any word goes back to sign-in.
+ */
 function RestorePhrase({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const text = useText();
   const [phrase, setPhrase] = useState<string[]>(() => Array(12).fill(''));
   const [error, setError] = useState<TextValue>('');
+  const [unclaimed, setUnclaimed] = useState(false);
   const filled = phrase.filter(word => words.has(word.trim().toLowerCase())).length;
   const valid = filled === 12;
+  function edit(change: (old: string[]) => string[]) { setPhrase(change); setError(''); setUnclaimed(false); }
   function paste(index: number, event: ClipboardEvent<HTMLInputElement>) {
     const pasted = event.clipboardData.getData('text').trim().toLowerCase().split(/\s+/);
     if (pasted.length < 2) return;
-    event.preventDefault(); setError('');
-    setPhrase(old => old.map((word, n) => n >= index && n - index < pasted.length ? pasted[n - index]! : word));
+    event.preventDefault();
+    edit(old => old.map((word, n) => n >= index && n - index < pasted.length ? pasted[n - index]! : word));
   }
   async function submit() {
     if (!valid || c.authBusy) return;
-    setError(''); try { await c.restoreAccount(phrase); }
-    catch (cause) { if (cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ACCOUNT_NOT_FOUND') setPhrase(Array(12).fill('')); setError(failureText(cause)); }
+    setError('');
+    try { await (unclaimed ? c.importAccount(phrase) : c.restoreAccount(phrase)); }
+    catch (cause) {
+      if (!unclaimed && cause && typeof cause === 'object' && 'code' in cause && cause.code === 'ACCOUNT_NOT_FOUND') { setUnclaimed(true); return; }
+      setError(failureText(cause));
+    }
   }
-  return <Step title={t('extension.copy.restoreTitle')} lead={t('extension.copy.restoreHint')} help={{ label: t('extension.copy.restorePasteHint'), content: t('extension.copy.restorePasteHint') }} onSubmit={() => void submit()} footer={<Button type="submit" variant="primary" size="lg" loading={c.authBusy} loadingLabel={t('extension.copy.signingIn')} disabled={!valid}>{t('extension.copy.signIn')}</Button>}>
+  const action = unclaimed ? t('extension.copy.createWithPhrase') : t('extension.copy.signIn');
+  return <Step title={t('extension.copy.restoreTitle')} lead={t('extension.copy.restoreHint')} help={{ label: t('extension.copy.restorePasteHint'), content: t('extension.copy.restorePasteHint') }} onSubmit={() => void submit()} footer={<Button type="submit" variant="primary" size="lg" loading={c.authBusy} loadingLabel={unclaimed ? t('common.working') : t('extension.copy.signingIn')} disabled={!valid}><Roll k={action}>{action}</Roll></Button>}>
     <div className={o.sheet}>
       <div className={o.sheetHead}>
         <span className={o.sheetCount} data-complete={valid || undefined}><b><Count value={filled} /></b> / 12</span>
-        {phrase.some(Boolean) && !c.authBusy && <Button size="sm" variant="quiet" className={o.sheetClear} onClick={() => { setPhrase(Array(12).fill('')); setError(''); }}>{t('extension.copy.clearPhrase')}</Button>}
+        {phrase.some(Boolean) && !c.authBusy && <Button size="sm" variant="quiet" className={o.sheetClear} onClick={() => edit(() => Array(12).fill(''))}>{t('extension.copy.clearPhrase')}</Button>}
       </div>
-      <div className={o.wordGrid} data-word-grid>{phrase.map((word, index) => <WordInput key={index} number={index + 1} label={t('extension.dynamic.wordNumber', { number: index + 1 })} invalid={!possible(word)} autoFocus={index === 0} value={word} disabled={c.authBusy} onPaste={event => paste(index, event)} onValue={value => { setPhrase(old => old.map((item, n) => n === index ? value : item)); setError(''); }} />)}</div>
+      <div className={o.wordGrid} data-word-grid>{phrase.map((word, index) => <WordInput key={index} number={index + 1} label={t('extension.dynamic.wordNumber', { number: index + 1 })} invalid={!possible(word)} autoFocus={index === 0} value={word} disabled={c.authBusy} onPaste={event => paste(index, event)} onValue={value => edit(old => old.map((item, n) => n === index ? value : item))} />)}</div>
     </div>
+    {unclaimed && <div className={o.warning} role="status"><ShieldAlert size={16} aria-hidden="true" /><p>{t('extension.copy.phraseNoAccount')}</p>
+      <HelpTip label={t('extension.copy.phraseSafety')} content={t('extension.copy.importRisk')} className={o.help} />
+    </div>}
     {error && <p className={edge.error} role="alert">{text(error)}</p>}
   </Step>;
 }
@@ -384,7 +405,7 @@ function PasswordSetup({ c }: { c: PalsideController }) {
     setError(''); try { await c.setPassword(pin); } catch (cause) { setError(failureText(cause)); }
   }
   return <Step title={t('extension.copy.passwordTitle')} lead={t('extension.copy.passwordHint')} help={{ label: t('extension.copy.passwordHelpLabel'), content: t('extension.copy.passwordHelp') }} onSubmit={() => void submit()}
-    footer={<Button type="submit" variant="primary" size="lg" loading={c.authBusy} loadingLabel={t('common.working')} disabled={pin.length < PIN_LENGTH}>{t(c.flow === 'create' ? 'extension.copy.createAccount' : 'extension.copy.signIn')}</Button>}>
+    footer={<Button type="submit" variant="primary" size="lg" loading={c.authBusy} loadingLabel={t('common.working')} disabled={pin.length < PIN_LENGTH}>{t(c.flow === 'restore' ? 'extension.copy.signIn' : 'extension.copy.createAccount')}</Button>}>
     <div className={o.pinBlock}>
       <PinInput outlined reveal aria-label={t('extension.copy.password')} aria-invalid={Boolean(error)} aria-describedby={error ? 'pin-error' : undefined} autoComplete="off" autoFocus value={pin} disabled={c.authBusy} onValueChange={value => { setPin(value); setError(''); }} />
       {error && <p id="pin-error" className={edge.error} role="alert">{text(error)}</p>}
@@ -403,8 +424,7 @@ function Nickname({ c }: { c: PalsideController }) {
     if (busy || invalid || !name.trim()) return;
     setBusy(true); setError('');
     try {
-      if (c.live) await c.live.command('profile', { name: name.trim() });
-      else c.setPeople(old => old.map(person => person.id === c.data.self ? { ...person, name: name.trim() } : person));
+      await c.live.command('profile', { name: name.trim() });
       if (c.data.pendingInvite) c.openInvitation();
       else c.go('chat');
     } catch (cause) { setError(failureText(cause, 'extension.copy.profileSaveFailed')); }
@@ -418,7 +438,7 @@ function Nickname({ c }: { c: PalsideController }) {
 
 export function Onboarding({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const back = !c.working && (c.screen === 'new-account' || c.screen === 'restore' || c.screen === 'confirm-phrase');
+  const back = c.working ? undefined : onboardingBack(c.screen);
   const shell = useRef<HTMLElement>(null);
   const wasRunning = useRef(false);
   useEffect(() => {
@@ -427,8 +447,8 @@ export function Onboarding({ c }: { c: PalsideController }) {
   }, [c.working]);
   return <section ref={shell} className={o.shell} data-screen={c.working ? 'working' : c.screen} aria-label={t('extension.copy.onboardingSteps')}>
     <header className={o.header}>
-      {back ? <Action label={t('common.back')} onClick={() => c.go(c.screen === 'confirm-phrase' ? 'new-account' : 'welcome')}><ArrowLeft /></Action> : <Brand />}
-      <span className={o.headerTools}><AppearanceSetting compact />{c.live && <LanguageSetting compact />}</span>
+      {back ? <Action label={t('common.back')} onClick={() => c.go(back)}><ArrowLeft /></Action> : <Brand />}
+      <span className={o.headerTools}><AppearanceSetting compact /><LanguageSetting compact /></span>
     </header>
     <Steps c={c} />
     {c.working && <div className={o.body}><Working c={c} /></div>}

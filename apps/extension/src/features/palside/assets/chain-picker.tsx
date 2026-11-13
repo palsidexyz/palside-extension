@@ -14,7 +14,7 @@ const chainOf = (asset: string) => asset.slice(0, asset.indexOf(':'));
 
 /** The candidates the active tab's address has when it is a token on several chains, current first; empty otherwise. */
 export function tabChainChoices(c: PalsideController, asset: string | undefined) {
-  const choices = c.live?.state.pageChoices;
+  const choices = c.live.state.pageChoices;
   if (!asset || !choices) return [];
   return Object.values(choices).find(candidates => candidates[0] === asset && candidates.length > 1) ?? [];
 }

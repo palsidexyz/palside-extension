@@ -11,7 +11,7 @@ import r from './recent-tokens.module.css';
 /** 最近看过: the last 弹幕 this account opened, as chips that reopen them. Memory only; nothing shows before the first one. */
 export function RecentTokens({ c }: { c: PalsideController }) {
   const t = useTranslations();
-  const keys = (c.live?.state.recentRooms ?? []) as RoomKey[];
+  const keys = (c.live.state.recentRooms ?? []) as RoomKey[];
   if (!keys.length) return null;
   return <div className={r.recent} role="group" aria-label={t('extension.room.recent')}>
     {keys.map(key => {

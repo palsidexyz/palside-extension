@@ -8,7 +8,7 @@ import { Brand } from '../ui/brand';
 import { useAppearance } from '../settings/appearance';
 import { LanguageContext, LanguageSetting } from '../settings/language-setting';
 import { PalsideApp } from './palside-app';
-import { siteCatalog } from '../settings/site-catalog';
+import type { LivePort } from './live-port';
 import { RotateCcw } from 'lucide-react';
 import { Button } from '@palside/ui/button';
 import s from './live-app.module.css';
@@ -70,7 +70,7 @@ export function LiveApp() {
   if (!language) return <main data-palside-app data-appearance={appearance} aria-busy="true" style={{ height: '100%', background: 'var(--ui-canvas)' }} />;
   return <IntlProvider timeZone={Intl.DateTimeFormat().resolvedOptions().timeZone} locale={language.locale} messages={messagesFor(language.locale)} getMessageFallback={getMessageFallback}>
     <LanguageContext.Provider value={{ state: language, connected, save }}>
-      {state?.banned ? <Banned expiresAt={state.banned.expiresAt} /> : !state?.ready ? <Loading error={error} /> : <PalsideApp data={state.data} sites={siteCatalog} live={live} deliver={async () => { throw new Error('Send service is unavailable'); }} />}
+      {state?.banned ? <Banned expiresAt={state.banned.expiresAt} /> : !state?.ready ? <Loading error={error} /> : <PalsideApp live={live as LivePort} />}
     </LanguageContext.Provider>
   </IntlProvider>;
 }

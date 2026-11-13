@@ -68,6 +68,9 @@ function fixture(t, rows = new Map()) {
   return { runtime, service, calls, count, handlers, rows, writes, avatarCalls, created, revoked, enter, invalidate: () => generation++, emits: () => emits, saved: () => saved, refreshed: () => refreshed, invites: value => { pendingInvites = value; } };
 }
 
+/** 设置 › 网页互动 › 弹幕 on or off, as the preferences command applies it. */
+const danmaku = (f, on) => { f.runtime.state.preferences = { ...f.runtime.state.preferences, siteInteraction: on ? {} : { '*': { on: true, danmaku: false, signal: true, chart: true } } }; return f.service.preferencesChanged(); };
+
 test('lease target follows the tab, pin overrides it, close follows the latest tab; the tab site accompanies renewal', async t => {
   const f = fixture(t);
   await f.service.tabChanged({ asset: key.slice(6), site: 'gmgn' }); assert.equal(f.count('POST /rooms/lease'), 0);
@@ -112,19 +115,18 @@ test('rapid lease changes serialize and discard stale snapshots', async t => {
 test('off releases an in-flight lease and clears all public queries; late responses cannot restore them', async t => {
   const f = fixture(t); await f.enter(); await f.service.summary(key); await f.service.watchHot({ sourceId: 'one:hot', open: true }); await f.service.people(key);
   const gate = deferred(); f.handlers.set('GET /rooms/summary', () => gate.promise); const pending = f.service.summary(otherKey);
-  await f.service.settings({ off: true }); assert.equal(f.runtime.state.rooms.current, undefined); assert.deepEqual(f.runtime.state.rooms.summaries, {}); assert.equal(f.runtime.state.rooms.hot, undefined); assert.equal(f.runtime.state.rooms.people, undefined);
+  await danmaku(f, false); assert.equal(f.runtime.state.rooms.current, undefined); assert.deepEqual(f.runtime.state.rooms.summaries, {}); assert.equal(f.runtime.state.rooms.hot, undefined); assert.equal(f.runtime.state.rooms.people, undefined);
   gate.resolve(summary(otherKey)); await pending; assert.deepEqual(f.runtime.state.rooms.summaries, {});
   const n = f.calls.length; t.mock.timers.tick(3 * ROOM_RENEW_MS); await settle(); assert.equal(f.calls.length, n);
   assert.equal(f.calls.filter(call => call.path === '/rooms/lease').at(-1).options.body.key, null);
   assert.throws(() => f.service.send('text'), { code: 'ROOM_OFF' }); await assert.rejects(f.service.summary(key), { code: 'ROOM_OFF' });
-  f.handlers.delete('GET /rooms/summary'); await f.service.settings({ off: false }); assert.equal(f.runtime.state.rooms.current.key, key); assert.equal(f.saved(), 2);
+  f.handlers.delete('GET /rooms/summary'); await danmaku(f, true); assert.equal(f.runtime.state.rooms.current.key, key);
 });
 
-test('invalid keys, settings, text and signed-out commands never contact the server', async t => {
+test('invalid keys, text and signed-out commands never contact the server', async t => {
   const f = fixture(t);
   for (const room of ['page:example.com', 'pool:Solana:anything', 'token:invalid']) assert.throws(() => f.service.open({ key: room }), { code: 'INVALID_INPUT' });
   assert.throws(() => f.service.tabChanged({ asset: 'wrong' }), { code: 'INVALID_INPUT' });
-  await assert.rejects(f.service.settings({ intro: true }), { code: 'INVALID_INPUT' });
   await f.enter(); const n = f.calls.length;
   for (const text of ['', '  ', '😀'.repeat(61), 1]) assert.throws(() => f.service.send(text), { code: 'INVALID_INPUT' });
   assert.equal(f.calls.length, n); f.runtime.auth.session = undefined;
@@ -165,7 +167,7 @@ for (const transition of ['snapshot failure', 'panel close', 'room switch', 'par
     await f.service.open({ key: otherKey }); await assert.rejects(f.service.send('hello'));
     await f.service.close();
   } else if (transition === 'participation off') {
-    await f.service.settings({ off: true }); await f.service.settings({ off: false });
+    await danmaku(f, false); await danmaku(f, true);
   } else await f.service.clearLocal();
   await assert.rejects(f.service.send('another text'));
   f.handlers.delete('POST /rooms/messages'); await f.service.send('hello');
@@ -320,8 +322,8 @@ test('avatars load only faces, people and visible authors, discard late loads an
   const f = fixture(t), gate = deferred(); f.runtime.api.roomAvatar = async (room, account) => { f.avatarCalls.push({ key: room, account }); return gate.promise; };
   f.handlers.set('GET /rooms/summary', () => summary(key, { faces: [{ ...peer, avatarId: 'avatar' }] }));
   await f.enter(); await settle(); assert.equal(f.avatarCalls.length, 1);
-  await f.service.settings({ off: true }); gate.resolve(new Blob(['late'])); await settle(); assert.equal(f.created.length, 0);
-  await f.service.settings({ off: false }); await settle(); assert.equal(f.created.length, 1);
+  await danmaku(f, false); gate.resolve(new Blob(['late'])); await settle(); assert.equal(f.created.length, 0);
+  await danmaku(f, true); await settle(); assert.equal(f.created.length, 1);
   const url = f.runtime.state.rooms.avatars.peer; await f.service.clearLocal(); assert.ok(f.revoked.includes(url));
 });
 
@@ -347,7 +349,7 @@ test('invite settings and owner permission use the agreed routes; business error
 test('room reconnection refreshes its snapshot without directory reads; participation off never reacquires a lease', async t => {
   const f = fixture(t); await f.enter(); const before = f.count('GET /rooms/summary'); f.service.reconnected(); await settle();
   assert.equal(f.count('GET /rooms/summary'), before + 1); assert.equal(f.count('GET /team-invites'), 0);
-  await f.service.settings({ off: true }); const leases = f.count('POST /rooms/lease'); f.service.reconnected(); await settle(); assert.equal(f.count('POST /rooms/lease'), leases); assert.equal(f.count('GET /team-invites'), 0);
+  await danmaku(f, false); const leases = f.count('POST /rooms/lease'); f.service.reconnected(); await settle(); assert.equal(f.count('POST /rooms/lease'), leases); assert.equal(f.count('GET /team-invites'), 0);
 });
 
 test('account reset rejects late work, releases with the old bearer and clears all room state', async t => {
@@ -359,8 +361,8 @@ test('account reset rejects late work, releases with the old bearer and clears a
   assert.equal(f.calls.filter(call => call.path === '/rooms/lease').at(-1).options.token, 'token');
 });
 
-test('preferences preserve participation settings and fresh state has no transient toggle or room fields', () => {
-  assert.deepEqual(readPreferences({ rooms: { off: true } }).rooms, { off: true }); assert.equal(readPreferencePatch({ rooms: { intro: true } }), undefined);
+test('preferences move the stored 参与弹幕 switch to the 弹幕 card and fresh state has no transient toggle or room fields', () => {
+  const moved = readPreferences({ rooms: { off: true, noticed: true } }); assert.deepEqual(moved.rooms, { noticed: true }); assert.deepEqual(moved.siteInteraction, { '*': { on: true, danmaku: false, signal: true, chart: true } }); assert.deepEqual(readPreferencePatch({ rooms: { off: true } }), { rooms: {} }); assert.equal(readPreferencePatch({ rooms: { intro: true } }), undefined);
   assert.equal(readPreferences({ rooms: { intro: true } }).rooms, undefined); assert.deepEqual(emptyState().preferences, { current: '', notifications: 'off' });
   assert.equal('toggles' in emptyState(), false);
   assert.equal('recent' in emptyState().rooms, false); assert.equal('active' in emptyState().rooms, false);
@@ -383,14 +385,9 @@ test('accept waits out an older team snapshot and requests a fresh post-join sna
 test('off during an in-flight lease queues release after the old acquisition', async t => {
   const f = fixture(t), gate = deferred(); await f.service.panelChanged(true);
   f.handlers.set('POST /rooms/lease', (_path, options) => options.body.key ? gate.promise : { key: null, count: 0, slowUntil: 0 });
-  const opening = f.service.open({ key }); await settle(); const stopping = f.service.settings({ off: true }); await settle();
+  const opening = f.service.open({ key }); await settle(); const stopping = danmaku(f, false); await settle();
   assert.equal(f.runtime.state.rooms.current, undefined); gate.resolve({ key, count: 2, slowUntil: 0 }); await Promise.all([opening, stopping]);
   assert.deepEqual(f.calls.filter(call => call.path === '/rooms/lease').map(call => call.options.body.key), [key, null]); assert.equal(f.count('GET /rooms/summary'), 0);
-});
-
-test('failed participation preference write restores the prior setting and lease', async t => {
-  const f = fixture(t); await f.enter(); f.runtime.sharing.savePreferences = async () => { throw Error('disk full'); };
-  await assert.rejects(f.service.settings({ off: true }), /disk full/); await settle(); assert.equal(f.runtime.state.preferences.rooms?.off, undefined); assert.equal(f.runtime.state.rooms.current.key, key);
 });
 
 test('slow snapshot reads cannot delay lease renewal or panel-close release', async t => {
@@ -463,7 +460,7 @@ test('a new offscreen room service acquires the unchanged host tab with backgrou
       if (name === 'room-panels') await receiver.panelChanged(payload.connected);
       return { ok: true };
     },
-    sharing: { observer: { replay: async () => {} } },
+    sharing: { observer: { replay: async () => {} }, replayDeviceState: async () => {} },
     panel: { reportRoomPanels: () => bg.run({ name: 'room-panels', payload: { connected: bg.panels.size > 0 } }) },
   };
   bg.roomTab = roomTab(bg); const sync = stateSync(bg);
@@ -551,7 +548,7 @@ test('hot reopens after live socket reconnect and closes when participation is d
   await f.service.watchHot({ sourceId: 'one:hot', open: true });
   f.service.reconnected(); await settle();
   assert.equal(f.count('POST /rooms/hot/subscription'), 2);
-  await f.service.settings({ off: true }); await settle();
+  await danmaku(f, false); await settle();
   assert.equal(f.calls.filter(call => call.path === '/rooms/hot/subscription').at(-1).options.body.open, false);
   assert.equal(f.runtime.state.rooms.hot, undefined);
 });

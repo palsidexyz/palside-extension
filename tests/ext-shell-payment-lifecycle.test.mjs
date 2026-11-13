@@ -56,7 +56,9 @@ function production() {
     '@palside/ui/inline-feedback': { InlineFeedback: ({ children, action }) => h('div', { role: 'alert' }, children, h('button', { onClick: action.onClick }, action.label)) },
     '../../../domain/wallet/model': walletModel,
     '../../../domain/account/model': { personFor: (people, id) => people.find(person => person.id === id) ?? { id, name: id } },
-    '../rooms/rooms': { roomPerson: (_c, author) => author },
+    '../rooms/rooms': { roomPerson: (_c, author) => author, roomView: (_c, key) => ({ id: key, name: key }) },
+    '../teams/team-avatar': { TeamAvatar: () => null },
+    '../assets/token-name': { tokenLabel: view => view.name, tokenWaiting: () => undefined },
     '../ui/primitives': { PersonAvatar: () => null, Token: () => null },
     '../ui/text': { useText: () => value => value },
     '../ui/motion-details': { Count: ({ value }) => value, CountText: ({ text }) => text, Dots: () => 'pending', Pending: () => 'pending', DrawnCheck: () => 'confirmed', Fit: pass, Rise: pass, Step: pass, Swap: pass },
@@ -72,7 +74,7 @@ function production() {
       return motionTags.get(tag);
     } }) },
   };
-  const context = vm.createContext({ console, setTimeout, clearTimeout, Date, window, document });
+  const context = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval, Date, window, document });
   function load(name) {
     const file = `apps/extension/src/features/palside/wallet/${name}.tsx`;
     const code = ts.transpileModule(readFileSync(file, 'utf8'), { fileName: file, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
@@ -96,7 +98,7 @@ async function fixture(t, handler = async () => undefined) {
   document.body.append(container);
   const root = createRoot(container);
   let view, sessionKey = 0;
-  const c = { data: { self: 'self' }, screen: 'chat', current: 'team', now: Date.now(), people: [{ id: 'self', name: 'Self' }, { id: 'peer', name: 'Peer' }], team: { name: 'Squad', owner: 'self', memberIds: ['self', 'peer'] }, back: () => calls.push(['back']) };
+  const c = { data: { self: 'self' }, screen: 'chat', current: 'team', now: Date.now(), people: [{ id: 'self', name: 'Self' }, { id: 'peer', name: 'Peer' }], team: { id: 'team', name: 'Squad', owner: 'self', memberIds: ['self', 'peer'] }, teams: [{ id: 'team', name: 'Squad', owner: 'self', memberIds: ['self', 'peer'] }], back: () => calls.push(['back']) };
   const command = async (name, payload) => { calls.push([name, structuredClone(payload)]); return handler(name, payload); };
   c.live = { command, state: { account: { id: 'self' }, authenticated: true, rooms: { current: { key: 'room', messages: [{ id: 'message', author: { id: 'peer', name: 'Peer' }, text: 'hello' }] } }, wallet: { availability: 'ready', config: { enabled: true, deployment: { decimals: 18 }, quickPay: { single: '250', daily: '1000' } }, balance: { balance: '1000000000000000000000' } } } };
   c.run = (...args) => command(...args).catch(() => undefined);

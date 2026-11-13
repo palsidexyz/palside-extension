@@ -29,7 +29,7 @@ test('all room and invite commands route their payload to the owned service', as
     ['room-panels', 'panelChanged', { connected: true }, [true]], ['room-tab', 'tabChanged', { asset: key.slice(6), site: 'gmgn' }], ['room-open', 'open', { key }], ['room-close', 'close', {}, []],
     ['room-send', 'send', { text: 'hi' }, ['hi']], ['room-more', 'more', {}, []], ['room-retract', 'retract', { id: 'm' }, ['m']], ['room-report', 'report', { id: 'm' }, ['m']],
     ['room-like', 'like', { key, id: 'message', liked: true }, [key, 'message', true]], ['room-summary', 'summary', { key }, [key]], ['room-people', 'people', { key }, [key]], ['room-hot', 'watchHot', { sourceId: 'panel', chain: 'Solana' }],
-    ['room-block', 'block', { accountId: 'peer', blocked: true }, ['peer', true]], ['room-blocks', 'blocks', {}, []], ['room-settings', 'settings', { off: true }],
+    ['room-block', 'block', { accountId: 'peer', blocked: true }, ['peer', true]], ['room-blocks', 'blocks', {}, []],
     ['invite-list', 'invites', {}, []], ['invite-options', 'inviteOptions', { accountId: 'peer' }, ['peer']], ['invite-send', 'inviteSend', { teamId: 'team', accountId: 'peer' }, ['team', 'peer']],
     ['invite-accept', 'inviteAccept', { id: 'i' }, ['i']], ['invite-ignore', 'inviteIgnore', { id: 'i' }, ['i']], ['invite-settings', 'inviteSettings', { accept: false }, [false]], ['team-invite-permission', 'invitePermission', { teamId: 'team', on: true }, ['team', true]],
   ];
@@ -50,6 +50,10 @@ test('panel bridge emits validated open-room keys, unsubscribes, ignores disconn
   const unsubscribe = bridge.onOpenRoom(value => received.push(value));
   const stop = bridge.observeState({ onDisconnect() {}, onState() {}, onError() {}, onLanguage() {}, onPage() {}, onCaptured() {}, onDanmaku() {} });
   await Promise.resolve(); ports[0].receive({ type: 'open-room', key }); ports[0].receive({ type: 'open-room', key: 'page:example.com' }); assert.deepEqual(received, [key]);
+  // A 红包 from the page names its packet; anything but a packet id is dropped, the room still opens.
+  const packets = [], unsubscribePackets = bridge.onOpenRoom((_key, packet) => packets.push(packet));
+  ports[0].receive({ type: 'open-room', key, packet: '0x' + 'a'.repeat(64) }); ports[0].receive({ type: 'open-room', key, packet: '<forged>' });
+  assert.deepEqual(packets, ['0x' + 'a'.repeat(64), undefined]); unsubscribePackets(); received.length = 1;
   unsubscribe(); ports[0].receive({ type: 'open-room', key }); assert.deepEqual(received, [key]);
   const unsubscribeAgain = bridge.onOpenRoom(value => received.push(value)); stop(); ports[0].receive({ type: 'open-room', key }); unsubscribeAgain(); assert.deepEqual(received, [key]);
   await assert.rejects(bridge.command('room-send', { text: 'hi' }), error => error.code === 'ROOM_SLOW' && error.retryAfterMs === 1234);

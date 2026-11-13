@@ -39,14 +39,13 @@ function AddressChip({ c, address }: { c: PalsideController; address: string }) 
 }
 
 export function WalletHome({ c }: { c: PalsideController }) {
-  const t = useTranslations(), wallet = c.live?.state.wallet, command = c.live?.command;
-  useEffect(() => { void command?.('wallet-refresh', {}).catch(() => {}); void command?.('wallet-reconcile', {}).catch(() => {}); }, [command]);
-  const loading = Boolean(c.live) && (!wallet || wallet.availability === 'loading');
+  const t = useTranslations(), wallet = c.live.state.wallet, command = c.live.command;
+  useEffect(() => { void command('wallet-refresh', {}).catch(() => {}); void command('wallet-reconcile', {}).catch(() => {}); }, [command]);
+  const loading = !wallet || wallet.availability === 'loading';
   // Loading never sits there for good: past a few seconds it says the wallet is unavailable and offers another try.
   const [stalled, setStalled] = useState(false), [attempt, setAttempt] = useState(0);
   const retry = () => { setStalled(false); setAttempt(value => value + 1); void c.run('wallet-refresh', {}); };
   useEffect(() => { if (!loading) return; const timer = setTimeout(() => setStalled(true), 6000); return () => { clearTimeout(timer); setStalled(false); }; }, [loading, attempt]);
-  if (!c.live) return <div className={s.empty}><Wallet /><p>{t('extension.wallet.soon')}</p></div>;
   if (loading && stalled) return <div className={s.empty}><Wallet /><p>{t('extension.wallet.unavailable')}</p><Button onClick={retry}>{t('common.retry')}</Button></div>;
   // Loading draws the page it is about to show: the balance block and the two tiles, in place, so nothing jumps on arrival.
   if (!wallet || wallet.availability === 'loading') return <div className={s.page} role="status" aria-busy="true" aria-label={t('extension.copy.loading')}>
@@ -83,10 +82,10 @@ function WalletUnlock({ c }: { c: PalsideController }) {
   return <div className={s.page}><h2>{t('extension.wallet.password')}</h2><PinInput outlined value={password} onValueChange={setPassword} aria-label={t('extension.wallet.password')} autoComplete="off" /><Button variant="primary" loading={busy} disabled={password.length !== PIN_LENGTH} onClick={() => { if (busy) return; setBusy(true); void c.run('wallet-unlock', { password }).finally(() => { setPassword(''); setBusy(false); }); }}>{t('common.confirm')}</Button></div>;
 }
 export function WalletReceive({ c }: { c: PalsideController }) {
-  const t = useTranslations(), command = c.live?.command, address = c.live?.state.wallet?.address;
+  const t = useTranslations(), command = c.live.command, address = c.live.state.wallet?.address;
   const [uri, setUri] = useState(''), [error, setError] = useState(false), [attempt, setAttempt] = useState(0), [copied, copy, failedValue] = useCopied(c);
   const reduced = useReducedMotion();
-  useEffect(() => { let current = true; void command?.('wallet-receive', {}).then(value => { if (current) setUri(value.uri); }, () => { if (current) setError(true); }); return () => { current = false; }; }, [command, attempt]);
+  useEffect(() => { let current = true; void command('wallet-receive', {}).then(value => { if (current) setUri(value.uri); }, () => { if (current) setError(true); }); return () => { current = false; }; }, [command, attempt]);
   return <div className={s.receive}>
     <h2>{t('extension.wallet.receive')}</h2>
     <div className={s.qrCard}>
@@ -101,11 +100,11 @@ export function WalletReceive({ c }: { c: PalsideController }) {
 }
 
 function RecordDetail({ c, record, onClose }: { c: PalsideController; record: ChainRecord; onClose: () => void }) {
-  const t = useTranslations(), locale = localeOrEnglish(useLocale()), [packet, setPacket] = useState(false), [copied, copy, failedValue] = useCopied(c), command = c.live?.command, packetId = record.packetId;
+  const t = useTranslations(), locale = localeOrEnglish(useLocale()), [packet, setPacket] = useState(false), [copied, copy, failedValue] = useCopied(c), command = c.live.command, packetId = record.packetId;
   // The packet is read while this sheet is up, so 红包 opens on its content; a failed read still opens and offers retry there.
   const [detail, setDetail] = useState<ApiResult<'chain.packet'> | null>();
-  useEffect(() => { if (!packetId) return; let current = true; void command?.('wallet-packet', { id: packetId }).then(value => { if (current) setDetail(value); }, () => { if (current) setDetail(null); }); return () => { current = false; }; }, [command, packetId]);
-  const incoming = record.to.toLowerCase() === c.live?.state.wallet?.address.toLowerCase();
+  useEffect(() => { if (!packetId) return; let current = true; void command('wallet-packet', { id: packetId }).then(value => { if (current) setDetail(value); }, () => { if (current) setDetail(null); }); return () => { current = false; }; }, [command, packetId]);
+  const incoming = record.to.toLowerCase() === c.live.state.wallet?.address.toLowerCase();
   if (packet && packetId && detail !== undefined) return <PacketDetail c={c} id={packetId} initial={detail ?? undefined} onClose={() => setPacket(false)} />;
   return <Sheet open onOpenChange={open => { if (!open) onClose(); }} boundarySelector="[data-palside-app]" aria-labelledby="record-title"><div className={`${s.page} ${s.sheetContent} ${s.detail}`}>
     <IconButton size="sm" variant="quiet" className={s.close} label={t('common.close')} onClick={onClose}><X size={18} /></IconButton>
@@ -123,10 +122,10 @@ function RecordDetail({ c, record, onClose }: { c: PalsideController; record: Ch
 }
 
 export function WalletRecords({ c }: { c: PalsideController }) {
-  const t = useTranslations(), wallet = c.live?.state.wallet, command = c.live?.command, reduced = useReducedMotion();
+  const t = useTranslations(), wallet = c.live.state.wallet, command = c.live.command, reduced = useReducedMotion();
   const [selected, setSelected] = useState<ChainRecord>();
   const [direction, setDirection] = useState<'all' | 'in' | 'out'>('all'), [busy, setBusy] = useState(true), [failed, setFailed] = useState(false), [revision, setRevision] = useState(0);
-  useEffect(() => { let current = true; void command?.('wallet-records', { direction }).catch(() => { if (current) setFailed(true); }).finally(() => { if (current) setBusy(false); }); return () => { current = false; }; }, [command, direction, revision]);
+  useEffect(() => { let current = true; void command('wallet-records', { direction }).catch(() => { if (current) setFailed(true); }).finally(() => { if (current) setBusy(false); }); return () => { current = false; }; }, [command, direction, revision]);
   const hidden = wallet?.preferences.hideAmounts;
   return <div className={s.page}>
     <div className={s.segment}>{(['all', 'in', 'out'] as const).map(value => <button key={value} aria-pressed={direction === value} onClick={() => { if (value !== direction) { setBusy(true); setFailed(false); setDirection(value); } }}>{t(value === 'in' ? 'extension.wallet.incoming' : value === 'out' ? 'extension.wallet.outgoing' : 'extension.hot.all')}</button>)}</div>

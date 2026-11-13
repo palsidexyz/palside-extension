@@ -1,11 +1,10 @@
-import { REACTION_TTL_MS } from '@palside/shared/rules/interactions';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import type { MatrixEvent } from 'matrix-js-sdk';
 import { sharingWork, PING_ENCRYPTION_WAIT_MS } from '../viewing/sharing-work';
 import { trustedDeviceMessages } from '../viewing/viewing-targets';
 import { teamSendGuard } from '../account/crypto-identity';
 import { readView } from '../viewing/view-snapshot';
-import { POKE_EVENT } from '../../domain/annotations/social';
+import { POKE_EVENT, reachedPoke, readPokeWire } from '../../domain/annotations/social';
 import { isReactionEmoji,pruneReactions,readReaction,REACTION_DISPLAY,REACTION_MAX_COUNT } from '../../domain/annotations/reactions';
 import type { RuntimeDevice } from '../account/device';
 import { mergePoke } from './team-items';
@@ -129,29 +128,55 @@ export class TeamInteractions {
     this.reactionTimer = setTimeout(() => { if (runtime.auth.session !== session) return; runtime.state.reactions = pruneReactions(runtime.state.reactions ?? []); runtime.emit(); }, REACTION_DISPLAY + 50);
     runtime.emit();
   }
+  /** 喊你来看 from a teammate: kept for a few minutes as a chat hint, and offered to the desktop when the squad's chat is not in view. */
   async consumePoke(event: MatrixEvent, session: RuntimeDevice) {
-    const runtime = this.runtime;
-    const scope = runtime.auth.scope();
-    if (runtime.auth.session !== session || !event.isEncrypted()) return; const c = event.getContent(); const team = typeof c.teamId === 'string' ? runtime.state.remoteTeams.find(t => t.id === c.teamId && t.joined) : undefined; const person = team?.people.find(p => p.matrixId === event.getSender() && team.memberIds.includes(p.id) && p.id !== session.account.id); if (!team || !person || typeof c.id !== 'string' || typeof c.sentAt !== 'number' || Date.now() - c.sentAt > REACTION_TTL_MS) return; const view = await scope.wait(readView(c.view)); if (!view || view.kind !== 'asset') return; runtime.state.pokes = mergePoke(runtime.state.pokes, { id: c.id, teamId: team.id, from: person.id, view, at: Date.now(), count: 1 }); runtime.emit();
+    const runtime = this.runtime, scope = runtime.auth.scope();
+    if (runtime.auth.session !== session || !event.isEncrypted()) return;
+    const wire = readPokeWire(event.getContent(), runtime.signals.serviceNow());
+    const team = wire && runtime.state.remoteTeams.find(t => t.id === wire.teamId && t.joined && t.memberIds.includes(session.account.id));
+    const person = team?.people.find(p => !p.deleted && p.matrixId === event.getSender() && team.memberIds.includes(p.id) && p.id !== session.account.id);
+    if (!wire || !team || !person) return;
+    const view = await scope.wait(readView(wire.view));
+    if (!view || runtime.auth.session !== session) return;
+    if (runtime.state.pokes?.some(item => item.id === wire.id)) return;
+    runtime.state.pokes = mergePoke(runtime.state.pokes, { id: wire.id, teamId: team.id, from: person.id, view, at: Date.now(), count: 1 });
+    runtime.emit();
+    // A squad chat open in a panel already shows the hint; otherwise the desktop is asked, under the squad's 通知 rules.
+    const shown = runtime.state.data.messages.some(message => message.teamId === team.id && runtime.timeline.visibleMessages.has(message.id));
+    if (!shown) void runtime.notify({ accountId: session.account.id, teamId: team.id, pokeId: wire.id, preview: Boolean(runtime.state.preferences.notificationPreview) }).catch(() => {});
   }
-  async poke(teamId: string, accountId: string) {
+  /**
+   * 喊来看: asks one teammate, or everyone online in the squad when `accountId` is absent, to come to the page this device shares.
+   * Reachable means online (active or away); the answer counts the people whose devices the call was encrypted for.
+   */
+  async poke(teamId: string, accountId?: string) {
     const runtime = this.runtime;
     const scope = runtime.auth.scope();
     const eligibility = teamSendGuard(runtime, teamId, true);
     const { session, team, client } = eligibility;
     const viewing = runtime.sharing.ownViewing;
-    const target = liveMembers(team).find(person => person.id === accountId);
+    const online = (id: string) => { const presence = runtime.state.data.people.find(person => person.id === id)?.presence; return presence === 'active' || presence === 'away'; };
+    // Calling everyone skips the teammates already on this page; calling one person always goes.
+    const there = (id: string) => { const shown = runtime.sharing.peerViewing.get(id); return Boolean(viewing && shown && reachedPoke(viewing.view, shown.view)); };
+    const targets = liveMembers(team).filter(person => person.id !== session.account.id && (accountId === undefined ? !there(person.id) : person.id === accountId) && online(person.id));
     const check = () => {
       eligibility.check();
       if (!viewing || runtime.sharing.ownViewing !== viewing || viewing.teamId !== teamId || viewing.expiresAt <= Date.now()) throw commandError('POKE_NEEDS_SHARING', 'extension.member.needSharing');
-      if (!target || runtime.state.data.people.find(person => person.id === accountId)?.presence !== 'active') throw commandError('POKE_OFFLINE', 'extension.runtime.pokeOffline');
+      if (accountId !== undefined && !online(accountId)) throw commandError('POKE_OFFLINE', 'extension.member.offline');
     };
     check();
+    if (!targets.length) {
+      if (accountId !== undefined) throw commandError('POKE_OFFLINE', 'extension.member.offline');
+      const anyoneOnline = liveMembers(team).some(person => person.id !== session.account.id && online(person.id));
+      throw anyoneOnline ? commandError('POKE_EVERYONE_HERE', 'extension.member.everyoneHere') : commandError('POKE_NOBODY', 'extension.member.nobodyOnline');
+    }
     const cryptoApi = client.getCrypto(); if (!cryptoApi) throw new MessageError(uiMessage('extension.runtime.reactionNotReady'));
-    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, [target!.matrixId], session.matrix, POKE_EVENT, { id: crypto.randomUUID(), teamId, view: viewing!.view, sentAt: Date.now() }, check), PING_ENCRYPTION_WAIT_MS));
+    const messages = await scope.wait(sharingWork(trustedDeviceMessages(cryptoApi, targets.map(person => person.matrixId), session.matrix, POKE_EVENT, { id: crypto.randomUUID(), teamId, view: viewing!.view, sentAt: runtime.signals.serviceNow() }, check), PING_ENCRYPTION_WAIT_MS));
     check();
-    if (!Object.keys(messages).length) return { delivered: 0 };
-    const result = await scope.wait(runtime.api.request('viewing.react', { body: { teamId, messages } }));
-    check(); return result;
+    const people = Object.keys(messages).length;
+    // Nobody had a device the call could be encrypted for: nothing went, and the panel says so instead of 已喊.
+    if (!people) throw commandError('POKE_UNREACHABLE', accountId === undefined ? 'extension.member.pokeNobodyReached' : 'extension.member.pokeUnreachable');
+    await scope.wait(runtime.api.request('viewing.react', { body: { teamId, messages } }));
+    check(); return { people };
   }
 }

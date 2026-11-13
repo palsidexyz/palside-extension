@@ -31,7 +31,7 @@ function find(node, type) {
 }
 
 // Render the production JSX with the same lightweight hook/host boundary used by feature tests.
-function fixture({ retention = 7, live = true } = {}) {
+function fixture({ retention = 7 } = {}) {
   const hooks = [];
   let cursor = 0;
   const calls = [];
@@ -40,10 +40,8 @@ function fixture({ retention = 7, live = true } = {}) {
     team: { id: 'team', owner: 'self', name: 'Squad', memberIds: [], retentionDays: retention },
     current: 'team', data: { self: 'self' }, canWrite: true, requests: [],
     setConfirmation(value) { c.confirmation = value; },
-    setTeams(update) { c.teams = update(c.teams); c.team = c.teams[0]; },
   };
-  c.teams = [c.team, { id: 'other', retentionDays: 30 }];
-  if (live) c.live = { state: { remoteTeams: [] }, command: (...args) => { calls.push(args); return command(...args); } };
+  c.live = { state: { remoteTeams: [] }, command: (...args) => { calls.push(args); return command(...args); } };
   const context = {
     exports: {}, Error,
     require(name) {
@@ -108,8 +106,8 @@ test('decrease waits for confirmation, preserves failure feedback, and can succe
   assert.equal(f.confirmation().open, false);
 });
 
-for (const live of [true, false]) test(`successful increase and confirmed decrease (${live ? 'live' : 'preview'})`, async () => {
-  const f = fixture({ live });
+test('successful increase and confirmed decrease', async () => {
+  const f = fixture();
   f.change(7);
   assert.equal(f.calls.length, 0);
   f.change(30);
@@ -119,11 +117,10 @@ for (const live of [true, false]) test(`successful increase and confirmed decrea
   await f.confirmation().onConfirm();
   assert.equal(f.c.confirmation, undefined);
   assert.equal(f.select().disabled, false);
-  if (live) assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [
+  assert.deepEqual(JSON.parse(JSON.stringify(f.calls)), [
     ['retention', { teamId: 'team', retentionDays: 30 }],
     ['retention', { teamId: 'team', retentionDays: 1 }],
   ]);
-  else assert.deepEqual(f.c.teams.map(team => team.retentionDays), [1, 30]);
 });
 
 for (const days of [1, 30]) test(`pending ${days < 7 ? 'decrease' : 'increase'} blocks same-tick and rerendered conflicting actions`, async () => {
@@ -150,15 +147,11 @@ for (const days of [1, 30]) test(`pending ${days < 7 ? 'decrease' : 'increase'} 
 });
 
 test('permanent is a selectable value and shortening it waits for confirmation', async () => {
-  const f = fixture({ retention: null, live: false });
+  const f = fixture({ retention: null });
+  const sent = () => f.calls.map(call => call[1].retentionDays);
   assert.equal(f.select().value, 'forever');
   f.change(30);
-  assert.equal(f.c.team.retentionDays, null);
+  assert.deepEqual(sent(), []);
   await f.confirmation().onConfirm();
-  assert.equal(f.c.team.retentionDays, 30);
-  f.change(null);
-  await drain();
-  assert.equal(f.c.team.retentionDays, null);
-  f.change(14);
-  assert.equal(f.c.team.retentionDays, null);
+  assert.deepEqual(sent(), [30]);
 });

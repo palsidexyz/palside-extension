@@ -26,7 +26,7 @@ export function TeamSettings({ c }: { c: PalsideController }) {
   const text = useText();
   const owner = c.team.owner === c.data.self && c.canWrite;
   const requests = c.requests.filter(request => request.teamId === c.current).length;
-  const remote = c.live?.state.remoteTeams.find(team => team.id === c.current);
+  const remote = c.live.state.remoteTeams.find(team => team.id === c.current);
   const invite = useSavingSwitch(Boolean(remote?.membersCanInvite));
   const mute = useSavingSwitch(c.team.muted);
   const transfer = remote?.transfer;
@@ -41,8 +41,7 @@ export function TeamSettings({ c }: { c: PalsideController }) {
       retentionPending.current = true;
       setRetentionBusy(true);
       try {
-        if (c.live) await c.live.command('retention', { teamId: c.current, retentionDays: days });
-        else c.setTeams(old => old.map(team => team.id === c.current ? { ...team, retentionDays: days } : team));
+        await c.live.command('retention', { teamId: c.current, retentionDays: days });
       } finally {
         retentionPending.current = false;
         setRetentionBusy(false);
@@ -52,7 +51,7 @@ export function TeamSettings({ c }: { c: PalsideController }) {
     else void apply().catch(error => c.setConfirmation({ title: uiMessage('common.error'), description: failureText(error), action: uiMessage('common.retry'), confirm: apply }));
   }
   const members = () => { c.setMemberFilter(undefined); c.go('members'); };
-  const dissolve = () => c.setConfirmation({ title: uiMessage('extension.copy.dissolveTitle'), description: uiMessage('extension.copy.dissolveDescription'), action: uiMessage('extension.copy.dissolveTeam'), danger: true, confirm: () => { const { current, team } = c; const done = () => c.exitTeam(current, uiMessage('extension.start.dissolvedNotice', { name: team.name })); if (c.live) return c.live.command('dissolve', { teamId: current }).then(done); c.setTeams(old => old.map(item => item.id === current ? { ...item, joined: false, readonly: true, readonlyReason: 'dissolved', published: false } : item)); done(); } });
+  const dissolve = () => c.setConfirmation({ title: uiMessage('extension.copy.dissolveTitle'), description: uiMessage('extension.copy.dissolveDescription'), action: uiMessage('extension.copy.dissolveTeam'), danger: true, confirm: () => { const { current, team } = c; const done = () => c.exitTeam(current, uiMessage('extension.start.dissolvedNotice', { name: team.name })); return c.live.command('dissolve', { teamId: current }).then(done); } });
   const identity = <span className={s.identityText}><strong>{c.team.name}</strong>{c.team.description && <span className={s.identityDescription}>{c.team.description}</span>}<span className={s.identityLevel}><LevelChip level={c.team.activity?.level ?? 1} /></span></span>;
 
   return <div className={s.page}>
@@ -76,14 +75,14 @@ export function TeamSettings({ c }: { c: PalsideController }) {
     {owner && <SettingGroup title={t('extension.copy.joiningGroup')}>
       <InvitationPanel key={c.current} c={c} />
       <RecruitmentSettings c={c} />
-      {c.live && <SettingControl icon={<UserPlus size={16} />}><Switch className={r.switch} label={t('extension.invite.membersCan')} checked={invite.checked} pending={invite.pending} refused={invite.refused} onChange={event => { const on = event.currentTarget.checked, teamId = c.current; void invite.save(on, async () => await c.run('team-invite-permission', { teamId, on }) !== undefined); }} /></SettingControl>}
+      <SettingControl icon={<UserPlus size={16} />}><Switch className={r.switch} label={t('extension.invite.membersCan')} checked={invite.checked} pending={invite.pending} refused={invite.refused} onChange={event => { const on = event.currentTarget.checked, teamId = c.current; void invite.save(on, async () => await c.run('team-invite-permission', { teamId, on }) !== undefined); }} /></SettingControl>
     </SettingGroup>}
 
     <SettingGroup title={t('extension.copy.messagesGroup')}>
       {owner
         ? <SettingControl icon={<Clock size={16} />}><label className={r.label} htmlFor="team-retention">{t('extension.copy.messageRetention')}</label><ValueSelect id="team-retention" value={retentionKey(retention)} disabled={retentionBusy} onChange={event => changeRetention(retentionFromKey(event.target.value))} options={retentionOptions.map(days => [retentionKey(days), text(retentionPeriod(days))] as const)} /></SettingControl>
         : <SettingItem icon={<Clock size={16} />} title={t('extension.copy.messageRetention')} end={text(retentionPeriod(retention))} />}
-      <SettingControl icon={<Bell size={16} />}><Switch className={r.switch} label={t('extension.copy.muteMessages')} checked={mute.checked} pending={mute.pending} refused={mute.refused} onChange={event => { const muted = event.target.checked, teamId = c.current; if (c.live) void mute.save(muted, async () => await c.run('team-preferences', { teamId, muted }) !== undefined); else c.setTeams(old => old.map(team => team.id === c.current ? { ...team, muted: event.target.checked } : team)); }} /></SettingControl>
+      <SettingControl icon={<Bell size={16} />}><Switch className={r.switch} label={t('extension.copy.muteMessages')} checked={mute.checked} pending={mute.pending} refused={mute.refused} onChange={event => { const muted = event.target.checked, teamId = c.current; void mute.save(muted, async () => await c.run('team-preferences', { teamId, muted }) !== undefined); }} /></SettingControl>
     </SettingGroup>
 
     {owner && <SettingGroup><SettingItem icon={<ArrowRightLeft size={16} />} title={t('extension.copy.transferTeam')} disabled={Boolean(transfer)} onClick={() => { c.setMemberFilter(undefined); c.setSelectingOwner(true); c.go('members'); }} /></SettingGroup>}

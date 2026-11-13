@@ -1,14 +1,15 @@
 import { IntegrationIntl } from './intl';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { PalsideApp } from './preview-app';
-import { palsideFixtures, demoSites } from './fixtures';
+import { PalsideApp } from '../src/features/palside/app/palside-app';
+import { palsideFixtures } from './fixtures';
+import { useFixtureLive } from './fixture-live';
 import { chains } from '../src/features/palside/assets/chain-catalog';
 import tokenMetadata from './fixtures/token-metadata.json';
 import '@palside/design/fonts.css';
 import '../src/styles.css';
 
-// Isolated UI samples; no account, runtime or message delivery connection.
+// Isolated UI samples on a fixture runtime port; nothing reaches a service.
 const data = structuredClone(palsideFixtures);
 const long = new URLSearchParams(location.search).has('long');
 data.views[0] = { ...data.views[0]!, name: long ? 'VeryLongUnbrokenTokenName'.repeat(3) : 'CASHCAT', source: 'DEX Screener', url: `https://dexscreener.com/robinhood/${data.views[0]!.address}`, logo: long ? '/intentionally-missing-token.webp' : undefined };
@@ -20,4 +21,5 @@ if (new URLSearchParams(location.search).has('sources')) {
   data.views.push(view);
   data.people = data.people.map(person => person.id === 'mia' ? { ...person, viewing: view.id } : person);
 }
-createRoot(document.getElementById('root')!).render(<IntegrationIntl><div style={{ width: '100%', height: '100dvh' }}><PalsideApp data={data} sites={demoSites} deliver={async () => {}} /></div></IntegrationIntl>);
+function Review() { return <PalsideApp live={useFixtureLive(data)} />; }
+createRoot(document.getElementById('root')!).render(<IntegrationIntl><div style={{ width: '100%', height: '100dvh' }}><Review /></div></IntegrationIntl>);

@@ -4,7 +4,7 @@ import { startPageLayer } from '../src/page-layer';
 import type { CaptureLabels, PageDown, PageUp } from '../src/runtime/browser/page-protocol';
 import { reviewStatus } from './review-harness';
 
-/** The page layer on a mock token page, driven by a fake background: `?scene=danmaku|capture|hidden`. */
+/** The page layer on a mock token page, driven by a fake background: `?scene=danmaku|packet|capture|hidden` (`packet`: 红包 lines among the rest). */
 // Review only: open the layer's shadow root so the page can be inspected.
 const attach = Element.prototype.attachShadow;
 Element.prototype.attachShadow = function (init) { return attach.call(this, { ...init, mode: 'open' }); };
@@ -34,13 +34,13 @@ const down = (message: PageDown) => listeners.forEach(listener => listener(messa
 (window as unknown as { down: typeof down }).down = down;
 (window as unknown as { pageUp: PageUp[] }).pageUp = [];
 startPageLayer({ postMessage: message => { (window as unknown as { pageUp: PageUp[] }).pageUp.push(message); }, onMessage: { addListener: listener => { listeners.push(listener); } } });
-const labels = { you: t('extension.page.you'), locale: 'zh-CN' };
+const labels = { you: t('extension.page.you'), member: t('common.member'), packetFrom: t('extension.wallet.packetFrom', { name: '{name}' }), locale: 'zh-CN' };
 down({ type: 'config', labels, danmaku: { density: 'high', enabled: true, area: 25, speed: 144, size: 'md', opacity: 90 } });
 const people = [{ name: 'Kai' }, { name: 'Robin' }, { name: 'Mia' }];
 const lines = ['这根量有点猛', '我先上车了', '止盈设好没', '持有人涨得好快', '等回调', '看这个大单'];
-if (scene === 'danmaku' || scene === 'hidden') {
+if (scene === 'danmaku' || scene === 'hidden' || scene === 'packet') {
   let n = 0;
-  const emit = () => { const i = n++; down({ type: 'danmaku', items: [{ id: `d${i}`, key: 'token:solana:fixture', text: lines[i % lines.length]!, author: people[i % 3]!, self: i % 4 === 1, timestamp: Date.now() - i * MINUTE_MS, ...(i % 3 === 0 ? { likes: 3 + i } : {}) }] }); };
+  const emit = () => { const i = n++; if (scene === 'packet' && i % 4 === 2) { down({ type: 'danmaku', items: [{ id: `p${i}`, key: 'token:solana:fixture', text: '', packet: true, author: people[i % 3]!, timestamp: Date.now() }] }); return; } down({ type: 'danmaku', items: [{ id: `d${i}`, key: 'token:solana:fixture', text: lines[i % lines.length]!, author: people[i % 3]!, self: i % 4 === 1, timestamp: Date.now() - i * MINUTE_MS, ...(i % 3 === 0 ? { likes: 3 + i } : {}) }] }); };
   for (let i = 0; i < 4; i++) setTimeout(emit, i * 300);
   setInterval(emit, 900);
 }

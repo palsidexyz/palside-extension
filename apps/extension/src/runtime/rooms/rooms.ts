@@ -9,6 +9,7 @@ import { ApiError } from '../transport/api';
 import { commandError } from '../composition/commands';
 import type { PalsideService } from '../composition/core';
 import { siteById } from '@palside/shared/sites';
+import { danmakuOn } from '../../domain/annotations/interaction';
 
 const SUMMARY_LIMIT = 64, RESULT_TTL = 10 * MINUTE_MS;
 /** A token's public numbers this recent are reused instead of read again; live events and 热门 keep them current meanwhile. */
@@ -74,7 +75,7 @@ export class RoomService {
   /** Unresolved text identifies a logical send within its account and room, independently of the view. */
   private pendingSends = new Map<string, { account: string; key: string; id: string; unknown: boolean; sending?: Promise<unknown> }>();
   private paging?: Promise<ApiResult<'rooms.messages'>>;
-  private enabled() { return Boolean(this.runtime.auth.session && !this.runtime.state.preferences.rooms?.off); }
+  private enabled() { return Boolean(this.runtime.auth.session && danmakuOn(this.runtime.state.preferences.siteInteraction)); }
   private scope() {
     const runtime = this.runtime, scope = runtime.auth.scope(), epoch = this.epoch, session = runtime.auth.session;
     const current = () => scope.current() && epoch === this.epoch && session === runtime.auth.session;
@@ -424,20 +425,11 @@ export class RoomService {
     void this.runtime.refresh().catch(() => {}); return result;
   }
   async clearLocal() { this.summaryFetched.clear(); this.recent.clear(); this.peopleAt = 0; this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.reads++; this.clearAvatars(); this.runtime.tokens.clear(); this.runtime.directory.clear(); this.runtime.pages.clear(); return { cleared: true }; }
-  /** The service's voted name and icon fill the memory-only token cache; a page read on this device stays stronger. */
+  /** 弹幕 switched on or off (网页互动 › 弹幕): off forgets every public number and avatar held for it, and the lease goes. */
   preferencesChanged() {
     void this.syncHot().catch(() => {});
-    if (this.runtime.state.preferences.rooms?.off) { this.reads++; this.recent.clear(); this.summaryFetched.clear(); this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.clearAvatars(); }
+    if (!danmakuOn(this.runtime.state.preferences.siteInteraction)) { this.reads++; this.recent.clear(); this.summaryFetched.clear(); this.runtime.state.rooms.summaries = {}; this.runtime.state.rooms.hot = undefined; this.runtime.state.rooms.people = undefined; this.clearAvatars(); }
     return this.sync();
-  }
-  async settings(input: { off?: unknown }) {
-    this.requireAccount(); if (Object.keys(input).some(key => key !== 'off') || typeof input.off !== 'boolean') throw commandError('INVALID_INPUT', 'common.error');
-    const scope = this.scope(), previous = this.runtime.state.preferences;
-    this.runtime.state.preferences = { ...previous, rooms: { ...previous.rooms, off: input.off } }; const submitted = this.runtime.state.preferences;
-    const syncing = this.preferencesChanged(); void syncing.catch(() => {});
-    try { await scope.wait(this.runtime.sharing.savePreferences()); }
-    catch (error) { if (scope.current() && this.runtime.state.preferences === submitted) { this.runtime.state.preferences = previous; void this.preferencesChanged().catch(() => {}); this.runtime.emit(); } throw error; }
-    await scope.wait(syncing); this.runtime.emit(); return { ...this.runtime.state.preferences.rooms };
   }
   private append(message: RoomMessage) {
     if (message.key !== this.runtime.state.rooms.current?.key || this.retracted.has(message.id)) return;

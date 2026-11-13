@@ -11,18 +11,18 @@ import s from './wallet.module.css';
 
 /** Separate paged ledger view: checking one operation never occupies the payment slot. */
 export function WalletRecoveryList({ c }: { c: PalsideController }) {
-  const t = useTranslations(), locale = localeOrEnglish(useLocale()), wallet = c.live?.state.wallet, command = c.live?.command;
+  const t = useTranslations(), locale = localeOrEnglish(useLocale()), wallet = c.live.state.wallet, command = c.live.command;
   const recovery = wallet?.recovery;
-  const accountId = c.live?.state.account?.id;
+  const accountId = c.live.state.account?.id;
   const requests = usePaymentRequest(c, c.screen);
   const [busy, setBusy] = useState<string>(), [errors, setErrors] = useState<Record<string, boolean>>({});
   const [owner, setOwner] = useState({ accountId, screen: c.screen });
   if (owner.accountId !== accountId || owner.screen !== c.screen) {
     setOwner({ accountId, screen: c.screen }); setBusy(undefined); setErrors({});
   }
-  useEffect(() => { void command?.('wallet-recovery', {}).catch(() => {}); }, [command, accountId]);
+  useEffect(() => { void command('wallet-recovery', {}).catch(() => {}); }, [command, accountId]);
   async function act(orderId: string, resume: boolean) {
-    if (!command || busy) return;
+    if (busy) return;
     const request = requests.capture();
     if (!request.isCurrent()) return;
     setBusy(orderId); setErrors(value => ({ ...value, [orderId]: false }));

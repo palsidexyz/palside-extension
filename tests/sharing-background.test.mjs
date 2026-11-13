@@ -170,6 +170,8 @@ test('Chrome taking back the tabs permission switches 共享在看 off with a re
 
 test('a replacement offscreen epoch replays live panels, room tab, page context and device activity', async t => {
  const f=fixture({helloActivity:false,site:true});t.after(f.dispose);
+ // 弹幕 follows a token only where its site keeps 弹幕 on.
+ f.update({preferences:{current:'one',share:true,siteInteraction:{...quiet,'gmgn.ai':{on:true,danmaku:true,signal:false,chart:false}}}});
  f.controls.tab.url='https://gmgn.ai/eth/token/0x1111111111111111111111111111111111111111';
  f.browser.tabs.onActivated.emit({windowId:10});await wait();await wait();
  const sender={id:'qa',url:'chrome-extension://qa/offscreen.html'};
@@ -187,6 +189,8 @@ test('a replacement offscreen epoch replays live panels, room tab, page context 
 
 test('account reset replays the same room tab and panel connection without reconnecting the port', async t => {
  const f=fixture({helloActivity:false,site:true});t.after(f.dispose);
+ // 弹幕 follows a token only where its site keeps 弹幕 on.
+ f.update({preferences:{current:'one',share:true,siteInteraction:{...quiet,'gmgn.ai':{on:true,danmaku:true,signal:false,chart:false}}}});
  f.controls.tab.url='https://gmgn.ai/eth/token/0x1111111111111111111111111111111111111111';
  f.browser.tabs.onActivated.emit({windowId:10});await wait();await wait();
  const before=f.calls.length;f.update({account:undefined,authenticated:false});await wait();await wait();
@@ -227,4 +231,32 @@ test('worker replay and initial activity use the same five-minute idle threshold
   f.browser.runtime.onMessage.emit({ type: 'palside/runtime-ready', epoch: 'new-runtime' }, { id: 'qa', url: 'chrome-extension://qa/offscreen.html' }, () => {});
   await wait(); f.dispose();
   assert.ok(thresholds.length > 0); assert.ok(thresholds.every(seconds => seconds === 300));
+});
+
+test('弹幕 follows a token page only while that site keeps 弹幕 on, and picks it up again when switched back on', async t => {
+ const f=fixture({helloActivity:false,site:true});t.after(f.dispose);
+ const asset='Ethereum:0x1111111111111111111111111111111111111111';
+ const tabs=()=>f.calls.filter(c=>c.name==='room-tab');
+ f.controls.tab.url='https://gmgn.ai/eth/token/0x1111111111111111111111111111111111111111';
+ f.browser.tabs.onActivated.emit({windowId:10});await wait();await wait();
+ assert.ok(tabs().length>0);assert.equal(tabs().some(c=>c.payload.asset===asset),false);
+ f.update({preferences:{current:'one',share:true,siteInteraction:{...quiet,'gmgn.ai':{on:true,danmaku:true,signal:false,chart:false}}}});await wait();await wait();
+ assert.equal(tabs().at(-1).payload.asset,asset);
+ f.update({preferences:{current:'one',share:true,siteInteraction:{...quiet,'gmgn.ai':{on:true,danmaku:false,signal:false,chart:false}}}});await wait();await wait();
+ assert.equal(tabs().at(-1).payload.asset,null);
+});
+
+test('device state follows input only: a locked screen or idle is 离开 even with a panel open', async t => {
+  const f = fixture(); t.after(f.dispose); await wait();
+  const last = () => f.calls.filter(c => c.name === 'device-state').at(-1)?.payload.state;
+  assert.equal(last(), 'active');
+  f.browser.idle.onStateChanged.emit('locked'); await wait();
+  assert.equal(last(), 'away');
+  f.browser.idle.onStateChanged.emit('active'); await wait();
+  assert.equal(last(), 'active');
+  f.browser.idle.onStateChanged.emit('idle'); await wait();
+  assert.equal(last(), 'away');
+  const reports = f.calls.filter(c => c.name === 'device-state').length;
+  f.port.onDisconnect.emit(); await wait();
+  assert.equal(f.calls.filter(c => c.name === 'device-state').length, reports);
 });
