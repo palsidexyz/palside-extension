@@ -1,8 +1,7 @@
 import { mnemonicToAccount, type HDAccount } from 'viem/accounts';
-import { toHex } from 'viem';
 import { isValidMnemonic, normalizeMnemonic } from '@palside/shared/identity';
 import { signRelayEnvelope, type RelaySigningEnvelope, type RelaySigningExpectation } from '@palside/shared/chain/signing';
-import { WALLET_LIMITS, WALLET_PATH } from '../../domain/wallet/model';
+import { WALLET_PATH } from '../../domain/wallet/model';
 import { unlockLocalMnemonic, type LocalLocks, type LocalSecretStorage } from '../account/local-password';
 
 export type WalletKeyOptions = {
@@ -18,10 +17,6 @@ export class WalletKeys {
   private options: WalletKeyOptions;
   private account?: HDAccount;
   private generation = 0;
-  private exported?: { id: string; owner: string; key: `0x${string}`; expiresAt: number };
-  private timer?: ReturnType<typeof setTimeout>;
-  private exposureGeneration = 0;
-  private exposureOwner?: string;
   constructor(options: WalletKeyOptions) { this.options = options; }
   get unlocked() { return Boolean(this.account); }
   get address() { return this.account?.address; }
@@ -48,25 +43,7 @@ export class WalletKeys {
     this.check(generation);
     return result;
   }
-  async reveal(password: string, owner: string): Promise<{ id: string; expiresAt: number; privateKey: string }> {
-    this.hide();
-    this.exposureOwner = owner;
-    const generation = this.generation, exposure = this.exposureGeneration;
-    await this.unlock(password); this.check(generation);
-    if (exposure !== this.exposureGeneration) throw new Error('PRIVATE_KEY_EXPOSURE_CANCELLED');
-    const key = this.account!.getHdKey().privateKey;
-    if (!key) throw new Error('WALLET_LOCKED');
-    const expiresAt = (this.options.now?.() ?? Date.now()) + WALLET_LIMITS.privateKeyExposureMs;
-    this.exported = { id: crypto.randomUUID(), owner, key: toHex(key), expiresAt };
-    this.timer = setTimeout(() => this.hide(), WALLET_LIMITS.privateKeyExposureMs);
-    return { id: this.exported.id, expiresAt, privateKey: this.exported.key };
-  }
-  hide(owner?: string) {
-    if (owner !== undefined && this.exposureOwner !== owner) return;
-    this.exposureGeneration++; this.exposureOwner = undefined;
-    clearTimeout(this.timer); this.timer = undefined; this.exported = undefined;
-  }
   /** Forget the signing account; payments ask for the password again. */
-  lock() { this.generation++; this.hide(); this.account = undefined; }
+  lock() { this.generation++; this.account = undefined; }
   dispose() { this.lock(); }
 }

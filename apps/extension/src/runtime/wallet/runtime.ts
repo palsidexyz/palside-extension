@@ -16,8 +16,6 @@ export class WalletRuntime {
   private accountId?: string;
   private starting?: Promise<WalletController>;
   private generation = 0;
-  private exposureGeneration = 0;
-  private exposureOwner?: string;
   private recipients = new Map<string, string>();
   private teamFeed?: { teamId: string; tail: Promise<unknown>; paged: boolean };
   private roomRequest = 0;
@@ -26,7 +24,7 @@ export class WalletRuntime {
   /** The binding signup or sign-in just made, so the start that follows does not ask again. */
   private bound?: { accountId: string; binding: NonNullable<ApiResult<'chain.wallet'>> };
   constructor(runtime: PalsideService) { this.runtime = runtime; }
-  reset() { this.bound = undefined; this.hide(); this.generation++; this.roomRequest++; this.messageRequest++; this.personRequests.clear(); this.roomReads.clear(); this.teamFeed = undefined; this.recipients.clear(); this.controller?.dispose(); this.keys?.dispose(); this.controller = undefined; this.keys = undefined; this.starting = undefined; this.accountId = undefined; this.runtime.state.wallet = undefined; }
+  reset() { this.bound = undefined; this.generation++; this.roomRequest++; this.messageRequest++; this.personRequests.clear(); this.roomReads.clear(); this.teamFeed = undefined; this.recipients.clear(); this.controller?.dispose(); this.keys?.dispose(); this.controller = undefined; this.keys = undefined; this.starting = undefined; this.accountId = undefined; this.runtime.state.wallet = undefined; }
   async start(mnemonic?: string): Promise<WalletController> {
     const runtime = this.runtime, session = runtime.auth.session;
     if (!session) throw new Error('AUTH_REQUIRED');
@@ -233,21 +231,7 @@ export class WalletRuntime {
     }
     runtime.emit();
   }
-  async reveal(password: string, owner: string) {
-    if (!owner) throw new Error('PANEL_REQUIRED');
-    if (this.accountId !== undefined && this.accountId !== this.runtime.auth.session?.account.id) this.reset();
-    this.hide();
-    this.exposureOwner = owner;
-    const exposure = this.exposureGeneration;
-    await this.start();
-    if (exposure !== this.exposureGeneration) throw new Error('PRIVATE_KEY_EXPOSURE_CANCELLED');
-    return this.keys!.reveal(password, owner);
-  }
-  hide(owner?: string) {
-    if (owner === undefined || this.exposureOwner === owner) { this.exposureGeneration++; this.exposureOwner = undefined; }
-    this.keys?.hide(owner);
-  }
-  async offline() { this.hide(); this.controller?.offline(); }
-  /** The device locked: forget the unlocked signing key and any shown private key; the next payment asks for the password. */
-  lock() { this.hide(); this.keys?.lock(); this.controller?.keysLocked(); }
+  async offline() { this.controller?.offline(); }
+  /** The device locked: forget the unlocked signing key; the next payment asks for the password. */
+  lock() { this.keys?.lock(); this.controller?.keysLocked(); }
 }

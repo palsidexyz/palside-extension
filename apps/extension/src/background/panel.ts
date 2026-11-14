@@ -75,7 +75,6 @@ export function panel(bg: Background) {
         }
         if (port.sender?.documentId) {
           void bg.run({ name: 'visible-drop', payload: { panel: port.sender.documentId } }).catch(() => {});
-          void bg.run({ name: 'wallet-panel-drop', payload: { owner: port.sender.documentId } }).catch(() => {});
         }
         void bg.sharing.observer.refresh();
       });

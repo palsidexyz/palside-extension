@@ -97,15 +97,6 @@ function Fixture() {
       if (mine) return { packet: { ...packet, claimedCount: 5, claimedAmount: String(25n * unit) }, distribution: 'random', blessing: '测试红包，祝大家好运', eligibility: 'claimed', eligibleAt: null, myClaim: mine, claims: [...others, { accountId: mine.accountId, amount: mine.amount, claimedAt: mine.claimedAt, status: 'issued' as const, best: false }] };
       return { packet, distribution: 'random', blessing: '测试红包，祝大家好运', eligibility: eligible ? 'eligible' : 'stay-too-short', eligibleAt: eligible ? null : eligibleAt.current, myClaim: null, claims: others };
     }
-    if (name === 'wallet-export-private-key') {
-      if (document.documentElement.dataset.holdExport === 'true') {
-        document.documentElement.dataset.exportPending = 'true';
-        await new Promise<void>(resolve => window.addEventListener('fixture-export-release', () => resolve(), { once: true }));
-        delete document.documentElement.dataset.exportPending;
-      }
-      return { id: 'fixture-export', privateKey: 'fixture-key-not-a-real-private-key', expiresAt: Date.now() + 30000 };
-    }
-    if (name === 'wallet-hide-private-key') return;
     if (name === 'wallet-receive') return { uri: address };
     if (name === 'wallet-records') {
       if (scene === 'records' && calls.filter(call => (call as { name: string }).name === name).length === 1) throw Error('Fixture record request failed');
@@ -145,7 +136,7 @@ function Fixture() {
     reviewStatus('ready');
   }, []);
   return <main data-palside-app data-appearance={query.get('theme') ?? 'light'} data-chain-scene={scene} style={{ height: '100%', overflowY: 'auto', padding: 16, boxSizing: 'border-box', background: 'var(--ui-canvas)', color: 'var(--ui-text-primary)' }}>
-    {page === 'level' ? <TeamLevel c={controller} /> : page === 'tip' ? <TipPayment c={controller} messageId="fixture-tip-message" onClose={() => setPage('home')} /> : page === 'packet' ? <PacketPage c={controller} /> : page === 'export' ? <WalletSettings c={controller} /> : page === 'room' ? <div data-room-packet><RoomPacketCard c={controller} packet={packet} /></div> : page === 'feed' ? <div data-feed style={{ display: 'flex', flexDirection: 'column' }}>{feedItems.map(item => <TeamPaymentCard key={item.id} c={controller} item={item as never} />)}</div> : page === 'receive' ? <WalletReceive c={controller} /> : page === 'records' ? <WalletRecords c={controller} /> : <WalletHome c={controller} />}
+    {page === 'level' ? <TeamLevel c={controller} /> : page === 'tip' ? <TipPayment c={controller} messageId="fixture-tip-message" onClose={() => setPage('home')} /> : page === 'packet' ? <PacketPage c={controller} /> : page === 'settings' ? <WalletSettings c={controller} /> : page === 'room' ? <div data-room-packet><RoomPacketCard c={controller} packet={packet} /></div> : page === 'feed' ? <div data-feed style={{ display: 'flex', flexDirection: 'column' }}>{feedItems.map(item => <TeamPaymentCard key={item.id} c={controller} item={item as never} />)}</div> : page === 'receive' ? <WalletReceive c={controller} /> : page === 'records' ? <WalletRecords c={controller} /> : <WalletHome c={controller} />}
     <PaymentSheet c={controller} />
   </main>;
 }

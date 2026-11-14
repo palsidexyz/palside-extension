@@ -31,7 +31,4 @@ export const walletHandlers = {
     if (payload.hideAmounts !== undefined) await controller.setHideAmounts(payload.hideAmounts);
   },
   'wallet-receive': async function (command) { return { uri: (await this.runtime.wallet.start()).receive(command.payload?.amount) }; },
-  'wallet-export-private-key': async function (command) { return this.runtime.wallet.reveal(command.payload.password, command.payload.owner ?? ''); },
-  'wallet-hide-private-key': async function (command) { this.runtime.wallet.hide(command.payload?.owner); },
-  'wallet-panel-drop': async function (command) { this.runtime.wallet.hide(command.payload.owner); },
 } satisfies HandlerRegistry;

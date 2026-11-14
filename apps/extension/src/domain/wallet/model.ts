@@ -3,7 +3,6 @@ import type { ChainClientConfig, ChainOrder, ChainOrderInput } from '@palside/sh
 import { chainAmount, palsUnit } from '@palside/shared/chain/amount';
 
 export const WALLET_PATH = "m/44'/60'/0'/0/0" as const;
-export const WALLET_LIMITS = Object.freeze({ privateKeyExposureMs: 30_000 });
 export type PaymentPhase = 'review' | 'password' | 'signing' | 'submitting' | 'pending' | 'confirmed' | 'failed' | 'expired';
 export type WalletPayment = {
   id: string; input: ChainOrderInput; order: ChainOrder; phase: PaymentPhase;

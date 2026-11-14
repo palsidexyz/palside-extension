@@ -70,9 +70,6 @@ export const commandPayloads = {
   'wallet-reconcile': empty, 'wallet-dismiss': strictObject({ accountId: text, paymentId: text }), 'wallet-opened-ack': empty,
   'wallet-preferences': strictObject({ smallPayments: optionalBool, hideAmounts: optionalBool, password: optionalText }),
   'wallet-receive': strictObject({ amount: Type.Optional(chainAmount) }),
-  'wallet-export-private-key': strictObject({ password: text, owner: optionalText }),
-  'wallet-hide-private-key': strictObject({ owner: optionalText }),
-  'wallet-panel-drop': strictObject({ owner: text }),
   'image-session-open': strictObject({ mode: Type.Enum(['view', 'edit']), teamId: text, source: strictObject({ src: text, name: text }), document: Type.Optional(imageDocument) }),
   'image-session-read': strictObject({ id: text }), 'image-session-return': strictObject({ id: text }),
   'image-session-update': strictObject({ id: text, expectedRevision: integer, document: imageDocument }),
@@ -146,7 +143,6 @@ type Results = {
   'wallet-recovery': ApiResult<'chain.recovery'>; 'wallet-recovery-check': ApiResult<'chain.recovery'>['items'][number]; 'wallet-recovery-resume': WalletPayment;
   'wallet-review': WalletPayment; 'wallet-packet-review': WalletPayment; 'wallet-confirm': WalletPayment;
   'wallet-reconcile': WalletPayment | undefined; 'wallet-receive': { uri: string };
-  'wallet-export-private-key': { id: string; privateKey: string; expiresAt: number };
   'image-session-open': ImageSessionSnapshot & { windowOpen: boolean }; 'image-session-read': ImageSessionSnapshot & { windowOpen: boolean };
   'image-session-return': ImageSessionSnapshot & { windowOpen: boolean }; 'image-session-update': ImageSessionSnapshot & { windowOpen: boolean };
   'image-session-cancel': ImageSessionSnapshot & { windowOpen: boolean }; 'image-session-save': ImageSessionSnapshot & { windowOpen: boolean };

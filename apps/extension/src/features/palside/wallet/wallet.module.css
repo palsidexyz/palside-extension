@@ -35,7 +35,6 @@
 .segment { display:flex; padding:3px; gap:3px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .segment button { flex:1; min-width:0; min-height:34px; padding:6px; border:0; border-radius:calc(var(--ui-radius-m) - 3px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); cursor:pointer; transition:background-color .18s,color .18s; }
 .segment button:is([aria-pressed=true],[aria-checked=true]) { background:var(--ui-canvas); color:var(--ui-text-primary); }
-.secret { padding:16px; border:0; background:var(--ui-control-surface); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); overflow-wrap:anywhere; font:400 var(--ui-type-callout)/22px var(--font-geist-mono),monospace; }
 .transferCard { display:block; width:var(--chat-card-width); max-width:100%; /* Same box as the 红包卡片 (packet.module.css .card): the chat card width, 60 top + 26 foot. */ border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; text-align:left; transition:opacity .3s; }
 .transferTop { display:flex; align-items:center; gap:10px; padding:12px 12px 11px; }
 .transferTop > span:last-child { min-width:0; display:flex; flex-direction:column; }
@@ -135,3 +134,4 @@
 .tipCustom input { flex:1; min-width:0; height:56px; border:0; outline:0; background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-title); font-weight:600; font-variant-numeric:tabular-nums; }
 .tipCustom span { color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
 .tipCustom:has(input:focus-visible) { background:var(--ui-control-hover); }
+.contract { display:inline-flex; align-items:center; gap:2px; min-width:0; }

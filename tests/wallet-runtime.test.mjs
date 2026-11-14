@@ -99,24 +99,6 @@ test('local password failures are shared, persisted, and lock for fifteen minute
   now = 901001;
   assert.equal(await unlock('123456'), mnemonic);
 });
-test('private-key reveal belongs to one window and expires after thirty seconds', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1000 });
-  const h = host(); await h.storage.put('vault', 'self', 'vault', await sealMnemonic(mnemonic, '123456'));
-  const keys = new WalletKeys({ ...h, accountId: 'self', check() {} });
-  t.after(() => keys.dispose());
-  const reveal = await keys.reveal('123456', 'window-a');
-  assert.equal(reveal.privateKey.length, 66);
-  assert.equal(reveal.expiresAt, 31000);
-  keys.hide('window-b');
-  assert.equal(keys.exported.key, reveal.privateKey);
-  t.mock.timers.tick(29999);
-  assert.equal(keys.exported.key, reveal.privateKey);
-  t.mock.timers.tick(1);
-  assert.equal(keys.exported, undefined);
-  assert.equal(keys.timer, undefined);
-  assert.equal(keys.exposureOwner, undefined);
-  keys.dispose(); assert.equal(keys.unlocked, false);
-});
 test('address transfer always asks password even with enabled small payments', async t => {
   const f = fixture(t); await f.controller.start();
   await f.controller.setSmallPayments(true, '123456');
@@ -211,46 +193,6 @@ test('a late balance response cannot re-enable an emergency-disabled wallet', as
   await f.controller.applyConfig({ ...f.config, enabled: false, version: 2 });
   resolve(balance); await refreshing;
   assert.equal(f.controller.snapshot().availability, 'closed');
-});
-test('panel disconnect during PIN decryption cancels private-key exposure', async () => {
-  const h = host(); await h.storage.put('vault', 'self', 'vault', await sealMnemonic(mnemonic, '123456'));
-  const keys = new WalletKeys({ ...h, accountId: 'self', check() {} });
-  const revealing = keys.reveal('123456', 'window'); keys.hide('window');
-  await assert.rejects(revealing, /PRIVATE_KEY_EXPOSURE_CANCELLED/); keys.dispose();
-});
-test('wallet startup respects owner-bound private-key cancellation', async t => {
-  for (const action of ['disconnect', 'hide', 'offline', 'reset', 'other-window', 'none']) {
-    await t.test(action, async t => {
-      const h = host(), entered = Promise.withResolvers(), released = Promise.withResolvers();
-      const get = h.storage.get;
-      h.storage.get = async key => {
-        if (key === 'self:wallet-address') { entered.resolve(); await released.promise; return address; }
-        return get(key);
-      };
-      const runtime = { storage: h.storage, auth: { session: { account: { id: 'self' } }, scope: () => ({ check() {} }) }, state: { data: { people: [] } }, emit() {}, api: { request: async name => {
-        if (name === 'chain.config') return { enabled: false, version: 1, deployment: null };
-        if (name === 'chain.recovery') return { items: [], nextCursor: null };
-        throw new Error(`Unexpected request: ${name}`);
-      } } };
-      const wallet = new WalletRuntime(runtime); runtime.wallet = wallet;
-      t.after(() => wallet.reset());
-      const exposure = { id: 'exposure', expiresAt: 31000, privateKey: 'synthetic-key' };
-      const reveal = t.mock.method(WalletKeys.prototype, 'reveal', async () => exposure);
-      const revealing = wallet.reveal('123456', 'window-a');
-      const cancelled = ['disconnect', 'hide', 'offline', 'reset'].includes(action);
-      const result = cancelled ? assert.rejects(revealing, action === 'reset' ? /WALLET_SESSION_CHANGED/ : /PRIVATE_KEY_EXPOSURE_CANCELLED/) : revealing;
-      await entered.promise;
-      if (action === 'disconnect') await walletHandlers['wallet-panel-drop'].call({ runtime }, { payload: { owner: 'window-a' } });
-      if (action === 'hide') wallet.hide();
-      if (action === 'offline') await wallet.offline();
-      if (action === 'reset') wallet.reset();
-      if (action === 'other-window') wallet.hide('window-b');
-      released.resolve();
-      const value = await result;
-      assert.equal(reveal.mock.callCount(), cancelled ? 0 : 1);
-      if (!cancelled) assert.deepEqual(value, exposure);
-    });
-  }
 });
 test('config disable during balance persistence cannot publish ready availability', async t => {
   const f = fixture(t); await f.controller.start();

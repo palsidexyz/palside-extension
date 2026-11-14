@@ -12,6 +12,7 @@ import { TEAM_MEMBER_LIMIT } from '@palside/shared/rules/teams';
 import { graphemeLength } from '../packages/shared/src/contracts/rules.ts';
 import { PIN_LENGTH } from '@palside/shared/rules/accounts';
 import { CHAIN_RULES, TIP_AMOUNTS } from '@palside/shared/rules/wallet';
+import { explorerLink } from '@palside/shared/chain/explorer';
 
 const require = createRequire(import.meta.url), h = React.createElement;
 const { window, document } = parseHTML('<html><body></body></html>');
@@ -35,6 +36,7 @@ function production() {
     'use-intl': { useTranslations: () => translate, useLocale: () => 'en' },
     '@palside/i18n': { errorMessage: error => error.message, clockTime: String, deadlineTime: String, shortDateTime: date => String(date.getTime()), localeOrEnglish: value => value },
     '@palside/shared/navigation': { shortAddress: value => value },
+    '@palside/shared/chain/explorer': { explorerLink },
     '@palside/ui/address-copy': { AddressCopy: ({ display }) => display },
     '../assets/chain-identity': { ChainLogo: () => null },
     '@palside/shared/rules/wallet': { CHAIN_RULES, TIP_AMOUNTS },

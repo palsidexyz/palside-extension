@@ -6,7 +6,7 @@ import type { Background } from './index.ts';
 import { accessStatus, broadOrigin, siteOriginPattern } from '../runtime/browser/permissions.ts';
 
 /** Commands only the worker itself may send to the offscreen runtime. */
-const hostOnly = new Set(['signal-send', 'mark-send', 'drawing-send', 'follow-scroll', 'follow-tabs', 'room-panels', 'room-tab', 'visible-drop', 'wallet-panel-drop']);
+const hostOnly = new Set(['signal-send', 'mark-send', 'drawing-send', 'follow-scroll', 'follow-tabs', 'room-panels', 'room-tab', 'visible-drop']);
 /** Commands whose success may turn sharing on before the state that says so arrives. */
 const claimsSharing = (command: Command) => command.name === 'toggle' && command.payload?.share === true || command.name === 'preferences' && 'current' in (command.payload ?? {});
 
@@ -80,11 +80,6 @@ export function commands(bg: Background) {
         catch { return { ok: false, code: 'LANGUAGE_SAVE_FAILED', message: 'Could not save language.' }; }
     }
     if (hostOnly.has(name)) throw new MessageError(uiMessage('extension.runtime.pageUnavailable'));
-    if (command.name === 'wallet-export-private-key' || command.name === 'wallet-hide-private-key') {
-      if (!panelDocument) throw new MessageError(uiMessage('extension.runtime.pageUnavailable'));
-      if (command.name === 'wallet-export-private-key') command = { name: command.name, payload: { password: command.payload.password, owner: panelDocument } };
-      else command = { name: 'wallet-hide-private-key', payload: { owner: panelDocument } };
-    }
     // A view subscription belongs to its panel document, so the panel's port closing can drop it.
     if (command.name === 'visible') command = { ...command, payload: { ...command.payload, sourceId: `${panelDocument ?? ''}:${command.payload.sourceId}` } };
     if (command.name === 'room-watch') command = { ...command, payload: { ...command.payload, id: `${panelDocument ?? ''}:${command.payload.id}` } };

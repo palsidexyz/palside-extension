@@ -2,6 +2,16 @@
 
 Each version matches a Chrome Web Store release. The GitHub release attaches the exact store package with its build provenance.
 
+## v0.1.9
+
+- **Wallet settings**: the PALS contract and the red packet contract are listed with their full addresses; copy either, or open it on Etherscan.
+- **Wallet security**: private key export is removed. Your recovery phrase restores the wallet address and its funds.
+- The wallet only shows a token once it is open to your account.
+
+Requires desktop Chrome 130 or later.
+
+零钱设置列出 PALS 合约与红包合约的完整地址，可复制，也可在 Etherscan 打开。移除导出私钥，助记词可恢复零钱地址及其资产。代币对你的账号开放后，零钱才显示它。需要桌面版 Chrome 130 或更高版本。
+
 ## v0.1.8
 
 - **Live comments in the chat area**: the Danmaku key now turns the chat area into the token's live comments, with a token card on top and a red bar for packets you can still open. Press it again to return to your squad, right where you left off.
