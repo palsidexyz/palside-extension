@@ -1,9 +1,8 @@
 /* 弹幕: a 32px-high key beside 发送. The word in a dashed, slightly rounded box that fits it; the button never fills.
    Grey (no token 弹幕 can follow; `gate`: a token page whose site keeps 弹幕 out, pressable), still (ready), dashes running round the box
-   like marquee lights (on). The key keeps a 5px right margin for the 在看 badge, so the badge can hang off the box's corner without
-   reaching 发送 (tools sit 2–4px apart). The selectors outrank the shared button's pressed fill (`[aria-pressed=true]:hover`), which this
+   like marquee lights (on). The selectors outrank the shared button's pressed fill (`[aria-pressed=true]:hover`), which this
    key never shows. */
-.key.key.key[data-size] { flex:none; width:auto; min-width:32px; height:32px; margin-inline-end:5px; padding:0 5px; }
+.key.key.key[data-size] { flex:none; width:auto; min-width:32px; height:32px; padding:0 5px; }
 .key.key.key.key[data-state] { background:transparent; color:var(--ui-text-secondary); }
 .key.key.key.key[data-state=on] { color:var(--ui-text-primary); }
 .key.key.key.key:is([data-state=off], [data-state=gate]) { color:var(--ui-ink-muted); }
@@ -25,40 +24,49 @@
 .key[data-lap] .glyph { animation:lift .52s var(--ui-ease-feedback); }
 @keyframes lap { to { stroke-dashoffset:var(--lap, -100px); } }
 @keyframes lift { 25% { transform:scale(1.08); } }
-/* 在看 N hangs off the box's top-right corner (the glyph is the box): its lower edge just inside the box above the word, reaching 8px past
-   its right edge into the key's margin. It moves with the box — never against it when the key is pressed. Green when it first arrives
-   for a token, then a quiet number on the canvas colour; the ring in the composer's colour parts it from the dashes. */
-.badge { position:absolute; top:-11px; right:-8px; z-index:1; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; min-width:16px; height:16px; padding:0 4px; border-radius:var(--ui-radius-pill); background:var(--ui-canvas); color:var(--ui-text-secondary); box-shadow:0 0 0 2px var(--ui-control-surface); font-size:var(--ui-type-caption); font-weight:600; line-height:16px; font-variant-numeric:tabular-nums; pointer-events:none; transition:background-color .7s ease, color .7s ease; }
-.badge[data-loud] { background:var(--ui-accent); color:var(--ui-on-accent); }
 
-/* The 弹幕 line opens at the top of the composer, a hairline under it; the squad field below stays as it was. Nothing in it reaches past
-   the slot (which clips while it unfolds): my face sits on the tool icons' left edge, ⌃ and 发送 on 发送's column below. */
-.slot { overflow:hidden; }
-.line { display:flex; align-items:center; gap:8px; margin:0 0 2px; padding:0 0 5px 7px; border-bottom:1px solid var(--ui-border-soft); }
-.line > [data-person-avatar] { flex:none; }
-.field { position:relative; flex:1; min-width:0; height:24px; overflow:hidden; }
-.input { position:relative; z-index:1; width:100%; height:100%; padding:0; border:0; background:none; outline:none; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-callout); }
-.input::placeholder { color:var(--ui-ink-muted); }
-.input:disabled { cursor:default; }
-/* Others' newest lines pass through the empty field, one at a time: name, then what they said. */
-.passing { position:absolute; inset:0; overflow:hidden; color:var(--ui-ink-muted); font-size:var(--ui-type-callout); line-height:24px; white-space:nowrap; text-overflow:ellipsis; pointer-events:none; }
-.passing b { margin-right:6px; color:var(--ui-text-secondary); font-weight:600; }
-/* A 红包 passing through is the one thing in the line to press: it opens the envelope right there. */
-.packet { display:inline-flex; align-items:center; gap:6px; max-width:100%; height:24px; padding:0; border:0; background:none; color:inherit; font:inherit; cursor:pointer; pointer-events:auto; }
-.packet b { margin:0; overflow:hidden; text-overflow:ellipsis; }
-.packet:hover b { color:var(--ui-text-primary); }
-.watch { display:inline-flex; flex:none; align-items:center; gap:4px; height:22px; padding:0 7px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback), color .16s var(--ui-ease-feedback); }
-.watch:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
-.expand.expand { flex:none; margin-left:-4px; border-radius:50%; color:var(--ui-text-secondary); }
-.send.send { flex:none; border-radius:50%; box-shadow:none; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; }
-.send.send:disabled { opacity:1; color:var(--ui-text-secondary); background:var(--ui-control-recess); }
-/* 👁 N and ↗ give way to 发送 as soon as there is text, and come back when it is gone. */
-.line .send, .line .watch, .line .expand { animation:swapIn .18s var(--ui-ease-feedback); }
-@keyframes swapIn { from { opacity:0; transform:scale(.86); } }
-/* In the composer the line is a quiet 24px row: its round keys shrink to 24px and keep 发送's right edge below. */
-.line .send.send, .line .expand.expand { width:24px; height:24px; min-height:24px; }
 .counter { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-variant-numeric:tabular-nums; }
 .counter[data-over] { color:var(--ui-ink-error); }
+@media (prefers-reduced-motion:reduce) { .key[data-lap] .dash, .key[data-lap] .glyph, .key[data-state=on] .dash { animation:none; } }
 
+/* While 弹幕 is on the composer is one row on the same surface — 红包, the field, 弹幕, 发送. */
+.row.row { display:flex; align-items:center; gap:4px; padding:6px 6px 6px 4px; }
+.input { flex:1; min-width:0; height:32px; padding:0 6px; border:0; outline:none; background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-body); }
+.input::placeholder { color:var(--ui-ink-muted); }
+.input:read-only { cursor:default; }
 
-@media (prefers-reduced-motion:reduce) { .key[data-lap] .dash, .key[data-lap] .glyph, .key[data-state=on] .dash, .line .send.send, .line .watch, .line .expand.expand { animation:none; } }
+/* The 弹幕 in place of the squad list. */
+.pane { position:relative; display:flex; flex-direction:column; flex:1; min-height:0; }
+/* The token's card in 共享在看's slot — the same 52px row and chip surface. */
+.slot { height:52px; flex:none; padding:0 16px 8px; }
+.card { display:flex; align-items:center; justify-content:space-between; gap:8px; height:44px; padding:0 8px 0 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.target { display:inline-flex; align-items:center; gap:4px; min-width:0; font-size:var(--ui-type-footnote); font-weight:600; color:var(--ui-text-primary); white-space:nowrap; }
+.target > :not(:first-child) { flex:none; }
+/* The token opens its details. */
+.token { display:inline-flex; align-items:center; gap:6px; min-width:0; height:30px; margin-left:-6px; padding:0 6px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-footnote); cursor:pointer; }
+.token b { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.token svg { flex:none; color:var(--ui-text-secondary); }
+.token:hover, .watch:hover { background:var(--ui-control-hover); }
+.watch { flex:none; display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 8px 0 4px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; cursor:pointer; }
+.watch:hover { color:var(--ui-text-primary); }
+/* Squad messages while 弹幕 holds the chat area: one pill at the list's foot, like 回到最新; pressing it returns to the squad. */
+.squadNews { position:absolute; left:50%; bottom:10px; z-index:3; display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 14px; border:1px solid var(--ui-border); border-radius:var(--ui-radius-pill); background:var(--ui-canvas); color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); white-space:nowrap; cursor:pointer; }
+.squadNews b { color:var(--ui-text-primary); font-weight:600; }
+.squadNews:hover { background:var(--ui-control-hover); }
+
+/* One line per 弹幕: a 20px face, the name then the words; 点赞 and ⋯ in their own columns, level with the first line. */
+.pane [data-room-line] { grid-template-columns:20px minmax(0, 1fr) auto auto; column-gap:8px; padding:5px 8px; align-items:start; }
+.pane [data-room-line] > button:first-child { width:20px; height:20px; overflow:visible; }
+.pane [data-room-line] > button:first-child > * { flex:none; transform:scale(.715); transform-origin:0 0; }
+.pane [data-room-line] > div:nth-child(2) { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:8px; }
+.pane [data-room-line] > div:nth-child(2) > div:first-child time { display:none; }
+.pane [data-room-line] p { line-height:20px; }
+.pane [data-room-line] > [class*=like], .pane [data-room-line] > span:last-child { align-self:start; margin-top:-2px; margin-bottom:0; }
+.pane [data-room-line] > span:last-child { position:static; display:flex; align-items:center; height:24px; margin-right:-4px; }
+.pane [data-room-line] > span:last-child button { width:24px; height:24px; min-width:24px; min-height:24px; padding:0; }
+/* Back from 弹幕, the squad's list settles in from just above. */
+.squadBack { animation:squadBack .26s var(--ui-ease-feedback); }
+@keyframes squadBack { from { opacity:0; transform:translateY(-6px); } }
+@media (prefers-reduced-motion:reduce) { .squadBack { animation:none; } }
+/* 打赏 under a line keeps its own row, under the words. */
+.pane [data-room-line] > div:nth-child(2) > [class*=tipNote] { flex-basis:100%; }

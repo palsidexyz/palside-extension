@@ -23,7 +23,8 @@ import { useTopCard } from '../src/features/palside/annotations/reminders';
 import { PageHintRow, usePageHints } from '../src/features/palside/annotations/page-hint';
 import { FollowBar } from '../src/features/palside/annotations/follow-bar';
 import { ReactionStage } from '../src/features/palside/annotations/reaction-picker';
-import { DanmakuView, RoomPersonSheet } from '../src/features/palside/rooms/danmaku-view';
+import { RoomPersonSheet } from '../src/features/palside/rooms/danmaku-view';
+import { RoomPane } from '../src/features/palside/rooms/composer-danmaku';
 import { Settings, NotificationSettings } from '../src/features/palside/settings/settings';
 import { Privacy, ReadSheet } from '../src/features/palside/settings/privacy';
 import { AppearanceSetting, useAppearance } from '../src/features/palside/settings/appearance';
@@ -54,8 +55,6 @@ let mode = 'header';
 let generation = 0;
 let state: RuntimeState;
 let page: LivePort['page'];
-let openPending: (() => void) | undefined;
-let delayOpen = false;
 /** Sign-in finds no account for the typed phrase, as for one never registered or since deleted. */
 let missingAccount = false;
 let phrase = 'abandon ability able about above absent absorb abstract absurd abuse access accident'.split(' ');
@@ -110,7 +109,7 @@ const command: LivePort['command'] = async <T,>(name: string, payload?: Record<s
   if (name === 'account-create' || name === 'account-login' || name === 'account-import') { state = { ...state, setup: 'password' }; render(); }
   if (name === 'password-set') { state = { ...state, setup: undefined, authenticated: true }; render(); }
   if (name === 'profile') { state = { ...state, account: { ...state.account!, nickname: String(payload?.name) } }; render(); }
-  if (name === 'dismiss-poke') { state = { ...state, pokes: state.pokes?.filter(poke => poke.id !== payload?.id) }; render(); }
+  if (name === 'link-card') { const view = state.data.views.find(view => view.url === payload?.url); result = view ? { attachment: { kind: 'asset', assetId: view.id, view } } : {}; }
   if (name === 'cache-usage') result = { bytes: 2048 };
   if (name === 'clear-cache') result = { bytes: 0 };
   if (name === 'diagnostics') result = { text: 'Synthetic diagnostics' };
@@ -123,7 +122,7 @@ const followListeners = new Set<(status: { paused: boolean; ended?: true }) => v
 const follow: NonNullable<LivePort['follow']> = async request => { follows.push(request); };
 const onFollowStatus: NonNullable<LivePort['onFollowStatus']> = listener => { followListeners.add(listener); return () => { followListeners.delete(listener); }; };
 const followStatus = (status: { paused: boolean; ended?: true }) => { for (const listener of followListeners) listener(status); };
-const openPage: LivePort['openPage'] = async url => { opened.push(url); if (delayOpen) await new Promise<void>(resolve => { openPending = resolve; }); };
+const openPage: LivePort['openPage'] = async url => { opened.push(url); };
 function Away({ controller }: { controller: PalsideController }) { const away = useAway(controller); return <div data-first={away.first}>{away.first && <AwayDivider c={controller} views={away.views} />}</div>; }
 // The 跟看 bar, the top row, and the chat hints that 喊你来看 and signals put in the timeline.
 function Top({ controller }: { controller: PalsideController }) { const top = useTopCard(controller); const hints = usePageHints(controller); return <><FollowBar c={controller} /><div data-top={top?.key}><WatchStrip c={controller} top={top} /></div><div data-hints>{hints.map(item => <PageHintRow key={item.id} c={controller} item={item.hint} />)}</div></>; }
@@ -145,7 +144,7 @@ function Surface() {
     case 'watch': content = <WatchStrip c={c} />; break;
     case 'top': content = <Top controller={c} />; break;
     case 'rain': content = <ReactionStage c={c}><span>Conversation</span></ReactionStage>; break;
-    case 'room': content = <DanmakuView c={c} />; break;
+    case 'room': { const room = c.live.state.rooms.current; content = room ? <RoomPane c={c} roomKey={room.key} room={room} offline={false} /> : null; break; }
     case 'settings': content = <Settings c={c} />; break;
     case 'notifications': content = <NotificationSettings c={c} />; break;
     case 'privacy': content = <><Privacy c={c} /><ReadSheet c={c} /></>; break;
@@ -161,7 +160,7 @@ function render() { root.render(<IntegrationIntl>{mode === 'app' ? <PalsideApp k
 async function reset(next: string, configure?: () => void) {
   // Sonner keeps toasts in module state; each check starts without the previous check's notices.
   toast.dismiss(); root.render(null); await wait(20);
-  mode = next; generation++; calls.length = 0; opened.length = 0; follows.length = 0; delayOpen = false; page = undefined;
+  mode = next; generation++; calls.length = 0; opened.length = 0; follows.length = 0; page = undefined;
   host.style.width = '400px'; host.style.height = '760px';
   state = {
     revision: 0, ready: true, authenticated: true,
@@ -327,9 +326,11 @@ async function memberChecks() {
   assert(dialog.textContent?.includes('Robin') && dialog.textContent?.includes(shortAccountAddress('0xf5c5cbb0c3dd22f9459e6a3bf1c6ebc105870eeb')) && dialog.textContent?.includes('只看 Base 新币') && dialog.querySelector('[data-presence="away"]'), 'A member name opens a card with name, short ID, biography, tags and presence');
   for (const label of ['extension.web.mention', 'extension.web.bringOver', 'extension.web.followShort']) assert(button(t(label), dialog), `A teammate card exposes ${t(label)}`);
   await clickKey('extension.web.mention'); assert(c.draft.text.includes('@Robin') && c.screen === 'chat', 'Mentioning a member returns to chat and inserts the mention');
-  state.viewingId = 'cashcat'; state.publishedViewing = { viewId: 'cashcat', teamId: 'night', expiresAt: Date.now() + 30000 }; state.data.people.find(person => person.id === 'robin')!.presence = 'away'; await refresh();
-  await click('Robin'); await clickKey('extension.web.bringOver');
-  assert(recorded('poke')[0]?.payload?.teamId === 'night' && recorded('poke')[0]?.payload?.accountId === 'robin', 'Inviting an away teammate to a shared page targets that teammate in the current team');
+  page = pageFixture(); state.data.people.find(person => person.id === 'robin')!.presence = 'away'; await refresh();
+  await click('Robin'); await clickKey('extension.web.bringOver'); await wait();
+  const called = recorded('send').at(-1)?.payload?.message as { teamId?: string; call?: string; mentionIds?: string[]; attachment?: { assetId?: string } } | undefined;
+  assert(called?.teamId === 'night' && called.call === 'one' && JSON.stringify(called.mentionIds) === '["robin"]' && called.attachment?.assetId === 'cashcat' && c.screen === 'chat', '喊 TA 来看 sends the page in front as a card that mentions that teammate, and returns to the chat');
+  page = undefined; await refresh();
   c.setMemberFilter(undefined); await wait(); await click(t('extension.dynamic.viewProfile', { name: '你' }));
   assert(text().includes(t('extension.copy.owner')) && button(t('extension.copy.editProfile')), 'The current user card identifies the captain and offers profile editing');
   await clickKey('extension.copy.editProfile'); assert(c.screen === 'profile', 'Editing the current user card opens the profile form');
@@ -435,10 +436,9 @@ function pageFixture(index = 0): NonNullable<LivePort['page']> {
 }
 async function reminderChecks() {
   await reset('top', () => { page = pageFixture(2); });
-  const hint = (text: string) => buttons().find(b => b.textContent?.includes(text));
   c.setPersonId('mia'); await wait(); await clickKey('extension.web.followShort');
   const mia = state.data.people.find(p => p.id === 'mia')!;
-  assert(social.follow?.personId === 'mia' && opened.length === 0 && !recorded('poke').length, 'Following a teammate opens no ordinary page and sends no invitation');
+  assert(social.follow?.personId === 'mia' && opened.length === 0 && !recorded('send').some(call => (call.payload?.message as { call?: string } | undefined)?.call), 'Following a teammate opens no ordinary page and sends no call');
   assert(recorded('follow-watch').at(-1)?.payload?.on === true, 'Following tells the followed teammate');
   assert(!host.querySelector('[data-top]'), 'Following takes no card: the 在看 row stays as it is');
   const first = follows.find(item => item.op === 'go');
@@ -472,20 +472,12 @@ async function reminderChecks() {
   state.followers = []; await refresh(); await wait(400); assert(!followers(), 'It leaves when they stop');
   c.setPersonId('robin'); await wait(); await clickKey('extension.web.followShort'); assert(social.follow?.personId === 'robin', 'Choosing another teammate replaces the single follow target');
   page = pageFixture(2);
-  state.pokes = [{ id: 'older', teamId: 'night', from: 'mia', view: state.data.views[1]!, at: Date.now() - SECOND_MS, count: 1 }, { id: 'newest', teamId: 'night', from: 'kai', view: state.data.views[1]!, at: Date.now(), count: 1 }]; await refresh();
-  assert(!host.querySelector('[data-top]') && Boolean(hint('Kai 喊你来看')) && Boolean(hint('Mia 喊你来看')), 'Invitations to view are chat hints and leave the 在看 row alone');
+  await refresh();
+  assert(!host.querySelector('[data-top]'), 'A page in front leaves the 在看 row alone');
   state.connection.networkOnline = false; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'connection-network-offline', 'Offline status takes the row');
   state.connection.networkOnline = true; state.data.teams[0]!.readonly = true; await refresh(); assert(query('[data-top]').getAttribute('data-top') === 'readonly', 'Read only team status takes the row');
   assert(social.follow?.personId === 'robin', 'A read only team keeps the local follow target');
   state.data.teams[0]!.readonly = false; await refresh();
-  const before = JSON.stringify({ messages: state.data.messages, unread: state.data.teams.map(team => team.unread) });
-  const ignore = hint('Kai 喊你来看')!.parentElement!.querySelector<HTMLButtonElement>(`[aria-label="${t('extension.top.ignore')}"]`)!;
-  ignore.click(); await wait(); assert(recorded('dismiss-poke').at(-1)?.payload?.id === 'newest', 'Ignoring an invitation dismisses that invitation');
-  delayOpen = true; hint('Mia 喊你来看')!.click(); await wait(); assert(!recorded('dismiss-poke').some(call => call.payload?.id === 'older'), 'Opening an invitation waits for the page open command to finish before dismissing');
-  openPending?.(); await wait(); assert(recorded('dismiss-poke').some(call => call.payload?.id === 'older'), 'A resolved page open command dismisses its invitation');
-  assert(JSON.stringify({ messages: state.data.messages, unread: state.data.teams.map(team => team.unread) }) === before, 'Viewing invitations do not change chat messages or unread counts');
-  state.pokes = [{ id: 'arrived', teamId: 'night', from: 'mia', view: state.data.views[0]!, at: Date.now(), count: 1 }]; page = pageFixture(); await refresh();
-  assert(recorded('dismiss-poke').some(call => call.payload?.id === 'arrived'), 'An invitation disappears when the current page already matches its token');
   setSocialUi({ follow: { teamId: 'night', personId: 'mia' } }); state.data.teams[0]!.memberIds = state.data.teams[0]!.memberIds.filter(id => id !== 'mia'); await refresh(); assert(!social.follow, 'Following clears when the teammate leaves the team');
   setSocialUi({ follow: { teamId: 'night', personId: 'robin' } }); state.preferences.current = 'weekend'; await refresh(); assert(!social.follow, 'Following clears when the current team changes');
 }
@@ -496,7 +488,7 @@ async function roomChecks() {
     state.data.teams[1]!.memberIds.push('alice');
     state.rooms.current = { key, site: 'gmgn', count: 3, likes: { line1: { count: 2, liked: true }, line3: { count: 1, liked: false } }, faces: [], loading: true, hasMore: true, slowUntil: 0, slowMs: 5_000, messages: Array.from({ length: 50 }, (_, i) => ({ id: `line${i + 1}`, key, text: `Message ${i + 1}`, author: { wallet: null, id: i === 0 ? 'alice' : i === 1 ? 'stranger' : i === 2 ? 'you' : 'mia', nickname: i === 0 ? 'Alice' : i === 1 ? 'Stranger' : i === 2 ? '你' : 'Mia', avatarId: null }, folded: false, reported: false, createdAt: Date.now() - (50 - i) * SECOND_MS })) };
   });
-  state.rooms.pinned = state.rooms.current!.key; state.rooms.current!.loading = false; state.rooms.current!.hasMore = false; c.go('room'); await refresh();
+  state.rooms.pinned = state.rooms.current!.key; state.rooms.current!.loading = false; state.rooms.current!.hasMore = false; await refresh();
   assert(query('[data-room-line="line1"]').getAttribute('data-mate') === 'true' && !query('[data-room-line="line2"]').hasAttribute('data-mate'), 'Room authors in any joined team are marked as teammates');
   const ring = query('[data-room-line="line1"] > button'); assert(getComputedStyle(ring).boxShadow !== 'none', 'Room teammates have a visible avatar ring');
   ring.dispatchEvent(new MouseEvent('click', { bubbles: true })); await wait(); assert(query('dialog[open]').textContent?.includes('Alice'), 'A teammate from another joined team opens the member card');
@@ -609,7 +601,7 @@ async function privacyChecks() {
 
 async function runtimeChecks() {
   await reset('top');
-  await verifyRuntimeBoundaries(state, assert, async snapshot => { state = snapshot; await refresh(); assert(buttons().some(b => b.textContent?.includes('喊你来看')) === Boolean(snapshot.pokes?.length), 'The invitation hint follows the runtime invitation lifetime'); });
+  await verifyRuntimeBoundaries(state, assert);
 }
 
 async function run() {

@@ -1,10 +1,10 @@
 'use client';
 import { tagKey, tagLabel } from '../../../domain/account/profile-tags';
 import { askFollowGroup } from '../annotations/follow-group';
+import { useCall } from '../annotations/call-key';
 import { useTranslations } from 'use-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ArrowLeftRight, AtSign, ChevronRight, Footprints, PenLine, UserRoundPlus, X } from 'lucide-react';
-import { errorMessage, message as uiMessage } from '@palside/i18n';
 import { Tooltip } from '@palside/ui/tooltip';
 import { useDialogBehavior } from '@palside/ui/dialog';
 import { setSocialUi, useSocialUi } from '../annotations/social-state';
@@ -24,7 +24,6 @@ const hostOf = (url: string) => displayHost(url) ?? '';
 export function PersonCard({ c }: { c: PalsideController }) {
   const t = useTranslations();
   const follow = useSocialUi().follow;
-  const [busy, setBusy] = useState(false);
   const person = c.people.find(p => p.id === c.personId);
   const close = () => c.setPersonId(undefined);
   // Focus starts on 关闭, not on the first control (the account ID), so opening never draws a ring around the ID.
@@ -32,6 +31,8 @@ export function PersonCard({ c }: { c: PalsideController }) {
   const { dialogRef, dialogProps } = useDialogBehavior({ open: Boolean(person), onOpenChange: open => { if (!open) close(); }, initialFocusRef: closeRef });
   const command = c.live.command, personId = person?.id, chainEnabled = c.live.state.wallet?.config?.enabled;
   useEffect(() => { if (personId && chainEnabled) void command('wallet-person', { accountId: personId }).catch(() => {}); }, [command, personId, chainEnabled]);
+  // 喊 TA 来看: the page in front, as a card in the chat that calls this teammate, online or not.
+  const called = useCall(c);
   if (!person) return null;
   const self = person.id === c.data.self;
   const member = c.team.memberIds.includes(person.id);
@@ -42,19 +43,9 @@ export function PersonCard({ c }: { c: PalsideController }) {
   const presence = member ? person.presence === 'active' ? t('extension.copy.presenceActive') : person.presence === 'away' ? t('extension.copy.presenceAway') : undefined : undefined;
   const bio = self ? c.live.state.account?.bio ?? person.bio : person.bio;
   const tags = (self ? c.live.state.account?.tags ?? person.tags : person.tags) ?? [];
-  // 喊来看 needs a page this device shares with the squad, and the teammate online (active or away).
-  const sharing = c.live.state.publishedViewing?.teamId === c.current;
-  const reason = !sharing ? t('extension.member.needSharing') : person.presence !== 'active' && person.presence !== 'away' ? t('extension.member.offline') : undefined;
   const following = follow?.teamId === c.current && follow.personId === person.id;
   const teammate = member && !self && c.canWrite;
   const transferReason = person.walletVerified === false ? t('extension.wallet.noWallet') : undefined;
-  async function poke() {
-    if (reason || busy || !person) return;
-    setBusy(true);
-    try { await c.live.command('poke', { teamId: c.current, accountId: person.id }); c.setNotice(uiMessage('extension.member.poked', { name: person.name ?? '' })); close(); }
-    catch (error) { c.setNotice(errorMessage(error)); }
-    finally { setBusy(false); }
-  }
   return <dialog ref={dialogRef} className={`${s.personCard} ${card.person}`} aria-label={t('extension.dynamic.profileTitle', { name: person.name ?? '' })} {...dialogProps}>
     <header className={card.head}>
       <PersonAvatar person={person} size="lg" />
@@ -78,8 +69,8 @@ export function PersonCard({ c }: { c: PalsideController }) {
       <Tooltip content={t('extension.dynamic.mentionPerson', { name: person.name })}>
         <button type="button" className={card.action} onClick={() => { close(); c.mention(person.id); c.go('chat'); requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[data-message-input]')?.focus()); }}><AtSign size={18} /><span>{t('extension.web.mention')}</span></button>
       </Tooltip>
-      <Tooltip content={reason ?? t('extension.member.poke')}>
-        <button type="button" className={card.action} aria-disabled={reason ? true : undefined} disabled={busy} onClick={() => void poke()}><UserRoundPlus size={18} /><span>{t('extension.web.bringOver')}</span></button>
+      <Tooltip content={called.reason ? t(called.reason) : t('extension.member.callPerson')}>
+        <button type="button" className={card.action} aria-disabled={called.reason ? true : undefined} aria-busy={called.busy || undefined} onClick={() => called.press(person.id, () => { close(); c.go('chat'); })}><UserRoundPlus size={18} /><span>{t('extension.web.bringOver')}</span></button>
       </Tooltip>
       <Tooltip content={following ? t('extension.member.stopFollowing') : t('extension.member.follow')}>
         <button type="button" className={card.action} aria-pressed={following} onClick={() => { const follow = () => { setSocialUi({ follow: following ? undefined : { teamId: c.current, personId: person.id, startedAt: Date.now() } }); close(); }; if (following) follow(); else void askFollowGroup().finally(follow); }}><Footprints size={18} /><span>{following ? follow?.paused ? t('extension.web.followPausedShort') : t('extension.web.followingShort') : t('extension.web.followShort')}</span></button>

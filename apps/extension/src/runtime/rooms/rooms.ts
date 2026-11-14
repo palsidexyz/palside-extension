@@ -506,6 +506,9 @@ export class RoomService {
     if (state.current) { add(state.current.key, state.current.messages.map(message => message.author)); add(state.current.key, state.current.faces); }
     for (const row of [...Object.values(state.summaries), ...this.hotRows()]) add(row.key, row.faces);
     if (state.people) add(state.people.key, state.people.people);
+    // The open 弹幕's 红包 senders, who may never have spoken there.
+    const chain = this.runtime.state.chainRoom;
+    if (chain && chain.key === state.current?.key) add(chain.key, chain.people ?? []);
     return people;
   }
   private visibleAvatars() {
@@ -525,7 +528,7 @@ export class RoomService {
       const state = this.runtime.state.rooms;
       return JSON.stringify([state.current?.key, state.current?.faces, [...this.messages], state.blocked,
         [...Object.values(state.summaries), ...this.hotRows()].map(row => [row.key, row.faces]),
-        state.people?.key, state.people?.people, state.invites, [...this.avatarUrls], [...this.avatarFailures].map(([id, failure]) => [id, failure.until]),
+        state.people?.key, state.people?.people, this.runtime.state.chainRoom?.key, this.runtime.state.chainRoom?.people, state.invites, [...this.avatarUrls], [...this.avatarFailures].map(([id, failure]) => [id, failure.until]),
         [...this.watches], [...this.hotSources], [...this.summaryAccess], this.peopleAt, state.pinned,
         this.enabled(), this.runtime.state.connection.networkOnline, this.runtime.auth.session?.token, this.epoch]);
     };

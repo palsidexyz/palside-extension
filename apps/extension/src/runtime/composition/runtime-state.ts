@@ -11,7 +11,6 @@ import type { ReceivedSignal,SignalRecord } from '../annotations/signals';
 import type { ReceivedChartMark } from '../annotations/chart-marks';
 import type { ChartDrawing } from '../annotations/chart-drawings';
 import type { RevisionedDraft } from '../storage/storage';
-import type { Poke } from '../../domain/annotations/social';
 import type { Preferences } from '../../domain/account/preferences.ts';
 import type { RoomState } from '../rooms/state.ts';
 import type { Invitation } from '../teams/invitation.ts';
@@ -32,8 +31,6 @@ export type RuntimeState = {
   pages?: Record<string, string | null>;
   /** Pages whose address is a token on several chains: URL → candidate assets, the current one first. */
   pageChoices?: Record<string, string[]>;
-  /** The last 弹幕 this account opened, newest first (room keys); memory only, gone on sign-out. */
-  recentRooms?: string[];
   /** Assets of the latest token search, so their names and icons travel with panel state. */
   searchAssets?: string[];
   /** The chains a pasted address is a token on, for the composer card's 切换链. */
@@ -59,7 +56,6 @@ export type RuntimeState = {
   leadScrolls?: LeadScroll[];
   leadTabs?: LeadTabs[];
   /** Teammates who asked you to look at their page during the last minute. */
-  pokes?: Poke[];
   history?: Record<string, { missingKeys: number; loaded: boolean; loading: boolean }>; /** Signup proof of work has run past a minute. */ signupWaiting?: boolean; /** An unanswered registration request is being confirmed by retrying with the same identity. */ signupChecking?: boolean; /** Which part of password-set is running, so the panel can name it. */ signupPhase?: SignupPhase; notice?: TextValue; pendingShareTeamId?: string; jumpMessageId?: string; jumpWindowId?: number; pendingShare?: string; revision: number; ready: boolean; authenticated: boolean; account?: Account; connection: Connection; error?: TextValue; data: Dataset;
   drafts: Record<string, RevisionedDraft<Draft>>; preferences: Preferences; viewingId?: string; remoteTeams: TeamSnapshot[]; lobbyTeams?: Team[];
   config: ApiResult<'system.config'>; setup?: 'password'; invitations: Record<string, Invitation>;

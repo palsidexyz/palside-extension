@@ -14,12 +14,10 @@ import { PersonCard } from '../account/person-card';
 import { PaymentSheet, usePaymentSession } from '../wallet/payment-sheet';
 import { teamDefaultAvatars, TeamPortraits } from '../account/default-avatar';
 import { SocialSession, captureSocialUi, setSocialUi } from '../annotations/social-state';
-import { FollowBar } from '../annotations/follow-bar';
 import { AllSitesSheet, GrantSheet, SitePicker } from '../settings/access-sheet';
 import { ReadSheet } from '../settings/privacy';
 import { Chat } from '../chat/chat';
-import { DanmakuView, InviteSheet, RoomPersonSheet } from '../rooms/danmaku-view';
-import { ChatHeader } from '../chat/chat-header';
+import { InviteSheet, RoomPersonSheet } from '../rooms/danmaku-view';
 import { openRoom } from '../rooms/rooms';
 import { Onboarding, onboardingBack, onboardingScreens } from '../account/onboarding';
 const Panels = lazy(() => import('./panels').then(module => ({ default: module.Panels })));
@@ -63,7 +61,7 @@ function PalsideSession(props: PalsideProps) {
   const onOpenRoom = c.live.onOpenRoom;
   const latest = useRef(c);
   useEffect(() => { latest.current = c; });
-  // A danmaku clicked on the page opens its 弹幕 view here; a 红包 clicked there also opens its envelope.
+  // A danmaku clicked on the page opens its 弹幕 in the chat area; a 红包 clicked there also opens its envelope.
   useEffect(() => onOpenRoom?.((key, packet) => { openRoom(latest.current, key); setSocialUi({ roomPacket: packet ? { key, id: packet } : undefined }); }), [onOpenRoom]);
   // 弹幕 is on by default: the first time this account joins a token's 弹幕 (a lease exists only while it is on), say once that the service sees which token it is.
   const leasedRoom = c.live.state.rooms?.leased;
@@ -101,11 +99,6 @@ function PalsideSession(props: PalsideProps) {
   const origin = jumpOrigin?.teamId === c.current ? jumpOrigin : undefined;
   // Account setup owns the whole panel, including the moment a restored account becomes signed in.
   const onboarding = c.working || onboardingScreens.includes(c.screen);
-  // The 弹幕 page slides in from the right over the chat it was opened from.
-  const [shownScreen, setShownScreen] = useState(c.screen);
-  const [leftScreen, setLeftScreen] = useState<typeof c.screen>();
-  if (shownScreen !== c.screen) { setLeftScreen(shownScreen); setShownScreen(c.screen); }
-  const roomPage = !onboarding && !noKnownTeam && c.screen === 'room';
   // The first-run tour waits for a squad chat with nothing else open on it, once per account on this device. It saves `toured` as soon as
   // it shows, so `tourTeam` keeps that run on screen; leaving the chat ends the run, and coming back does not start it over.
   const tourFits = Boolean(c.live.state.authenticated) && !onboarding && !noKnownTeam && c.screen === 'chat' && c.team.joined && !c.team.readonly && !c.personId && !c.confirmation && !c.image;
@@ -119,12 +112,9 @@ function PalsideSession(props: PalsideProps) {
     setObservedJump(incomingJump);
     if (incomingJump) { setJumpTarget({ id: incomingJump, teamId: c.current }); setJumpOrigin(undefined); c.openNotification(); }
   }
-  return <main ref={root} className={s.app} data-palside-app data-appearance={appearance} data-from={roomPage ? leftScreen : undefined} onClick={event => { const link = event.target instanceof Element ? event.target.closest('a') : null; if (!event.defaultPrevented && link?.href && /^https?:/.test(link.href)) { event.preventDefault(); const live = c.live; const href = link.href; const session = captureSocialUi(); const open = () => { if (!session.current()) return Promise.resolve(); return live.openPage(href).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); }; if (siteForUrl(href)) void open(); else c.setConfirmation({ title: uiMessage('extension.copy.openLinkTitle'), description: uiMessage('extension.dynamic.openLinkDescription', { host: new URL(href).hostname }), confirm: async () => { await open(); } }); } }} onKeyDown={e => { if (e.key !== 'Escape' || e.defaultPrevented || c.screen === 'chat') return; const back = onboarding ? (c.working ? undefined : onboardingBack(c.screen)) : 'chat'; if (back) { e.preventDefault(); c.go(back); } }}><TeamPortraits value={portraits}><SiteDirectoryContext value={sites}>
-    {roomPage && <ChatHeader c={c} room onTeam={id => { c.chooseTeam(id); setJumpTarget(undefined); setJumpOrigin(undefined); }} />}
-    {roomPage && <FollowBar c={c} />}
+  return <main ref={root} className={s.app} data-palside-app data-appearance={appearance} onClick={event => { const link = event.target instanceof Element ? event.target.closest('a') : null; if (!event.defaultPrevented && link?.href && /^https?:/.test(link.href)) { event.preventDefault(); const live = c.live; const href = link.href; const session = captureSocialUi(); const open = () => { if (!session.current()) return Promise.resolve(); return live.openPage(href).catch(error => { if (session.current()) c.setNotice(errorMessage(error)); }); }; if (siteForUrl(href)) void open(); else c.setConfirmation({ title: uiMessage('extension.copy.openLinkTitle'), description: uiMessage('extension.dynamic.openLinkDescription', { host: new URL(href).hostname }), confirm: async () => { await open(); } }); } }} onKeyDown={e => { if (e.key !== 'Escape' || e.defaultPrevented || c.screen === 'chat') return; const back = onboarding ? (c.working ? undefined : onboardingBack(c.screen)) : 'chat'; if (back) { e.preventDefault(); c.go(back); } }}><TeamPortraits value={portraits}><SiteDirectoryContext value={sites}>
     {onboarding || !c.live.state.authenticated ? null : noKnownTeam ? c.screen === 'chat' ? c.disconnected ? <ConnectionEmpty c={c} /> : <TeamStart c={c} /> : null : <Chat key={c.current} c={c} jumpId={jumpTarget?.teamId === c.current ? jumpTarget.id : undefined} clearJump={() => { setJumpTarget(undefined); setJumpOrigin(undefined); }} originLabel={origin ? t('extension.copy.searchMessages') : undefined} searchQuery={origin?.screen === 'search' ? c.query : undefined} onReturn={origin ? () => { c.go(origin.screen); requestAnimationFrame(() => { const element = root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]'); if (element) element.scrollTop = origin.scrollTop; }); } : undefined} />}
-    {!onboarding && <DanmakuView c={c} />}
-    {onboarding ? <Onboarding c={c} /> : c.screen !== 'chat' && c.screen !== 'room' ? <Suspense fallback={<div className={s.empty} data-lazy role="status">{t('extension.copy.loading')}</div>}><Panels key={c.screen} c={c} onJump={id => { if (c.screen === 'search') setJumpOrigin({ screen: c.screen, scrollTop: root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]')?.scrollTop ?? 0, teamId: c.current }); setJumpTarget({ id, teamId: c.current }); c.go('chat'); }} /></Suspense> : null}
+    {onboarding ? <Onboarding c={c} /> : c.screen !== 'chat' ? <Suspense fallback={<div className={s.empty} data-lazy role="status">{t('extension.copy.loading')}</div>}><Panels key={c.screen} c={c} onJump={id => { if (c.screen === 'search') setJumpOrigin({ screen: c.screen, scrollTop: root.current?.querySelector<HTMLElement>('[data-palside-panel-scroll]')?.scrollTop ?? 0, teamId: c.current }); setJumpTarget({ id, teamId: c.current }); c.go('chat'); }} /></Suspense> : null}
     {!onboarding && <JoinSheet c={c} />}
     {touring && <FirstRunTour key={`tour:${c.current}`} c={c} onRun={setTourTeam} />}
     <Toaster label={t('extension.copy.notices')} closeLabel={t('extension.copy.closeNotice')} />

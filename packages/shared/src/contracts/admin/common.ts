@@ -6,8 +6,8 @@ import { contractString, strictObject, type Infer } from '../validation.ts';
 const TAIPEI_OFFSET_MS = 8 * HOUR_MS;
 /** Start of the Taipei calendar day containing `at`; Taipei is fixed UTC+8 with no daylight saving. */
 export const taipeiDayStart = (at: number) => Math.floor((at + TAIPEI_OFFSET_MS) / DAY_MS) * DAY_MS - TAIPEI_OFFSET_MS;
-/** Governance reasons: trimmed, counted in visible characters. */
-export const text = contractString({ min: 1, max: ADMIN_REASON_LENGTH, unit: 'grapheme', trim: true });
+/** Governance reasons: optional notes, trimmed, counted in visible characters; empty means none was given. */
+export const text = contractString({ min: 0, max: ADMIN_REASON_LENGTH, unit: 'grapheme', trim: true });
 export const targetId = Type.String({ minLength: 1, maxLength: ADMIN_ID_LENGTH });
 export const nullable = <S extends TSchema>(schema: S) => Type.Union([schema, Type.Null()]);
 export const id = Type.String();

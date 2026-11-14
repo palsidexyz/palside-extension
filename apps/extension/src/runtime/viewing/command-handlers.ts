@@ -8,7 +8,6 @@ import { iconDataUrl } from './viewing';
 import { pageLabel,titleNamesAccount } from './page-title';
 import { tokenNamed } from './token-profiles.ts';
 import { assetKey } from '../../domain/annotations/interaction.ts';
-import { reachedPoke } from '../../domain/annotations/social.ts';
 import type { Command } from '../transport/command-map';
 import { readPreferencePatch } from '../composition/state';
 import { startedTeams } from '../teams/onboarding';
@@ -66,8 +65,6 @@ export async function pageCommand(this: RuntimeCommands, command: Extract<Comman
     runtime.sharing.page = view;
     runtime.cache.upsertView(view);
     runtime.state.viewingId = view.id;
-    // Arriving at a page answers every 喊你来看 to it: the hint and its desktop notification go.
-    if (runtime.state.pokes?.some(poke => reachedPoke(poke.view, view))) runtime.state.pokes = runtime.state.pokes.filter(poke => !reachedPoke(poke.view, view));
     runtime.state.data.people = runtime.state.data.people.map(person => person.id === session.account.id ? { ...person, viewing: view.id } : person);
     runtime.emit();
     if (publish && !preview && p.stable === true) {

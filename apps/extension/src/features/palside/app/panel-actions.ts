@@ -31,6 +31,8 @@ export type PanelActions = {
   attach: (attachment: Attachment, teamId?: string) => void;
   send: (prepare?: (message: Message) => void) => Promise<boolean>;
   retry: (message: Message) => void;
+  /** 喊来看: the page in front, as a card, to everyone or to one teammate. */
+  call: (url: string, accountId?: string) => Promise<boolean>;
   edit: (message: Message) => void;
   saveEdit: () => void;
   recall: (message: Message) => void;

@@ -10,7 +10,7 @@
 .envelope[data-size=lg] { width:44px; height:56px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); }
 
 /* 红包卡片 in chat: red top, quiet foot; spent packets fade toward the canvas. */
-.card { display:block; width:240px; max-width:100%; margin:0; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--packet); color:var(--packet-ink); font:inherit; text-align:left; overflow:hidden; cursor:pointer; transition:background-color .3s; }
+.card { display:block; width:var(--chat-card-width); max-width:100%; margin:0; padding:0; border:0; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--packet); color:var(--packet-ink); font:inherit; text-align:left; overflow:hidden; cursor:pointer; transition:background-color .3s; }
 .card:hover { background:var(--packet-hover); }
 .card[data-dim] { background:var(--packet-dim); }
 .card[data-dim] .envelope { opacity:.7; }
@@ -63,6 +63,8 @@
 .saved[data-state=issued] { color:var(--ui-text-secondary); }
 .saved[data-state=failed] { color:var(--ui-ink-error); }
 .centered { text-align:center; }
+.next { display:flex; }
+.nextAction { flex:1; }
 .claims { display:flex; flex-direction:column; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; }
 .claims > header { display:flex; justify-content:space-between; gap:12px; padding:12px 14px 6px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; }
 .claims > header:only-child { padding-bottom:12px; }

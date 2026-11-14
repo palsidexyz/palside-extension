@@ -103,9 +103,9 @@ export function AssetDiscussion({ c, asset, onJump }: { c: PalsideController; as
       {view.kind === 'asset' ? <Token view={view} size="lg" /> : <span className={s.pageLogo}><SiteLogo site={site} /></span>}
       <div className={s.names}>
         <h2><TokenName c={c} view={view} /></h2>
-        <p>{view.kind === 'asset'
+        <div className={s.meta}>{view.kind === 'asset'
           ? <>{view.chain && <span>{view.chain}</span>}{view.chain && short && <span aria-hidden="true">·</span>}{short && <Tooltip content={t('extension.copy.copyContractAddress')}><button type="button" className={s.address} aria-label={t('extension.copy.copyContractAddress')} onClick={() => void c.copy(view.address!)}>{short}<Copy size={12} aria-hidden="true" /></button></Tooltip>}</>
-          : <span>{site?.name ?? view.source}</span>}</p>
+          : <span>{site?.name ?? view.source}</span>}</div>
       </div>
       {reachable && roomKey && summary && <button type="button" className={s.watch} onClick={() => { setSocialUi({ people: roomKey }); c.go('room-people'); }}><Faces c={c} people={summary.faces} /><span><CountText text={t('extension.room.watching', { count: summary.count })} value={summary.count} /></span></button>}
     </header>

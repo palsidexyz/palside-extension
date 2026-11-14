@@ -13,14 +13,14 @@ export const adminJobRow = strictObject({
 });
 export const adminJobPage = strictObject({ ...page(adminJobRow).properties, checkedAt: count });
 export const adminHealthState = Type.Enum(['ok', 'degraded', 'down', 'unconfigured', 'unverified']);
-export const adminHealthDetail = Type.Enum(['QUERY_OK', 'PROTOCOL_REACHABLE', 'INDEX_REACHABLE', 'INDEX_SYNCED', 'INDEX_LAGGING', 'DEPLOYMENT_MISMATCH', 'PROVIDER_OK', 'PROVIDER_DEGRADED', 'PROVIDER_DOWN', 'PRICE_OK', 'NOT_CONFIGURED', 'PROBE_UNAVAILABLE', 'CONFIGURED_UNVERIFIED', 'TIMEOUT', 'CHECK_FAILED', 'INVALID_RESPONSE', 'SLOW_RESPONSE', 'STALE_BLOCK', 'PRICE_UNAVAILABLE', 'INVALID_PRICE']);
+export const adminHealthDetail = Type.Enum(['QUERY_OK', 'PROTOCOL_REACHABLE', 'INDEX_REACHABLE', 'INDEX_SYNCED', 'INDEX_LAGGING', 'DEPLOYMENT_MISMATCH', 'PROVIDER_OK', 'PROVIDER_DEGRADED', 'PROVIDER_DOWN', 'SPONSOR_OK', 'SPONSOR_POLICY', 'SPONSOR_ALLOWLIST', 'SPONSOR_LIMIT', 'SPONSOR_REFUSED', 'PRICE_OK', 'NOT_CONFIGURED', 'PROBE_UNAVAILABLE', 'CONFIGURED_UNVERIFIED', 'TIMEOUT', 'CHECK_FAILED', 'INVALID_RESPONSE', 'SLOW_RESPONSE', 'STALE_BLOCK', 'PRICE_UNAVAILABLE', 'INVALID_PRICE']);
 const sample = { state: adminHealthState, detail: adminHealthDetail, startedAt: count, checkedAt: count, latencyMs: nullable(count) };
 export const adminIndexProgress = strictObject({ indexedBlock: uint, headBlock: uint, lagBlocks: uint, checkpointBlockAt: nullable(count), deploymentMatches: nullable(Type.Boolean()), synced: nullable(Type.Boolean()) });
 export const adminHealthQuote = strictObject({ numerator: Type.String({ pattern: '^[1-9][0-9]*$', maxLength: 256 }), denominator: Type.String({ pattern: '^[1-9][0-9]*$', maxLength: 256 }), currency: Type.Literal('USD'), source: Type.Enum(['curve', 'pool']), blockNumber: uint, blockAt: count });
 export const adminDatabaseHealth = strictObject({ id: Type.Literal('database'), ...sample });
 export const adminMatrixHealth = strictObject({ id: Type.Literal('matrix'), ...sample, protocolVersions: nullable(Type.Array(Type.String({ minLength: 1, maxLength: 100 }), { minItems: 1, maxItems: 100 })) });
 export const adminIndexHealth = strictObject({ id: Type.Literal('index'), ...sample, chainId: nullable(count), progress: nullable(adminIndexProgress) });
-export const adminRelayHealth = strictObject({ id: Type.Literal('relay'), ...sample, configured: nullable(Type.Boolean()), provider: nullable(Type.Enum(['alchemy', 'local'])), probe: Type.Enum(['configuration', 'provider-read']) });
+export const adminRelayHealth = strictObject({ id: Type.Literal('relay'), ...sample, configured: nullable(Type.Boolean()), provider: nullable(Type.Enum(['alchemy', 'local'])), probe: Type.Enum(['configuration', 'provider-read', 'sponsorship']) });
 export const adminPriceHealth = strictObject({ id: Type.Literal('price'), ...sample, quote: nullable(adminHealthQuote) });
 export const adminJobAlerts = strictObject({
   storage: nullable(strictObject({ state: Type.Enum(['ok', 'low', 'unavailable']), checkedAt: count, bytes: nullable(count), freeBytes: nullable(count) })),

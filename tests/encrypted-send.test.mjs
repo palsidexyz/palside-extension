@@ -227,7 +227,7 @@ for (const change of ['none', 'session', 'client', 'membership', 'room', 'readon
   if (change === 'none') await eligible; else await assert.rejects(eligible);
 });
 
-for (const path of ['viewing', 'reaction', 'poke']) {
+for (const path of ['viewing', 'reaction']) {
   for (const change of ['none', 'identity', 'membership', 'session']) test(`${path} enforces signed devices and ${change} guard`, async () => {
     let f; const encrypted = [];
     const api = encryptedCrypto({
@@ -242,7 +242,7 @@ for (const path of ['viewing', 'reaction', 'poke']) {
       },
     });
     f = fixture({ getCrypto: () => api });
-    const send = () => path === 'viewing' ? f.runtime.sharing.publishViewing() : path === 'reaction' ? f.interactions.react('team', '🔥', 1) : f.interactions.poke('team', 'peer');
+    const send = () => path === 'viewing' ? f.runtime.sharing.publishViewing() : f.interactions.react('team', '🔥', 1);
     if (change !== 'none' && path !== 'viewing') await assert.rejects(send()); else await send();
     assert.equal(encrypted.length, 1);
     assert.ok(encrypted[0].every(target => target.deviceId === 'SIGNED'));

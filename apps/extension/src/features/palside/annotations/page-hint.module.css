@@ -19,8 +19,4 @@
 .note[data-pending] .open::after { content:''; flex:none; width:10px; height:10px; margin-inline-start:2px; border-radius:50%; border:1.5px solid currentColor; border-inline-end-color:transparent; animation:pending-turn .8s linear infinite; }
 @keyframes pending-turn { to { transform:rotate(360deg); } }
 /* Ignore sits just outside the hint's end and shows on hover, so the resting hint stays one clean sentence. */
-.ignore { position:absolute; top:50%; left:calc(100% + 4px); display:grid; place-items:center; width:20px; height:20px; padding:0; border:0; border-radius:50%; background:var(--ui-control-surface); color:var(--ui-text-secondary); cursor:pointer; opacity:0; transform:translateY(-50%); transition:opacity .16s var(--ui-ease-feedback), color .16s, background-color .16s; }
-.row:hover .ignore, .ignore:focus-visible { opacity:1; }
-.ignore:hover { color:var(--ui-text-primary); background:var(--ui-control-hover); }
-@media(hover:none) { .ignore { opacity:1; } }
-@media(prefers-reduced-motion:reduce) { .note, .ignore { transition:none; } .note[data-pending] .open::after { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .note { transition:none; } .note[data-pending] .open::after { animation:none; } }

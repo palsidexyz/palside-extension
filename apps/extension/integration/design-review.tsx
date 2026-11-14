@@ -1,10 +1,12 @@
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@palside/shared/units';
 import { IntegrationIntl } from './intl';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PalsideApp } from '../src/features/palside/app/palside-app';
 import { setSocialUi, type ReadKey } from '../src/features/palside/annotations/social-state';
 import { palsideFixtures } from './fixtures';
+import { DanmakuShell, demoPage, demoRooms, demoTabs, demoTalk, type DemoTab } from './danmaku-demo';
+import { demoPacket, demoWallet, demoWalletCommand } from './danmaku-wallet';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import type { LivePort } from '../src/features/palside/app/live-port';
 import { pageCapabilities } from '../src/runtime/browser/page-capabilities';
@@ -58,6 +60,13 @@ const now = Date.now();
 data.views.push({ id: 'page-github', name: 'palsidexyz/palside-extension: Watch tokens alongside friends', kind: 'website', disclosure: 'page', source: 'github.com', url: 'https://github.com/palsidexyz/palside-extension', color: '#e9edf0', glyph: 'G' });
 data.messages.push({ id: 'n6', teamId: 'night', author: 'leo', text: '这个仓库看看', attachment: { kind: 'asset', assetId: 'page-github', view: data.views.at(-1)! }, time: '14:33', status: 'sent' });
 data.messages.push({ id: 'n7', teamId: 'night', author: 'robin', text: '', attachment: { kind: 'asset', assetId: 'cashcat', view: data.views[0]! }, time: '14:34', status: 'sent' });
+// scene=call: 喊来看 — Robin calls everyone to PONS, Kai calls you to X, and you call Mia to CASHCAT, beside a 转账, a page card and a 红包.
+if (scene === 'call') {
+  data.messages = data.messages.filter(message => message.id !== 'n7');
+  data.messages.push({ id: 'c1', teamId: 'night', author: 'robin', text: '', call: 'all', mentionIds: ['robin', 'mia', 'leo', 'kai', 'luna', 'you'].filter(id => id !== 'robin'), timestamp: now - MINUTE_MS, attachment: { kind: 'asset', assetId: 'pons', view: data.views[1]! }, time: '14:35', status: 'sent' });
+  data.messages.push({ id: 'c3', teamId: 'night', author: 'kai', text: '', call: 'one', mentionIds: [data.self], timestamp: now - 40_000, attachment: { kind: 'asset', assetId: 'x', view: data.views[2]! }, time: '14:35', status: 'sent' });
+  data.messages.push({ id: 'c2', teamId: 'night', author: 'you', text: '', call: 'one', mentionIds: ['mia'], timestamp: now - 20_000, attachment: { kind: 'asset', assetId: 'cashcat', view: data.views[0]! }, time: '14:36', status: 'sent' });
+}
 // scene=site-faces: 共享在看 on sites outside the catalog, named by their domain — a coloured mark, a white mark and a full square icon.
 if (scene === 'site-faces') {
   const svg = (body: string) => `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${body}</svg>`)}`;
@@ -98,7 +107,10 @@ const stranger = (id: string, nickname: string) => ({ wallet: `0x${[...id].reduc
 const roomPeople = [stranger('kenji-0x91c4', 'Kenji'), stranger('zed-0x3c2a', 'Zed'), stranger('nova-0x7e10', 'Nova'), { wallet: null, id: 'robin', nickname: 'Robin', avatarId: null }, { wallet: null, id: data.self, nickname: '测试成员', avatarId: null }];
 const roomLine = (id: string, author: (typeof roomPeople)[number], text: string, ago: number, extra = {}) => ({ id, key: roomKey, author, text, folded: false, reported: false, createdAt: now - ago * MINUTE_MS, ...extra });
 const roomFaces = roomPeople.slice(0, 3);
-const roomMessages = scene === 'room-empty' ? [] : [roomLine('r1', roomPeople[0]!, '池子刚加了一倍', 9), roomLine('r2', roomPeople[3]!, '跟上了，看 5 分钟线', 7), roomLine('r3', roomPeople[1]!, 'dev 钱包刚卖了一部分，注意', 5), roomLine('r4', roomPeople[2]!, '这币要拉 10 倍，私聊带你', 4, { folded: true }), roomLine('r5', roomPeople[4]!, '哪个钱包', 1)];
+// 打赏: Kenji's line tipped by you, Robin's by three people, Zed's by Nova.
+const pals = (amount: number) => String(BigInt(amount) * 10n ** 18n);
+const tipGroup = (id: string, messageId: string, accountIds: string[], amount: number) => ({ id, messageId, roomKey, recipientId: 'x', accountIds, amount: pals(amount), startedAt: now, updatedAt: now });
+const roomMessages = scene === 'room-empty' ? [] : [roomLine('r1', roomPeople[0]!, '池子刚加了一倍', 9, { tips: [tipGroup('t1', 'r1', [data.self], 2)] }), roomLine('r2', roomPeople[3]!, '跟上了，看 5 分钟线', 7, { tips: [tipGroup('t2', 'r2', ['kenji-0x91c4', 'zed-0x3c2a', data.self], 30)] }), roomLine('r3', roomPeople[1]!, 'dev 钱包刚卖了一部分，注意', 5, { tips: [tipGroup('t3', 'r3', ['nova-0x7e10'], 5)] }), roomLine('r4', roomPeople[2]!, '这币要拉 10 倍，私聊带你', 4, { folded: true }), roomLine('r5', roomPeople[4]!, '哪个钱包', 1)];
 // 点赞: two lines others liked, one of them by you, and your own line liked by one.
 const roomLikes = scene === 'room-empty' ? {} : { r2: { count: 12, liked: true }, r3: { count: 3, liked: false }, r5: { count: 1, liked: false } };
 const roomFor = (key: string) => key === roomKey
@@ -142,16 +154,17 @@ function Review() {
     drafts: scene === 'ref' ? { night: { value: { text: '这里量很大', ref: { target: { kind: 'quote', exact: '24h 成交额 $1.2M，持有人 3,412', prefix: '', suffix: '' }, caption: '24h 成交额 $1.2M，持有人 3,412', view: data.views[0]! } }, revision: 1 } } as never : scene === 'draft' ? { night: { value: { text: '看这个', attachment: { kind: 'asset', assetId: 'page-github', view: data.views.at(-1)! } }, revision: 1 } } as never : {},
     rooms, tokens: hotNames,
     preferences: { toured: params.get('tour') !== '1', rooms: {}, share: params.get('share') !== '0' && on.includes('share'), siteInteraction, current: 'night', notifications: params.get('notify') === 'off' ? 'off' : 'all', notificationPreview: true, hiddenStickies: scene === 'stickies' ? ['k5'] : [] },
+    ...(scene === 'danmaku-panel' ? { wallet: demoWallet(now) } : {}),
     remoteTeams: [], lobbyTeams, config: { websiteUrl: 'https://example.test', signupDifficulty: 0 },
     invitations: {},
-    // scene=signals: chat hints for pages this window is not showing — signals and 喊你来看 (the panel is on gmgn's token page).
+    // scene=signals: chat hints for pages this window is not showing (the panel is on gmgn's token page).
     signalRecords: scene === 'signals' ? [
       { id: '$sig-kai', teamId: 'night', personId: 'kai', kind: 'question', url: 'https://x.com/robinhoodapp/status/1', timestamp: now - 40_000, expiresAt: now + DAY_MS, target: { kind: 'page' } },
       { id: '$sig-mia', teamId: 'night', personId: 'mia', kind: 'danger', url: 'https://dexscreener.com/solana/So11111111111111111111111111111111111111112', timestamp: now - 4000, expiresAt: now + DAY_MS, target: { kind: 'page' } },
     ] as RuntimeState['signalRecords'] : [],
-    // pokes: this device shares CASHCAT, so the composer's 喊大家来看 key is live.
-    ...(scene === 'pokes' ? { viewingId: data.views[0]!.id, publishedViewing: { viewId: data.views[0]!.id, teamId: 'night', expiresAt: now + 30_000 } } : {}),
-    pokes: scene === 'chat' || scene === 'pokes' || scene === 'signals' ? [{ id: 'p1', teamId: 'night', from: 'mia', view: data.views[0]!, at: now, count: 2 }, { id: 'p2', teamId: 'night', from: 'kai', view: data.views[1]!, at: now - 5000, count: 1 }] : [],
+    // call: a 红包 and a 转账 sit in the same chat, so every card's width can be compared.
+    ...(scene === 'call' ? { chainTeam: { teamId: 'night', nextCursor: null, transfers: [{ id: 'call-transfer', accountId: 'mia', recipientId: data.self, amount: String(20n * 10n ** 18n), status: 'confirmed', createdAt: now - 4 * MINUTE_MS, submittedAt: now - 4 * MINUTE_MS, confirmedAt: now - 4 * MINUTE_MS }],
+      packets: [{ packet: { id: '0x' + 'f'.repeat(64), accountId: 'kai', kind: 'team', scope: 'night', status: 'active', count: 5, amount: String(25n * 10n ** 18n), claimedCount: 2, claimedAmount: String(10n * 10n ** 18n), createdAt: now - 3 * MINUTE_MS, expiresAt: now + HOUR_MS }, distribution: 'random', blessing: '周五收盘红包', eligibility: 'eligible', eligibleAt: null, myClaim: null, claims: [] }] } } as never : {}),
   } as RuntimeState);
   // scene=chat follows Robin; a moment later Robin moves to PONS, so the chip's follow mark moves and the chat shows 去了.
   React.useEffect(() => {
@@ -166,8 +179,36 @@ function Review() {
     const timer = setInterval(() => { const next = order[step++ % order.length]!; setState(old => ({ ...old, data: { ...old.data, people: old.data.people.map(person => person.id === old.data.self || person.id === 'mia' && step % 2 ? { ...person, viewing: next } : person) } })); }, 1400);
     return () => clearInterval(timer);
   }, []);
+  // scene=danmaku-panel: the panel inside scene=danmaku-modes' browser window — tabs switch, 弹幕 and 红包 arrive live.
+  const stateRef = useRef(state), commandRef = useRef<LivePort['command']>(undefined);
+  useLayoutEffect(() => { stateRef.current = state; });
+  const [tab, setTab] = useState<DemoTab>('cashcat');
+  const demoCache = useRef(demoRooms(roomFor, roomKey, otherKey, roomPeople, now));
+  const demoPackets = useRef(new Map(scene === 'danmaku-panel' ? [demoPacket(roomKey, 'kenji-0x91c4', '恭喜发财，CASHCAT 冲')].map(item => [item.packet.id, { ...item, packet: { ...item.packet, createdAt: now - 3 * MINUTE_MS } }]) : []));
+  const demoEvent = useCallback((event: 'packet' | 'burst' | 'squad') => {
+    if (event === 'squad') { setState(old => ({ ...old, data: { ...old.data, messages: [...old.data.messages, { id: `sq${Date.now()}`, teamId: 'night', author: 'mia', text: '你们看 CASHCAT 的弹幕了吗', time: '14:40', timestamp: Date.now(), status: 'sent' }] } })); return; }
+    const key = stateRef.current.rooms.current?.key ?? roomKey;
+    const sent = event === 'burst' ? [['nova-0x7e10', '新年快乐'], ['ivy-0xa8f0', '拿着买 CASHCAT'], ['toshi-0x52aa', '手慢无']] : [['zed-0x3c2a', '大家吃个红包']];
+    sent.forEach(([who, wish], index) => { const packet = demoPacket(key, who!, wish!); demoPackets.current.set(packet.packet.id, { ...packet, packet: { ...packet.packet, createdAt: Date.now() + index } }); });
+    void commandRef.current?.('wallet-room', { key });
+  }, []);
+  const goTab = useCallback((next: DemoTab) => { setTab(next); const key = demoTabs[next].key === 'cashcat' ? roomKey : demoTabs[next].key === 'pons' ? otherKey : undefined;
+    setState(old => ({ ...old, rooms: { ...old.rooms, tab: key, leased: old.rooms.pinned ?? key, current: old.rooms.pinned ? old.rooms.current : key ? demoCache.current[key] : undefined } })); }, []);
+  React.useEffect(() => {
+    if (scene !== 'danmaku-panel') return;
+    const first = setTimeout(() => setState(old => ({ ...old, rooms: { ...old.rooms, summaries: { ...old.rooms.summaries, [otherKey]: { key: otherKey, site: 'gmgn', count: 41, faces: roomFaces.slice(1), at: now } } } })));
+    const timer = setInterval(() => setState(old => {
+      const current = old.rooms.current; if (!current) return old;
+      const message = demoTalk(current.key === roomKey, roomPeople, current.key);
+      const next = { ...current, messages: [...current.messages, message] };
+      demoCache.current[current.key] = next;
+      return { ...old, rooms: { ...old.rooms, current: next } };
+    }), 4200);
+    return () => { clearTimeout(first); clearInterval(timer); };
+  }, []);
   const [danmakuSettings, setDanmakuSettings] = useState<DanmakuSettings>(defaultDanmakuSettings);
   const command: LivePort['command'] = useCallback(async <T,>(name: string, payload?: Record<string, unknown>): Promise<T> => {
+    if (scene === 'danmaku-panel' && name.startsWith('wallet-')) return demoWalletCommand(name, payload, demoPackets.current as never, () => stateRef.current, setState, data.self) as T;
     if (name === 'signal-settings-get') return signalConfig.current as T;
     if (name === 'signal-sites-get') return {} as T;
     if (name === 'signal-settings') { signalConfig.current = normalizeSignalSettings({ ...signalConfig.current, ...(payload?.settings as object) }); return signalConfig.current as T; }
@@ -188,9 +229,9 @@ function Review() {
     const setRooms = (update: (rooms: RuntimeState['rooms']) => Partial<RuntimeState['rooms']>) => setState(old => ({ ...old, rooms: { ...old.rooms, ...update(old.rooms) } }));
     // 弹幕 switched off in 网页互动 drops the room, as the runtime does.
     if (name === 'preferences' && payload?.siteInteraction && !danmakuOn(payload.siteInteraction as SiteInteractions)) setRooms(() => ({ pinned: undefined, leased: undefined, current: undefined }));
-    if (name === 'room-open') setRooms(rooms => ({ pinned: key, leased: key, current: rooms.current?.key === key ? rooms.current : roomFor(key) }));
-    if (name === 'room-close') setRooms(() => ({ pinned: undefined }));
-    if (name === 'room-send') { const message = roomLine(`r${Date.now()}`, roomPeople[4]!, String(payload?.text), 0); setRooms(rooms => rooms.current ? { current: { ...rooms.current, messages: [...rooms.current.messages, message], slowUntil: Date.now() + 5_000 } } : {}); return { message } as T; }
+    if (name === 'room-open') setRooms(rooms => ({ pinned: key, leased: key, current: rooms.current?.key === key ? rooms.current : demoCache.current[key] ?? roomFor(key) }));
+    if (name === 'room-close') setRooms(rooms => ({ pinned: undefined, leased: rooms.tab, current: rooms.tab ? demoCache.current[rooms.tab] ?? roomFor(rooms.tab) : undefined }));
+    if (name === 'room-send') { const message = { ...roomLine(`r${Date.now()}`, roomPeople[4]!, String(payload?.text), 0), key: String(stateRef.current.rooms.current?.key ?? roomKey) }; setRooms(rooms => rooms.current ? { current: { ...rooms.current, messages: [...rooms.current.messages, message], slowUntil: Date.now() + 5_000 } } : {}); return { message } as T; }
     if (name === 'room-retract') setRooms(rooms => rooms.current ? { current: { ...rooms.current, messages: rooms.current.messages.filter(message => message.id !== payload?.id) } } : {});
     if (name === 'room-report') { setRooms(rooms => rooms.current ? { current: { ...rooms.current, messages: rooms.current.messages.map(message => message.id === payload?.id ? { ...message, reported: true } : message) } } : {}); return {} as T; }
     if (name === 'room-like') {
@@ -209,6 +250,7 @@ function Review() {
     if (name === 'danmaku-settings') setDanmakuSettings(old => normalizeDanmakuSettings({ ...old, ...(payload?.settings as object) }));
     return undefined as T;
   }, []);
+  useLayoutEffect(() => { commandRef.current = command; });
   const [, setGrantTick] = useState(0);
   React.useEffect(() => { const tick = () => setGrantTick(n => n + 1); added.add(tick); removed.add(tick); return () => { added.delete(tick); removed.delete(tick); }; }, []);
   const site = grants.origins.has('https://gmgn.ai/*') || grants.origins.has('<all_urls>');
@@ -225,6 +267,21 @@ function Review() {
     if (scene === 'grant') setSocialUi({ grant: true });
     if (scene === 'read') setSocialUi({ read: (params.get('read') ?? 'share') as ReadKey });
   }, []);
+  // The panel inside the demo's browser window (an iframe, so sheets, dialogs and toasts stay in the panel as in Chrome); the window drives it by messages.
+  React.useEffect(() => {
+    if (scene !== 'danmaku-panel') return;
+    const listen = (event: MessageEvent) => {
+      const message = event.data as { demo?: string; value?: unknown };
+      if (message.demo === 'tab') goTab(message.value as DemoTab);
+      if (message.demo === 'event') demoEvent(message.value as 'packet' | 'burst' | 'squad');
+    };
+    window.addEventListener('message', listen);
+    window.parent.postMessage({ demoReady: true }, '*');
+    return () => window.removeEventListener('message', listen);
+  }, [goTab, demoEvent]);
+  if (scene === 'danmaku-panel') return <div style={{ height: '100dvh', width: '100%', overflow: 'hidden' }}>
+    <PalsideApp live={{ state, command, openPage: async () => {}, page: demoPage(tab, site, interactive, pageCapabilities), danmaku: danmakuSettings } as LivePort} />
+  </div>;
   return <div style={{ height: '100dvh', width: `${params.get('w') ?? 380}px`, boxShadow: '1px 0 0 #ddd', transform: 'translateZ(0)', overflow: 'hidden' }}><PalsideApp live={{ state, command, openPage: async () => {}, page, danmaku: danmakuSettings, update: params.get('update') ? { ready: params.get('update')! } : undefined } as LivePort} /></div>;
 }
-createRoot(document.getElementById('root')!).render(<IntegrationIntl><Review /></IntegrationIntl>);
+createRoot(document.getElementById('root')!).render(scene === 'danmaku-modes' ? <DanmakuShell /> : <IntegrationIntl><Review /></IntegrationIntl>);

@@ -72,11 +72,27 @@ test('recall strips quoted content and mentions for live events and historical r
     await runtime.timeline.consume({ ...original, isRedacted: () => mode === 'historical', getRedactionEvent: () => ({ content: { reason: 'author' } }) });
     const message = runtime.state.data.messages[0];
     assert.equal(message.recalled, true);
-    for (const field of ['attachment', 'replyTo', 'replyRange', 'replyToExpiresAt']) assert.equal(message[field], undefined, `${mode}: ${field}`);
+    for (const field of ['attachment', 'call', 'replyTo', 'replyRange', 'replyToExpiresAt']) assert.equal(message[field], undefined, `${mode}: ${field}`);
     assert.deepEqual(plain(message.mentionIds), []);
     const cached = writes.get('$incoming').value;
     assert.deepEqual(plain(runtime.state.data.views), []);
     assert.deepEqual(cached.views, []);
+  }
+});
+
+test('喊来看 is read from a page card: everyone, or exactly one mentioned teammate', async () => {
+  const view = { version: 1, kind: 'website', disclosure: 'page', name: 'source', url };
+  const cases = [
+    [{ 'com.palside.asset': view, 'com.palside.call': 'all', 'm.mentions': { user_ids: ['@alice:example.com'] } }, 'all'],
+    [{ 'com.palside.asset': view, 'com.palside.call': 'one', 'm.mentions': { user_ids: ['@alice:example.com'] } }, 'one'],
+    [{ 'com.palside.asset': view, 'com.palside.call': 'one', 'm.mentions': { user_ids: [] } }, undefined],
+    [{ 'com.palside.asset': view, 'com.palside.call': 'everyone' }, undefined],
+    [{ 'com.palside.call': 'all' }, undefined],
+  ];
+  for (const [extra, expected] of cases) {
+    const { runtime } = fixture();
+    await runtime.timeline.consume(event('m.room.message', { msgtype: 'm.text', body: '', ...extra }));
+    assert.equal(runtime.state.data.messages[0]?.call, expected, JSON.stringify(extra));
   }
 });
 

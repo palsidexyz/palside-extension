@@ -1,4 +1,6 @@
 'use client';
+import { CallCard, CallLabel } from './call-card';
+import callStyles from './call-card.module.css';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { clockTime, localeOrEnglish, message as uiMessage } from '@palside/i18n';
 import { useLocale, useTranslations } from 'use-intl';
@@ -166,6 +168,8 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
     requestAnimationFrame(() => row.current?.scrollIntoView({ block: 'nearest' }));
   }
 
+  // 喊来看 always names itself in the name line, so it never folds into the previous message.
+  const callMeta = Boolean(message.call && asset);
   const className = [s.message, self && s.selfMessage, grouped && s.groupedMessage].filter(Boolean).join(' ');
   return <motion.article ref={row} className={className} data-message-id={message.id} inert={Boolean(leaving)} aria-hidden={leaving ? true : undefined}
     initial={flying ? false : { opacity: 0, y: reduced ? 0 : 9, scale: reduced ? 1 : .985 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}
@@ -174,7 +178,7 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
       ? <span className={s.avatarGap} aria-hidden="true" />
       : taking ? <span className={s.takeOver}><PersonAvatar person={person} onClick={c.people.some(item => item.id === person.id) ? () => c.setPersonId(person.id) : undefined} /></span> : <PersonAvatar person={person} onClick={c.people.some(item => item.id === person.id) ? () => c.setPersonId(person.id) : undefined} />}
     <div className={s.messageContent}>
-      {!self && !grouped && <div className={`${s.messageMeta} ${taking ? s.takeOver : ''}`}><strong>{person.name}</strong></div>}
+      {(callMeta || !self && !grouped) && <div className={`${s.messageMeta} ${taking ? s.takeOver : ''} ${callMeta ? callStyles.meta : ''}`} data-self={self || undefined}>{!self && <strong>{person.name}</strong>}{callMeta && <CallLabel c={c} message={message} />}</div>}
       <div className={s.messageLine}>
         <div ref={stack} className={s.messageStack} onPointerDownCapture={event => { if (event.button === 2) menu.current?.press(); }} onContextMenu={event => menu.current?.openAt(event)} data-sending={message.status === 'sending' && !queued} data-queued={queued ? true : undefined} aria-busy={message.status === 'sending'}>
           {(message.replyTo || message.text) && <div ref={bubble} className={`${s.messageBubble} ${jumbo ? s.jumbo : ''}`} data-link={linkOnly || undefined} data-editing={editing || undefined} data-size={jumbo ? Math.min(characterLength(message.text.replace(/\s+/g, '')), 2) : undefined}>
@@ -190,7 +194,7 @@ function MessageBody({ c, message, grouped, landing, landingRange, queued, onRep
             </> : message.text && <p ref={text} id={textId} className={s.messageText} data-message-text data-folded={folded || undefined} data-toggled={toggled || undefined}><LinkedText c={c} message={message} /></p>}
             {long && !editing && <button type="button" className={s.foldToggle} aria-expanded={expanded} aria-controls={textId} onClick={() => { setToggled(true); if (expanded) collapse(); else setExpanded(true); }}>{expanded ? t('extension.reading.collapse') : t('extension.reading.expand')}</button>}
           </div>}
-          {asset && !linkOnly && <AssetCard view={asset} onOpen={() => c.selectAsset(asset.id)} />}
+          {asset && !linkOnly && (message.call ? <CallCard c={c} message={message} view={asset} /> : <AssetCard view={asset} onOpen={() => c.selectAsset(asset.id)} />)}
           {/* A token card whose details did not come through still takes its place, so the message never reads as empty. */}
           {message.attachment?.kind === 'asset' && !asset && <div className={s.assetGone}><CircleSlash size={16} aria-hidden="true" />{t('extension.copy.tokenGone')}</div>}
           {message.attachment?.kind === 'image' && <MessageImage c={c} id={message.id} sentAt={message.timestamp} image={message.attachment} />}

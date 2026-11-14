@@ -1,8 +1,0 @@
-/* 最近看过 under the frost's title: up to three token chips, centred, the same pill as 热门's chain filter. */
-.recent { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; max-width:100%; margin-top:2px; }
-.chip { display:inline-flex; align-items:center; gap:6px; max-width:132px; height:30px; padding:0 10px 0 5px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
-.chip > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.chip [data-token-size] { --token-size:20px; flex:none; }
-.chip:hover { background:var(--ui-control-hover); }
-.chip:active { background:var(--ui-control-recess); }
-.chip:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }

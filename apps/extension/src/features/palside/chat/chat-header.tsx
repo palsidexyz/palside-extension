@@ -4,20 +4,17 @@ import { flushSync } from 'react-dom';
 import { VisuallyHidden } from '@palside/ui/visually-hidden';
 import { Tooltip } from '@palside/ui/tooltip';
 import { useTranslations } from 'use-intl';
-import { ArrowLeft, ArrowUpCircle, CheckCheck, ChevronDown, Compass, Eye, Flame, MoreHorizontal, Plus, Search, Settings2, Star, Users } from 'lucide-react';
+import { ArrowUpCircle, CheckCheck, ChevronDown, Compass, Flame, MoreHorizontal, Plus, Search, Settings2, Star, Users } from 'lucide-react';
 import { TeamAvatar } from '../teams/team-avatar';
 import { formerTeams } from '../teams/team-start';
 import type { Team } from '../../../domain/teams/model';
 import { Count, UnreadBadge } from '../ui/motion-details';
-import { WheelArt } from '../settings/signal-settings';
 import { Action, PersonAvatar } from '../ui/primitives';
 import { Button, IconButton } from '@palside/ui/button';
 import { Menu, MenuTrigger, MenuContent, MenuItem } from '@palside/ui/menu';
 import { Popover, PopoverTrigger, PopoverContent, usePopoverContext } from '@palside/ui/popover';
-import { roomCount, roomsOn, useShownRoomKey } from '../rooms/rooms';
-import { RoomTitle } from '../app/panel-tabs';
+import { roomsOn } from '../rooms/rooms';
 import { PageCapsule } from '../viewing/page-key';
-import { setSocialUi } from '../annotations/social-state';
 import { useExtensionUpdate } from '../feedback/extension-update';
 import type { PalsideController } from '../app/use-palside';
 import s from '../app/palside.module.css';
@@ -64,12 +61,10 @@ function usePresenceFit(content: string) {
  *  the page key and the menu (热门代币 sits in it). 弹幕 is sent from the composer's 弹 key, not from here.
  *  Other teams, pending invites and 喊你来看 waiting in another squad mark the switcher itself: @N for mentions, otherwise a dot in place of the chevron. A downloaded
  *  extension version marks ⋯ with a dot and leads its menu with 更新到 x.
- *  On the 弹幕 page (`room`, opened from 热门 or a token) the row leads with ← back to the chat, then the token. */
-export function ChatHeader({ c, onTeam, room: roomPage }: { c: PalsideController; onTeam: (id: string) => void; room?: boolean }) {
+ */
+export function ChatHeader({ c, onTeam }: { c: PalsideController; onTeam: (id: string) => void }) {
   const t = useTranslations();
-  const roomKey = useShownRoomKey(c);
   const update = useExtensionUpdate(c);
-  const room = roomPage && c.screen === 'room';
   const count = c.team.memberCount ?? c.team.memberIds.length;
   const others = c.people.filter(p => p.id !== c.data.self && (p.presence === 'active' || p.presence === 'away') && c.team.memberIds.includes(p.id)).sort((a, b) => Number(b.presence === 'active') - Number(a.presence === 'active'));
   // You are online too: two people here read as two faces and 2, others first so the squad stays in view.
@@ -80,34 +75,25 @@ export function ChatHeader({ c, onTeam, room: roomPage }: { c: PalsideController
   const loud = switchable.filter(team => team.id !== c.current && !team.muted);
   const mentions = loud.reduce((sum, team) => sum + (team.mentions ?? 0), 0);
   const unread = loud.some(team => team.unread > 0);
-  // 喊你来看 waiting in another squad marks the switcher like unread messages do.
-  const called = calledTeams(c);
-  const calls = loud.some(team => called.has(team.id));
   const alone = count <= 1 && c.team.joined && !c.team.readonly;
   const invites = c.live.state.rooms.invites.length;
-  const switchLabel = [mentions > 0 ? t('extension.dynamic.teamMentions', { name: t('extension.copy.switchTeam'), count: mentions }) : t('extension.copy.switchTeam'), invites > 0 && t('extension.invite.pending', { count: invites }), calls && t('extension.top.called')].filter(Boolean).join(', ');
+  const switchLabel = [mentions > 0 ? t('extension.dynamic.teamMentions', { name: t('extension.copy.switchTeam'), count: mentions }) : t('extension.copy.switchTeam'), invites > 0 && t('extension.invite.pending', { count: invites })].filter(Boolean).join(', ');
   function markAllRead() {
     void c.run('team-preferences', { teamId: c.current, readIds: c.currentMessages.filter(m => m.status === 'sent').map(m => m.id) });
   }
   const search = () => { c.setSharedCategory('messages'); c.setQuery(''); c.go('search'); };
-  const watching = roomKey ? roomCount(c, roomKey) : undefined;
   const presenceLabel = alone ? `${t('extension.header.onlyYou')} · ${t('extension.copy.inviteShort')}` : t('extension.dynamic.onlineMembers', { online: online.length || (c.disconnected ? 0 : 1), count });
   const extra = online.length - Math.min(online.length, 2);
-  const { header, fit } = usePresenceFit([room ? `room:${roomKey ?? ''}:${watching ?? ''}` : c.team.name, alone, online.length, extra, mentions, unread || invites > 0 || calls, c.team.readonly].join('|'));
+  const { header, fit } = usePresenceFit([c.team.name, alone, online.length, extra, mentions, unread || invites > 0, c.team.readonly].join('|'));
   return <header ref={header} className={`${s.header} ${styles.bar}`}>
-    {room ? <div key="room" className={`${s.teamIdentity} ${styles.identity} ${styles.swap}`} data-fit={fit}><Action label={t('common.back')} className={styles.back} onClick={() => c.go('chat')}><ArrowLeft /></Action><RoomTitle c={c} />
-      {watching !== undefined && <Tooltip content={t('extension.room.watching', { count: watching })}><button type="button" className={styles.presence} data-kind="watch" aria-label={t('extension.room.watching', { count: watching })} onClick={() => { setSocialUi({ people: undefined }); c.go('room-people'); }}>
-        <Eye className={styles.glyph} size={14} strokeWidth={2.2} aria-hidden="true" /><span className={styles.number}><Count value={watching} /></span>
-      </button></Tooltip>}
-    </div> : <>
     <VisuallyHidden asChild><h1>{c.team.name}</h1></VisuallyHidden>
-    <div key="chat" className={`${s.teamIdentity} ${styles.identity}`} data-fit={fit}>
+    <div className={`${s.teamIdentity} ${styles.identity}`} data-fit={fit}>
       <Popover boundarySelector="[data-palside-app]" align="start">
         <PopoverTrigger asChild><button type="button" className={`${s.teamSelect} ${styles.squad}`} aria-label={switchLabel}>
           <TeamAvatar team={c.team} size="md" />
           <span className={styles.name} data-header-name>{c.team.name}</span>
           {mentions > 0 && <span className={s.nameMention}>@<Count value={mentions} /></span>}
-          {mentions === 0 && (unread || invites > 0 || calls) ? <span className={s.nameDot} /> : <ChevronDown size={14} />}
+          {mentions === 0 && (unread || invites > 0) ? <span className={s.nameDot} /> : <ChevronDown size={14} />}
         </button></PopoverTrigger>
         <PopoverContent aria-label={switchLabel} className={styles.teamPopup}><TeamOptions c={c} onTeam={onTeam} /></PopoverContent>
       </Popover>
@@ -120,9 +106,9 @@ export function ChatHeader({ c, onTeam, room: roomPage }: { c: PalsideController
             {extra > 0 && <span className={styles.more}>+<Count value={extra} /></span>}</span><span className={styles.number}><Count value={online.length} /></span></>
           : <><Users className={styles.glyph} size={14} strokeWidth={2.2} aria-hidden="true" /><span className={styles.number}><Count value={count} /></span></>}
       </button></Tooltip>}
-    </div></>}
+    </div>
     <div className={s.tools}>
-      {!room && <Action label={t('extension.copy.searchMessages')} className={styles.tool} onClick={search}><Search /></Action>}
+      <Action label={t('extension.copy.searchMessages')} className={styles.tool} onClick={search}><Search /></Action>
       {/* The page capsule: this tab's site (its sheet holds 网页互动 here and Chrome's permission), then the 共享在看 key. */}
       <PageCapsule c={c} />
       <Menu boundarySelector="[data-palside-app]" align="end">
@@ -143,23 +129,17 @@ export function ChatHeader({ c, onTeam, room: roomPage }: { c: PalsideController
   </header>;
 }
 
-/** Squads with a 喊你来看 still waiting for you. */
-function calledTeams(c: PalsideController) {
-  return new Set((c.live.state.pokes ?? []).map(poke => poke.teamId));
-}
-
 export function TeamOptions({ c, onTeam }: { c: PalsideController; onTeam: (id: string) => void }) {
   const t = useTranslations();
   const { close } = usePopoverContext();
   const joined = c.teams.filter(team => team.joined);
   const former = formerTeams(c);
   const invites = c.live.state.rooms.invites.length;
-  const called = calledTeams(c);
   const reason = (team: Team) => t(team.readonlyReason === 'removed' ? 'extension.start.removed' : team.readonlyReason === 'dissolved' ? 'extension.start.dissolved' : 'extension.start.left');
   return <>
     {joined.map(team => <button type="button" key={team.id} className={styles.teamOption} aria-current={team.id === c.current ? true : undefined}
-      aria-label={[team.mentions ? t('extension.dynamic.teamMentions', { name: team.name, count: team.mentions }) : t('extension.dynamic.teamUnread', { name: team.name, count: team.unread }), team.id !== c.current && called.has(team.id) && t('extension.top.called')].filter(Boolean).join(', ')} onClick={() => { close(); onTeam(team.id); }}>
-      <TeamAvatar team={team} size="sm" /><span className={styles.teamOptionLabel}>{team.name}</span>{team.id !== c.current && called.has(team.id) && <WheelArt entry="together" style={{ width: 18, height: 18, flex: 'none' }} />}{team.mentions ? <span className={styles.mentionBadge}>@<Count value={team.mentions} /></span> : <UnreadBadge count={team.unread} />}
+      aria-label={team.mentions ? t('extension.dynamic.teamMentions', { name: team.name, count: team.mentions }) : t('extension.dynamic.teamUnread', { name: team.name, count: team.unread })} onClick={() => { close(); onTeam(team.id); }}>
+      <TeamAvatar team={team} size="sm" /><span className={styles.teamOptionLabel}>{team.name}</span>{team.mentions ? <span className={styles.mentionBadge}>@<Count value={team.mentions} /></span> : <UnreadBadge count={team.unread} />}
     </button>)}
     {/* Teams that ended keep their read-only history here, below the live ones, each saying how it ended. */}
     {former.length > 0 && <div role="group" aria-labelledby="former-teams-label">

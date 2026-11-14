@@ -57,6 +57,7 @@ async function fixture(t) {
     '@palside/ui/tooltip': { Tooltip: ({ children }) => children },
     '../annotations/social-state': { useSocialUi: () => ({}), setSocialUi() {} },
     '../annotations/follow-group': { askFollowGroup: async () => {} },
+    '../annotations/call-key': { useCall: () => ({ reason: undefined, busy: false, press() {} }) },
     '../ui/primitives': { Action: ({ label, children, ...props }) => h('button', { ...props, 'aria-label': label }, children), PersonAvatar: () => null, Token: () => null },
     './account-id': { AccountId: ({ address }) => address ? h('span', null, address) : null },
     '../assets/token-name': { TokenName: ({ view }) => view.name, tokenWaiting: () => undefined },

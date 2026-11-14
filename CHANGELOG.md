@@ -2,6 +2,18 @@
 
 Each version matches a Chrome Web Store release. The GitHub release attaches the exact store package with its build provenance.
 
+## v0.1.8
+
+- **Live comments in the chat area**: the Danmaku key now turns the chat area into the token's live comments, with a token card on top and a red bar for packets you can still open. Press it again to return to your squad, right where you left off.
+- **Call to look**: the megaphone posts the current page into chat and calls the whole squad; Call to look on a profile calls one teammate. No sharing needed. The card shows who has arrived.
+- **Red packets**: a packet shows its sender's name and avatar even if they never commented on the token. After opening one, "Open next" moves to the next packet.
+- **Payments**: if free network fees are temporarily unavailable, the payment retries automatically; a payment that was not sent is marked as not charged.
+- Tips appear below the comment they were sent to.
+
+Requires desktop Chrome 130 or later.
+
+弹幕进入聊天区：「弹幕」键把聊天区就地换成该代币的弹幕，顶部为代币卡，红包条列出还能领的红包；再按一次回到小队聊天，阅读位置不变。「喊来看」：扩音器把当前页面发到聊天并喊全队，资料卡里的「喊来看」只喊一位队友，不需要先开启共享，卡片下方显示已经到了的队友。红包即使发送者没在该代币发过言也显示其名字与头像，领完可「开下一个」。免费网络费暂时不可用时付款自动重试，未发出的付款标明未扣款。打赏显示在对应弹幕下方。需要桌面版 Chrome 130 或更高版本。
+
 ## v0.1.7
 
 - **Red packets in live comments**: a red packet sent to a token appears once on the page as a gold comment with a small envelope; click it to open the envelope in the side panel. When a packet is not yet claimable, the envelope shows the time left and the requirement. Slow mode limits text comments only, not red packets.

@@ -1,6 +1,8 @@
 import { CHAIN_RULES, SPONSORED_DAILY_LIMIT, SUPPORTED_CHAINS, QUICK_PAY_LIMITS } from '../rules/wallet.ts';
 import Type, { type StaticDecode } from 'typebox';
 import { strictObject, contractString } from './validation.ts';
+import { id, text } from './common.ts';
+import { NICKNAME_LENGTH } from '../rules/accounts.ts';
 export const chainAddress = Type.String({ pattern: '^0x[0-9a-fA-F]{40}$' });
 export const chainHash = Type.String({ pattern: '^0x[0-9a-fA-F]{64}$' });
 export const chainAmount = Type.String({ pattern: '^(0|[1-9][0-9]{0,77})$' });
@@ -34,7 +36,9 @@ export const chainPacketDetail = strictObject({ packet: publicChainPacket, distr
 export const chainTransferCard = strictObject({ id: chainHash, accountId: accountLink, recipientId: accountLink, teamId: identifier, amount: chainAmount, createdAt: time, submittedAt: Type.Union([time, Type.Null()]), confirmedAt: Type.Union([time, Type.Null()]), status: chainOrderStatus, transactionHash: Type.Union([chainHash, Type.Null()]) });
 export const chainTeamFeed = strictObject({ packets: Type.Array(chainPacketDetail), transfers: Type.Array(chainTransferCard), nextCursor: Type.Union([identifier, Type.Null()]) });
 export const chainTipGroup = strictObject({ id: identifier, messageId: identifier, roomKey: identifier, recipientId: accountLink, accountIds: Type.Array(identifier), amount: chainAmount, startedAt: time, updatedAt: time });
-export const chainRoom = strictObject({ packets: Type.Array(publicChainPacket) });
+// The senders' public profiles (the same fields as a room person), so a 红包 names its sender even when they never spoke in the room.
+export const chainRoomSender = strictObject({ id, nickname: text(NICKNAME_LENGTH), avatarId: Type.Union([id, Type.Null()]), wallet: Type.Union([chainAddress, Type.Null()]) });
+export const chainRoom = strictObject({ packets: Type.Array(publicChainPacket), people: Type.Array(chainRoomSender) });
 export const chainConfigEvent = strictObject({ config: chainClientConfig });
 export const chainEvent = Type.Union([
   strictObject({ type: Type.Literal('config'), config: chainClientConfig }),

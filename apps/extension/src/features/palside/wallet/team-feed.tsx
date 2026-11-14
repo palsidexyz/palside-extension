@@ -130,7 +130,7 @@ function TransferCard({ c, transfer, timestamp }: { c: PalsideController; transf
   const state = transfer.status === 'confirmed' ? 'done' : transfer.status === 'failed' || transfer.status === 'expired' ? 'failed' : 'sending';
   return <motion.div className={s.transferCard} data-state={state} initial={arriving && !reduced ? { opacity: 0, y: 14, scale: .96 } : false} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 360, damping: 30 }}>
     <span className={s.transferTop}><Token view={PALS} size="card" /><span><strong><PalsAmount value={transfer.amount} /></strong><small>{line}</small></span></span>
-    <span className={s.transferFoot}><span>PALS {t('extension.wallet.transfer')}</span><span data-state={state}>
+    <span className={s.transferFoot}><span>PALS {t('extension.wallet.transfer')}</span><span className={s.status} data-state={state}>
       {state === 'done' ? settled ? <Check className={s.settled} /> : <DrawnCheck size="sm" /> : state === 'sending' ? <Pending /> : <span className={s.failGlyph}><X /></span>}
       <Swap k={state}>{t(state === 'done' ? 'extension.wallet.arrived' : state === 'failed' ? 'extension.wallet.recoveryFailed' : 'extension.wallet.sending')}</Swap>
     </span></span>

@@ -19,6 +19,7 @@ import { errorMessage } from '@palside/i18n';
 import { defaultTokenSite, tokenSites } from '../../../runtime/rooms/token-sites';
 import { siteLogo } from '../settings/site-catalog';
 import { setSocialUi } from '../annotations/social-state';
+import { pageIssue } from '../feedback/page-issue';
 
 /** 弹幕 is on (设置 › 网页互动 and its 弹幕 card); it needs the live runtime. Off, every way into it goes. */
 export function roomsOn(c: PalsideController) { return Boolean(danmakuOn(c.siteInteraction)); }
@@ -61,66 +62,18 @@ export function teammateIds(c: PalsideController) {
   return new Set(c.teams.filter(team => team.joined).flatMap(team => team.memberIds).filter(id => id !== c.data.self));
 }
 
+/** Everyone the open 弹幕 can name: its faces, 在看的人, speakers, and the senders of its 红包. */
+export function roomKnownPeople(c: PalsideController): RoomPerson[] {
+  const rooms = c.live.state.rooms, current = rooms.current, chain = c.live.state.chainRoom;
+  return [...current?.faces ?? [], ...rooms.people?.people ?? [], ...current?.messages.map(message => message.author) ?? [], ...chain && chain.key === current?.key ? chain.people ?? [] : []];
+}
+
 /** A room person as the panel draws people: teammates keep their own profile, avatar and presence. */
 export function roomPerson(c: PalsideController, person: RoomPerson, fallback: string, mates = teammateIds(c)): Person & { mate: boolean } {
   const known = c.people.find(item => item.id === person.id);
   const mate = mates.has(person.id);
   if (known) return { ...known, walletAddress: known.walletAddress ?? person.wallet ?? undefined, mate };
   return { id: person.id, name: person.nickname || fallback, color: '#e5e6e9', avatar: c.live.state.rooms.avatars[person.id], walletAddress: person.wallet ?? undefined, mate };
-}
-
-type Opening = { key: RoomKey; status: 'opening' | 'error' };
-type RoomSession = { opening?: Opening; current?: PalsideController; navigation: object; listeners: Set<() => void> };
-// The stable panel state setter identifies one mounted account session.
-const sessions = new WeakMap<PalsideController['setPersonId'], RoomSession>();
-function roomSession(c: PalsideController) {
-  let session = sessions.get(c.setPersonId);
-  if (!session) { session = { navigation: {}, listeners: new Set() }; sessions.set(c.setPersonId, session); }
-  return session;
-}
-function publishOpening(session: RoomSession, opening?: Opening) {
-  session.opening = opening;
-  for (const listener of session.listeners) listener();
-}
-
-/** Opens the requested token in the 弹幕 tab, pinned, while its snapshot travels to the panel. */
-export function openRoom(c: PalsideController, key: RoomKey) {
-  if (!roomsOn(c)) return;
-  // Every entry opens the room alone; a 红包 from the page names its envelope again right after.
-  setSocialUi({ roomPacket: undefined });
-  const session = roomSession(c), opening: Opening = { key, status: 'opening' };
-  session.navigation = {};
-  publishOpening(session, opening);
-  c.go('room');
-  if (c.live.state.rooms.pinned !== key) void c.live.command('room-open', { key }).catch(() => {
-    if (session.opening === opening) publishOpening(session, { ...opening, status: 'error' });
-  });
-}
-
-function updateRoomController(session: RoomSession, c?: PalsideController) { session.current = c; }
-function releaseRoomSession(session: RoomSession, identity: PalsideController['setPersonId']) {
-  session.current = undefined; session.navigation = {}; publishOpening(session); sessions.delete(identity);
-}
-
-export function useRoomOpening(c: PalsideController) {
-  const session = roomSession(c);
-  const opening = useSyncExternalStore(listener => { session.listeners.add(listener); return () => { session.listeners.delete(listener); }; }, () => session.opening, () => session.opening);
-  const pinned = c.live.state.rooms.pinned, on = roomsOn(c);
-  useLayoutEffect(() => { updateRoomController(session, c); });
-  useLayoutEffect(() => {
-    if (c.screen !== 'room' || !on || opening?.status === 'opening' && pinned === opening.key) publishOpening(session);
-  }, [session, c.screen, on, opening, pinned]);
-  useLayoutEffect(() => {
-    sessions.set(c.setPersonId, session);
-    return () => releaseRoomSession(session, c.setPersonId);
-  }, [session, c.setPersonId]);
-  return opening;
-}
-
-/** The token being opened, before its room arrives: read only, for labels that must not wait for the service. */
-export function useOpeningKey(c: PalsideController) {
-  const session = roomSession(c);
-  return useSyncExternalStore(listener => { session.listeners.add(listener); return () => { session.listeners.delete(listener); }; }, () => session.opening?.key, () => session.opening?.key);
 }
 
 /** The token 弹幕 follows, exactly as the runtime leases it: the active tab of the panel window the user last worked in, on an added site.
@@ -135,10 +88,66 @@ export function roomElsewhere(c: PalsideController) {
   return Boolean(c.live.state.rooms.elsewhere && c.live.page?.access.site && tabRoomKey(c) && !c.live.state.rooms.pinned);
 }
 
-/** The token the 弹幕 tab shows: the one being opened, else the pinned one, else the token it follows; none elsewhere. */
-export function useShownRoomKey(c: PalsideController) {
-  const opening = useOpeningKey(c);
-  return opening ?? c.live.state.rooms.pinned ?? followedTabRoomKey(c);
+/**
+ * 弹幕 on: the chat area turns into one token's 弹幕 and the composer writes to it, until the 弹幕 key (or Esc on an empty field) hands
+ * the panel back to the squad. One panel session; it never outlives the panel. `opening`: a token asked for from 热门, a card or 详情,
+ * held while its room is pinned; `lap` / `lapped`: the 弹幕 key's arrival lap, once per token.
+ */
+const danmaku = { on: false, opening: undefined as RoomKey | undefined, lap: undefined as RoomKey | undefined, lapped: new Set<RoomKey>(), listeners: new Set<() => void>() };
+export function updateDanmaku(next: Partial<Pick<typeof danmaku, 'on' | 'opening' | 'lap'>>) { Object.assign(danmaku, next); for (const listener of danmaku.listeners) listener(); }
+function subscribeDanmaku(listener: () => void) { danmaku.listeners.add(listener); return () => { danmaku.listeners.delete(listener); }; }
+export function useDanmakuState() {
+  const on = useSyncExternalStore(subscribeDanmaku, () => danmaku.on, () => false);
+  const opening = useSyncExternalStore(subscribeDanmaku, () => danmaku.opening, () => undefined);
+  const lap = useSyncExternalStore(subscribeDanmaku, () => danmaku.lap, () => undefined);
+  return { on, opening, lap };
+}
+/** The arrival lap runs once per token per panel session. */
+export function firstVisit(key: RoomKey) { if (danmaku.lapped.has(key)) return false; danmaku.lapped.add(key); return true; }
+export function lapRunning(key: RoomKey) { return danmaku.lap === key; }
+/** While 弹幕 is on, the token it shows stays pinned across other screens (详情, 发红包, 在看的人). */
+export function danmakuHoldsPin() { return danmaku.on; }
+
+/** Turns 弹幕 on for the token the tab follows; the keyboard moves to the one composer field. */
+export function openDanmaku() {
+  updateDanmaku({ on: true });
+  requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-message-input]')?.focus());
+}
+/** Leaves 弹幕 and hands the keyboard back to the squad field; a token opened from 热门 or a card is let go. */
+export function closeDanmaku(c: PalsideController) {
+  updateDanmaku({ on: false, opening: undefined });
+  setSocialUi({ roomPacket: undefined });
+  if (c.live.state.rooms.pinned) void c.live.command('room-close').catch(() => {});
+  requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-message-input]')?.focus());
+}
+
+/** Opens a token's 弹幕 in the chat area from 热门, a token card, 详情 or the page: pinned unless it is the tab's own token. */
+export function openRoom(c: PalsideController, key: RoomKey) {
+  if (!roomsOn(c)) return;
+  const rooms = c.live.state.rooms, followed = followedTabRoomKey(c) === key;
+  setSocialUi({ roomPacket: undefined });
+  updateDanmaku({ on: true, opening: followed || rooms.pinned === key ? undefined : key });
+  c.go('chat');
+  requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-message-input]')?.focus());
+  if (followed) { if (rooms.pinned) void c.live.command('room-close').catch(() => {}); return; }
+  if (rooms.pinned === key) return;
+  void c.live.command('room-open', { key }).then(() => { if (danmaku.opening === key) updateDanmaku({ opening: undefined }); }, error => {
+    if (danmaku.opening !== key) return;
+    updateDanmaku({ on: false, opening: undefined });
+    c.setNotice(errorMessage(error));
+  });
+}
+
+/** The 弹幕 the composer and the chat area show: the token being opened, else the pinned one, else the one the tab follows; and its live room once loaded. */
+export function useDanmaku(c: PalsideController) {
+  const state = useDanmakuState();
+  const shown = roomsOn(c);
+  const rooms = c.live.state.rooms;
+  const key = shown ? state.opening ?? rooms.pinned ?? followedTabRoomKey(c) : undefined;
+  // 弹幕 is live server data only: without the service it holds no list or count that may be stale.
+  const offline = Boolean(key) && Boolean(pageIssue(c, 'service'));
+  const room = key && rooms.current?.key === key ? rooms.current : undefined;
+  return { shown, key, room, offline, on: state.on && Boolean(key), lap: state.lap };
 }
 
 /** Drafts belong to the mounted panel account, including visits to other screens. */

@@ -46,7 +46,7 @@ async function fixture(t) {
     '../ui/primitives': { PersonAvatar: icon, Token: icon },
     '../rooms/rooms': { openRoom() {}, roomKeyFor: () => undefined, roomsOn: () => false },
     '../annotations/social-state': social,
-    '../annotations/reminders': { PokeRow: icon },
+    '../annotations/reminders': {},
     '../assets/chain-identity': {}, '../assets/site-logo': {}, '../settings/site-catalog': { siteAt: () => undefined },
     '../assets/token-name': { NamePending: () => null, TokenName: ({ view }) => view.name, tokenLabel: view => view.name, tokenWaiting: () => undefined },
     '../assets/token-data': { liveView: (_c, view) => view },

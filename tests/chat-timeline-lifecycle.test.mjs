@@ -60,12 +60,13 @@ function chat(messages, payments = [], overrides = {}) {
     useChatTimeline: () => ({ sendIntent: () => () => false }), unreadMentions: () => [],
     useTopCard: () => undefined, usePageHints: () => [], useAway: () => ({}), showsNewTeam: () => false, NewTeam: 'NewTeam', SendFlights: function () { return flights; },
     captureComposer: () => ({}), interleaveTimed, mergeSignalRuns, MINUTE_MS: 60 * 1000,
-    s: new Proxy({}, { get: (_, key) => key }), navigation: {},
-    ...Object.fromEntries(['MessageItem', 'TeamPaymentCard', 'PageHintRow', 'SendFlightContext', 'ReactionStage', 'ChatHeader', 'FollowBar', 'WatchStrip', 'MoreTeamPayments', 'AnimatePresence', 'FloatingDate', 'Composer', 'ReadonlyDraft'].map(name => [name, name])),
+    s: new Proxy({}, { get: (_, key) => key }), dm: new Proxy({}, { get: (_, key) => key }), navigation: {},
+    useDanmaku: () => ({ on: false }), useDanmakuState: () => ({ on: false }), closeDanmaku() {}, followedTabRoomKey: () => undefined,
+    ...Object.fromEntries(['MessageItem', 'TeamPaymentCard', 'PageHintRow', 'SendFlightContext', 'ReactionStage', 'ChatHeader', 'FollowBar', 'WatchStrip', 'MoreTeamPayments', 'AnimatePresence', 'FloatingDate', 'Composer', 'ReadonlyDraft', 'RoomPane', 'RoomComposer'].map(name => [name, name])),
     ...overrides,
   };
   const Chat = execute(declarations('chat.tsx', ['groupWindow', 'continues', 'dayKey', 'dayLabel', 'Chat']), 'Chat', context);
-  const c = { currentMessages: messages, data: { self: 'self' }, current: 'team', screen: 'chat', canWrite: true, live: { command: async () => {}, state: { remoteTeams: [] } }, ...overrides.c };
+  const c = { currentMessages: messages, data: { self: 'self' }, current: 'team', screen: 'chat', canWrite: true, live: { command: async () => {}, state: { remoteTeams: [], rooms: {} } }, ...overrides.c };
   const tree = Chat({ c, clearJump() {} });
   return { tree, flights, send: nodes(tree, n => n.type === 'Composer')[0].props.onSend };
 }

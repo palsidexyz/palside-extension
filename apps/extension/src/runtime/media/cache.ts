@@ -3,7 +3,6 @@ import { resolveTokenMetadata,tokenName } from '../viewing/token-name';
 import { message as uiMessage,MessageError } from '@palside/i18n';
 import { imageExpiry, messageExpiry } from '../chat/message-expiry';
 import { retainedViews } from '../viewing/view-retention';
-import { POKE_DISPLAY } from '../../domain/annotations/social';
 import type { Message } from '../../domain/chat/model';
 import type { Viewing } from '../../domain/assets/model';
 import { clearCache } from './local-data';
@@ -88,7 +87,6 @@ export class LocalDataRuntime {
     for (const id of removed) { this.eventTimes.delete(id); runtime.timeline.edits.delete(id); if (!runtime.sending.inFlight.has(id)) runtime.sending.outgoing.delete(id); }
     if (removed.size) runtime.state.data.messages = runtime.state.data.messages.filter(message => !removed.has(message.id));
     if (changed || removed.size) { this.pruneMedia(); changed = true; }
-    if (runtime.state.pokes) { const pokes = runtime.state.pokes.filter(poke => poke.at + POKE_DISPLAY > now); if (pokes.length !== runtime.state.pokes.length) { runtime.state.pokes = pokes; changed = true; } }
 
     if (this.pruneViews()) changed = true;
     if (await scope.wait(runtime.signals.pruneRecords(record => this.expiresAt(record, record.timestamp) > now))) changed = true;

@@ -25,7 +25,7 @@ import { usePacketCoins, type PacketCoins } from './packet-coins';
 import { useText } from '../ui/text';
 import { TeamAvatar } from '../teams/team-avatar';
 import { tokenLabel, tokenWaiting } from '../assets/token-name';
-import { roomView } from '../rooms/rooms';
+import { roomKnownPeople, roomPerson, roomView } from '../rooms/rooms';
 import s from './wallet.module.css';
 import p from './packet.module.css';
 
@@ -124,11 +124,17 @@ type EnvelopeState = 'idle' | 'spinning' | 'opened' | 'lost' | 'leaving';
  * flap lifts away and the result rises. When the last share went first, the seal stops, the envelope shakes and says so.
  * Opened from a banner before its detail arrived, it shows the sender at once and the seal breathes until the wish lands.
  */
+/** Who sent or grabbed a 红包: a squad member, else someone the open 弹幕 knows (its faces, speakers, 在看), so a 弹幕 红包 never reads 成员. */
+function packetPerson(c: PalsideController, id: string | null, member: string, deleted: string) {
+  const known = !id || c.people.some(person => person.id === id) ? undefined : roomKnownPeople(c).find(person => person.id === id);
+  return known ? roomPerson(c, known, member) : personFor(c.people, id, member, deleted);
+}
+
 function PacketEnvelope({ c, packet, detail, onClose, onClaim, onOpened, onBurst, feedback }: { c: PalsideController; packet: Packet; detail?: Detail; onClose: () => void; onClaim: () => void; onOpened: () => void; onBurst: (seal: Element) => void; feedback?: ReactNode }) {
   const t = useTranslations(), text = useText(), reduced = useReducedMotion();
   const dialogRef = useRef<HTMLDialogElement>(null), sealRef = useRef<HTMLButtonElement>(null), envRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<EnvelopeState>('idle'), [note, setNote] = useState<string>(), [claiming, setClaiming] = useState(false);
-  const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
+  const sender = packetPerson(c, packet.accountId, t('common.member'), t('common.deletedMember'));
   // From the tap on 开 the envelope plays its own story: the claim's live update already reads 已领取, which must not swap the
   // spinning seal for the spent one or the wish for that word before the flap has lifted.
   const canOpen = claiming || (detail ? openable(detail, c.now) : undefined);
@@ -199,11 +205,11 @@ function ShareState({ claim, delay }: { claim: NonNullable<Detail['myClaim']>; d
  * What I got rolls up from zero, then says whether it is already in 零钱; below, who got what, in the order they grabbed.
  * Coins from the envelope, when still floating, fly into the amount once the sheet has risen; it rolls as the first lands.
  */
-function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; detail: Detail; coins?: PacketCoins; onClose: () => void }) {
+function PacketResult({ c, detail, coins, next, onClose }: { c: PalsideController; detail: Detail; coins?: PacketCoins; next?: PacketNext; onClose: () => void }) {
   const t = useTranslations(), locale = useLocale(), reduced = useReducedMotion(), { packet } = detail;
   const [shown, setShown] = useState('0'), [pocketing] = useState(() => !reduced && !!coins?.pending()), amountRef = useRef<HTMLSpanElement>(null);
   const mine = packet.accountId === c.data.self, claim = detail.myClaim && detail.myClaim.status !== 'failed' ? detail.myClaim : undefined, got = claim?.amount;
-  const sender = personFor(c.people, packet.accountId, t('common.member'), t('common.deletedMember'));
+  const sender = packetPerson(c, packet.accountId, t('common.member'), t('common.deletedMember'));
   useEffect(() => {
     if (got === undefined) return;
     if (reduced || !coins?.pending()) { const timer = setTimeout(() => setShown(got), reduced ? 0 : 260); return () => clearTimeout(timer); }
@@ -234,13 +240,14 @@ function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; det
     <section className={p.claims}>
       <header><span><CountText text={t('extension.wallet.claimedOf', { claimed: packet.claimedCount, count: packet.count })} value={packet.claimedCount} /></span><span>{groupPals(formatPals(packet.claimedAmount))}/{groupPals(formatPals(packet.amount))} PALS</span></header>
       {detail.claims.map((item, index) => <motion.div key={item.accountId ?? `deleted:${index}`} className={p.claim} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...motionPresets.feedback, delay: .05 * index + .2 }}>
-        <PersonAvatar person={personFor(c.people, item.accountId, t('common.member'), t('common.deletedMember'))} size="sm" />
-        <span className={p.claimWho}><strong>{item.accountId === c.data.self ? t('common.self') : personFor(c.people, item.accountId, t('common.member'), t('common.deletedMember')).name}</strong>
+        <PersonAvatar person={packetPerson(c, item.accountId, t('common.member'), t('common.deletedMember'))} size="sm" />
+        <span className={p.claimWho}><strong>{item.accountId === c.data.self ? t('common.self') : packetPerson(c, item.accountId, t('common.member'), t('common.deletedMember')).name}</strong>
           <small>{clockTime(item.claimedAt, localeOrEnglish(locale))}{item.status === 'issued' && <> · {t('extension.wallet.settling')}</>}</small></span>
         <span><b>{groupPals(formatPals(item.amount))}</b>{item.best && <small className={p.best}><Crown />{t('extension.wallet.best')}</small>}</span>
       </motion.div>)}
     </section>
     {claim && (packet.status !== 'active' || packet.expiresAt <= c.now) && <p className={`${s.note} ${p.centered}`}>{status}</p>}
+    {next && <Rise delay={reduced ? 0 : pocketing ? 1.5 : 1.1} className={p.next}><Button variant="primary" className={p.nextAction} onClick={next.open}>{t('extension.wallet.nextPacket', { count: next.count })}</Button></Rise>}
   </div>;
 }
 
@@ -248,7 +255,9 @@ function PacketResult({ c, detail, coins, onClose }: { c: PalsideController; det
  * One packet by id. A chat card hands over the detail it already shows, so the envelope or the result opens at once and
  * only refreshes behind it; a banner hands over its summary and the envelope waits on that until the detail lands.
  */
-export function PacketDetail({ c, id, initial, summary, onClose }: { c: PalsideController; id: string; initial?: Detail; summary?: Packet; onClose: () => void }) {
+/** More 红包 waiting in the same place: how many, and opening the next one's envelope. */
+export type PacketNext = { count: number; open: () => void };
+export function PacketDetail({ c, id, initial, summary, next, onClose }: { c: PalsideController; id: string; initial?: Detail; summary?: Packet; next?: PacketNext; onClose: () => void }) {
   const t = useTranslations(), command = c.live.command;
   const [detail, setDetail] = useState<Detail | undefined>(initial), [failed, setFailed] = useState(false), [revision, setRevision] = useState(0), [opened, setOpened] = useState(false), [claiming, setClaiming] = useState(false);
   const chainRevision = c.live.state.chainRevision, coins = usePacketCoins();
@@ -274,7 +283,7 @@ export function PacketDetail({ c, id, initial, summary, onClose }: { c: PalsideC
     {coins.node}
     {envelope ? <PacketEnvelope c={c} packet={packet} detail={detail} feedback={feedback} onClose={onClose} onBurst={coins.burst} onClaim={() => setClaiming(true)} onOpened={() => { setOpened(true); setRevision(value => value + 1); }} />
       : <Sheet open onOpenChange={open => { if (!open) onClose(); }} boundarySelector="[data-palside-app]" aria-labelledby="packet-detail-title">
-        {detail ? <><PacketResult c={c} detail={detail} coins={coins} onClose={onClose} />{feedback}</>
+        {detail ? <><PacketResult c={c} detail={detail} coins={coins} next={next} onClose={onClose} />{feedback}</>
           : <div className={`${s.page} ${s.sheetContent}`}><VisuallyHidden asChild><h2 id="packet-detail-title">{t('extension.wallet.packet')}</h2></VisuallyHidden><p className={s.empty}>{t(failed ? 'extension.wallet.unavailable' : 'extension.copy.loading')}</p>{failed && <Button onClick={() => setRevision(value => value + 1)}>{t('common.retry')}</Button>}</div>}
       </Sheet>}
   </>;

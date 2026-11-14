@@ -1,9 +1,4 @@
-/* 弹幕: the full-panel view of one token's public messages, 热门, the people in it and team invites. */
-.view { position:relative; display:flex; flex-direction:column; flex:1; min-height:0; background:var(--ui-canvas); }
-/* Opened from 聊天: it comes in from the right, the side its tab is on. */
-:global([data-from=chat]) > .view { animation:tabFromRight .32s var(--ui-ease-feedback); }
-@keyframes tabFromRight { from { opacity:0; transform:translateX(14px); } }
-@media (prefers-reduced-motion:reduce) { :global([data-from=chat]) > .view { animation:none; } }
+/* 弹幕: one token's public messages in the chat area, 热门, the people in it and team invites. */
 
 /* Overlapping faces; teammates ringed. */
 .faces { display:inline-flex; align-items:center; flex:none; }
@@ -14,10 +9,6 @@
 .faces b { margin-left:6px; color:var(--ui-text-primary); font-size:var(--ui-type-footnote); font-weight:600; font-variant-numeric:tabular-nums; }
 .faces:not(:has(span)) b { margin-left:0; }
 
-/* The 弹幕 toolbar, only when the tab is elsewhere: this token on the left, 去网站 at the end. Same 40px rhythm and 12px gutters as the switch row. */
-.toolbar { display:flex; align-items:center; gap:8px; flex:none; height:40px; padding:0 8px 0 12px; font-size:var(--ui-type-callout); }
-.toolbar > :first-child { --token-size:20px; }
-.toolbar > strong { flex:1; min-width:0; overflow:hidden; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
 /* 去网站: one 28px pill — logo, site name, ↗ — split from ⌄ by a hairline. Flat surface, hover steps each half on its own. */
 .sites { display:inline-flex; flex:none; align-items:center; height:28px; max-width:60%; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); }
 .siteOpen { display:inline-flex; align-items:center; gap:6px; min-width:0; height:28px; padding:0 8px 0 6px; border:0; border-radius:var(--ui-radius-pill) 0 0 var(--ui-radius-pill); background:transparent; color:var(--ui-text-primary); font-size:var(--ui-type-footnote); font-weight:600; cursor:pointer; transition:background-color .16s var(--ui-ease-feedback); }
@@ -31,36 +22,6 @@
 .siteMenu { --popover-width:200px; padding:6px; }
 .siteMenuHead { padding:6px 10px 4px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:16px; }
 
-/* The tab moved to another token: one row under the header offering the switch. */
-.switchRow { display:flex; align-items:center; gap:8px; flex:none; height:40px; padding:0 12px; background:var(--ui-control-surface); font-size:var(--ui-type-callout); }
-.switchRow > :first-child { --token-size:20px; }
-.switchRow strong { flex:1; min-width:0; overflow:hidden; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
-/* On the token's own page, when Chrome has not allowed the site: the grey site logo and a plain statement, no warning colour. */
-.switchRow[data-notice] strong { font-weight:500; }
-.noticeLogo { flex:none; display:block; --logo-size:20px; }
-.noticeLogo > span { --logo-size:20px; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-caption); }
-/* No token: the whole room (list, box) frosts over and says why, the header staying sharp. Under it only grey shapes.
-   A sanctioned veil, not a slab: an ellipse of canvas behind the words (94%, then 70% at its rim) fading to 12% at the edges over a 1.5px blur,
-   so the skeleton shows round it. Flat, no border or shadow. It fades in and thaws out with the feedback timing. */
-.skeleton { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; padding:6px 10px; overflow:hidden; }
-.skeleton > div { display:grid; grid-template-columns:28px minmax(0, 1fr); column-gap:10px; padding:7px 8px; }
-.skeleton i { width:28px; height:28px; border-radius:50%; background:var(--ui-control-surface); }
-.skeleton span { display:flex; flex-direction:column; gap:7px; padding-top:3px; }
-.skeleton b { height:12px; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); }
-.skeleton b:first-child { height:9px; }
-.frost { position:absolute; inset:0; z-index:2; display:flex; align-items:center; justify-content:center; padding:24px; background:radial-gradient(60% 34% at 50% 48%, color-mix(in srgb, var(--ui-canvas) 94%, transparent) 0%, color-mix(in srgb, var(--ui-canvas) 70%, transparent) 55%, color-mix(in srgb, var(--ui-canvas) 12%, transparent) 100%); -webkit-backdrop-filter:blur(1.5px); backdrop-filter:blur(1.5px); }
-.frostBody { display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; }
-.frostBody strong { color:var(--ui-text-primary); font-size:var(--ui-type-headline); font-weight:600; }
-.frostGlyph { display:grid; place-items:center; width:44px; height:44px; margin-bottom:4px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); color:var(--ui-text-primary); }
-.frostGlyph svg { width:22px; height:22px; }
-.frostAction.frostAction { min-width:120px; margin-top:8px; }
-.frostLink { display:inline-flex; align-items:center; gap:4px; height:28px; margin-top:2px; padding:0 8px; border:0; border-radius:var(--ui-radius-s); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-weight:500; cursor:pointer; transition:background-color .16s ease, color .16s ease; }
-.frostLink:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
-.gateLogo { display:block; margin-bottom:4px; }
-.gateLogo > span { --logo-size:44px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-callout); }
-.gateLogo svg { width:65%; height:65%; opacity:.8; }
-.switchButton.switchButton { min-height:28px; height:28px; padding:0 12px; border-radius:var(--ui-radius-pill); font-size:var(--ui-type-footnote); font-weight:600; }
-
 /* Messages: dense rows, not chat bubbles. */
 .list { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; padding:6px 10px 6px; scrollbar-width:thin; }
 .list > :first-child { margin-top:auto; }
@@ -70,13 +31,11 @@
 /* Name, 打赏 and time on one quiet line; the text under it carries the weight. */
 .messageHead { display:flex; align-items:center; gap:6px; height:18px; margin-bottom:3px; }
 .messageHead > b { min-width:0; overflow:hidden; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:18px; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
-.tipChip { display:inline-flex; flex:none; align-items:center; gap:3px; height:18px; padding:0 6px 0 4px; border-radius:var(--ui-radius-pill); background:var(--ui-accent-soft); color:var(--ui-ink-accent); font-size:var(--ui-type-caption); font-weight:600; font-variant-numeric:tabular-nums; }
-.tipChip small { font-size:inherit; font-weight:500; }
-.tipCoin { display:inline-flex; }
-.tipCoin svg { width:12px; height:12px; stroke-width:2; }
-.tipLine { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; margin-top:6px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); }
-.tipLine > span:last-child { color:var(--ui-ink-accent); font-weight:600; font-variant-numeric:tabular-nums; }
-.tipLine > span:last-child small { font-size:inherit; font-weight:500; }
+.tipNote { display:flex; align-items:center; gap:4px; height:18px; margin-top:4px; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:18px; }
+.tipCoin { display:inline-flex; margin-right:1px; color:var(--ui-ink-accent); }
+.tipCoin svg { width:13px; height:13px; stroke-width:2; }
+.tipNote b { color:var(--ui-ink-accent); font-weight:600; font-variant-numeric:tabular-nums; }
+.tipNote b small { font-size:inherit; font-weight:500; }
 .row[data-mate] .messageHead > b { color:var(--ui-ink-accent); font-weight:600; }
 .row:hover, .row:focus-within, .row:has([aria-expanded=true]) { background:var(--ui-control-hover); }
 .row > button:first-child { display:inline-flex; padding:0; border:0; border-radius:50%; background:transparent; cursor:pointer; }
@@ -100,14 +59,6 @@ span.like { cursor:default; }
 .more { align-self:center; height:24px; margin:4px 0; padding:0 10px; border:0; border-radius:var(--ui-radius-pill); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); }
 .empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; flex:1; color:var(--ui-text-secondary); font-size:var(--ui-type-callout); }
 .empty svg { width:24px; height:24px; stroke-width:1.4; }
-
-/* One-line composer: the page switch, the input, send. */
-.bar { display:flex; align-items:center; gap:6px; flex:none; margin:4px 10px 10px; padding:5px; border-radius:var(--ui-radius-xl); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
-.input { flex:1; min-width:0; height:32px; padding:0 6px; border:0; background:transparent; color:var(--ui-text-primary); font:inherit; font-size:var(--ui-type-callout); outline:none; }
-.input::placeholder { color:var(--ui-text-secondary); }
-.counter { flex:none; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); font-variant-numeric:tabular-nums; }
-.counter[data-over] { color:var(--ui-ink-error); }
-.send { border-radius:50%; font-size:var(--ui-type-callout); font-weight:600; font-variant-numeric:tabular-nums; }
 
 /* 热门 */
 /* The chain menu sits at the end of the header; its label and logo keep the same weight as a quiet control. */
@@ -194,9 +145,30 @@ span.like { cursor:default; }
 .siteOpen:focus-visible, .siteMore:focus-visible, .row > button:first-child:focus-visible, .like:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 @media (prefers-reduced-motion:reduce) { .row, .menu, .like { transition:none; } }
 
-
 .messageMenu { --popover-width:148px; min-width:0; padding:5px; }
 .messageAction { min-height:34px; padding:7px 9px; gap:9px; border-radius:calc(var(--ui-radius-popover) - 5px); corner-shape:var(--ui-corner-shape); font-size:var(--ui-type-footnote); }
 
 .foldedAction.foldedAction { min-height:22px; height:22px; padding:0 8px; font-size:var(--ui-type-footnote); }
 
+/* 红包 made for 弹幕 — the packet's own red and gold seal, on the 弹幕 line's rhythm. */
+[data-room-packet] { --pk:#E2543F; --pk-hover:#D94D39; --pk-flap:#EC6A53; --pk-seal:#F5C55B; --pk-seal-ink:#7A4A06; --pk-gold:#F8D27E; --pk-ink:#FFF6EA; --pk-text:light-dark(#C8432F, #FF8A73); }
+.packetGlyph { position:relative; flex:none; display:inline-block; margin-right:6px; width:12px; height:15px; border-radius:2.5px; background:var(--pk); overflow:hidden; vertical-align:-2px; }
+.packetGlyph::before { content:""; position:absolute; left:-25%; right:-25%; top:-38%; height:72%; border-radius:0 0 50% 50%; background:var(--pk-flap); }
+.packetGlyph::after { content:""; position:absolute; left:50%; top:34%; width:4px; height:4px; margin-left:-2px; border-radius:50%; background:var(--pk-seal); }
+.packetWords { display:inline; padding:0; border:0; background:none; font:inherit; color:var(--pk-text); font-weight:600; cursor:pointer; text-align:left; }
+.packetSeal { flex:none; display:inline-grid; place-items:center; min-width:24px; height:24px; padding:0 8px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-caption); font-weight:600; white-space:nowrap; cursor:pointer; }
+.packetSeal[data-live] { width:24px; padding:0; border-radius:50%; background:var(--pk-seal); color:var(--pk-seal-ink); font-size:var(--ui-type-footnote); }
+.packetSeal[data-live]:hover { filter:brightness(1.05); }
+/* Keeps the seal in 点赞's column: ⋯'s column stays empty on a 红包 line. */
+.packetSpacer { width:24px; }
+/* The 红包 I can still grab, in one red bar between the token card and the 弹幕: the newest with its wish, +N, the gold 开. */
+.packetStrip { display:flex; align-items:center; gap:8px; width:100%; height:36px; padding:0 6px 0 12px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--pk); color:var(--pk-ink); font:inherit; font-size:var(--ui-type-callout); text-align:left; cursor:pointer; }
+.packetStrip:hover { background:var(--pk-hover); }
+.packetStrip .packetGlyph { margin-right:0; background:var(--pk-seal); }
+.packetStrip .packetGlyph::before { background:var(--pk-gold); }
+.packetStrip .packetGlyph::after { background:var(--pk); }
+.packetWish { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.85; }
+.packetBarSlot { flex:none; padding:0 16px 8px; overflow:hidden; }
+.packetBarText { flex:1; min-width:0; display:flex; align-items:center; gap:8px; }
+.packetBarText > b { flex:none; font-weight:600; }
+.packetMore { flex:none; font-size:var(--ui-type-caption); font-weight:600; opacity:.85; }

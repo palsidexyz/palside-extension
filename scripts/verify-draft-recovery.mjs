@@ -71,8 +71,7 @@ const base = () => ({
   items: {
     danmaku: []
   },
-  invitations: {},
-  pokes: []
+  invitations: {}
 });
 let shared = base();
 const publish = new Map();

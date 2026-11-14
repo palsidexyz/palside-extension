@@ -49,6 +49,7 @@ const message = Type.Decode(object, (input): Message => {
   const path: (string | number)[] = [];
   for (const field of ['id', 'teamId', 'author', 'text']) decodeContract(text, input[field], [...path, field]);
   if (input.attachment !== undefined) decodeContract(attachment, input.attachment, [...path, 'attachment']);
+  if (input.call !== undefined && (input.call !== 'all' && input.call !== 'one' || (input.attachment as { kind?: unknown } | undefined)?.kind !== 'asset')) throw new ContractDecodeError([...path, 'call'], 'call needs a page card');
   return input as Message;
 });
 const preferences = strictObject({ accountId: text, current: optionalText, startedTeams: Type.Optional(denseArray(text)), forgottenTeams: Type.Optional(denseArray(text)), notificationPreview: optionalBool, notifications: Type.Optional(Type.Enum(['off', 'mentions', 'all'])), siteInteraction: Type.Optional(validated(readSiteInteractions)), favorites: Type.Optional(validated(readFavorites)), toured: optionalBool, rooms: Type.Optional(strictObject({ site: optionalText, noticed: optionalBool, used: optionalBool })) });
@@ -105,17 +106,16 @@ export const commandPayloads = {
   'device-state': activity,
   'host-notice': strictObject({ message: strictObject({ key: text, values: Type.Optional(plainRecord(Type.Union([text, safeInteger()]))) }) }),
   'dismiss-notice': empty, 'dismiss-jump': strictObject({ messageId: optionalText, windowId: optionalInt }),
-  'dismiss-invite': strictObject({ url: text }), 'dismiss-open-team': empty, 'dismiss-poke': strictObject({ id: text }),
+  'dismiss-invite': strictObject({ url: text }), 'dismiss-open-team': empty,
   'external-team': strictObject({ id: text }), 'external-invite': strictObject({ code: text }),
   'external-share': strictObject({ text, teamId: optionalText, accountId: optionalText }),
   page: strictObject({ failed: optionalBool, clear: optionalBool, activity: optionalBool, identity: Type.Optional(object), host: optionalText, preview: optionalBool, stable: optionalBool, title: optionalText, favicon: optionalText }),
   history: strictObject(team), visible: strictObject({ teamId: optionalText, sourceId: text, ids: denseArray(text) }), 'visible-drop': strictObject({ panel: text }),
   'notification-open': strictObject({ accountId: text, teamId: optionalText, messageId: text, windowId: integer, preview: optionalBool }),
-  'poke-open': strictObject({ accountId: text, pokeId: text }),
   'image-draft-save': strictObject({ ...accountTeam, source: text, draftRevision: integer, src: text }),
   attach: strictObject({ ...accountTeam, attachment, replace: optionalBool, revision: optionalInt }),
   draft: strictObject({ ...accountTeam, patch: draft, revision: integer }), 'clear-share': empty,
-  poke: strictObject({ ...team, accountId: optionalText }), 'prepare-retry': strictObject({ accountId: text, id: text }),
+  'prepare-retry': strictObject({ accountId: text, id: text }),
   send: strictObject({ message, revision: safeInteger({ minimum: -1 }) }), react: strictObject({ ...team, emoji: text, count: integer }),
   'cancel-send': strictObject({ id: text }), edit: strictObject({ ...team, id: text, text, baseEditedAt: optionalInt }), recall: strictObject({ ...team, id: text }),
   avatar: strictObject({ accountId: text, teamId: optionalText, data: text }), 'remove-avatar': strictObject({ accountId: text, teamId: optionalText, id: text }), 'reload-image': strictObject({ id: text }),
@@ -154,7 +154,7 @@ type Results = {
   'password-set': { nicknameRequired: boolean };
   'room-panels': { connected: boolean }; 'invite-settings': { accept: boolean };
   'team-invite-permission': ApiResult<'teams.invitePermission'>;
-  react: ApiResult<'viewing.react'>; poke: { people: number }; 'poke-open': { url: string };
+  react: ApiResult<'viewing.react'>;
   team: { done: true }; retention: { done: true }; dissolve: { done: true }; leave: { done: true }; remove: { done: true }; unban: { done: true }; recruitment: { done: true }; apply: { done: true }; 'cancel-application': { done: true }; decide: { done: true }; transfer: { done: true }; 'team-preferences': { done: true };
   edit: { done: true }; avatar: { done: true }; 'remove-avatar': { done: true }; recall: { done: true };
   lobby: LobbyPaging | undefined; 'lobby-more': LobbyPaging | undefined; 'lobby-close': void;

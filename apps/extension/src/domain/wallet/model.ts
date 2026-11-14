@@ -10,6 +10,8 @@ export type WalletPayment = {
   passwordRequired: boolean; total: string; error?: string; requestId?: string;
   /** sentAt is when 付款 sent it on its way (signing began): where the chat places it until the service records the submission. */
   signed?: boolean; sentAt?: number; pendingSince?: number; quickPayResetAt?: number;
+  /** While signed but not yet accepted: the service is resubmitting it because fee sponsorship refused (`sponsor`) or the reply was unclear. */
+  retrying?: 'sponsor' | 'unclear';
 };
 export type WalletPreferences = { smallPayments: boolean; hideAmounts: boolean };
 export type WalletAvailability = 'loading' | 'closed' | 'locked' | 'ready' | 'offline';

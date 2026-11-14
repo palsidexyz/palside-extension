@@ -51,9 +51,13 @@ export interface WalletControllerPort {
   receive(amount?: string): string;
 }
 const PENDING_POLL_MS = 3000, PENDING_FAST_MS = 2 * MINUTE_MS, PENDING_MAX_POLL_MS = 30_000;
+/** Fee sponsorship refused: before signing nothing is asked for; after signing the service stopped resubmitting. Nothing was charged. */
+const SPONSOR_UNAVAILABLE = { code: 'CHAIN_SPONSOR_UNAVAILABLE' } as const;
 const code = (error: unknown) => {
   // The relay checks the latest on-chain balance before anything is sent: spent elsewhere is a balance problem, not an unknown submission.
   if (error && typeof error === 'object' && 'code' in error && error.code === 'CHAIN_RELAY_REJECTED' && 'reason' in error && error.reason === 'insufficient_unreserved_pals') return 'INSUFFICIENT_BALANCE';
+  // Fee sponsorship refused before anything was signed: nothing was charged, and it is not this payment's fault.
+  if (error && typeof error === 'object' && 'code' in error && error.code === 'CHAIN_RELAY_REJECTED' && 'reason' in error && error.reason === 'sponsor_unavailable') return SPONSOR_UNAVAILABLE.code;
   return error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : error instanceof Error ? error.message : 'WALLET_ERROR';
 };
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -344,11 +348,14 @@ export class WalletController implements WalletControllerPort {
     if (!payment || result.orderId !== payment.id || result.requestId !== payment.requestId) throw new Error('ORDER_MISMATCH');
     if (terminalPayment(payment.phase)) return;
     // A successful receipt is the payment done for the payer; records, balances and the recipient's entitlement still wait for the index.
+    payment.retrying = result.state === 'uncertain' ? result.error === 'sponsor_unavailable' ? 'sponsor' : 'unclear' : undefined;
     if (result.state === 'included' || result.state === 'confirmed') {
       payment.phase = 'confirmed'; payment.error = undefined;
       clearTimeout(this.pollTimer); this.pollTimer = undefined; this.quoteAttempt = undefined;
     } else if (result.state === 'failed' || result.state === 'expired' || result.state === 'cancelled') {
-      payment.phase = result.state === 'cancelled' ? 'expired' : result.state; await this.local.release(payment.id, result.state === 'failed' ? 0n : payment.signed ? BigInt(payment.total) : 0n); payment.error = result.error ?? undefined;
+      payment.phase = result.state === 'cancelled' ? 'expired' : result.state; await this.local.release(payment.id, result.state === 'failed' ? 0n : payment.signed ? BigInt(payment.total) : 0n);
+      // A relay that stopped resubmitting after sponsorship kept refusing never reached the chain: say so, not "failed".
+      payment.error = result.error === 'sponsor_unavailable' ? SPONSOR_UNAVAILABLE.code : result.error ?? undefined;
       clearTimeout(this.pollTimer); this.pollTimer = undefined; this.quoteAttempt = undefined;
     } else payment.phase = 'pending';
   }

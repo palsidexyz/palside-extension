@@ -56,7 +56,7 @@ function fixture() {
   };
   function load(file) {
     if (modules.has(file)) return modules.get(file);
-    const extra = file === 'rooms/danmaku-view.tsx' ? '\nexport { LineMenu, RoomBar, InviteChoices, showPerson };' : '';
+    const extra = file === 'rooms/danmaku-view.tsx' ? '\nexport { LineMenu, InviteChoices, showPerson };' : '';
     const source = ts.transpileModule(readFileSync(root + file, 'utf8') + extra, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
     const exports = {};
     modules.set(file, exports);
@@ -101,38 +101,34 @@ function controller() {
   return { c, rooms, calls, pending, take: name => pending.findLast(item => item.name === name) };
 }
 
-test('opening waits for the requested pinned snapshot; departure and replacement invalidate delayed results', async () => {
+test('opening shows the requested token in the chat area until its room is pinned; a superseded result changes nothing', async () => {
   const f = fixture(), { c, rooms, calls, take } = controller(), api = f.load('rooms/rooms.ts');
-  const view = f.mount(f.load('rooms/danmaku-view.tsx').DanmakuView);
-  view.render({ c });
+  const hook = f.mount(() => api.useDanmaku(c));
+  assert.equal(hook.render().on, false);
   api.openRoom(c, 'token:Ethereum:a');
-  let tree = view.render({ c });
-  assert.equal(c.screen, 'room');
-  assert.equal(find(tree, 'RoomToolbar').props.roomKey, 'token:Ethereum:a');
-  take('room-open').resolve(); await drain(); view.render({ c });
-  assert.equal(c.screen, 'room', 'command completion alone is not a snapshot');
-  rooms.pinned = 'token:Ethereum:old'; view.render({ c });
-  assert.equal(find(view.render({ c }), 'RoomToolbar').props.roomKey, 'token:Ethereum:a');
-  rooms.pinned = 'token:Ethereum:a'; view.render({ c });
+  assert.equal(c.screen, 'chat');
+  let state = hook.render(); assert.equal(state.on, true); assert.equal(state.key, 'token:Ethereum:a');
+  rooms.pinned = 'token:Ethereum:old'; assert.equal(hook.render().key, 'token:Ethereum:a', 'another pinned snapshot does not replace the request');
+  rooms.pinned = 'token:Ethereum:a'; take('room-open').resolve(); await drain();
+  state = hook.render(); assert.equal(state.key, 'token:Ethereum:a'); assert.equal(state.on, true);
   api.openRoom(c, 'token:Ethereum:b'); const b = take('room-open');
   api.openRoom(c, 'token:Ethereum:c'); b.reject(new Error('late')); await drain();
-  tree = view.render({ c }); assert.equal(find(tree, 'InlineFeedback'), undefined);
-  assert.equal(find(tree, 'RoomToolbar').props.roomKey, 'token:Ethereum:c');
-  c.go('hot'); view.render({ c }); take('room-open').reject(new Error('late')); await drain();
-  rooms.pinned = 'token:Ethereum:c'; assert.equal(view.render({ c }), null); assert.equal(c.screen, 'hot');
-  assert.equal(calls.some(call => call[0] === 'go' && call[1] === 'chat'), false);
-  view.unmount();
+  state = hook.render(); assert.equal(state.key, 'token:Ethereum:c'); assert.equal(state.on, true);
+  assert.equal(calls.some(call => call[0] === 'notice'), false, 'a superseded failure shows nothing');
+  api.closeDanmaku(c); assert.equal(hook.render().on, false);
+  assert.ok(calls.some(call => call[0] === 'room-close'));
+  hook.unmount();
 });
 
-test('opening failure shows existing feedback and retry; panel unmount cancels completion', async () => {
-  const f = fixture(), { c, take } = controller(), api = f.load('rooms/rooms.ts');
-  const view = f.mount(f.load('rooms/danmaku-view.tsx').DanmakuView);
-  view.render({ c }); api.openRoom(c, 'token:Ethereum:a'); view.render({ c });
+test('opening failure turns 弹幕 off and shows the error; turning it off again is harmless', async () => {
+  const f = fixture(), { c, calls, take } = controller(), api = f.load('rooms/rooms.ts');
+  const hook = f.mount(() => api.useDanmaku(c));
+  api.openRoom(c, 'token:Ethereum:a'); assert.equal(hook.render().on, true);
   take('room-open').reject(new Error('offline')); await drain();
-  const feedback = find(view.render({ c }), 'InlineFeedback'); assert.ok(feedback);
-  feedback.props.action.onClick(); assert.equal(find(view.render({ c }), 'InlineFeedback'), undefined);
-  view.unmount(); take('room-open').reject(new Error('closed')); await drain();
-  assert.equal(f.mount(api.useRoomOpening).render(c), undefined);
+  assert.equal(hook.render().on, false);
+  assert.deepEqual(calls.find(call => call[0] === 'notice'), ['notice', 'offline']);
+  api.closeDanmaku(c); assert.equal(hook.render().on, false);
+  hook.unmount();
 });
 
 for (const kind of ['people', 'summary', 'blocks', 'invites', 'hot']) test(`${kind} read exposes failure/retry, ignores late results, and keeps snapshot data`, async () => {
@@ -171,27 +167,25 @@ test('people, blocks, invites and Hot show retry without replacing verified rows
   assert.equal(retries, 4);
 });
 
-test('room drafts survive screen/room visits, clear after successful send, and isolate accounts and panel mounts', async () => {
-  const f = fixture(), { c, take } = controller(), api = f.load('rooms/rooms.ts'), { RoomBar } = f.load('rooms/danmaku-view.tsx');
+test('room drafts survive remounts, clear after successful send, and isolate rooms and accounts', async () => {
+  const f = fixture(), { c, take } = controller(), api = f.load('rooms/rooms.ts'), { useRoomSend } = f.load('rooms/danmaku-view.tsx');
   const owner = f.mount(api.useRoomDrafts); let drafts = owner.render('self');
-  const room = { key: 'room-a', slowUntil: 0 };
-  let bar = f.mount(RoomBar);
-  find(bar.render({ c, room, drafts }), 'input').props.onChange({ target: { value: 'keep me' } });
-  bar.unmount();
+  const room = { key: 'room-a', slowUntil: 0 }, input = { current: { focus() {} } };
+  const field = () => f.mount(props => useRoomSend(c, props.room, props.drafts, input));
+  let box = field(); box.render({ room, drafts }).setText('keep me'); box.unmount();
   assert.equal(owner.render('self'), drafts);
-  bar = f.mount(RoomBar); let tree = bar.render({ c, room, drafts }); assert.equal(find(tree, 'input').props.value, 'keep me');
-  find(tree, 'input').props.onKeyDown({ nativeEvent: {}, key: 'Enter', preventDefault() {} });
-  take('room-send').resolve(undefined); await drain(); assert.equal(find(bar.render({ c, room, drafts }), 'input').props.value, 'keep me');
-  find(bar.render({ c, room, drafts }), 'input').props.onKeyDown({ nativeEvent: {}, key: 'Enter', preventDefault() {} });
-  bar.unmount(); bar = f.mount(RoomBar); tree = bar.render({ c, room, drafts });
-  assert.equal(nodes(tree, node => node.props?.label === 'extension.copy.sendMessage')[0].props.disabled, true, 'pending send survives remount');
-  take('room-send').resolve({ id: 'sent' }); await drain(); assert.equal(find(bar.render({ c, room, drafts }), 'input').props.value, '');
-  find(bar.render({ c, room, drafts }), 'input').props.onChange({ target: { value: 'private' } });
-  const other = f.mount(RoomBar); assert.equal(find(other.render({ c, room: { ...room, key: 'room-b' }, drafts }), 'input').props.value, ''); other.unmount();
+  box = field(); let send = box.render({ room, drafts }); assert.equal(send.text, 'keep me');
+  void send.send(); take('room-send').resolve(undefined); await drain();
+  assert.equal(box.render({ room, drafts }).text, 'keep me', 'an unconfirmed send keeps the draft');
+  void box.render({ room, drafts }).send(); box.unmount();
+  box = field(); assert.equal(box.render({ room, drafts }).ready, false, 'pending send survives remount');
+  take('room-send').resolve({ id: 'sent' }); await drain(); assert.equal(box.render({ room, drafts }).text, '');
+  box.render({ room, drafts }).setText('private');
+  const other = field(); assert.equal(other.render({ room: { ...room, key: 'room-b' }, drafts }).text, ''); other.unmount();
   drafts = owner.render(''); assert.equal(drafts.values.size, 0);
   drafts = owner.render('self'); assert.equal(drafts.values.size, 0);
   assert.equal(f.mount(api.useRoomDrafts).render('self').values.size, 0);
-  bar.unmount(); owner.unmount();
+  box.unmount(); owner.unmount();
 });
 
 test('invitation openings reset picks and send requires a current eligible option in the handler and button', async () => {

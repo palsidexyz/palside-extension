@@ -25,7 +25,7 @@ const pages = {
   'baseline-review': { check: true, run: true, viewport: { width: 600, height: 1000 } },
   'chat-reading': { check: true, run: true },
   'connection-review': { check: true, variants: scenes('service', 'sync', 'connecting', 'crypto', 'readonly', 'empty', 'login') },
-  'design-review': { variants: [...scenes('chat', 'add-site', 'blocked', 'cache-clear-error', 'cache-read-error', 'detail', 'draft', 'follow-off', 'grant', 'hot', 'interaction', 'invites', 'lobby', 'pokes', 'read', 'ref', 'room-empty', 'room-slow', 'security', 'start', 'shared-tokens'), 'scene=start&tour=1'] },
+  'design-review': { variants: [...scenes('chat', 'add-site', 'blocked', 'cache-clear-error', 'cache-read-error', 'detail', 'draft', 'follow-off', 'grant', 'hot', 'interaction', 'invites', 'lobby', 'call', 'read', 'ref', 'room-empty', 'room-slow', 'security', 'start', 'shared-tokens'), 'scene=start&tour=1'] },
   'edge-review': { allow: [/\/intentionally-missing-token\.webp$/], variants: scenes('normal', 'assets', 'empty', 'failure', 'invite', 'invite-nickname', 'missing', 'no-team', 'pacing', 'password', 'readonly', 'suspended') },
   'i18n-review': { variants: ['', ...scenes('login')] },
   'notification-runtime': { check: true, run: true },

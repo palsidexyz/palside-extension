@@ -61,7 +61,7 @@ export function danmaku(bg: Background) {
     const source = room && !room.loading && room.key === projection.key && bg.state?.chainRoom?.key === projection.key ? bg.state.chainRoom : undefined;
     if (!source || !room) return;
     const now = Date.now(), blocked = new Set(bg.state!.rooms.blocked.map(person => person.id));
-    const known = [...room.faces ?? [], ...bg.state!.rooms.people?.key === room.key ? bg.state!.rooms.people.people : [], ...room.messages.map(item => item.author)];
+    const known = [...room.faces ?? [], ...bg.state!.rooms.people?.key === room.key ? bg.state!.rooms.people.people : [], ...room.messages.map(item => item.author), ...source.people ?? []];
     for (const item of source.packets) {
       if (projection.packets.has(item.id) || item.kind !== 'room' || item.scope !== projection.key || item.status !== 'active' || !item.accountId || blocked.has(item.accountId) || item.claimedCount >= item.count || item.expiresAt <= now) continue;
       projection.packets.add(item.id);

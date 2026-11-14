@@ -2464,14 +2464,14 @@
     },
     "node_modules/@hono/node-server": {
       "name": "@hono/node-server",
-      "version": "2.1.5",
-      "integrity": "sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==",
+      "version": "2.1.8",
+      "integrity": "sha512-jdf7FHh6A1lzjpHHQUgxsg2GeER2vMetnAOfeActzcoli6jamlK+NAwL6Dsr5Fl3BS3tYUQzCdtZjU8Qxv7bEA==",
       "license": "MIT",
       "notices": [
         {
           "file": "LICENSE",
           "sha256": "6895190430d809c4c57a7582ecc2f99acbc2ea39a5dfad20262a41d5b3e91733",
-          "source": "https://registry.npmjs.org/@hono/node-server/-/node-server-2.1.5.tgz"
+          "source": "https://registry.npmjs.org/@hono/node-server/-/node-server-2.1.8.tgz"
         }
       ]
     },
@@ -5847,14 +5847,14 @@
     },
     "node_modules/hono": {
       "name": "hono",
-      "version": "4.13.13",
-      "integrity": "sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==",
+      "version": "4.13.18",
+      "integrity": "sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==",
       "license": "MIT",
       "notices": [
         {
           "file": "LICENSE",
           "sha256": "a6ab98e5c77b9070c443eaff2ff81034a6f8cc05a7524d5098eb0f24defa0115",
-          "source": "https://registry.npmjs.org/hono/-/hono-4.13.13.tgz"
+          "source": "https://registry.npmjs.org/hono/-/hono-4.13.18.tgz"
         }
       ]
     },

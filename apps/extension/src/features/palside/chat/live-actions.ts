@@ -4,7 +4,7 @@ import { canSend, characterLength, draftAttachmentPatch, emptyDraft, type Attach
 import type { PanelState } from '../app/use-panel-state';
 import type { PanelActions } from '../app/panel-actions';
 
-type DraftActions = Pick<PanelActions, 'updateDraft' | 'flushDraft' | 'resolveDraftConflict' | 'attach' | 'send' | 'retry' | 'saveEdit' | 'recall'>;
+type DraftActions = Pick<PanelActions, 'updateDraft' | 'flushDraft' | 'resolveDraftConflict' | 'attach' | 'send' | 'retry' | 'call' | 'saveEdit' | 'recall'>;
 
 export function createLiveDraftActions(state: PanelState, getActions: () => PanelActions): DraftActions {
   const { view: { current, drafts, data, setNotice, draft, setConfirmation, teams, team, disconnected, draftConflict, canWrite, editing, editText, messages, setEditing, live }, draftVersions, blockedDrafts, draftConflicts, setOptimisticDrafts, draftRevisions, draftQueue, setDraftConflicts, resolvingDrafts, editRevision, setEditRevision } = state;
@@ -114,6 +114,26 @@ export function createLiveDraftActions(state: PanelState, getActions: () => Pane
     return Boolean(result?.eventId);
   }
 
+  /**
+   * 喊来看: the page as a card — a token card on a token page, a website card elsewhere — sent like any message, so the chat shows
+   * exactly what went (sending, sent or failed). It mentions everyone, or the one teammate, so it reaches them under 仅 @ too.
+   * The draft is left alone.
+   */
+  async function call(url: string, accountId?: string): Promise<boolean> {
+    if (disconnected || !canWrite) return false;
+    const teamId = current;
+    const attachment = await live.command('link-card', { url }).then(result => result.attachment, error => { setNotice(errorMessage(error)); return null; });
+    if (attachment === null) return false;
+    if (!attachment) { setNotice(uiMessage('extension.member.callUnavailable')); return false; }
+    const others = team.memberIds.filter(id => id !== data.self);
+    const message: Message = {
+      id: crypto.randomUUID(), teamId, author: data.self, text: '', time: '', timestamp: Date.now(), attachment,
+      call: accountId === undefined ? 'all' : 'one', mentionIds: accountId === undefined ? others : [accountId], status: 'sending',
+    };
+    const result = await getActions().guarded('send', { message, revision: -1 }, () => void call(url, accountId));
+    return Boolean(result?.eventId);
+  }
+
   /** 重试 sends the failed message again as it was, not the current draft. */
   function retry(message: Message) {
     if (disconnected || !canWrite) return;
@@ -154,5 +174,5 @@ export function createLiveDraftActions(state: PanelState, getActions: () => Pane
     });
   }
 
-  return { updateDraft, flushDraft, resolveDraftConflict, attach, send, retry, saveEdit, recall };
+  return { updateDraft, flushDraft, resolveDraftConflict, attach, send, retry, call, saveEdit, recall };
 }

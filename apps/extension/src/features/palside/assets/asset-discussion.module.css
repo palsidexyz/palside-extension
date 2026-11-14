@@ -9,8 +9,8 @@
 .pageLogo { display:grid; place-items:center; width:48px; height:48px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .names { min-width:0; }
 .names h2 { margin:0; font-size:var(--ui-type-title-l); line-height:26px; font-weight:600; letter-spacing:-.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.names p { display:flex; align-items:center; gap:6px; min-width:0; margin:0; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:18px; white-space:nowrap; }
-.names p > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.meta { display:flex; align-items:center; gap:6px; min-width:0; margin:0; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:18px; white-space:nowrap; }
+.meta > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .address { display:inline-flex; align-items:center; gap:4px; flex:none; padding:0; border:0; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background:transparent; color:inherit; font:500 var(--ui-type-footnote)/18px var(--font-geist-mono), monospace; cursor:pointer; transition:color .16s ease; }
 .address:hover { color:var(--ui-text-primary); }
 .watch { display:inline-flex; align-items:center; gap:6px; flex:none; height:32px; margin-right:-4px; padding:0 4px; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; white-space:nowrap; cursor:pointer; transition:background-color .16s ease, color .16s ease; }

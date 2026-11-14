@@ -165,7 +165,7 @@ test('a snapshot superseded during persistence does not mark cold-start membersh
 test('removed commands are rejected before mutation', async () => {
   const { runtime } = fixture();
   let calls = 0;
-  runtime.interactions = { poke: async () => { calls++; } };
+  runtime.interactions = { react: async () => { calls++; } };
   for (const name of ['team-event', 'team-event-remove', 'quote-sticky', 'locate-sticky', 'attach-ref']) await assert.rejects(runtime.dispatch.execute({ name, payload: { kind: 'sticky', teamId: 'team' } }));
   assert.equal(calls, 0);
 });

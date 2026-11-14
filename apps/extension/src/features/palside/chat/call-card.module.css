@@ -1,0 +1,19 @@
+/* 喊来看: the page card plus one answer line, at the chat card width. The answer row is 28px (the card's button height) under a hairline,
+   with the card's own 10px rhythm above and below the line. */
+.card { width:var(--chat-card-width); max-width:100%; padding:10px 12px; text-align:left; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
+.card > [data-asset-card] { width:100%; margin:0; padding:0; background:none; }
+.foot { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:28px; margin-top:10px; padding-top:10px; border-top:1px solid var(--ui-border-soft); }
+
+/* Name line: the sender's name (footnote 600, primary), then the call (footnote 600, secondary) with the glyph in accent ink. */
+.label { display:inline-flex; align-items:center; gap:4px; min-width:0; color:var(--ui-text-secondary); font-size:var(--ui-type-footnote); line-height:18px; font-weight:600; white-space:nowrap; }
+.label > svg { color:var(--ui-ink-accent); flex:none; }
+.meta[data-self] { justify-content:flex-end; }
+
+/* Who came: up to three 20px faces overlapping by 6px, ringed in the card surface, then the count in caption. */
+.arrived { display:inline-flex; align-items:center; gap:6px; min-width:0; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height:16px; font-weight:500; white-space:nowrap; }
+.faces { display:inline-flex; flex:none; }
+.faces > * { border-radius:50%; box-shadow:0 0 0 2px var(--ui-control-surface); }
+.faces > * + * { margin-inline-start:-6px; }
+.here { color:var(--ui-ink-success); font-size:var(--ui-type-footnote); line-height:16px; font-weight:600; white-space:nowrap; }
+/* 去看 matches 详情 above it: 28px high, footnote 600, the right edges aligned. */
+.go.go { min-height:28px; height:28px; padding:0 10px 0 12px; gap:2px; font-size:var(--ui-type-footnote); font-weight:600; white-space:nowrap; }

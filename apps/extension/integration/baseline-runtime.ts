@@ -1,12 +1,11 @@
-import { MINUTE_MS } from '@palside/shared/units';
-import { MatrixClient, type MatrixEvent } from 'matrix-js-sdk';
+import { MatrixClient } from 'matrix-js-sdk';
 import { PalsideService } from '../src/runtime/composition/core';
 import { ClientStorage } from '../src/runtime/storage/storage';
 import type { RuntimeState } from '../src/runtime/composition/runtime-state';
 import { remoteTeam } from './fixtures';
 
 /** Real runtime command and expiry paths, with an inert Matrix transport and an isolated local database. */
-export async function verifyRuntimeBoundaries(initial: RuntimeState, check: (value: unknown, label: string) => void, show: (state: RuntimeState) => Promise<void>) {
+export async function verifyRuntimeBoundaries(initial: RuntimeState, check: (value: unknown, label: string) => void) {
   const name = `palside-ui-check-${crypto.randomUUID()}`;
   const storage = new ClientStorage(name);
   const runtime = new PalsideService(async () => {}, async () => true, storage);
@@ -47,26 +46,6 @@ export async function verifyRuntimeBoundaries(initial: RuntimeState, check: (val
     check(pages[0] === 100 && runtime.state.history?.night?.loaded === false && runtime.state.history.night.loading === false, 'Loading earlier messages requests one hundred entries and keeps pagination available');
     await runtime.command({ name: 'history', payload: { teamId: 'night' } });
     check(pages[1] === 100 && runtime.state.history?.night?.loaded === true && runtime.state.history.night.loading === false, 'The next history request also uses one hundred entries and recognizes the exhausted cursor');
-    const now = Date.now;
-    const at = now();
-    const event = (age: number) => ({ isEncrypted: () => true, getSender: () => '@mia:example.test', getContent: () => ({ id: `poke${age}`, teamId: 'night', sentAt: at - age, view: { ...initial.data.views[0]!, version: 1 } }) }) as unknown as MatrixEvent;
-    try {
-      Date.now = () => at;
-      await runtime.interactions.consumePoke(event(15_001), session);
-      check(!runtime.state.pokes?.length, 'A viewing invitation older than the relay lifetime plus clock tolerance is not replayed on receipt');
-      await runtime.interactions.consumePoke(event(15_000), session);
-      check(runtime.state.pokes?.length === 1, 'A viewing invitation at the edge of the relay lifetime plus clock tolerance can still arrive');
-      await runtime.interactions.consumePoke(event(15_000), session);
-      check(runtime.state.pokes?.length === 1 && runtime.state.pokes[0]!.count === 1, 'The same invitation delivered twice counts once');
-      await show(runtime.state);
-      Date.now = () => at + 5 * MINUTE_MS - 1;
-      await runtime.cache.expireLocalContent();
-      check(runtime.state.pokes?.length === 1, 'A received viewing invitation remains before its five minute display deadline');
-      Date.now = () => at + 5 * MINUTE_MS;
-      await runtime.cache.expireLocalContent();
-      check(runtime.state.pokes?.length === 0 && runtime.state.data.messages.length === 0, 'The display deadline removes viewing invitations without adding chat history');
-      await show(runtime.state);
-    } finally { Date.now = now; }
   } finally {
     const database = await (storage as unknown as { database: Promise<IDBDatabase> }).database;
     database.close();

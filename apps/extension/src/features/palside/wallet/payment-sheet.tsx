@@ -233,7 +233,9 @@ function Settle({ c, payment, step, failedAt, onClose, onRestart }: { c: Palside
   // While it runs: offline is what the browser reports; checking is a submitted payment whose reply was lost and is being
   // reconciled; slow is the same stage still running after 8 s, measured here.
   const busyStep = step === 'busy', offline = busyStep && c.live.state?.connection?.networkOnline === false;
-  const checking = busyStep && payment.phase === 'pending' && Boolean(payment.error);
+  const checking = busyStep && payment.phase === 'pending' && (Boolean(payment.error) || payment.retrying === 'unclear');
+  // Signed, and the service keeps resubmitting it unchanged until fee sponsorship answers or the window closes as "not sent".
+  const sponsorRetry = busyStep && payment.phase === 'pending' && payment.retrying === 'sponsor';
   const slow = useSlow(busyStep && !offline ? `${payment.id}:${payment.phase}` : undefined);
   async function pay(pin?: string) {
     if (busy) return; setBusy(true);
@@ -270,11 +272,12 @@ function Settle({ c, payment, step, failedAt, onClose, onRestart }: { c: Palside
   </>;
   const labels = [t('extension.wallet.stageSign'), t('extension.wallet.stageSend'), t('extension.wallet.pending')];
   if (step === 'busy') {
-    const prominent = slow || checking;
+    const prominent = slow || checking || sponsorRetry;
     return <>
       {hero()}
       <Stages at={STAGES.indexOf(payment.phase as typeof STAGES[number])} mode={offline ? 'offline' : undefined} labels={labels} />
       <div className={s.noteRow}>{offline ? <WaitNote key="offline" icon={<WifiOff />}>{t('common.networkOffline')}</WaitNote>
+        : sponsorRetry ? <WaitNote key="sponsor">{t('extension.wallet.retrySponsor')}</WaitNote>
         : checking ? <WaitNote key="checking">{t('extension.wallet.checking')}</WaitNote> : slow ? <WaitNote key="slow">{t('common.slowNetwork')}</WaitNote> : null}</div>
       <div className={s.foot}><Button className={s.primary} variant={prominent ? 'surface' : 'quiet'} leadingIcon={prominent ? <RotateCcw size={16} /> : undefined} disabled={offline} loading={refreshing} onClick={() => { setRefreshing(true); void c.run('wallet-reconcile', {}).finally(() => setRefreshing(false)); }}>{t('extension.wallet.checkStatus')}</Button></div>
     </>;

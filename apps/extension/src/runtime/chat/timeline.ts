@@ -70,7 +70,7 @@ export class TimelineRuntime {
         // The gateway performs redactions with its service account and sets the
         // reason after checking author/owner permission; sender is not the actor.
         const removedByOwner = event.getContent().reason === 'owner';
-        runtime.state.data.messages = runtime.state.data.messages.map(m => m.id === target ? { ...m, text: '', attachment: undefined, ref: undefined, replyTo: undefined, replyRange: undefined, replyToExpiresAt: undefined, mentionIds: [], recalled: true, removedByOwner } : m);
+        runtime.state.data.messages = runtime.state.data.messages.map(m => m.id === target ? { ...m, text: '', attachment: undefined, ref: undefined, replyTo: undefined, replyRange: undefined, replyToExpiresAt: undefined, mentionIds: [], call: undefined, recalled: true, removedByOwner } : m);
         this.redactions.set(target, removedByOwner); this.edits.delete(target);
         runtime.cache.pruneViews();
         const mediaKey = `${session.account.id}:cache:media:event:${target}`;
@@ -121,6 +121,9 @@ export class TimelineRuntime {
     const transactionId = person.id === session.account.id ? event.getTxnId() ?? event.getUnsigned().transaction_id : undefined;
     team = readableTeam(); if (!team) return;
     const message: Message = { clientId: transactionId, id: eventId, teamId: team.id, author: person.id, text: truncateChatText(text(content.body), CHAT_TEXT_MAX * 2), time: '', timestamp, expiresAt, status: 'sent', replyTo: relation?.['m.in_reply_to']?.event_id, replyRange: relation?.['m.in_reply_to']?.event_id ? readQuoteRange(content['com.palside.reply_range']) : undefined, mentionIds: team.people.filter(p => Array.isArray(content['m.mentions']?.user_ids) && p.matrixId !== null && content['m.mentions'].user_ids.includes(p.matrixId)).map(p => p.id), ...(asset ? { attachment: { kind: 'asset', assetId: asset.id, view: asset } } : {}) };
+    // 喊来看 rides on a page card: everyone, or the one teammate the message mentions.
+    const call = content['com.palside.call'];
+    if (asset && (call === 'all' || call === 'one' && message.mentionIds?.length === 1)) message.call = call;
     if (!event.isRedacted() && !this.redactions.has(eventId) && !runtime.state.data.messages.find(m => m.id === eventId)?.recalled && content.msgtype === 'm.image' && content.file?.['com.palside.media'] && content.info?.mimetype && IMAGE_MIME_TYPES.some(type => type === content.info.mimetype)) {
       const mediaId = text(content.file['com.palside.media']);
       try {
@@ -143,7 +146,7 @@ export class TimelineRuntime {
     if (event.isRedacted() || this.redactions.has(eventId) || cached?.recalled) {
       const mediaKey = `${session.account.id}:cache:media:event:${eventId}`;
       await scope.wait(runtime.storage.remove(mediaKey)); if (runtime.auth.session !== session) return; runtime.cache.evictCachedContent([mediaKey]);
-      message.text = ''; message.attachment = undefined; message.replyTo = undefined; message.replyRange = undefined; message.replyToExpiresAt = undefined; message.mentionIds = []; message.recalled = true;
+      message.text = ''; message.attachment = undefined; message.replyTo = undefined; message.replyRange = undefined; message.replyToExpiresAt = undefined; message.mentionIds = []; message.call = undefined; message.recalled = true;
       const reason = event.getRedactionEvent()?.content?.reason;
       message.removedByOwner = this.redactions.get(eventId) ?? (reason === 'owner' ? true : reason === 'author' ? false : cached?.removedByOwner);
     }

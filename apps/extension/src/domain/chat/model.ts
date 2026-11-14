@@ -62,5 +62,5 @@ export function applyMessageEdit(messages: Message[], id: string, self: string, 
   return messages.map(m => m.id === id && m.author === self && m.status === 'sent' && !m.recalled ? { ...m, text, edited: true, editedAt: Math.max(Date.now(), (m.editedAt ?? 0) + 1) } : m);
 }
 export function recallMessage(messages: Message[], id: string, actorId?: string) {
-  return messages.map(m => m.id === id && m.status === 'sent' ? { ...m, text: '', attachment: undefined, replyTo: undefined, replyRange: undefined, recalled: true, removedByOwner: actorId ? actorId !== m.author : m.removedByOwner } : m);
+  return messages.map(m => m.id === id && m.status === 'sent' ? { ...m, text: '', attachment: undefined, call: undefined, replyTo: undefined, replyRange: undefined, recalled: true, removedByOwner: actorId ? actorId !== m.author : m.removedByOwner } : m);
 }

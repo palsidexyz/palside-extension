@@ -54,3 +54,9 @@ description = "Fixed idempotency keys in the chain integration test"
 condition = "AND"
 paths = ['''^tests/chain-integration\.test\.mjs$''']
 regexes = ['''^integration-key-\d+$''']
+
+[[allowlists]]
+description = "Design review demo account name, not a credential"
+condition = "AND"
+paths = ['''^apps/extension/integration/design-review\.tsx$''']
+regexes = ['''^kenji-0x91c4$''']

@@ -138,7 +138,7 @@ export class SendingRuntime {
       runtime.state.data.messages = orderMessages([...runtime.state.data.messages.filter(m => m.id !== message.id), { ...message, failure: undefined, status: 'sending' }]); runtime.emit();
       await scope.wait(this.releaseDraft(session, team.id, packet.draftRevision ?? revision)); guard();
       const mentions = liveMembers(team).filter(p => message.mentionIds?.includes(p.id)).map(p => p.matrixId);
-      const content: RoomMessageEventContent & Record<string, unknown> = { 'm.mentions': { user_ids: mentions }, msgtype: MsgType.Text, body: message.text, 'com.palside.asset': packet.asset, ...(message.replyTo ? { 'm.relates_to': { 'm.in_reply_to': { event_id: message.replyTo } }, ...(message.replyRange ? { 'com.palside.reply_range': message.replyRange } : {}) } : {}) };
+      const content: RoomMessageEventContent & Record<string, unknown> = { 'm.mentions': { user_ids: mentions }, msgtype: MsgType.Text, body: message.text, 'com.palside.asset': packet.asset, ...(message.call && packet.asset ? { 'com.palside.call': message.call } : {}), ...(message.replyTo ? { 'm.relates_to': { 'm.in_reply_to': { event_id: message.replyTo } }, ...(message.replyRange ? { 'com.palside.reply_range': message.replyRange } : {}) } : {}) };
       if (message.attachment?.kind === 'image') {
         const blob = await scope.wait((await scope.wait(fetch(message.attachment.src))).blob());
         if (blob.size > IMAGE_LIMIT.maxBytes || !IMAGE_MIME_TYPES.some(type => type === blob.type)) throw new MessageError(uiMessage('extension.runtime.imageSizeLimit'));

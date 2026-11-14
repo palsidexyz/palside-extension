@@ -1,5 +1,3 @@
-import { message as uiMessage, MessageError } from '@palside/i18n';
-import { POKE_DISPLAY } from '../../domain/annotations/social.ts';
 import type { Command } from '../transport/command-map';
 import { text } from '../composition/state';
 import { browser } from 'wxt/browser';
@@ -47,32 +45,6 @@ export async function followTabsCommand(this: RuntimeCommands, command: Extract<
   return await this.runtime.interactions.leadTabs(p.teamId, p.gen, p.open, p.front);
 }
 
-export async function pokeCommand(this: RuntimeCommands, command: Extract<Command, { name: "poke" }>) {
-  const { runtime } = signedIn(this);
-  const p = command.payload ?? {};
-  const teamId = text('teamId' in p ? p.teamId : undefined);
-  return runtime.interactions.poke(teamId, p.accountId === undefined ? undefined : text(p.accountId));
-}
-
-/** A 喊你来看 desktop notification was clicked: the panel opens that squad, the call is answered, and the host opens the page. */
-export async function pokeOpenCommand(this: RuntimeCommands, command: Extract<Command, { name: "poke-open" }>) {
-  const { runtime, accountId, scope } = signedIn(this);
-  const p = command.payload;
-  const poke = runtime.state.pokes?.find(item => item.id === p.pokeId && item.at + POKE_DISPLAY > Date.now());
-  if (p.accountId !== accountId || !poke || !runtime.state.remoteTeams.some(team => team.id === poke.teamId && team.joined)) throw new MessageError(uiMessage('extension.member.pokeGone'));
-  runtime.state.pokes = runtime.state.pokes!.filter(item => item !== poke);
-  runtime.state.preferences.current = poke.teamId;
-  await scope.wait(runtime.sharing.savePreferences());
-  runtime.emit();
-  return { url: poke.view.url };
-}
-
-export async function dismissPokeCommand(this: RuntimeCommands, command: Extract<Command, { name: "dismiss-poke" }>) {
-  const { runtime } = signedIn(this);
-  const p = command.payload ?? {};
-  runtime.state.pokes = (runtime.state.pokes ?? []).filter(x => x.id !== p.id); runtime.emit();
-}
-
 export async function reactCommand(this: RuntimeCommands, command: Extract<Command, { name: "react" }>) {
   const { runtime } = signedIn(this);
   const p = command.payload ?? {};
@@ -87,8 +59,5 @@ export const annotationsHandlers = {
   'follow-watch': followWatchCommand,
   'follow-scroll': followScrollCommand,
   'follow-tabs': followTabsCommand,
-  'poke': pokeCommand,
-  'dismiss-poke': dismissPokeCommand,
-  'poke-open': pokeOpenCommand,
   'react': reactCommand,
 } satisfies HandlerRegistry;

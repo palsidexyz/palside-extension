@@ -13,6 +13,13 @@ export function relayEntryPointNonceKey(nonceKey: string): bigint {
   return (key << 40n) | 1n;
 }
 export const relayBatchAbi = parseAbi(['function executeBatch((address target, uint256 value, bytes data)[] calls) payable returns (bytes[])']);
+const relayExecuteAbi = parseAbi(['function execute(address target, uint256 value, bytes data) payable returns (bytes)']);
+/** Modular Account calls: the Wallet API wraps one call as execute, several as executeBatch. */
+export function relayOperationCalls(callData: Hex): RelayCall[] {
+  const decoded = decodeFunctionData({ abi: [...relayBatchAbi, ...relayExecuteAbi], data: callData });
+  if (decoded.functionName === 'execute') { const [to, value, data] = decoded.args; return [{ to, value: value.toString(), data }]; }
+  return decoded.args[0].map(c => ({ to: c.target, value: c.value.toString(), data: c.data }));
+}
 const approveAbi = parseAbi(['function approve(address spender, uint256 amount) returns (bool)']);
 export type RelayCall = { to: Address; value: string; data: Hex };
 export type RelaySignature = { type: 'secp256k1'; data: Hex };
@@ -89,11 +96,10 @@ export function validateRelayEnvelope(envelope: RelaySigningEnvelope, expected: 
     relayAssert(!request.data.factory && !request.data.factoryData && !request.data.signature && !request.data.eip7702Auth, 'Unexpected account creation or signature');
     if (request.data.paymaster === undefined) {
       relayAssert(envelope.fee.mode === 'sponsored' && ['preVerificationGas', 'maxFeePerGas', 'maxPriorityFeePerGas'].every(field => relayAmount(request.data[field]) === 0n), 'Missing paymaster requires zero-fee sponsorship');
-      relayAssert(request.data.paymasterData === undefined && request.data.paymasterVerificationGasLimit === undefined && request.data.paymasterPostOpGasLimit === undefined, 'Unexpected paymaster fields');
+      // Zero paymaster gas limits are quoted on zero-fee chains and are not hashed without a paymaster.
+      relayAssert(request.data.paymasterData === undefined && [request.data.paymasterVerificationGasLimit, request.data.paymasterPostOpGasLimit].every(value => value === undefined || relayAmount(value) === 0n), 'Unexpected paymaster fields');
     } else relayAssert(isAddress(String(request.data.paymaster), { strict: false }) && !sameRelayAddress(request.data.paymaster, '0x0000000000000000000000000000000000000000'), 'Missing paymaster');
-    const decoded = decodeFunctionData({ abi: relayBatchAbi, data: request.data.callData as Hex });
-    const actual = decoded.args[0].map(c => ({ to: c.target, value: c.value.toString(), data: c.data }));
-    validateRelayCalls(actual, expected.calls);
+    validateRelayCalls(relayOperationCalls(request.data.callData as Hex), expected.calls);
     const hash = relayOperationHash(request);
     relayAssert(request.signatureRequest.type === 'personal_sign' && request.signatureRequest.data?.raw === hash && request.signatureRequest.rawPayload === hashMessage({ raw: hash }), 'UserOperation signing digest mismatch');
   }

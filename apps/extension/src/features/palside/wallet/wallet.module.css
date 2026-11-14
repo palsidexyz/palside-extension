@@ -36,13 +36,17 @@
 .segment button { flex:1; min-width:0; min-height:34px; padding:6px; border:0; border-radius:calc(var(--ui-radius-m) - 3px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); cursor:pointer; transition:background-color .18s,color .18s; }
 .segment button:is([aria-pressed=true],[aria-checked=true]) { background:var(--ui-canvas); color:var(--ui-text-primary); }
 .secret { padding:16px; border:0; background:var(--ui-control-surface); border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); overflow-wrap:anywhere; font:400 var(--ui-type-callout)/22px var(--font-geist-mono),monospace; }
-.transferCard { display:block; width:240px; max-width:100%; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; text-align:left; transition:opacity .3s; }
-.transferTop { display:flex; align-items:center; gap:10px; padding:12px 12px 10px; }
+.transferCard { display:block; width:var(--chat-card-width); max-width:100%; /* Same box as the 红包卡片 (packet.module.css .card): the chat card width, 60 top + 26 foot. */ border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); overflow:hidden; text-align:left; transition:opacity .3s; }
+.transferTop { display:flex; align-items:center; gap:10px; padding:12px 12px 11px; }
 .transferTop > span:last-child { min-width:0; display:flex; flex-direction:column; }
-.transferTop strong { font-size:var(--ui-type-title); line-height:22px; font-weight:600; font-variant-numeric:tabular-nums; }
-.transferTop small { font-size:var(--ui-type-footnote); line-height:16px; color:var(--ui-text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.transferFoot { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:34px; padding:0 12px; background:var(--ui-control-recess); font-size:var(--ui-type-footnote); color:var(--ui-text-secondary); }
+/* One ladder with the 红包卡片: main line 14/20 semibold, second line 12/17, foot 11 in a 26px band. */
+.transferTop strong { font-size:var(--ui-type-body); line-height:20px; font-weight:600; font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.transferTop small { font-size:var(--ui-type-footnote); line-height:17px; color:var(--ui-text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.transferFoot { display:flex; align-items:center; justify-content:space-between; gap:8px; height:26px; padding:0 12px; background:var(--ui-control-recess); font-size:var(--ui-type-caption); color:var(--ui-text-secondary); }
 .transferFoot > span { display:inline-flex; align-items:center; gap:4px; }
+/* Status glyphs sized to the 11px foot text, the same 12px as the 红包卡片's sending ring. */
+.status > span:first-child, .status > svg:first-child { width:12px; height:12px; }
+.status > span:first-child svg { width:8px; height:8px; }
 .transferFoot [data-state=done] { color:var(--ui-ink-success); }
 .transferFoot [data-state=failed] { color:var(--ui-ink-error); }
 .settled { width:13px; height:13px; }

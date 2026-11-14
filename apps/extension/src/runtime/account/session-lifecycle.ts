@@ -235,7 +235,7 @@ export class SessionRuntime {
     this.mnemonic = undefined; this.pendingIdentity = undefined; this.pendingDevice = undefined;
     this.cryptoInitialised = false; this.snapshotAt = 0; this.snapshotReadAt = 0; this.changedAt = 0; this.maintenanceFailures = 0; this.maintenanceRetryAt = 0; this.directoryExpiresAt = 0; this.authMode = undefined;
     const config = runtime.state.config;
-    runtime.state = { ...emptyState(), revision: runtime.state.revision, ready: true, config, pokes: undefined };
+    runtime.state = { ...emptyState(), revision: runtime.state.revision, ready: true, config };
     runtime.emit();
     if (!await this.cleanup.flush() && scope.current()) { runtime.state.error = uiMessage('extension.runtime.deviceCleanupPending'); runtime.emit(); }
   }

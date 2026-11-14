@@ -1,6 +1,6 @@
 import { parseCommand } from '../runtime/transport/command-map.ts';
 import { translator } from '@palside/i18n';
-import { notificationTarget,notificationValid,pokeNotificationTarget,type NotificationIdentity } from '../runtime/chat/notification-policy.ts';
+import { notificationTarget,notificationValid,type NotificationIdentity } from '../runtime/chat/notification-policy.ts';
 import type { RuntimeState } from '../runtime/composition/runtime-state';
 import type { Background } from './index.ts';
 
@@ -53,15 +53,12 @@ export function notifications(bg: Background) {
             if (window.id === undefined || window.incognito) return;
             opened = true;
             await browser.sidePanel.open({ windowId: window.id });
-            // 喊你来看 opens the squad and then the page it called to; a message opens the squad at the message.
-            if (stored?.pokeId !== undefined) {
-              const result = await bg.run(parseCommand({ name: 'poke-open', payload: { accountId: stored.accountId, pokeId: stored.pokeId } }));
-              if (result.ok && result.value && typeof (result.value as { url?: unknown }).url === 'string') await bg.openPage((result.value as { url: string }).url);
-              else bg.notifyWindow(window.id, result);
-              return;
-            }
+            // A message opens the squad at the message; 喊来看 then also opens the page it called to.
+            const called = stored && bg.state?.data.messages.find(message => message.id === stored.messageId && message.call && message.attachment?.kind === 'asset');
             const result = await bg.run(parseCommand({ name: 'notification-open', payload: { ...stored, windowId: window.id } }));
             bg.notifyWindow(window.id, result);
+            const url = called?.attachment?.kind === 'asset' ? called.attachment.view?.url : undefined;
+            if (result.ok && url) await bg.openPage(url);
           } finally {
             // Without a normal window the notification stays, so the message can still be reached from it later.
             try { if (opened) await forget(id, true); } finally { clicked.delete(id); }
@@ -71,7 +68,6 @@ export function notifications(bg: Background) {
     },
     /** The offscreen document asks to notify a message: rechecked against the current state before and after creation. */
     async notify(identity: NotificationIdentity) {
-      if (identity.pokeId !== undefined) return this.notifyPoke(identity);
       const started = epoch;
       const current = () => started === epoch && notificationTarget(bg.state, identity);
       if (!current() || !await granted() || !current()) return;
@@ -85,28 +81,14 @@ export function notifications(bg: Background) {
         if (!target) { await forget(id); return; }
         const person = bg.state?.data.people.find(person => person.id === target.message.author);
         const author = person?.deleted ? t('common.deletedMember') : person?.name || t('common.member');
-        const content = preview
+        const call = target.message.call === 'one' && !target.mentioned ? undefined : target.message.call, page = target.message.attachment?.kind === 'asset' ? target.message.attachment.view?.name : undefined;
+        // 喊来看 says who called everyone or you, and with 显示内容 on, to which page; a call to someone else reads as a message.
+        const content = call && preview && page
+          ? t(call === 'all' ? 'extension.runtime.notificationCallAllPage' : 'extension.runtime.notificationCallYouPage', { author, page })
+          : call ? t(call === 'all' ? 'extension.runtime.notificationCallAll' : 'extension.runtime.notificationCallYou', { author })
+          : preview
           ? t('extension.runtime.notificationPreview', { author, content: target.message.text.slice(0, 120) || t(target.message.attachment?.kind === 'image' ? 'extension.copy.imageQuote' : 'extension.copy.tokenQuote') })
           : t(target.mentioned ? 'extension.runtime.notificationMention' : target.replied ? 'extension.runtime.notificationReply' : 'extension.runtime.notificationMessage', { author });
-        await browser.notifications.create(id, { type: 'basic', iconUrl: browser.runtime.getURL('/icon-128.png'), title: target.team.name, message: content });
-      } catch { await forget(id); return; }
-      if (!current()) await forget(id, true);
-    },
-    /** 喊你来看: “Robin 喊你来看 CHUMP”, or without the page while 显示内容 is off. Rechecked before and after creation. */
-    async notifyPoke(identity: NotificationIdentity) {
-      const started = epoch;
-      const current = () => started === epoch ? pokeNotificationTarget(bg.state, identity) : undefined;
-      if (!current() || !await granted() || !current()) return;
-      const { accountId, teamId, pokeId, preview } = identity;
-      const id = `${PREFIX}${accountId}:poke:${pokeId}`;
-      await browser.storage.local.set({ [id]: { accountId, teamId, pokeId, preview } });
-      try {
-        const t = translator((await bg.language.get()).locale);
-        const target = current();
-        if (!target) { await forget(id); return; }
-        const person = bg.state?.data.people.find(person => person.id === target.poke.from);
-        const name = person?.deleted ? t('common.deletedMember') : person?.name || t('common.member');
-        const content = preview ? t('extension.runtime.notificationPokePage', { name, page: target.poke.view.name }) : t('extension.runtime.notificationPoke', { name });
         await browser.notifications.create(id, { type: 'basic', iconUrl: browser.runtime.getURL('/icon-128.png'), title: target.team.name, message: content });
       } catch { await forget(id); return; }
       if (!current()) await forget(id, true);
@@ -115,7 +97,7 @@ export function notifications(bg: Background) {
     notificationState(previous: RuntimeState | undefined, next: RuntimeState) {
       const who = (state: RuntimeState | undefined) => [state?.account?.id, state?.authenticated, state?.preferences.notifications, state?.preferences.notificationPreview];
       if (JSON.stringify(who(previous)) !== JSON.stringify(who(next))) epoch++;
-      if (previous?.authenticated === next.authenticated && previous?.account?.id === next.account?.id && previous?.remoteTeams === next.remoteTeams && previous?.data.messages === next.data.messages && previous?.pokes === next.pokes && previous?.preferences.notifications === next.preferences.notifications && previous?.preferences.notificationPreview === next.preferences.notificationPreview) return;
+      if (previous?.authenticated === next.authenticated && previous?.account?.id === next.account?.id && previous?.remoteTeams === next.remoteTeams && previous?.data.messages === next.data.messages && previous?.preferences.notifications === next.preferences.notifications && previous?.preferences.notificationPreview === next.preferences.notificationPreview) return;
       void (async () => {
         if (!await granted()) return;
         for (const id of Object.keys(await browser.notifications.getAll())) if (id.startsWith(PREFIX)) {

@@ -15,6 +15,9 @@ import { DRAWING_RUN, emoteRun, mergeSignalRuns } from '../../../domain/annotati
 import { AwayDivider, useAway } from './away-divider';
 import { unreadMentions } from '../../../domain/chat/unread-mentions';
 import { Composer } from './composer';
+import { RoomComposer, RoomPane } from '../rooms/composer-danmaku';
+import { closeDanmaku, followedTabRoomKey, useDanmaku, useDanmakuState } from '../rooms/rooms';
+import dm from '../rooms/composer-danmaku.module.css';
 import { ReadonlyDraft } from '../feedback/readonly-draft';
 import { ChatHeader } from './chat-header';
 import { FollowBar } from '../annotations/follow-bar';
@@ -36,7 +39,7 @@ import s from '../app/palside.module.css';
 /** Consecutive messages from one person within five minutes read as one group. */
 const groupWindow = 5 * MINUTE_MS;
 function continues(previous: Message | undefined, message: Message) {
-  if (!previous || previous.author !== message.author) return false;
+  if (!previous || previous.author !== message.author || message.call) return false;
   return previous.timestamp === undefined || message.timestamp === undefined || message.timestamp - previous.timestamp < groupWindow;
 }
 function dayKey(timestamp?: number) { return timestamp === undefined ? '' : new Date(timestamp).toDateString(); }
@@ -125,6 +128,26 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
     if (index === 0) { clearJump(); onReturn?.(); }
   }
   const input = useRef<HTMLTextAreaElement>(null);
+  // 弹幕 on turns the chat area into the token's 弹幕 and the composer writes to it; the squad's list stays mounted underneath.
+  const danmaku = useDanmaku(c), roomKey = danmaku.on ? danmaku.key : undefined;
+  // Nothing left to show (the tab left every token page, 弹幕 switched off): back to the squad.
+  const lostRoom = useDanmakuState().on && !danmaku.key;
+  useEffect(() => { if (lostRoom) closeDanmaku(c); }, [lostRoom, c]);
+  // The tab moved to another token while one was pinned: 弹幕 follows the tab again.
+  const tabKey = followedTabRoomKey(c), lastTab = useRef(tabKey), pinned = live.state.rooms.pinned;
+  useEffect(() => {
+    const was = lastTab.current; lastTab.current = tabKey;
+    if (tabKey && was !== tabKey && pinned && pinned !== tabKey) void live.command('room-close').catch(() => {});
+  }, [tabKey, pinned, live]);
+  // Squad messages that arrived while 弹幕 held the chat area: a pill on the 弹幕 list leads back.
+  const squadTotal = c.currentMessages.filter(message => message.author !== c.data.self).length;
+  const [squadMark, setSquadMark] = useState<number>();
+  if (roomKey && squadMark === undefined) setSquadMark(squadTotal);
+  if (!roomKey && squadMark !== undefined) setSquadMark(undefined);
+  const squadNew = roomKey && squadMark !== undefined ? Math.max(0, squadTotal - squadMark) : 0;
+  // Back from 弹幕 the squad's list settles in (its animation replays as it shows again); never on the chat's first showing.
+  const [visited, setVisited] = useState(false);
+  if (roomKey && !visited) setVisited(true);
   const top = useTopCard(c);
   const away = useAway(c);
   const hints = usePageHints(c);
@@ -154,7 +177,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
   // Messages arrive in the runtime's chat order and are never re-sorted here: a pending send's written time and a confirmed
   // one's service time are not comparable, so sorting by time would move rows as they confirm.
   const merged = mergeSignalRuns(interleaveTimed(c.currentMessages, [...payments, ...hints]), item => {
-    if (!('entry' in item) || !('hint' in item.entry) || item.entry.hint.kind === 'poke') return;
+    if (!('entry' in item) || !('hint' in item.entry)) return;
     const { hint, timestamp } = item.entry;
     return { person: hint.personId, page: hint.view?.id ?? hint.url ?? '', kind: hint.kind === 'drawing' ? DRAWING_RUN : hint.emote ? emoteRun(hint.emote) : hint.signal ?? 'attention', day: dayKey(timestamp) };
   });
@@ -190,8 +213,9 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
   });
   return <div className={s.chat} hidden={c.screen !== 'chat'}><SendFlightContext value={flight}><ReactionStage c={c}>
     <ChatHeader c={c} onTeam={changeTeam} /><FollowBar c={c} />
-    <WatchStrip key={c.current} c={c} top={top} />
-    <div className={navigation.viewport}>
+    {!roomKey && <WatchStrip key={c.current} c={c} top={top} />}
+    {roomKey && <RoomPane c={c} roomKey={roomKey} room={danmaku.room} offline={danmaku.offline} squadNew={squadNew} />}
+    <div className={`${navigation.viewport} ${visited ? dm.squadBack : ''}`} style={roomKey ? { display: 'none' } : undefined}>
     <div ref={list} className={`${s.timeline} ${navigation.list}`} aria-label={t('extension.copy.chatMessages')} tabIndex={0}>
     <div ref={content} className={`${navigation.content} ${!c.currentMessages.length ? navigation.emptyContent : ''}`}>
 
@@ -223,7 +247,7 @@ export function Chat({ c, jumpId, clearJump, originLabel, onReturn, searchQuery,
       {timeline.away && <Button size="sm" variant="surface" className={`${navigation.button} ${navigation.latest}`} style={{ minHeight: 34, padding: '7px 12px' }} onClick={bottom} aria-label={timeline.newCount ? t('extension.dynamic.newMessagesLatest', { count: (timeline.newCount) ?? '' }) : t('extension.copy.latest')}><span className={navigation.buttonContent}><ArrowDown size={14} className={navigation.buttonIcon} /><span className={navigation.buttonLabel} aria-live="polite" aria-atomic="true">{timeline.newCount ? <CountText text={t('extension.dynamic.newMessages', { count: timeline.newCount })} value={timeline.newCount} /> : t('extension.copy.latest')}</span></span></Button>}
     </nav>}
     </div>
-    {c.canWrite ? <Composer c={c} inputRef={input} onSend={send} /> : <ReadonlyDraft c={c} />}
+    {roomKey ? <RoomComposer key={roomKey} c={c} room={danmaku.room} offline={danmaku.offline} /> : c.canWrite ? <Composer c={c} inputRef={input} onSend={send} /> : <ReadonlyDraft c={c} />}
     <div ref={layer} className={s.flightLayer} aria-hidden="true" />
   </ReactionStage></SendFlightContext></div>;
 }

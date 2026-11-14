@@ -6,6 +6,10 @@ html, body, #root { width: 100%; height: 100%; margin: 0; min-width: 0; }
 body { overflow: hidden; -webkit-font-smoothing: antialiased; }
 /* The product's strongest weight is 600; emphasis never falls back to the browser's bold. */
 :where(b, strong) { font-weight: 600; }
+/* Every card in the chat — page, token, 喊大家来看, 红包, 转账, a missing card, an image's limit — has one width; heights follow content.
+   272px, or less in a narrow panel: the day column (container `chat-day`) minus the avatar column (36 + 10) and the time aside (58 + 6),
+   so a card never shrinks against its own row and every card, yours or a teammate's, keeps the same width. */
+:root { --chat-card-width: min(272px, calc(100cqi - 110px)); }
 
 /* Text highlights registered by features/palside/chat/text-highlights.ts. A landing tint holds, then steps down. */
 ::highlight(palside-focus) { background-color: color-mix(in srgb, var(--ui-accent) 62%, transparent); color: var(--ui-text-primary); }

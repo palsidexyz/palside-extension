@@ -1,15 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergePoke } from '../apps/extension/src/runtime/annotations/team-items.ts';
 
-
-test('poke merge groups sender and view', () => {
-  const view = { version: 1, id: 'a', kind: 'asset', chain: 'Ethereum', address: '0x1', url: 'https://x.test/a', name: 'A', source: 'x.test', color: '#fff', glyph: 'A' };
-  const first = { id: '1', teamId: 't', from: 'a', view, at: 10, count: 1 };
-  const merged = mergePoke([first], { ...first, id: '2', at: 20 }, 20);
-  assert.equal(merged.length, 1);
-  assert.equal(merged[0].count, 2);
-});
 
 test('sharing and favorites use equal public page keys', async () => {
   const { publicShareUrl, pageKey } = await import('../packages/shared/src/navigation.ts');
@@ -23,41 +14,38 @@ test('sharing and favorites use equal public page keys', async () => {
   assert.notEqual(pageScopeUrl('https://example.com/#one'), pageScopeUrl('https://example.com/#two'));
 });
 
-test('喊你来看 arrives on service time, so the two devices\' own clocks never decide', async () => {
-  const { readPokeWire } = await import('../apps/extension/src/domain/annotations/social.ts');
-  const service = 1_000_000;
-  const wire = sentAt => readPokeWire({ id: 'p', teamId: 't', view: {}, sentAt }, service);
-  assert.ok(wire(service - 15_000));
-  assert.equal(wire(service - 15_001), undefined);
-  assert.ok(wire(service + 5_000));
-  assert.equal(wire(service + 5_001), undefined);
-  assert.equal(readPokeWire({ id: '', teamId: 't', sentAt: service }, service), undefined);
-});
-
 test('a call is answered on the same page or on the same token anywhere', async () => {
-  const { reachedPoke } = await import('../apps/extension/src/domain/annotations/social.ts');
+  const { reachedCall } = await import('../apps/extension/src/domain/annotations/social.ts');
   const token = { kind: 'asset', chain: 'Ethereum', address: '0x1111111111111111111111111111111111111111', url: 'https://dexscreener.com/ethereum/0x1111111111111111111111111111111111111111' };
-  assert.ok(reachedPoke(token, { kind: 'asset', chain: 'Ethereum', address: '0x1111111111111111111111111111111111111111', url: 'https://gmgn.ai/eth/token/0x1111111111111111111111111111111111111111' }));
-  assert.ok(!reachedPoke(token, { kind: 'asset', chain: 'Ethereum', address: '0x2222222222222222222222222222222222222222', url: 'https://gmgn.ai/eth/token/0x2222222222222222222222222222222222222222' }));
+  assert.ok(reachedCall(token, { kind: 'asset', chain: 'Ethereum', address: '0x1111111111111111111111111111111111111111', url: 'https://gmgn.ai/eth/token/0x1111111111111111111111111111111111111111' }));
+  assert.ok(!reachedCall(token, { kind: 'asset', chain: 'Ethereum', address: '0x2222222222222222222222222222222222222222', url: 'https://gmgn.ai/eth/token/0x2222222222222222222222222222222222222222' }));
   const post = { kind: 'website', url: 'https://x.com/robin/status/1' };
-  assert.ok(reachedPoke(post, { kind: 'website', url: 'https://www.x.com/robin/status/1?utm_source=a' }));
-  assert.ok(!reachedPoke(post, { kind: 'website', url: 'https://x.com/robin/status/2' }));
+  assert.ok(reachedCall(post, { kind: 'website', url: 'https://www.x.com/robin/status/1?utm_source=a' }));
+  assert.ok(!reachedCall(post, { kind: 'website', url: 'https://x.com/robin/status/2' }));
 });
 
-test('喊你来看 notifies under every 通知 choice but off, never from a muted squad, and only while it waits', async () => {
-  const { pokeNotificationTarget } = await import('../apps/extension/src/runtime/chat/notification-policy.ts');
-  const { POKE_DISPLAY } = await import('../apps/extension/src/domain/annotations/social.ts');
+test('喊来看 mentions the people it calls, so it notifies them under 仅 @ too, never under 关闭 or from a muted squad', async () => {
+  const { notificationTarget } = await import('../apps/extension/src/runtime/chat/notification-policy.ts');
   const now = 10_000_000;
-  const state = (notifications, muted = false, at = now) => ({
+  const call = (mentionIds, kind = 'all') => ({ id: 'm', teamId: 't', author: 'robin', text: '', time: '', status: 'sent', timestamp: now, call: kind, mentionIds, attachment: { kind: 'asset', assetId: 'x', view: { url: 'https://x.com' } } });
+  const state = (notifications, message, muted = false) => ({
     authenticated: true, account: { id: 'me' }, preferences: { notifications, notificationPreview: false },
-    remoteTeams: [{ id: 't', joined: true, preferences: { muted } }],
-    pokes: [{ id: 'p', teamId: 't', from: 'robin', view: { url: 'https://x.com' }, at, count: 1 }],
+    remoteTeams: [{ id: 't', joined: true, preferences: { muted, readIds: [] } }], data: { messages: [message] },
   });
-  const identity = { accountId: 'me', teamId: 't', pokeId: 'p', preview: false };
-  assert.ok(pokeNotificationTarget(state('all'), identity, now));
-  assert.ok(pokeNotificationTarget(state('mentions'), identity, now));
-  assert.equal(pokeNotificationTarget(state('off'), identity, now), undefined);
-  assert.equal(pokeNotificationTarget(state('all', true), identity, now), undefined);
-  assert.equal(pokeNotificationTarget(state('all', false, now - POKE_DISPLAY), identity, now), undefined);
-  assert.equal(pokeNotificationTarget(state('all'), { ...identity, pokeId: 'other' }, now), undefined);
+  const identity = { accountId: 'me', teamId: 't', messageId: 'm', preview: false };
+  assert.ok(notificationTarget(state('all', call(['me', 'mia'])), identity, now)?.mentioned);
+  assert.ok(notificationTarget(state('mentions', call(['me', 'mia'])), identity, now));
+  assert.ok(notificationTarget(state('mentions', call(['me'], 'one')), identity, now));
+  assert.equal(notificationTarget(state('mentions', call(['mia'], 'one')), identity, now), undefined);
+  assert.equal(notificationTarget(state('off', call(['me'])), identity, now), undefined);
+  assert.equal(notificationTarget(state('all', call(['me']), true), identity, now), undefined);
+});
+
+test('a call travels only on a page card', async () => {
+  const { parseCommand } = await import('../apps/extension/src/runtime/transport/command-map.ts');
+  const message = { id: 'm', teamId: 't', author: 'me', text: '', time: '', status: 'sending', call: 'all', mentionIds: ['mia'] };
+  assert.ok(parseCommand({ name: 'send', payload: { revision: -1, message: { ...message, attachment: { kind: 'asset', assetId: 'x', view: { url: 'https://x.com' } } } } }));
+  assert.throws(() => parseCommand({ name: 'send', payload: { revision: -1, message } }));
+  assert.throws(() => parseCommand({ name: 'send', payload: { revision: -1, message: { ...message, call: 'loud', attachment: { kind: 'asset', assetId: 'x' } } } }));
+  for (const name of ['poke', 'poke-open', 'dismiss-poke']) assert.throws(() => parseCommand({ name, payload: { teamId: 't' } }));
 });

@@ -7,7 +7,6 @@ import { isLiveTimelineArrival } from '../chat/timeline-arrival';
 import { createClient,PendingEventOrdering,ClientEvent,RoomEvent,MatrixEventEvent,MatrixScheduler,type MatrixClient,type MatrixEvent,type Room } from 'matrix-js-sdk';
 import { type Identity } from '@palside/shared/identity';
 import { deviceKeyPublication,ensureCryptoIdentity,ownDeviceSigned,secretStorageCallbacks,OnlySignedDevicesIsolationMode } from './crypto-identity';
-import { POKE_EVENT } from '../../domain/annotations/social';
 import { FOLLOW_EVENT } from '../../domain/annotations/follow.ts';
 import type { RuntimeDevice } from './device';
 import { silent } from '../composition/state';
@@ -116,7 +115,6 @@ export async function connectRuntimeDevice(this: SessionRuntime, session: Runtim
       if (event.getType() === 'com.palside.chart_mark') { runtime.signals.consumeMark(event, session); return; }
       if (event.getType() === 'com.palside.reaction') { runtime.interactions.consumeReaction(event, session); return; }
       if (event.getType() === FOLLOW_EVENT) { runtime.interactions.consumeFollow(event, session); return; }
-      if (event.getType() === POKE_EVENT) { void runtime.interactions.consumePoke(event, session).catch(() => {}); return; }
       if (event.getType() !== 'com.palside.viewing') return;
       void runtime.sharing.consumeViewing(event, session).catch(() => {});
     });

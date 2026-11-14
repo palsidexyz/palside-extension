@@ -24,9 +24,6 @@ import { signalAsset } from '../annotations/signals';
 import { createPatchSliceCache,diffState } from '../transport/state-diff';
 import { teamUnreadCounts } from '../../domain/chat/unread-mentions';
 
-/** 最近看过 keeps this many 弹幕. */
-const RECENT_ROOMS_SHOWN = 3;
-
 /** One offscreen runtime coordinates the account-scoped services for all panels. */
 export class PalsideService {
   readonly storage: ClientStorage;
@@ -119,14 +116,11 @@ export class PalsideService {
   }
   private tokenInput = '';
   private pagesVersion = -1;
-  private recentAccount?: string;
-  /** Remembers each 弹幕 once it has opened, for 最近看过 where there is no token. */
-  private noteRecentRoom() {
+  private tokenAccount?: string;
+  /** Search and card lookups belong to one account; another account starts without them. */
+  private forgetOtherAccount() {
     const state = this.state, account = state.account?.id;
-    if (account !== this.recentAccount) { this.recentAccount = account; state.recentRooms = undefined; state.searchAssets = undefined; state.cardAssets = undefined; }
-    const key = state.rooms.current && !state.rooms.current.loading ? state.rooms.current.key : undefined;
-    if (!account || !key || state.recentRooms?.[0] === key) return;
-    state.recentRooms = [key, ...(state.recentRooms ?? []).filter(item => item !== key)].slice(0, RECENT_ROOMS_SHOWN);
+    if (account !== this.tokenAccount) { this.tokenAccount = account; state.searchAssets = undefined; state.cardAssets = undefined; }
   }
   /** The token records the panel needs: every token it currently shows, so card, 详情, 弹幕, 热门 and 在看 read one record. */
   private projectTokens() {
@@ -137,12 +131,10 @@ export class PalsideService {
     for (const view of state.data.views) add(view);
     for (const message of state.data.messages) { add(message.attachment?.kind === 'asset' ? message.attachment.view : undefined); }
     for (const record of [...state.signalRecords ?? [], ...(state.chartDrawings ?? []).filter(record => record.shape)]) { const asset = signalAsset(record); if (asset) assets.push(asset); }
-    for (const poke of state.pokes ?? []) add(poke.view);
     for (const draft of Object.values(state.drafts)) { add(draft.value.attachment?.kind === 'asset' ? draft.value.attachment.view : undefined); }
     for (const row of state.rooms.hot?.rows ?? []) addKey(row.key);
     for (const key of Object.keys(state.rooms.summaries)) addKey(key);
-    this.noteRecentRoom();
-    for (const key of state.recentRooms ?? []) addKey(key);
+    this.forgetOtherAccount();
     assets.push(...state.searchAssets ?? [], ...state.cardAssets ?? []);
     if (this.pages.version !== this.pagesVersion) { this.pagesVersion = this.pages.version; state.pages = this.pages.pick(); state.pageChoices = this.pages.choices(); }
     // 切换链 names every chain the address is a token on, not only the one shown.

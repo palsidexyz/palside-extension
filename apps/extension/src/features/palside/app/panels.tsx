@@ -48,7 +48,7 @@ export function Panels({ c, onJump }: { c: PalsideController; onJump: (id: strin
   const [hotChain, setHotChain] = useState<string | null>(hotStartChain);
   const draftAsset = assetView(c.draft.attachment);
   const asset = draftAsset?.id === c.selectedAsset ? draftAsset : c.selectedView?.id === c.selectedAsset ? c.selectedView : c.data.views.find(v => v.id === c.selectedAsset) ?? c.selectedView;
-  if (c.screen === 'chat' || c.screen === 'room') return null;
+  if (c.screen === 'chat') return null;
   function back() { if (c.screen === 'members' && c.selectingOwner) c.go('team'); else c.back(); }
   const title = titles[c.screen] ?? 'extension.copy.signIn';
   const siteTitle = c.siteHost === 'all' ? t('extension.sites.allSites') : siteOf(c, c.siteHost).name;
