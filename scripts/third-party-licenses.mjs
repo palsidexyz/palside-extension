@@ -9,12 +9,19 @@ const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const LICENSE_HOSTS = ['extension', 'website', 'server', 'admin', 'indexer'];
 export const licenseHosts = lock => LICENSE_HOSTS.filter(host => lock.packages[`apps/${host}`]);
-const fontHosts = ['extension', 'website', 'admin'];
-const copiedLicenses = [
+const productLicenses = [
   ['LICENSE', 'Palside-MIT.txt'],
   ['packages/design/fonts/Geist-OFL.txt', 'Geist-OFL.txt'],
   ['packages/design/fonts/GeistMono-OFL.txt', 'GeistMono-OFL.txt'],
 ];
+// Hosts that ship the product UI carry its fonts' licenses; the website also ships the Noto Sans SC display subset.
+const hostLicenses = {
+  extension: productLicenses,
+  website: [...productLicenses, ['packages/design/fonts/NotoSansSC-OFL.txt', 'NotoSansSC-OFL.txt']],
+  admin: productLicenses,
+};
+/** [source, published name] pairs copied byte-for-byte into a host's public/licenses. */
+export const copiedLicenses = host => hostLicenses[host] ?? [];
 
 // Follow the lockfile's actual nested resolution, not a scan of all node_modules.
 export function runtimePackages(lock, workspace) {
@@ -143,9 +150,7 @@ export async function syncThirdPartyLicenses(root = project) {
     await mkdir(target, { recursive: true });
     await writeFile(join(target, 'THIRD-PARTY.txt'), text);
     await writeFile(join(target, 'THIRD-PARTY.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-    if (fontHosts.includes(host)) {
-      for (const [source, file] of copiedLicenses) await copyFile(join(root, source), join(target, file));
-    }
+    for (const [source, file] of copiedLicenses(host)) await copyFile(join(root, source), join(target, file));
   }
 }
 
@@ -156,11 +161,9 @@ export async function verifyThirdPartyLicenses(directory, { root = project, host
   const manifest = JSON.parse(await readFile(join(directory, 'licenses/THIRD-PARTY.json'), 'utf8'));
   if (actual !== expected.text || JSON.stringify(manifest) !== JSON.stringify(expected.manifest)) throw new Error(`Missing, stale or altered ${host} third-party notices`);
   if (expected.manifest.unresolved.length) throw new Error(`Unresolved ${host} distribution licenses:\n${expected.manifest.unresolved.join('\n')}`);
-  if (fontHosts.includes(host)) {
-    for (const [source, file] of copiedLicenses) {
-      const actual = await readFile(join(directory, 'licenses', file));
-      if (!actual.equals(await readFile(join(root, source)))) throw new Error(`Missing, stale or altered ${host} license: ${file}`);
-    }
+  for (const [source, file] of copiedLicenses(host)) {
+    const actual = await readFile(join(directory, 'licenses', file));
+    if (!actual.equals(await readFile(join(root, source)))) throw new Error(`Missing, stale or altered ${host} license: ${file}`);
   }
   return expected.manifest;
 }

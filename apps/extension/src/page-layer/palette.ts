@@ -1,4 +1,5 @@
 import { productColors as product } from '@palside/design/colors';
+import { fontStacks } from '@palside/design/fonts';
 
 /**
  * Every colour the page layer draws with. Product surfaces (accent, panels, menus) take the product's own values;
@@ -49,8 +50,11 @@ const colors = {
 
 const property = (name: string) => `--pl-${name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`;
 
-/** The palette as custom properties on the ShadowRoot host; put it first in each page-layer stylesheet. */
-export const paletteCss = `:host{${Object.entries(colors).map(([name, value]) => `${property(name)}:${value}`).join(';')};--ui-radius-xs:8px;--ui-radius-s:12px;--ui-radius-m:18px;--ui-radius-l:24px;--ui-radius-xl:32px;--ui-radius-pill:999px;--ui-corner-shape:superellipse(1.4);--ui-focus-width:1px;--ui-focus-offset:2px;--ui-text-secondary:#686773;--ui-dark-text-secondary:#9A9EA7;--ui-shadow-floating:0 4px 12px rgb(0 0 0 / 6%)}`;
+/**
+ * The palette and font stacks as custom properties on the ShadowRoot host; put it first in each page-layer stylesheet.
+ * Geist is not loaded on other sites, so product text here takes the system UI face (fonts.ts).
+ */
+export const paletteCss = `:host{--ui-font-sans:${fontStacks.system};--ui-font-mono:${fontStacks.mono};--ui-font-danmaku:${fontStacks.danmaku};--ui-font-system:${fontStacks.system};${Object.entries(colors).map(([name, value]) => `${property(name)}:${value}`).join(';')};--ui-radius-xs:8px;--ui-radius-s:12px;--ui-radius-m:18px;--ui-radius-l:24px;--ui-radius-xl:32px;--ui-radius-pill:999px;--ui-corner-shape:superellipse(1.4);--ui-focus-width:1px;--ui-focus-offset:2px;--ui-text-secondary:#686773;--ui-dark-text-secondary:#9A9EA7;--ui-shadow-floating:0 4px 12px rgb(0 0 0 / 6%)}`;
 
 /** Member colours behind initials when there is no portrait. */
 export const avatarTints = [product.accent, '#9BE7FF', '#FFCF99', '#D7B8FF', '#FFB7D5'] as const;

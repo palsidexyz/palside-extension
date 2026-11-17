@@ -1,4 +1,4 @@
-import { pageMatches, pageScript } from '../apps/extension/src/runtime/browser/page-layer-host.ts';
+import { pageRegistration, pageScript } from '../apps/extension/src/runtime/browser/page-layer-host.ts';
 import { readFile, access, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { chartBridgePolicy, validateChartBridge, validateExtensionManifest, validatePageLayerRegistration } from "./lib/extension-artifact.mjs";
@@ -25,11 +25,12 @@ for (const size of brandIconSizes) {
 }
 try { await verifyThirdPartyLicenses(root); } catch (error) { errors.push(error.message); }
 const policyState = { authenticated: true, preferences: { current: 'verification', web: { share: true, interact: true } }, toggles: { share: false, interact: true }, remoteTeams: [{ id: 'verification', joined: true }] };
-const registration = pageScript(pageMatches(policyState, ['*://custom.example.com/*', 'https://secure.example.com/*', 'https://localhost/*']));
+const registration = pageScript(pageRegistration(policyState, ['*://custom.example.com/*', 'https://secure.example.com/*', 'https://localhost/*']));
 errors.push(...validatePageLayerRegistration(registration));
 if (JSON.stringify(registration?.matches) !== JSON.stringify(['http://custom.example.com/*', 'https://custom.example.com/*', 'https://secure.example.com/*'])) errors.push('Automatic registrations must follow the exact granted public origins');
-const broad = pageScript(pageMatches(policyState, ['<all_urls>']));
+const broad = pageScript(pageRegistration({ ...policyState, preferences: { ...policyState.preferences, siteInteraction: { 'bank.example.com': { on: false, danmaku: true, signal: true, chart: true } } } }, ['<all_urls>']));
 errors.push(...validatePageLayerRegistration(broad));
+if (JSON.stringify(broad?.excludeMatches) !== JSON.stringify(['*://bank.example.com/*'])) errors.push('A site switched off must stay out of the every-site registration');
 for (const [source, output] of [
   ['LICENSE', 'Palside-MIT.txt'],
   ['packages/design/fonts/Geist-OFL.txt', 'Geist-OFL.txt'],

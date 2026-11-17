@@ -37,7 +37,7 @@ export function createSignals(send: (message: PageUp) => void, base: string, onP
   const style = document.createElement('style');
   style.textContent = paletteCss + signalArtCss + `
     :host { color-scheme: dark; --ui-text-secondary:var(--ui-dark-text-secondary); }
-    button, .notice { font: 12px/18px system-ui,sans-serif; color: var(--pl-signal-ink); background: var(--pl-signal-surface); border:0; border-radius:var(--ui-radius-s);corner-shape:var(--ui-corner-shape); padding: 3px 8px; }
+    button, .notice { font: 12px/18px var(--ui-font-sans); color: var(--pl-signal-ink); background: var(--pl-signal-surface); border:0; border-radius:var(--ui-radius-s);corner-shape:var(--ui-corner-shape); padding: 3px 8px; }
     .anchor-label { position: absolute; left: 0; top: 64px; transform: translateX(-50%); white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
     .anchor-label.locate { pointer-events: auto; cursor: pointer; }
     button:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary);outline-offset:var(--ui-focus-offset); }

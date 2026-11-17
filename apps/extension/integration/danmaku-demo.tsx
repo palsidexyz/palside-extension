@@ -51,7 +51,7 @@ export function DanmakuShell() {
     const listen = (event: MessageEvent) => { if ((event.data as { demoReady?: boolean })?.demoReady) frame.current?.contentWindow?.postMessage({ demo: 'tab', value: tab }, '*'); };
     window.addEventListener('message', listen); return () => window.removeEventListener('message', listen);
   }, [tab]);
-  return <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', gap: 14, padding: '18px 22px 22px', background: '#e4e6ea', boxSizing: 'border-box', font: '13px/1.5 system-ui, -apple-system, sans-serif', color: '#1d1f23' }}>
+  return <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', gap: 14, padding: '18px 22px 22px', background: '#e4e6ea', boxSizing: 'border-box', font: '13px/1.5 var(--ui-font-system)', color: '#1d1f23' }}>
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 16px' }}>
       <span style={{ color: '#4a4e55' }}>按输入框里的「弹幕」，聊天区换成这个代币的弹幕；再按一次（或 Esc）回到小队。</span>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span style={{ color: '#4a4e55', whiteSpace: 'nowrap' }}>模拟</span>

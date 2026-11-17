@@ -1,6 +1,6 @@
 import { MessageError,message as uiMessage } from '@palside/i18n';
 import { accessStatus } from '../runtime/browser/permissions.ts';
-import { PAGE_SCRIPT_ID,pageAsset,pageMatches,pageScript,pageStatus,pageUrlHost,updatePageUrl,locateResponse,type PageConnection } from '../runtime/browser/page-layer-host.ts';
+import { PAGE_SCRIPT_ID,pageAsset,pageRegistration,pageScript,pageStatus,pageUrlHost,updatePageUrl,locateResponse,type PageConnection } from '../runtime/browser/page-layer-host.ts';
 import type { LocateResult,PageDown,PageUp } from '../runtime/browser/page-protocol.ts';
 import { pageScopeUrl,samePage } from '../domain/annotations/interaction.ts';
 import type { Background } from './index.ts';
@@ -118,8 +118,8 @@ export function pages(bg: Background) {
     if (!valid()) return;
     const origins = (await browser.permissions.getAll()).origins ?? [];
     if (!valid()) return;
-    const matches = pageMatches(bg.state, origins, bg.danmaku.enabled() && Boolean(bg.state?.rooms?.current) && bg.panels.size > 0);
-    const script = matches.length ? pageScript(matches) : undefined;
+    const target = pageRegistration(bg.state, origins, bg.danmaku.enabled() && Boolean(bg.state?.rooms?.current) && bg.panels.size > 0);
+    const script = target && pageScript(target);
     const key = JSON.stringify(script ?? null);
     if (key === registrationKey) return;
     const ids = { ids: [PAGE_SCRIPT_ID] };
@@ -133,7 +133,7 @@ export function pages(bg: Background) {
     }
     registrationKey = key;
     if (!script) return;
-    for (const tab of await browser.tabs.query({ url: matches })) {
+    for (const tab of await browser.tabs.query({ url: script.matches })) {
       if (!valid()) return;
       if (tab.id === undefined || !tab.url || tab.incognito || tab.status === 'loading' || !allowedPage({ tabId: tab.id, windowId: tab.windowId, url: tab.url }) || portFor(tab.id, tab.url)) continue;
       const access = await accessStatus(tab.url, browser);

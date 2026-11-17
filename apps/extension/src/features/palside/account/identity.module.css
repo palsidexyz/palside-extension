@@ -1,9 +1,9 @@
 .phrase { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; transition:filter .2s ease; }
-.phrase li { display:flex; align-items:baseline; gap:8px; min-width:0; padding:8px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-field-surface, var(--ui-control-surface)); font:var(--ui-type-callout)/20px var(--font-geist-mono),monospace; overflow-wrap:anywhere; }
+.phrase li { display:flex; align-items:baseline; gap:8px; min-width:0; padding:8px 12px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--ui-field-surface, var(--ui-control-surface)); font:var(--ui-type-callout)/20px var(--ui-font-mono); overflow-wrap:anywhere; }
 .phrase span { min-width:16px; color:var(--ui-text-secondary); font-size:var(--ui-type-caption); text-align:right; }
 .phrase[data-hidden] { filter:blur(6px); user-select:none; }
 .page { display:flex; flex-direction:column; gap:14px; min-width:0; }
-.accountId { flex:1; min-width:0; container-type:inline-size; font:500 var(--ui-type-callout)/20px var(--font-geist-mono),monospace; letter-spacing:0; color:var(--ui-text-primary); white-space:nowrap; }
+.accountId { flex:1; min-width:0; container-type:inline-size; font:500 var(--ui-type-callout)/20px var(--ui-font-mono); letter-spacing:0; color:var(--ui-text-primary); white-space:nowrap; }
 .accountId > span { display:block; }
 .accountId > span:first-child { display:none; }
 @container (min-width: 42ch) { .accountId > span:first-child { display:block; } .accountId > span:last-child { display:none; } }

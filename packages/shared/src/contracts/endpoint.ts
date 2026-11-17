@@ -16,12 +16,11 @@ export const jsonResponse = <S extends TSchema>(schema: S, statuses: readonly nu
 export const binaryResponse = { kind: 'binary', schema: binaryBody() } as const;
 export type Endpoint<P extends TSchema = TSchema, Q extends TSchema = TSchema, B extends TSchema = TSchema, R extends TSchema = TSchema> = {
   id: string; method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'; path: string; auth: Auth;
-  authorization: 'account' | 'member' | 'owner' | 'transfer-party' | 'resource';
   rateLimits: readonly RateLimit[]; params: P; query: Q; body: Body<B>; response: Response<R>;
   errors: readonly ErrorCode[]; idempotency: 'none' | 'required' | 'accept'; headers: TSchema;
 };
 export function endpoint<const I extends string, const M extends Endpoint['method'], const T extends string, P extends TSchema = typeof empty, Q extends TSchema = typeof empty, B extends TSchema = TUndefined, R extends TSchema = TSchema>(input: {
-  id: I; method: M; path: T; auth?: Auth; authorization?: Endpoint['authorization'];
+  id: I; method: M; path: T; auth?: Auth;
   rateLimits?: readonly (RateLimitName | RateLimit)[]; params?: P; query?: Q; body?: Body<B>;
   response: Response<R>; errors?: readonly ErrorCode[]; idempotency?: Endpoint['idempotency'];
 }): Endpoint<P, Q, B, R> & { id: I; method: M; path: T } {
@@ -31,7 +30,7 @@ export function endpoint<const I extends string, const M extends Endpoint['metho
   if (auth === 'bearer') rates.push({ name: 'session' });
   rates.push(...(input.rateLimits ?? []).map(rule => typeof rule === 'string' ? { name: rule } : rule));
   return {
-    ...input, auth, authorization: input.authorization ?? 'account', idempotency,
+    ...input, auth, idempotency,
     params: (input.params ?? empty) as P, query: (input.query ?? empty) as Q, body: (input.body ?? noBody) as Body<B>,
     headers: idempotency === 'none' ? empty : strictObject({ 'idempotency-key': idempotency === 'required' ? operationKey : Type.Optional(operationKey) }),
     rateLimits: rates,

@@ -2,7 +2,7 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  body { @apply bg-background text-foreground; font-family: var(--font-geist-sans), sans-serif; }
+  body { @apply bg-background text-foreground; font-family: var(--ui-font-sans); }
 }
 
 html { scrollbar-width: thin; scrollbar-color: gray transparent; }

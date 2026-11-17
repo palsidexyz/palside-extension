@@ -71,7 +71,7 @@ const icons = {
 };
 const svg = (paths: string) => `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 const style = paletteCss + `
-  :host { --bg: ${chartToolbar.dark.surface}; --fg: ${chartToolbar.dark.ink}; --line: ${chartToolbar.dark.line}; --hover: ${chartToolbar.dark.hover}; --font: system-ui, sans-serif; }
+  :host { --bg: ${chartToolbar.dark.surface}; --fg: ${chartToolbar.dark.ink}; --line: ${chartToolbar.dark.line}; --hover: ${chartToolbar.dark.hover}; --font: var(--ui-font-system); }
   * { box-sizing: border-box; }
   .plot { position: absolute; left: 0; top: 0; overflow: hidden; pointer-events: none; }
   .plot[data-tool] { pointer-events: auto; cursor: crosshair; touch-action: none; }
@@ -334,7 +334,7 @@ class ChartOverlay {
   }
   private badge() {
     const badge = this.el('span');
-    badge.style.cssText = 'position:absolute;right:-6px;bottom:-6px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;font:600 10px/15px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums;pointer-events:none;';
+    badge.style.cssText = 'position:absolute;right:-6px;bottom:-6px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;font:600 10px/15px var(--ui-font-system);text-align:center;font-variant-numeric:tabular-nums;pointer-events:none;';
     return badge;
   }
   /** The entry's box in the chart frame's viewport, wherever the entry sits. */

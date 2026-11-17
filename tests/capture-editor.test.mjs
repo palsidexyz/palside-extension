@@ -7,6 +7,7 @@ import { CAPTURE_IDLE_MS, CAPTURE_MAX_MS, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX, 
 import { createCaptureEditor } from '../apps/extension/src/page-layer/capture.ts';
 import { encodeCapture } from '../apps/extension/src/runtime/media/encode-capture.ts';
 import { IMAGE_LIMIT } from '../apps/extension/src/domain/images/image-policy.ts';
+import { fontStacks } from '../packages/design/fonts.ts';
 
 test('capture selection math clamps and normalizes a drag', () => {
   assert.deepEqual(normalizeSelection({ x: 80, y: 70 }, { x: -10, y: 20 }, { width: 100, height: 90 }), { x: 0, y: 20, width: 80, height: 50 });
@@ -62,7 +63,8 @@ function editorFixture(options) {
     CAPTURE_IDLE_MS, CAPTURE_MAX_MS, IMAGE_TEXT_MAX, IMAGE_PEN_POINTS_MAX, MIN_SELECTION, clamp, clipImageText, moveSelection, normalizeSelection, resizeSelection, toolbarPlacement, cropRectAtDpr, undoAnnotations,
     Date: { now: () => now }, requestAnimationFrame: fn => fn(),
     pointerPoint: event => ({ x: event.clientX, y: event.clientY }),
-    drawOps: (_context, ops) => { rendered.splice(0, rendered.length, ...ops); },
+    // Other sites never load Geist: page-layer annotations draw in the system face.
+    fontStacks, drawOps: (_context, ops, _scale, font) => { assert.equal(font, fontStacks.system); rendered.splice(0, rendered.length, ...ops); },
     exportCapture: (_image, selection, ops) => { exported = structuredClone({ selection, ops }); return {}; }, encodeCapture: () => 'data:image/png;base64,OK',
     options, window, document, stage, send: message => messages.push(message), close: () => closes++, innerWidth: 100, innerHeight: 100,
     labels, COLORS: ['#FF4D4F'], makeButton: () => document.createElement('button'), icon: () => document.createElement('span'),

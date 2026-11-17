@@ -47,7 +47,7 @@
 .pinCell { position:relative; display:grid; place-items:center; height:52px; border-radius:var(--ui-radius-control); corner-shape:var(--ui-corner-shape); background:var(--ui-field-surface, var(--ui-control-surface)); transition:box-shadow .18s var(--ui-ease-feedback), background-color .18s var(--ui-ease-feedback); }
 .pinCell::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--ui-text-primary); transform:scale(0); transition:transform .18s var(--ui-ease-feedback); }
 .pinCell[data-filled]::after { transform:scale(1); }
-.pinCell[data-reveal] { font:600 var(--ui-type-title-l)/1 var(--font-geist-mono),monospace; color:var(--ui-text-primary); font-variant-numeric:tabular-nums; }
+.pinCell[data-reveal] { font:600 var(--ui-type-title-l)/1 var(--ui-font-mono); color:var(--ui-text-primary); font-variant-numeric:tabular-nums; }
 .pinCell[data-reveal]::after { display:none; }
 .pinCell[data-reveal][data-filled] { animation:pinDigit .22s var(--ui-ease-feedback); }
 .pin:has(.pinInput:focus) .pinCell[data-active] { background:var(--ui-control-hover); }

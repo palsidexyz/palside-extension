@@ -58,8 +58,11 @@ export function allSites(sites: SiteInteractions | undefined): SiteInteraction {
 
 /** 网页互动 runs on the site and, given a feature, that feature is on there — both by the master switch and by the site's own; Chrome's grant is checked by the caller. */
 export function siteAllows(sites: SiteInteractions | undefined, host: string | undefined, feature?: SiteFeature) {
-  const all = allSites(sites), value = siteInteraction(sites, host);
-  return Boolean(normalizeSiteHost(host)) && all.on && value.on && (!feature || all[feature] && value[feature]);
+  return Boolean(normalizeSiteHost(host)) && settingAllows(allSites(sites), siteInteraction(sites, host), feature);
+}
+/** `siteAllows` for one site's setting under the master switch `all`. */
+export function settingAllows(all: SiteInteraction, value: SiteInteraction, feature?: SiteFeature) {
+  return all.on && value.on && (!feature || all[feature] && value[feature]);
 }
 
 /**

@@ -91,7 +91,8 @@ function drawArrow(context: CanvasRenderingContext2D, op: Extract<CaptureOp, { k
   context.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
   context.stroke();
 }
-export function drawOps(context: CanvasRenderingContext2D, ops: CaptureOp[], scale: number) {
+/** `font` is the caller's font stack (fonts.ts): canvas text cannot read CSS variables, and each host loads different faces. */
+export function drawOps(context: CanvasRenderingContext2D, ops: CaptureOp[], scale: number, font: string) {
   for (const op of ops) {
     if (op.kind === 'mosaic') {
       const block = mosaicBlockSize(scale);
@@ -124,7 +125,7 @@ export function drawOps(context: CanvasRenderingContext2D, ops: CaptureOp[], sca
       for (const point of op.points.slice(1)) context.lineTo(point.x * scale, point.y * scale);
       context.stroke();
     } else if (op.kind === 'text') {
-      context.font = `700 ${18 * scale}px Geist, ui-sans-serif, system-ui, sans-serif`;
+      context.font = `700 ${18 * scale}px ${font}`;
       context.lineWidth = 3 * scale;
       context.lineJoin = 'round';
       context.strokeStyle = 'rgb(0 0 0 / .45)';

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pageUrlHost, pageAsset, pageMatches, pageStatus, locateResponse } from '../apps/extension/src/runtime/browser/page-layer-host.ts';
+import { pageUrlHost, pageAsset, pageRegistration, pageStatus, locateResponse } from '../apps/extension/src/runtime/browser/page-layer-host.ts';
+const pageMatches = (...input) => pageRegistration(...input)?.matches ?? [];
 const addr='0x39dbed3a2bd333467115de45665cc57f813c4571';
 const state={authenticated:true,account:{id:'me'},preferences:{current:'t',notifications:'off'},remoteTeams:[{id:'t',joined:true}],data:{views:[],messages:[],people:[]},drafts:{}};
 test('asset adapters are independent of 网页互动 and accept both web protocols',()=>{

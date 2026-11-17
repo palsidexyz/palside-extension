@@ -2,6 +2,7 @@ import type { CaptureLabels,PageUp } from '../browser/page-protocol';
 import { ImageDocument,readImageDocument,fitImageViewport,imagePoint,imageCrop,imageCropHandle,resizeImageViewport,zoomImageViewport,type ImageDocumentSnapshot,type ImagePoint,type ImageViewport } from '../../domain/images/image-document.ts';
 import { captureDimensions,drawOps,type CaptureColor,type CaptureHandle,type CaptureOp,type CaptureSelection,type CaptureTool, clipImageText, IMAGE_PEN_POINTS_MAX } from '../../domain/images/drawing.ts';
 import { encodeCapture } from './encode-capture.ts';
+import { fontStacks } from '@palside/design/fonts';
 
 export type ImageWorkspaceTool = 'pan' | 'crop' | CaptureTool;
 export type ImageWorkspaceState = { ready: boolean; dirty: boolean; tool: ImageWorkspaceTool; zoom: number; undoReady: boolean; redoReady: boolean; error?: string };
@@ -48,7 +49,7 @@ export function createImageWorkspace(stage: HTMLElement, send: (message: PageUp)
     if (!documentState) return;
     full ??= document.createElement('canvas'); full.width = image.naturalWidth; full.height = image.naturalHeight;
     const context = full.getContext('2d', { willReadFrequently: true }); if (!context) return;
-    context.drawImage(image, 0, 0); drawOps(context, documentState.snapshot().ops, 1);
+    context.drawImage(image, 0, 0); drawOps(context, documentState.snapshot().ops, 1, fontStacks.sans);
   }
   function display() {
     if (closed || !documentState || !full) return;
@@ -60,7 +61,7 @@ export function createImageWorkspace(stage: HTMLElement, send: (message: PageUp)
     context.drawImage(full, 0, 0);
     if (draft) {
       if (draft.kind === 'mosaic') { context.fillStyle = 'rgba(120,120,120,.65)'; context.fillRect(draft.x, draft.y, draft.width, draft.height); }
-      else drawOps(context, [draft], 1);
+      else drawOps(context, [draft], 1, fontStacks.sans);
     }
     const crop = draftCrop ?? documentState.snapshot().crop;
     context.fillStyle = 'rgba(0,0,0,.38)';

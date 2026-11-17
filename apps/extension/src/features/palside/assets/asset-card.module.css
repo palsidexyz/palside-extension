@@ -3,7 +3,7 @@
 .layout { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; container: asset-card / inline-size; }
 .heading { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .chain { flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; height: 16px; padding: 0 5px; border-radius:var(--ui-radius-xs); corner-shape:var(--ui-corner-shape); background: var(--ui-control-surface); color: var(--ui-text-secondary); font-size:var(--ui-type-caption); line-height: 16px; font-weight: 600; white-space: nowrap; }
-.address { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-geist-mono, ui-monospace), ui-monospace, monospace; font-size:var(--ui-type-caption); }
+.address { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--ui-font-mono); font-size:var(--ui-type-caption); }
 .identity { display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: 1; min-width: 0; }
 .title {
   overflow: hidden;

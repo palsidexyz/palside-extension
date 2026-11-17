@@ -1,6 +1,7 @@
 import type { CaptureLabels,PageUp } from '../runtime/browser/page-protocol';
 import { type CaptureSelection,type CaptureHandle,type CaptureTool,type CaptureColor,type CaptureOp,MIN_SELECTION,CAPTURE_IDLE_MS,CAPTURE_MAX_MS,clipImageText,IMAGE_PEN_POINTS_MAX,COLORS,clamp,normalizeSelection,resizeSelection,moveSelection,toolbarPlacement,cropRectAtDpr,undoAnnotations,drawOps,captureDimensions } from '../domain/images/drawing.ts';
 import { encodeCapture } from '../runtime/media/encode-capture.ts';
+import { fontStacks } from '@palside/design/fonts';
 
 function icon(path: string) {
   const element = document.createElement('span');
@@ -28,7 +29,7 @@ function exportCapture(image: HTMLImageElement, selection: CaptureSelection, ops
   const context = canvas.getContext('2d');
   if (!context) throw new Error('canvas');
   context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
-  drawOps(context, ops, canvas.width / Math.max(1, selection.width));
+  drawOps(context, ops, canvas.width / Math.max(1, selection.width), fontStacks.system);
   return canvas;
 }
 /**
@@ -109,7 +110,7 @@ export function createCaptureEditor(stage: HTMLElement, send: (message: PageUp) 
     // The canvas sits exactly over the same pixels, so drawing the crop under the marks changes nothing on screen
     // and gives mosaic the screenshot to sample: what is shown is what gets exported.
     context.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
-    drawOps(context, draft ? [...ops, draft] : ops, dpr);
+    drawOps(context, draft ? [...ops, draft] : ops, dpr, fontStacks.system);
   };
   const local = (point: { x: number; y: number }) => selection ? { x: clamp(point.x - selection.x, 0, selection.width), y: clamp(point.y - selection.y, 0, selection.height) } : point;
   const shape = (kind: CaptureTool, from: { x: number; y: number }, to: { x: number; y: number }): CaptureOp | undefined => {

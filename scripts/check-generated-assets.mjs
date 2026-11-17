@@ -3,7 +3,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isMain, validateRelativePath } from './lib/release-files.mjs';
-import { licenseBundle, licenseHosts, verifyThirdPartyLicenses } from './third-party-licenses.mjs';
+import { copiedLicenses, licenseBundle, licenseHosts, verifyThirdPartyLicenses } from './third-party-licenses.mjs';
 import { assetFolders, hostAssets, presentHosts } from './lib/site-assets.mjs';
 import { brandIconSizes, renderBrandPng, renderTokenPng } from './lib/brand-assets.mjs';
 
@@ -76,9 +76,7 @@ async function checkGeneratedAssets(root = project) {
   for (const host of licenseHosts(lock)) {
     try {
       const expected = new Map();
-      if (['extension', 'website', 'admin'].includes(host)) {
-        for (const [source, file] of [['LICENSE', 'Palside-MIT.txt'], ['packages/design/fonts/Geist-OFL.txt', 'Geist-OFL.txt'], ['packages/design/fonts/GeistMono-OFL.txt', 'GeistMono-OFL.txt']]) expected.set(file, await readFile(join(root, source)));
-      }
+      for (const [source, file] of copiedLicenses(host)) expected.set(file, await readFile(join(root, source)));
       const { text, manifest } = await licenseBundle(root, host);
       expected.set('THIRD-PARTY.txt', Buffer.from(text));
       expected.set('THIRD-PARTY.json', Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`));

@@ -6,11 +6,11 @@
 .content { position:relative; min-height:100%; }
 .emptyContent { height:100%; }
 /* Shown only while scrolling through history, then fades; never at the live tail. */
-.floatingDate { position:absolute; top:8px; left:50%; z-index:3; padding:1px 10px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:500 var(--ui-type-caption)/16px var(--font-geist-sans),sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; pointer-events:none; opacity:0; transform:translate(-50%,-4px); transition:opacity .2s ease,transform .2s ease; }
+.floatingDate { position:absolute; top:8px; left:50%; z-index:3; padding:1px 10px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:500 var(--ui-type-caption)/16px var(--ui-font-sans); font-variant-numeric:tabular-nums; white-space:nowrap; pointer-events:none; opacity:0; transform:translate(-50%,-4px); transition:opacity .2s ease,transform .2s ease; }
 .floatingDate:empty { display:none; }
 .floatingDate[data-visible] { opacity:1; transform:translate(-50%,0); }
 .navigation { position:absolute; inset-inline:12px; bottom:10px; display:flex; align-items:center; justify-content:center; gap:8px; pointer-events:none; }
-.button { flex-shrink:1; min-width:34px; border-radius:var(--ui-radius-pill); corner-shape:round; color:var(--ui-ink-muted); font:500 var(--ui-type-footnote)/18px var(--font-geist-sans),sans-serif; pointer-events:auto; white-space:nowrap; transition:background .16s ease,color .16s ease; }
+.button { flex-shrink:1; min-width:34px; border-radius:var(--ui-radius-pill); corner-shape:round; color:var(--ui-ink-muted); font:500 var(--ui-type-footnote)/18px var(--ui-font-sans); pointer-events:auto; white-space:nowrap; transition:background .16s ease,color .16s ease; }
 .button:hover { background:var(--ui-control-surface); color:var(--ui-text-primary); }
 .button:active { background:var(--ui-control-recess); }
 .button:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
@@ -18,7 +18,7 @@
 .buttonIcon { flex-shrink:0; }
 .buttonLabel { overflow:hidden; text-overflow:ellipsis; }
 /* The jump path: every earlier stop is a way back; the message being read ends it. */
-.trail { display:inline-flex; align-items:center; flex:0 1 auto; min-width:0; max-width:100%; min-height:34px; padding:0 10px 0 8px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-ink-muted); font:500 var(--ui-type-footnote)/18px var(--font-geist-sans),sans-serif; pointer-events:auto; overflow:hidden; }
+.trail { display:inline-flex; align-items:center; flex:0 1 auto; min-width:0; max-width:100%; min-height:34px; padding:0 10px 0 8px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-ink-muted); font:500 var(--ui-type-footnote)/18px var(--ui-font-sans); pointer-events:auto; overflow:hidden; }
 .trailIcon { flex-shrink:0; margin-inline-end:2px; }
 .stop { flex:0 1 auto; min-width:24px; max-width:96px; height:26px; padding:0 6px; border:0; border-radius:var(--ui-radius-pill); background:none; color:inherit; font:inherit; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; transition:background .16s ease,color .16s ease; }
 .stop:hover { background:var(--ui-control-surface); color:var(--ui-text-primary); }

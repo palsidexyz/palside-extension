@@ -1,7 +1,7 @@
 .menu { --popover-width:216px; padding:8px; max-width:calc(100vw - 24px); }
 .teamPopup { --popover-width:256px; padding:6px; max-width:calc(100vw - 24px); }
 .separator { height:1px; border:0; background:none; margin:5px; }
-.teamOption { display:flex; align-items:center; gap:10px; padding:6px 8px; min-height:40px; width:100%; border:0; background:none; color:inherit; text-align:left; font:400 var(--ui-type-callout)/20px var(--font-geist-sans),sans-serif; border-radius:calc(var(--ui-radius-popover) - 8px); corner-shape:var(--ui-corner-shape); cursor:pointer; transition:background .18s,color .18s; }
+.teamOption { display:flex; align-items:center; gap:10px; padding:6px 8px; min-height:40px; width:100%; border:0; background:none; color:inherit; text-align:left; font:400 var(--ui-type-callout)/20px var(--ui-font-sans); border-radius:calc(var(--ui-radius-popover) - 8px); corner-shape:var(--ui-corner-shape); cursor:pointer; transition:background .18s,color .18s; }
 .teamOption:hover { background:var(--ui-control-surface); }
 .teamOption:focus-visible { outline:var(--ui-focus-width) solid var(--ui-text-secondary); outline-offset:var(--ui-focus-offset); }
 .teamOption[aria-current="true"] { background:var(--ui-control-surface); }

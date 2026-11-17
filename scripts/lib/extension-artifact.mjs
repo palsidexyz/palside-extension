@@ -49,11 +49,12 @@ export function validatePageLayerRegistration(registration) {
   if (!registration) return [];
   const errors = [];
   const broad = JSON.stringify(registration.matches) === JSON.stringify(['http://*/*', 'https://*/*']);
-  if (!broad && (!Array.isArray(registration.matches) || !registration.matches.length || registration.matches.some(pattern => {
-    if (typeof pattern !== 'string') return true;
-    const match = pattern.match(/^(?:https?|\*):\/\/([^/*]+)\/\*$/);
-    return !match || normalizeSiteHost(match[1]) !== match[1];
-  }))) errors.push('Automatic page-layer matches must name exact public hosts over HTTP/HTTPS, or every site');
+  const exactHosts = patterns => Array.isArray(patterns) && patterns.length > 0 && patterns.every(pattern => {
+    const match = typeof pattern === 'string' && pattern.match(/^(?:https?|\*):\/\/([^/*]+)\/\*$/);
+    return Boolean(match) && normalizeSiteHost(match[1]) === match[1];
+  });
+  if (!broad && !exactHosts(registration.matches)) errors.push('Automatic page-layer matches must name exact public hosts over HTTP/HTTPS, or every site');
+  if (registration.excludeMatches !== undefined && (!broad || !exactHosts(registration.excludeMatches))) errors.push('Page-layer exclusions must name exact public hosts and only narrow the every-site registration');
   if (JSON.stringify(registration.js) !== JSON.stringify(manualPageLayerPolicy.files)) errors.push('Only the bundled page-layer script may be injected');
   if (registration.world !== undefined && registration.world !== 'ISOLATED') errors.push('Page-layer injection must use the isolated world');
   if (registration.allFrames || registration.matchOriginAsFallback) errors.push('Page-layer injection must stay in the matched top frame');

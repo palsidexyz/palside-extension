@@ -24,7 +24,7 @@
 .tools li > b { padding-right:2px; font-weight:600; white-space:nowrap; }
 .tools li > p { display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; min-width:0; margin:0; font-size:inherit; line-height:inherit; color:var(--ui-text-secondary); }
 .tools li > p > span { flex-wrap:nowrap; gap:3px; }
-.tools li > p kbd { min-width:20px; height:20px; padding:0 4px; box-sizing:border-box; text-align:center; font:500 var(--ui-type-footnote)/20px system-ui, sans-serif; color:var(--ui-text-secondary); }
+.tools li > p kbd { min-width:20px; height:20px; padding:0 4px; box-sizing:border-box; text-align:center; font:500 var(--ui-type-footnote)/20px var(--ui-font-system); color:var(--ui-text-secondary); }
 
 .footer { display:flex; align-items:center; gap:4px; margin-top:12px; }
 .dots { display:flex; gap:4px; margin-right:auto; }

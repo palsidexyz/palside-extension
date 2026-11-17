@@ -2,6 +2,15 @@
 
 Each version matches a Chrome Web Store release. The GitHub release attaches the exact store package with its build provenance.
 
+## v0.1.10
+
+- **Typography**: the side panel and page overlays now use one typeface, Geist, with the system's own Chinese font.
+- **Site controls**: when Palside is allowed on all websites, sites you turn off no longer load its page layer at all.
+
+Requires desktop Chrome 130 or later.
+
+侧边栏与网页浮层统一使用 Geist 字体，中文使用系统字体。授权「所有网站」时，你关闭的网站不再加载 Palside 的页面层。需要桌面版 Chrome 130 或更高版本。
+
 ## v0.1.9
 
 - **Wallet settings**: the PALS contract and the red packet contract are listed with their full addresses; copy either, or open it on Etherscan.

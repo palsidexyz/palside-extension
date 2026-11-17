@@ -10,6 +10,8 @@
   --color-foreground: var(--foreground);
   --color-border: var(--border);
   --color-ring: var(--ring);
+  --font-sans: var(--ui-font-sans);
+  --font-mono: var(--ui-font-mono);
 }
 
 /* Shared product design values. */
@@ -36,6 +38,12 @@
   --ui-space-5: 24px;
   --ui-space-6: 32px;
   --ui-space-7: 48px;
+  /* Font stacks from fonts.ts (tests/design-fonts.test.mjs keeps them equal). CSS uses these names, never font names. */
+  --ui-font-sans: Geist, "Geist Fallback", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  --ui-font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", monospace;
+  --ui-font-display: Geist, "Geist Fallback", "Noto Sans SC Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  --ui-font-danmaku: SimHei, "Microsoft JhengHei", Arial, Helvetica, sans-serif;
+  --ui-font-system: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
   /* Type scale for product surfaces. CSS modules use these names, never raw pixel sizes. */
   --ui-type-caption: 11px;
   --ui-type-footnote: 12px;

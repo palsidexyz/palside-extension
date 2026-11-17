@@ -1,4 +1,4 @@
-.page { min-height:100dvh; background:var(--ui-canvas); color:var(--ui-text-primary); font:400 var(--ui-type-body)/1.6 var(--font-geist-sans),sans-serif; }
+.page { min-height:100dvh; background:var(--ui-canvas); color:var(--ui-text-primary); font:400 var(--ui-type-body)/1.6 var(--ui-font-sans); }
 .page *, .page *::before, .page *::after { box-sizing:border-box; }
 .page h1,.page h2,.page h3,.page h4,.page p { margin:0; }
 .page a { color:inherit; text-decoration:none; }
@@ -6,7 +6,7 @@
 .header { display:flex; flex-wrap:wrap; justify-content:space-between; gap:20px; align-items:center; padding:24px 4vw; }
 .brand { display:flex; align-items:center; gap:10px; font-size:var(--ui-type-title-l); font-weight:600; }
 .brandMark { width:28px; height:28px; flex:none; background:url("/brand/palside.svg") center / contain no-repeat; }
-.brand > span:not(.brandMark) { margin-left:24px; font:500 var(--ui-type-caption)/1.5 var(--font-geist-mono),monospace; letter-spacing:.06em; color:var(--ui-text-secondary); }
+.brand > span:not(.brandMark) { margin-left:24px; font:500 var(--ui-type-caption)/1.5 var(--ui-font-mono); letter-spacing:.06em; color:var(--ui-text-secondary); }
 .controls { display:flex; gap:8px; align-items:center; }
 .controls > :last-child { width:110px; }
 .main { max-width:1200px; padding:64px 24px; margin:auto; }

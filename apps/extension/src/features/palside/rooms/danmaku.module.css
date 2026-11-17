@@ -85,7 +85,7 @@ span.like { cursor:default; }
 .hot > :nth-child(3) { --token-size:32px; }
 .hotOpen { position:absolute; inset:0; z-index:1; padding:0; border:0; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:transparent; cursor:pointer; }
 .hotOpen:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
-.rank { color:var(--ui-text-secondary); font:600 var(--ui-type-callout) var(--font-geist-mono), monospace; text-align:center; }
+.rank { color:var(--ui-text-secondary); font:600 var(--ui-type-callout) var(--ui-font-mono); text-align:center; }
 .hot[data-top] .rank { color:var(--ui-text-primary); }
 .hotName { display:flex; flex-direction:column; min-width:0; }
 .hotName strong { display:flex; align-items:center; gap:6px; min-width:0; font-size:var(--ui-type-body); line-height:20px; font-weight:600; }
@@ -140,7 +140,7 @@ span.like { cursor:default; }
 /* It draws the way 弹幕 look on a dark chart page, in either theme. */
 .preview { --dm-chart: #0E0F12; --dm-ink: #FFFFFF; --dm-outline: #000000; position:relative; height:132px; margin:12px 0 6px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); overflow:hidden; background:var(--dm-chart); }
 .preview svg { position:absolute; inset:12px 0 0; width:100%; height:calc(100% - 12px); opacity:.6; }
-.preview > span { position:absolute; color:var(--dm-ink); opacity:var(--dm-alpha); font:bold var(--dm-size)/1.25 SimHei, "Microsoft JhengHei", Arial, Helvetica, sans-serif; white-space:nowrap; text-shadow:1px 0 1px var(--dm-outline), 0 1px 1px var(--dm-outline), 0 -1px 1px var(--dm-outline), -1px 0 1px var(--dm-outline); }
+.preview > span { position:absolute; color:var(--dm-ink); opacity:var(--dm-alpha); font:bold var(--dm-size)/1.25 var(--ui-font-danmaku); white-space:nowrap; text-shadow:1px 0 1px var(--dm-outline), 0 1px 1px var(--dm-outline), 0 -1px 1px var(--dm-outline), -1px 0 1px var(--dm-outline); }
 
 .siteOpen:focus-visible, .siteMore:focus-visible, .row > button:first-child:focus-visible, .like:focus-visible, .hot:focus-visible, .personRow:focus-visible, .choice:focus-visible { outline:none; box-shadow:var(--ui-focus-ring); }
 @media (prefers-reduced-motion:reduce) { .row, .menu, .like { transition:none; } }

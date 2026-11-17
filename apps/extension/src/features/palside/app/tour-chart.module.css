@@ -4,7 +4,7 @@
 .page { --tv-bg:#131722; --tv-ink:#D1D4DC; --tv-muted:rgb(209 212 220 / 58%); --tv-line:rgb(255 255 255 / 12%); --tv-hover:rgb(255 255 255 / 8%);
   --tv-up:#26A69A; --tv-down:#EF5350; --tv-blue:#2962FF; --tv-price-ink:#FFFFFF; --tv-shadow:rgb(0 0 0 / 28%); --badge-ink:#000000; --mate:#FF9F0A; --tag-ink:#141414; --logo-ink:#202121;
   position:absolute; left:0; top:0; z-index:1; width:200%; height:200%; scale:.5; transform-origin:0 0;
-  background:var(--tv-bg); color:var(--tv-ink); font-family:-apple-system, BlinkMacSystemFont, "Trebuchet MS", system-ui, sans-serif; }
+  background:var(--tv-bg); color:var(--tv-ink); font-family:var(--ui-font-system); }
 
 .top { position:absolute; left:0; right:0; top:0; display:flex; align-items:center; gap:16px; height:40px; padding:0 16px; border-bottom:2px solid var(--tv-line); font-size:var(--ui-type-lead-l); line-height:1; color:var(--tv-muted); }
 .top b { color:var(--tv-ink); font-weight:600; }

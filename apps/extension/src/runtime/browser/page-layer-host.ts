@@ -5,7 +5,7 @@ import { broadOrigin,grantedHost } from './permissions.ts';
 import type { RuntimeState } from '../composition/runtime-state';
 import { pageCapabilities,type CapabilityAccess,type CapabilityTab } from './page-capabilities.ts';
 import { SIGNAL_TTL,readSignal } from '../annotations/signals.ts';
-import { allSites,siteAllows,siteDraws } from '../../domain/annotations/interaction.ts';
+import { allSites,defaultSiteInteraction,settingAllows,siteAllows,siteInteraction,type SiteInteraction } from '../../domain/annotations/interaction.ts';
 import { iconDataUrl } from '../viewing/viewing.ts';
 import { normalizeSiteHost } from '../../domain/assets/site-host.ts';
 
@@ -44,22 +44,33 @@ export function pageLookup(url: string, state?: RuntimeState) {
 }
 function pageIdentity(url: string) { const host = pageUrlHost(url); return host ? identifyPage(url, [host]) : null; }
 export const PAGE_SCRIPT_ID = 'palside-page';
-/** The page layer's content script for exact host patterns: top frame only, re-registered after each browser start. */
-export function pageScript(matches: string[]) {
-  return { id: PAGE_SCRIPT_ID, js: ['page-layer.js'], matches, runAt: 'document_idle' as const, persistAcrossSessions: false, allFrames: false };
+/** Where the page layer registers: exact hosts, or every site minus the sites whose own setting keeps it off. */
+export type PageRegistration = { matches: string[]; excludeMatches?: string[] };
+/** The page layer's content script: top frame only, re-registered after each browser start. */
+export function pageScript({ matches, excludeMatches }: PageRegistration) {
+  return { id: PAGE_SCRIPT_ID, js: ['page-layer.js'], matches, ...(excludeMatches?.length ? { excludeMatches } : {}), runAt: 'document_idle' as const, persistAcrossSessions: false, allFrames: false };
 }
-/** The page layer's registration patterns: every 已授权网站 as Chrome granted it, while 网页互动 runs for a joined team. */
-export function pageMatches(state: RuntimeState | undefined, origins: readonly string[], roomEnabled = false) {
-  const sites = state?.preferences.siteInteraction;
+/**
+ * The page layer's registration: every 已授权网站 as Chrome granted it, while 网页互动 runs for a joined team or 弹幕 for an open room.
+ * A site whose own setting keeps the layer off never receives the script, under a broad grant too, so the runtime gate is not the only boundary.
+ */
+export function pageRegistration(state: RuntimeState | undefined, origins: readonly string[], roomEnabled = false): PageRegistration | undefined {
+  const sites = state?.preferences.siteInteraction, all = allSites(sites);
   const team = Boolean(pageTeam(state));
+  if (!team && !roomEnabled || !all.on) return;
   // A site runs the page layer while 网页互动 is on there for a joined team, or with 弹幕 while a room is open.
-  const runs = (host: string) => team && siteDraws(sites, host) || roomEnabled && siteAllows(sites, host, 'danmaku');
-  if (!team && !roomEnabled || !allSites(sites).on) return [];
-  if (origins.some(broadOrigin)) return ['http://*/*', 'https://*/*'];
-  return [...new Set(origins.flatMap(origin => {
+  const runs = (value: SiteInteraction) => team && settingAllows(all, value) || roomEnabled && settingAllows(all, value, 'danmaku');
+  const hostRuns = (host: string) => runs(siteInteraction(sites, host));
+  if (origins.some(broadOrigin)) {
+    if (!runs(defaultSiteInteraction)) return;
+    const excluded = Object.keys(sites ?? {}).map(normalizeSiteHost).filter((host): host is string => Boolean(host) && !hostRuns(host!));
+    return { matches: ['http://*/*', 'https://*/*'], ...(excluded.length ? { excludeMatches: [...new Set(excluded)].sort().map(host => `*://${host}/*`) } : {}) };
+  }
+  const matches = [...new Set(origins.flatMap(origin => {
     const host = normalizeSiteHost(grantedHost(origin));
-    return !host || !runs(host) ? [] : origin.startsWith('*') ? [`http://${host}/*`, `https://${host}/*`] : [`https://${host}/*`];
+    return !host || !hostRuns(host) ? [] : origin.startsWith('*') ? [`http://${host}/*`, `https://${host}/*`] : [`https://${host}/*`];
   }))].sort();
+  return matches.length ? { matches } : undefined;
 }
 export function pageStatus(windowId: number, tab: (CapabilityTab & { title?: string; favicon?: string; favIconUrl?: string }) | undefined, ports: readonly PageConnection[], access: CapabilityAccess, state?: RuntimeState): PageStatus {
   const port = ports.find(port => port.windowId === windowId && port.tabId === tab?.id && (!tab?.url || port.url === tab.url));

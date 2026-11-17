@@ -12,8 +12,8 @@ export const signalArtCss = `#pings, #emotes { position: fixed; inset: 0; pointe
 #wheel .aim { transition: opacity .08s; }
 #wheel .icon { transition: filter .1s, transform .1s; transform-box: fill-box; transform-origin: center; }
 #wheel .icon.hot { filter: brightness(1.12); transform: scale(1.04); }
-#wheel .centerTxt { font: 600 15px Geist, ui-sans-serif, system-ui, sans-serif; fill: #16b8df; }
-#wheel .backTxt { font: 12px Geist, ui-sans-serif, system-ui, sans-serif; fill: #7b8080; }
+#wheel .centerTxt { font: 600 15px var(--ui-font-sans); fill: #16b8df; }
+#wheel .backTxt { font: 12px var(--ui-font-sans); fill: #7b8080; }
 
 /* ---------- pings ---------- */
 .ping { position: absolute; width: 0; height: 0; pointer-events: none; --size: 110px; --dur: 3.2s; }
@@ -34,7 +34,7 @@ export const signalArtCss = `#pings, #emotes { position: fixed; inset: 0; pointe
   position: absolute; left: 0; top: calc(var(--size) * 0.28); transform: translateX(-50%); white-space: nowrap;
   max-width: 220px; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box;
   padding: 1px 8px; border: 1px solid var(--tag); border-radius: 6px; background: #0b0f14; color: #fff;
-  font: 600 13px/18px Geist, ui-sans-serif, system-ui, sans-serif; letter-spacing: .2px;
+  font: 600 13px/18px var(--ui-font-sans); letter-spacing: .2px;
   animation: tagIn .25s ease-out both, life var(--dur) linear forwards;
 }
 /* A kept ping skips the fade at the end of its life: its art stays, still bobbing, until it is removed. */
@@ -58,7 +58,7 @@ export const signalArtCss = `#pings, #emotes { position: fixed; inset: 0; pointe
   position: absolute; left: 8%; top: 8%; width: 84%; height: 68%; box-sizing: border-box; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: #f4efe2; border: 3px solid #c8aa6e; color: #1f2a30;
-  font: 600 calc(var(--size) * .4)/1 Geist, ui-sans-serif, system-ui, sans-serif;
+  font: 600 calc(var(--size) * .4)/1 var(--ui-font-sans);
 }
 @keyframes emoteIn { 0% { transform: scale(0) } 60% { transform: scale(1.15) } 100% { transform: scale(1) } }
 @keyframes emoteBob { 0%, 100% { translate: 0 0 } 25% { translate: 0 -4px } 75% { translate: 0 4px } }

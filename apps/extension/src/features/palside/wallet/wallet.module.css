@@ -31,7 +31,7 @@
 .receive h2 { font-size:var(--ui-type-title); font-weight:600; text-align:center; }
 .qr { --qr-paper:#fff; padding:8px; border-radius:var(--ui-radius-l); corner-shape:var(--ui-corner-shape); background:var(--qr-paper); }
 .qr svg { display:block; max-width:100%; height:auto; }
-.fullAddress { margin:0; font:400 var(--ui-type-footnote)/20px var(--font-geist-mono),monospace; color:var(--ui-text-secondary); overflow-wrap:anywhere; text-align:center; }
+.fullAddress { margin:0; font:400 var(--ui-type-footnote)/20px var(--ui-font-mono); color:var(--ui-text-secondary); overflow-wrap:anywhere; text-align:center; }
 .segment { display:flex; padding:3px; gap:3px; border-radius:var(--ui-radius-m); corner-shape:var(--ui-corner-shape); background:var(--ui-control-surface); }
 .segment button { flex:1; min-width:0; min-height:34px; padding:6px; border:0; border-radius:calc(var(--ui-radius-m) - 3px); corner-shape:var(--ui-corner-shape); background:transparent; color:var(--ui-text-secondary); font:inherit; font-size:var(--ui-type-callout); cursor:pointer; transition:background-color .18s,color .18s; }
 .segment button:is([aria-pressed=true],[aria-checked=true]) { background:var(--ui-canvas); color:var(--ui-text-primary); }
@@ -69,7 +69,7 @@
 @media(prefers-reduced-motion:reduce) { .segment button { transition:none; } }
 
 /* Wallet home: the balance with its address, two equal tiles. */
-.addressChip { display:inline-flex; align-items:center; gap:6px; height:28px; margin-top:4px; padding:0 10px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:500 var(--ui-type-footnote)/16px var(--font-geist-mono),monospace; cursor:pointer; transition:background-color .18s, color .18s; }
+.addressChip { display:inline-flex; align-items:center; gap:6px; height:28px; margin-top:4px; padding:0 10px; border:0; border-radius:var(--ui-radius-pill); background:var(--ui-control-surface); color:var(--ui-text-secondary); font:500 var(--ui-type-footnote)/16px var(--ui-font-mono); cursor:pointer; transition:background-color .18s, color .18s; }
 .addressChip:hover { background:var(--ui-control-hover); color:var(--ui-text-primary); }
 .addressChip[data-copied] { color:var(--ui-ink-success); }
 .addressChip svg { width:13px; height:13px; }
@@ -94,7 +94,7 @@
 .facts > div { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; padding:8px 14px; }
 .facts dt { flex:none; font-size:var(--ui-type-callout); color:var(--ui-text-secondary); }
 .facts dd { display:flex; align-items:center; justify-content:flex-end; gap:6px; min-width:0; margin:0; font-size:var(--ui-type-callout); font-weight:500; text-align:right; overflow-wrap:anywhere; }
-.mono { font-family:var(--font-geist-mono),monospace; font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; word-break:break-all; }
+.mono { font-family:var(--ui-font-mono); font-size:var(--ui-type-footnote); font-variant-numeric:tabular-nums; word-break:break-all; }
 .wide { width:100%; }
 .ok { color:var(--ui-ink-success); }
 .detail { position:relative; }
