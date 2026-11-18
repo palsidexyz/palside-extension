@@ -2,7 +2,7 @@
    colours page-layer/palette.ts gives them (chartToolbar.dark, chartTints). The page is laid out at twice the stage's size on the
    design scale and shown at half, so the site's small type keeps real steps. */
 .page { --tv-bg:#131722; --tv-ink:#D1D4DC; --tv-muted:rgb(209 212 220 / 58%); --tv-line:rgb(255 255 255 / 12%); --tv-hover:rgb(255 255 255 / 8%);
-  --tv-up:#26A69A; --tv-down:#EF5350; --tv-blue:#2962FF; --tv-price-ink:#FFFFFF; --tv-shadow:rgb(0 0 0 / 28%); --badge-ink:#000000; --mate:#FF9F0A; --tag-ink:#141414; --logo-ink:#202121;
+  --tv-up:#26A69A; --tv-down:#EF5350; --tv-blue:#2962FF; --tv-price-ink:#FFFFFF; --tv-shadow:rgb(0 0 0 / 28%); --badge-ink:#000000; --mate:#FF9F0A; --tag-ink:#141414; --logo-ink:#141414;
   position:absolute; left:0; top:0; z-index:1; width:200%; height:200%; scale:.5; transform-origin:0 0;
   background:var(--tv-bg); color:var(--tv-ink); font-family:var(--ui-font-system); }
 
@@ -17,9 +17,12 @@
 .entry svg { width:36px; height:36px; }
 .square { fill:var(--tv-ink); transition:fill .2s; }
 .hole { fill:var(--tv-bg); transition:fill .2s; }
-.eye { fill:var(--ui-accent); }
+.eye { fill:var(--ui-accent); transition:fill .2s; }
+.glint { fill:var(--tv-bg); transition:fill .2s; }
 .page[data-on] .square { fill:var(--ui-accent); }
-.page[data-on] .hole { fill:var(--logo-ink); }
+.page[data-on] .hole { fill:#FFFFFF; }
+.page[data-on] .eye { fill:var(--logo-ink); }
+.page[data-on] .glint { fill:#FFFFFF; }
 .badge { position:absolute; right:-4px; bottom:-2px; min-width:20px; height:20px; padding:0 4px; border-radius:var(--ui-radius-pill); background:var(--tv-ink); color:var(--badge-ink); box-shadow:0 0 0 3px var(--tv-bg);
   font-size:var(--ui-type-body); font-weight:600; line-height:20px; text-align:center; font-variant-numeric:tabular-nums; animation:pop .3s cubic-bezier(.22,1.3,.36,1) both; }
 @keyframes pop { from { transform:scale(.4); opacity:0; } }

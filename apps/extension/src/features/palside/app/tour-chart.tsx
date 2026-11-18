@@ -20,7 +20,8 @@ const LOW = 18, HIGH = 92;
 const K = 2;
 /** In page pixels: interval bar height, rail width, price axis width, one rail row and the rule under the entry. */
 const TOP = 40, RAIL = 56, AXIS = 60, ROW = 44, SEP = 10;
-const LOGO = 'M38 33H90A4 4 0 0 1 94 37V75A4 4 0 0 1 90 79H59.333Q58 79 56.933 79.8L36.4 95.2Q34 97 34 94V37A4 4 0 0 1 38 33Z';
+/** The P of the brand mark, in its 128-unit box, drawn inside `translate(1 2.25)`. */
+const LOGO = 'M47 23H68A30 30 0 0 1 68 83H65A5 5 0 0 0 60 88A14.5 14.5 0 0 1 31 88V39A16 16 0 0 1 47 23Z';
 const TOOLS = {
   crosshair: <path d="M12 3v7M12 14v7M3 12h7M14 12h7" />,
   trendLine: <><circle cx="5.5" cy="18.5" r="1.8" /><circle cx="18.5" cy="5.5" r="1.8" /><path d="M6.8 17.2 17.2 6.8" /></>,
@@ -76,8 +77,8 @@ export function ChartPage({ geo, state }: { geo: ChartGeometry; state: ChartStat
     <div className={s.top}><b>PALS</b><i /><span>1m</span><span>5m</span><span data-on>15m</span><span>1h</span><span>D</span></div>
     <div className={s.rail}>
       <span className={s.entry}>
-        <svg viewBox="0 0 128 128" aria-hidden="true"><rect className={s.square} x="4" y="4" width="120" height="120" rx="32" /><path className={s.hole} d={LOGO} />
-          <circle className={s.eye} cx="53" cy="56" r="5" /><circle className={s.eye} cx="75" cy="56" r="5" /></svg>
+        <svg viewBox="0 0 128 128" aria-hidden="true"><rect className={s.square} x="4" y="4" width="120" height="120" rx="30" /><g transform="translate(1 2.25)"><path className={s.hole} d={LOGO} />
+          {[57, 74].map(x => <g key={x}><ellipse className={s.eye} cx={x} cy="53" rx="5.6" ry="8.2" /><ellipse className={s.glint} cx={x - 1.7} cy="49.4" rx="1.9" ry="2.2" /></g>)}</g></svg>
         {state.mate && <b className={s.badge}>1</b>}
       </span>
       <i className={s.sep} />

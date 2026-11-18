@@ -16,6 +16,8 @@
     "./base.css": "./base.css",
     "./fonts.css": "./fonts.css",
     "./brand/palside.svg": "./assets/brand/palside.svg",
+    "./brand/palside-reverse.svg": "./assets/brand/palside-reverse.svg",
+    "./brand/pals-coin.svg": "./assets/brand/pals-coin.svg",
     "./motion": "./motion.ts",
     "./colors": "./colors.ts",
     "./fonts": "./fonts.ts"

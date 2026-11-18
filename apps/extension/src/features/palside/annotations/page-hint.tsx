@@ -50,12 +50,14 @@ export function usePageHints(c: PalsideController): PageHint[] {
   return [...signals, ...drawn];
 }
 
-/** The 共享画线 mark as it sits in the chart toolbar while 共享给小队 is on: a trend line drawn in the logo's bubble. */
+/** The 共享画线 mark at chat size: the reverse brand mark (dark tile, lime P) with the trend line drawn across the P in dark ink, readable at 18px. */
 function DrawingArt() {
   return <svg className={s.art} viewBox="0 0 128 128" width="18" height="18" aria-hidden="true">
-    <rect x="4" y="4" width="120" height="120" rx="32" fill="var(--ui-accent)" />
-    <path d="M38 33H90A4 4 0 0 1 94 37V75A4 4 0 0 1 90 79H59.333Q58 79 56.933 79.8L36.4 95.2Q34 97 34 94V37A4 4 0 0 1 38 33Z" fill="var(--ui-on-accent)" />
-    <path d="M46 69L58 58L67 63L83 45" fill="none" stroke="var(--ui-accent)" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+    <rect x="4" y="4" width="120" height="120" rx="30" fill="#202121" />
+    <g transform="translate(1 2.25)">
+      <path d="M47 23H68A30 30 0 0 1 68 83H65A5 5 0 0 0 60 88A14.5 14.5 0 0 1 31 88V39A16 16 0 0 1 47 23Z" fill="#C6F71C" />
+      <path d="M44.5 67L55.5 57L64.5 61L80.5 44" fill="none" stroke="#202121" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+    </g>
   </svg>;
 }
 

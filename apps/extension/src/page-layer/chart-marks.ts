@@ -45,21 +45,30 @@ function askShow(frame: HTMLIFrameElement, show: ChartShow) {
 }
 /** From this many people the list gets a search field. */
 const SEARCH_FROM = 9;
-const logoPath = 'M38 33H90A4 4 0 0 1 94 37V75A4 4 0 0 1 90 79H59.333Q58 79 56.933 79.8L36.4 95.2Q34 97 34 94V37A4 4 0 0 1 38 33Z';
-/** The trend line the idle 画一笔 draws inside the bubble, with its two end points. */
-const penPath = 'M46 69L58 58L67 63L83 45';
+/** The P of the brand mark (packages/design/assets/brand/palside.svg), in its 128-unit box, drawn inside `translate(1 2.25)`. */
+const markP = 'M47 23H68A30 30 0 0 1 68 83H65A5 5 0 0 0 60 88A14.5 14.5 0 0 1 31 88V39A16 16 0 0 1 47 23Z';
+/** The trend line the idle 画一笔 draws across the P where the eyes were, with its two end points. */
+const penPath = 'M44.5 67L55.5 57L64.5 61L80.5 44';
 /**
- * The brand mark, filling the whole button (34px, the size of the site's hover plate): in colour while 共享给小队 is on; in the
- * toolbar's own ink, hole cut to its background, while off, the eyes still in the accent on dark charts so it reads as Palside.
- * The eyes and the hidden pen are the parts the idle moments move.
+ * The brand mark, filling the whole button (34px, the size of the site's hover plate): the full mark while 共享给小队 is on; while off,
+ * a tile in the toolbar's own ink with the P cut to its background and the eyes kept on it, in the accent on dark charts so it still
+ * reads as Palside. The eyes and the hidden pen are the parts the idle moments move; the pen is dark ink so it reads on the white P.
+ * Ids are fixed: the entry lives alone in its shadow root.
  */
 const logo = (on: boolean, hole: string, isDark: boolean) => {
-  const accent = chartTints[0], mark = on || isDark ? accent : 'currentColor';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="34" height="34" aria-hidden="true" style="display:block;margin:-3px;overflow:visible">`
-    + `<rect x="4" y="4" width="120" height="120" rx="32" fill="${on ? accent : 'currentColor'}"/><path d="${logoPath}" fill="${on ? chartToolbar.logoInk : hole}"/>`
-    + `<g data-eyes><circle cx="53" cy="56" r="5" fill="${mark}"/><circle cx="75" cy="56" r="5" fill="${mark}"/></g>`
-    + `<g data-pen opacity="0"><path d="${penPath}" fill="none" stroke="${mark}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>`
-    + `<circle cx="46" cy="69" r="4.5" fill="${mark}" opacity="0"/><circle cx="83" cy="45" r="4.5" fill="${mark}" opacity="0"/></g></svg>`;
+  const accent = chartTints[0], eye = on ? 'url(#pl-mark-e)' : isDark ? accent : 'currentColor', glint = on ? '#FFFFFF' : hole;
+  const pen = on ? chartToolbar.logoInk : isDark ? accent : 'currentColor';
+  const defs = on ? '<defs><linearGradient id="pl-mark-t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D9FC40"/><stop offset=".5" stop-color="#ADEB18"/><stop offset="1" stop-color="#66CB1E"/></linearGradient>'
+    + '<radialGradient id="pl-mark-b" cx=".36" cy=".28" r=".85"><stop offset=".3" stop-color="#FFFFFF"/><stop offset=".78" stop-color="#F5FBE6"/><stop offset="1" stop-color="#E1F0BC"/></radialGradient>'
+    + '<radialGradient id="pl-mark-e" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#333333"/><stop offset="1" stop-color="#0B0B0B"/></radialGradient>'
+    + '<filter id="pl-mark-g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur in="SourceAlpha" stdDeviation="6.5" result="a"/><feFlood flood-color="#F7FFD2" flood-opacity=".78"/><feComposite in2="a" operator="in" result="halo"/>'
+    + '<feGaussianBlur in="SourceAlpha" stdDeviation="3.6"/><feOffset dx="1" dy="4.5" result="o"/><feFlood flood-color="#2F7A00" flood-opacity=".32"/><feComposite in2="o" operator="in" result="ds"/>'
+    + '<feMerge><feMergeNode in="halo"/><feMergeNode in="ds"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="34" height="34" aria-hidden="true" style="display:block;margin:-3px;overflow:visible">${defs}`
+    + `<rect x="4" y="4" width="120" height="120" rx="30" fill="${on ? 'url(#pl-mark-t)' : 'currentColor'}"/><g transform="translate(1 2.25)"><path d="${markP}" fill="${on ? 'url(#pl-mark-b)' : hole}"${on ? ' filter="url(#pl-mark-g)"' : ''}/>`
+    + `<g data-eyes>${[57, 74].map(x => `<g data-eye><ellipse cx="${x}" cy="53" rx="5.6" ry="8.2" fill="${eye}"/><ellipse cx="${x - 1.7}" cy="49.4" rx="1.9" ry="2.2" fill="${glint}"/></g>`).join('')}</g>`
+    + `<g data-pen opacity="0"><path d="${penPath}" fill="none" stroke="${pen}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>`
+    + `<circle cx="44.5" cy="67" r="5.5" fill="${pen}" opacity="0"/><circle cx="80.5" cy="44" r="5.5" fill="${pen}" opacity="0"/></g></g></svg>`;
 };
 const icons = {
   sync: '<path d="M5 19 13.5 10.5"/><circle cx="4" cy="20" r="1.5"/><circle cx="14.5" cy="9.5" r="1.5"/><path d="M17.6 6.4a4.4 4.4 0 0 1 0 6.2M19.8 4.2a7.5 7.5 0 0 1 0 10.6"/>',
@@ -389,7 +398,7 @@ class ChartOverlay {
       const frames = twice
         ? [{ transform: 'scaleY(1)' }, { transform: 'scaleY(.1)', offset: .14 }, { transform: 'scaleY(1)', offset: .3 }, { transform: 'scaleY(1)', offset: .5 }, { transform: 'scaleY(.1)', offset: .64 }, { transform: 'scaleY(1)', offset: .8 }, { transform: 'scaleY(1)' }]
         : [{ transform: 'scaleY(1)' }, { transform: 'scaleY(.1)', offset: .45 }, { transform: 'scaleY(1)' }];
-      for (const eye of eyes.querySelectorAll('circle')) centred(eye).animate(frames, { duration: twice ? 560 : 190, easing: 'ease-in-out' });
+      for (const eye of eyes.querySelectorAll<SVGGElement>('[data-eye]')) centred(eye).animate(frames, { duration: twice ? 560 : 190, easing: 'ease-in-out' });
       return;
     }
     const duration = 1_400, line = pen.querySelector('path'), [start, end] = [...pen.querySelectorAll('circle')];

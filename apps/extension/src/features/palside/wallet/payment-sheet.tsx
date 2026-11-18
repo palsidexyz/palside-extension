@@ -25,7 +25,7 @@ import { quotaResetText } from './quota';
 import { recordLabels } from './recovery-state';
 import s from './payment.module.css';
 
-export const PALS = { id: 'pals', name: 'PALS', kind: 'asset', url: '', color: '#f2ffcc', logo: '/brand/palside.svg' } as Viewing;
+export const PALS = { id: 'pals', name: 'PALS', kind: 'asset', url: '', color: '#CCFF00', logo: '/brand/pals-coin.svg' } as Viewing;
 
 /**
  * One sheet carries every payment, from wherever it starts: a transfer begins with who and how much; tips, packets,

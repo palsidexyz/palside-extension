@@ -48,7 +48,7 @@ export function usePacketCoins() {
       const angle = -Math.PI / 2 + (i - (COUNT - 1) / 2) * (2.5 / COUNT), distance = 110 + (i % 3) * 34;
       const el = document.createElement('span');
       el.className = p.coin ?? '';
-      el.innerHTML = '<img src="/brand/palside.svg" alt="" draggable="false">';
+      el.innerHTML = '<img src="/brand/pals-coin.svg" alt="" draggable="false">';
       host.append(el);
       const px = Math.max(box.left + 24, Math.min(box.right - 24, x + Math.cos(angle) * distance)), py = Math.max(box.top + 24, y + Math.sin(angle) * distance);
       const coin: Coin = { el, dx: px - x, dy: py - y, r: (i % 2 ? 1 : -1) * (90 + i * 23), s: .7 + (i % 3) * .15, d: Math.hypot(px - x, py - y) };

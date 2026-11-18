@@ -7,13 +7,17 @@ import { adminHealth } from './health.ts';
 const count = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const time = Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER });
 const day = Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' });
-const activity = { accountsCreated: count, roomMessagesCreated: count, reportSubmissions: count, ordersCreated: count };
+const activity = { accountsCreated: count, roomMessagesCreated: count, reportSubmissions: count, ordersCreated: count, siteViews: count, siteVisitors: count };
+// `*` is the fold for values past the per-day cap.
+const siteTop = Type.Array(strictObject({ value: Type.String({ minLength: 1, maxLength: 100 }), count }), { maxItems: 5 });
 export const adminOverview = strictObject({
   checkedAt: time, timeZone: Type.Literal('Asia/Taipei'), todayStartAt: time, todayEndAt: time,
   totals: strictObject({ accountsPresent: count, activeTeams: count }),
   today: strictObject({ ...activity, ordersConfirmed: count, confirmedVolumes: Type.Array(strictObject({ chainId: chainDeployment.properties.chainId, token: chainAddress, decimals: chainDeployment.properties.decimals, amount })) }),
   // Seven Taipei days, oldest first, including the incomplete current day.
   series: Type.Array(strictObject({ day, ...activity }), { minItems: 7, maxItems: 7 }),
+  // Website pages and entry sources across the same seven days, busiest first.
+  site: strictObject({ pages: siteTop, sources: siteTop }),
   queue: strictObject({ openCases: count, oldestQueuedAt: nullable(time), href: Type.Literal('#/review?status=open') }),
   // Ordinary background jobs with failed attempts awaiting retry; excludes completed or currently leased work.
   jobs: strictObject({ retrying: count, oldestRetryingAt: nullable(time), href: Type.Literal('#/system?status=retrying') }),

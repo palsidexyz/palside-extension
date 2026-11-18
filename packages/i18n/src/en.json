@@ -2017,7 +2017,7 @@
       }
     },
     "policy": {
-      "updated": "Last updated: November 7, 2026",
+      "updated": "Last updated: November 18, 2026",
       "can": {
         "title": "What Palside does",
         "chat": "Encrypts and decrypts squad chat on your device",
@@ -2065,7 +2065,7 @@
       },
       "data": {
         "title": "Data visibility",
-        "note": "End-to-end encryption protects content but does not hide all metadata. Only the screenshot you confirm is uploaded, without the original or cropped areas.",
+        "note": "End-to-end encryption protects content but does not hide all metadata. Only the screenshot you confirm is uploaded, without the original or cropped areas. The website counts anonymous page views per day, without cookies or stored IP addresses, and skips browsers that send Do Not Track.",
         "device": {
           "title": "Your device only",
           "detail": "Recovery phrase, local password and wallet private key; full screenshots and their editing; drafts; the page text index for locating signals."

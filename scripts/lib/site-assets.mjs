@@ -6,12 +6,12 @@ export const assetFolders = [['sites', 'site-logos'], ['chains', 'chain-logos'],
 // Full catalogs are used by the extension and by the website's public squad portraits.
 export const hostAssets = {
   extension: {
-    sites: 'all', chains: 'all', avatars: 'all', brand: ['palside.svg'],
+    sites: 'all', chains: 'all', avatars: 'all', brand: ['palside.svg', 'palside-reverse.svg', 'pals-coin.svg'],
     'team-avatars': 'all', art: ['team.webp'], tokens: ['cashcat.webp', 'pons.webp', 'chump.webp'],
   },
   website: {
     sites: ['gmgn.webp', 'fomo.webp', 'axiom.webp', 'dexscreener.webp', 'bullx.webp', 'birdeye.webp', 'jupiter.webp', 'dextools.webp', 'x.webp', 'coingecko.webp', 'defillama.webp', 'tradingview.webp'],
-    chains: ['robinhood.webp'], avatars: 'all', brand: ['palside.svg'],
+    chains: ['robinhood.webp'], avatars: 'all', brand: ['palside.svg', 'palside-reverse.svg', 'pals-coin.svg'],
     'team-avatars': 'all', art: [], tokens: 'all',
   },
 };

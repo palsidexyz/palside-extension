@@ -1,6 +1,14 @@
 [
   {
     "file": "palside.svg",
-    "source": "Palside brand master: rounded speech bubble"
+    "source": "Palside brand master: white puffy P with eyes on a lime tile"
+  },
+  {
+    "file": "palside-reverse.svg",
+    "source": "Palside reverse mark: lime P on a dark tile, for lime backgrounds and very small sizes"
+  },
+  {
+    "file": "pals-coin.svg",
+    "source": "PALS token coin: the brand master cropped to a circle"
   }
 ]

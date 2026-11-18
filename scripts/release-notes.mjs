@@ -1,27 +1,49 @@
 /**
- * Prints the GitHub release notes for a tag: its CHANGELOG.md section followed by how to verify the package.
+ * Prints the GitHub release notes for a tag: its CHANGELOG.md section (English and Chinese
+ * mirrored), the requirement and compare link, then how to verify the package.
  *
  * Usage: node scripts/release-notes.mjs <tag> <commit>
  */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+const REPOSITORY = 'palsidexyz/palside-extension';
+const HEADINGS = ["### What's new", '### 更新内容'];
+
 export function releaseNotes(changelog, tag, commit) {
   const sections = changelog.split(/^## /m).slice(1);
-  const section = sections.find(text => text.split('\n', 1)[0].trim() === tag);
-  if (!section) throw new Error(`CHANGELOG.md has no "## ${tag}" section`);
+  const titles = sections.map(text => text.split('\n', 1)[0].trim());
+  const index = titles.indexOf(tag);
+  if (index < 0) throw new Error(`CHANGELOG.md has no "## ${tag}" section`);
+  const body = sections[index].slice(sections[index].indexOf('\n') + 1).trim();
+  for (const heading of HEADINGS) {
+    if (!body.split('\n').includes(heading)) throw new Error(`CHANGELOG.md section ${tag} needs a "${heading}" heading`);
+  }
   const version = tag.replace(/^v/, '');
-  return `${section.slice(section.indexOf('\n') + 1).trim()}
+  const previous = titles[index + 1];
+  const footer = ['**Requires** desktop Chrome 130 or later · 需要桌面版 Chrome 130 或更高版本'];
+  if (previous) footer.push(`**Full Changelog**: https://github.com/${REPOSITORY}/compare/${previous}...${tag}`);
+  return `${body}
 
-### Verify this package · 校验安装包
+---
+
+${footer.join('\\\n')}
+
+<details>
+<summary>Verify this package · 校验安装包</summary>
 
 \`palside-${version}-chrome.zip\` is the exact package submitted to the Chrome Web Store, built by GitHub Actions from commit ${commit}.
 
 \`\`\`sh
-gh attestation verify palside-${version}-chrome.zip --repo palsidexyz/palside-extension
+# 1. Build provenance
+gh attestation verify palside-${version}-chrome.zip --repo ${REPOSITORY}
+
+# 2. File checksums
 mkdir palside && unzip -q palside-${version}-chrome.zip -d palside && cd palside
 grep -v chrome.zip ../SHA256SUMS.txt | shasum -a 256 -c
 \`\`\`
+
+</details>
 `;
 }
 
